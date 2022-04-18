@@ -1,0 +1,13 @@
+*~
+/apps/test/Debug/
+/apps/test/build/
+/apps/test/cmake_install.cmake
+/apps/test/daserpent.build/
+*.xcodeproj/
+/apps/test/serpent/
+/apps/test/srp.log
+/apps/test/version.srp
+CMakeCache.txt
+CMakeFiles/
+CmakeScripts/
+.DS_Store/
