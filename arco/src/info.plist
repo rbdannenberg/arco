@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>CFBundleDevelopmentRegion</key>
+      <string>English</string>
+    <key>CFBundleName</key>
+      <string>arco3</string>
+    <key>NSMicrophoneUsageDescription</key>
+      <string>Apple macOS will only enable audio input with your
+        permission. Without permission, this application
+        will either crash or the audio input will be
+        complete silence (zero) regardless of the actual
+        input.</string>
+    <key>CFBundleIdentifier</key>
+      <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+    <key>NSCameraUsageDescription</key>
+      <string>Apple macOS will only enable camera input with your
+        permission. If you see this message, ask yourself if this
+        application should be accessing the camera.</string>
+  </dict>
+</plist>

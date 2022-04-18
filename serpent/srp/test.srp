@@ -1,0 +1,65 @@
+# arco.srp -- Serpent library for controlling Arco
+#
+# Roger B. Dannenberg
+# Jan 2022
+
+# call arco_init(ensemble) to start
+# call arco_run() after setting up UI and or scheduling things
+# arco_ready is set to true when arco is ready for action
+
+require "arco"
+
+class Atone (Instrument):
+    def init(freq, dur, nharm):
+        instr_begin()
+        var env = member(pwlb(dur * 0.2, 1, dur * 0.8), 'env')
+        env.atend(MUTE, this)
+        var mix = mix(1)
+        for i = 1 to nharm:
+            mix.ins(sine(freq * i, 0.8 ** i), env)
+        super.init("Atone", mix)
+
+    def start():
+        get('env').start()
+        this
+
+
+def arco_ready():
+    # called when arco is intialized and ready to make sound
+    print "**** arco ready! starting to play ... ****"
+    if false:  // simple test
+        sine(440.0, 0.1).play()
+        sine(880.0, 0.1).play()
+        sine(1320.0, 0.07).play()
+        sine(1760.0, 0.05).play()
+    
+    if false: // mixer test
+        m1 = mix(1)
+        m1.ins(sine(440.0, 0.1), 1)
+        m1.ins(sine(880.0, 0.1), 1)
+        m1.ins(sine(1320.0, 0.07), 1)
+        m1.ins(sine(1760.0, 0.05), 1)
+        m1.play()
+
+    if true: // Atone instrument test
+        atone_sequence()
+        
+def atone_sequence():
+    var step = 40 + irandom(40)
+    var freq = 440.0 * (2.0 ** (1/12)) ** (step - 69)
+    var dur = random()
+    dur = dur * dur * 10 + 0.05
+    var nharm = irandom(15) + 2
+    display "atone_sequence", freq, dur, nharm
+    var atone = Atone(freq, dur, nharm).play().start()
+    // sched_cause(dur + 0.2, atone, 'mute')
+    var ioi = random()
+    ioi = ioi * ioi * 2 + 0.05
+    sched_cause(ioi, nil, 'atone_sequence')
+
+
+def main():
+    arco_init(network = false)
+    arco_run()
+
+main()

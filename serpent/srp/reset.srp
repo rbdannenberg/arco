@@ -1,0 +1,24 @@
+# arco.srp -- Serpent library for controlling Arco
+#
+# Roger B. Dannenberg
+# Jan 2022
+
+# call arco_init(ensemble) to start
+# call arco_run() after setting up UI and or scheduling things
+# arco_ready is set to true when arco is ready for action
+
+require "arco"
+
+def arco_ready():
+    # called when arco is intialized and ready to make sound
+    print "**** arco ready! starting to play ... ****"
+    set_arco_state('resetting')  // need to avoid restarting audio
+    o2_send_cmd("/arco/reset", 0, "s", "actl")
+    print "**** arco/reset message sent ****"
+
+
+def main():
+    arco_init(network = false)
+    arco_run()
+
+main()

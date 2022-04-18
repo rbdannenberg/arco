@@ -1,0 +1,202 @@
+# arco4 incorporated with serpent into a custom application
+# Roger B. Dannenberg
+# Feb 2022
+
+# This is based on serpent/64bit/CMakeLists.txt
+
+# Structure of the CMake system:
+# 
+# arco4.cmakeinclude
+#     arco4/CMakeLists.txt -- arco sources for arco library
+#     ../serpent/src/serpent.cmakeinclude -- common serpent code,
+#              defines options like USE_OSC
+#     ../serpent/src/source-lists.cmakeinclude -- sets variables 
+#              to all the necessary serpent source code,
+#     ../serpent/64bit/src/CMakeLists.txt
+#     ../serpent/wxs/wxs.cmakeinclude -- make the application
+
+cmake_minimum_required(VERSION 3.21)
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+message(STATUS CMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR} " "
+               CMAKE_CURRENT_LIST_DIR=${CMAKE_CURRENT_LIST_DIR})
+# "FRIENDS" is where to find dependent software: o2, serpent, liblo, portaudio,
+#  etc.  We are in arco4/serpent, so go up two levels:
+get_filename_component(FRIENDS ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
+get_filename_component(FRIENDS ${FRIENDS} DIRECTORY)
+
+set(SERPENT_BASE_DIR ${FRIENDS}/serpent)
+get_filename_component(SERPENT_BASE_DIR ${SERPENT_BASE_DIR} REALPATH)
+message(STATUS SERPENT_BASE_DIR=${SERPENT_BASE_DIR})
+include(${SERPENT_BASE_DIR}/src/serpent.cmakeinclude)
+
+set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "only build forx86_64" FORCE)
+
+
+set(COMMON_LIBRARIES srplib ${LO_LIB} 
+                     ${EXTRA_NEEDED_LIBS}
+                     CACHE INTERNAL " " FORCE)
+
+# since libraries depend on the USE_STATIC_LIBS option, clear the libraries
+#  from the cache
+# portmidi is handled by serpent
+set(SNDFILE_LIB SNDFILE_LIB-NOTFOUND)
+set(OGG_LIB OGG_LIB-NOTFOUND) 
+set(FLAC_LIB FLAC_LIB-NOTFOUND)
+set(VORBIS_LIB VORBIS_LIB-NOTFOUND)
+set(VORBISENC_LIB VORBISENC_LIB-NOTFOUND) 
+
+if(USE_STATIC_LIBS)
+  message(STATUS "** Searching for static libs FRIENDS ${FRIENDS}")
+
+  # searches are in pairs - first look locally, then look for defaults
+
+  find_library(PORTAUDIO_LIB portaudio_s PATHS ${FRIENDS}/portaudio/lib
+                             NO_DEFAULT_PATH)
+  # if we found the library locally, use local installation as include 
+  #   path: go up two directory levels from _LIB and then down to /include:
+  if(NOT (PORTAUDIO_LIB STREQUAL "PORTAUDIO_LIB-NOTFOUND")) 
+    get_filename_component(PORTAUDIO_INCLUDES ${PORTAUDIO_LIB} DIRECTORY) 
+    get_filename_component(PORTAUDIO_INCLUDES ${PORTAUDIO_INCLUDES} DIRECTORY) 
+    set(PORTAUDIO_INCLUDES "${PORTAUDIO_INCLUDES}/include") 
+    message(STATUS "found local portaudio_s, include path 
+                   ${PORTAUDIO_INCLUDES}")
+  else(NOT (PORTAUDIO_LIB STREQUAL "PORTAUDIO_LIB-NOTFOUND"))
+    # check if it is in Nyquist
+    find_library(PORTAUDIO_LIB portaudio_static portaudio_s PATHS 
+        ${FRIENDS}/nyquist PATH_SUFFIXES Release Debug NO_DEFAULT_PATH)
+    if(NOT (PORTAUDIO_LIB STREQUAL "PORTAUDIO_LIB-NOTFOUND")) 
+      get_filename_component(PORTAUDIO_INCLUDES ${PORTAUDIO_LIB} DIRECTORY) 
+      get_filename_component(PORTAUDIO_INCLUDES ${PORTAUDIO_INCLUDES} 
+                                                DIRECTORY) 
+      set(PORTAUDIO_INCLUDES "${PORTAUDIO_INCLUDES}/portaudio/include") 
+      message(STATUS "found local static portaudio, include path 
+        ${PORTAUDIO_INCLUDES}")
+    endif(NOT (PORTAUDIO_LIB STREQUAL "PORTAUDIO_LIB-NOTFOUND"))
+    find_library(PORTAUDIO_LIB portaudio_s)
+  endif(NOT (PORTAUDIO_LIB STREQUAL "PORTAUDIO_LIB-NOTFOUND")) 
+
+
+  find_library(SNDFILE_LIB sndfile_s PATHS ${FRIENDS}/libsndfile/src/.libs
+                           NO_DEFAULT_PATH)
+  # if we found the library locally, use local installation as include 
+  #   path: go up two directory levels from _LIB:
+  if(NOT (${SNDFILE_LIB} STREQUAL "SNDFILE_LIB-NOTFOUND")) 
+    get_filename_component(SNDFILE_INCLUDES ${SNDFILE_LIB} DIRECTORY) 
+    get_filename_component(SNDFILE_INCLUDES ${SNDFILE_INCLUDES} DIRECTORY) 
+    set(SNDFILE_INCLUDES "${SNDFILE_INCLUDES}") 
+    message(STATUS "found local sndfile_s, include path ${SNDFILE_INCLUDES}") 
+  else(NOT (${SNDFILE_LIB} STREQUAL "SNDFILE_LIB-NOTFOUND"))
+    # check if it is in Nyquist
+    find_library(SNDFILE_LIB sndfile_static sndfile_s PATHS 
+        ${FRIENDS}/nyquist PATH_SUFFIXES Release Debug NO_DEFAULT_PATH)
+    if(NOT (SNDFILE_LIB STREQUAL "SNDFILE_LIB-NOTFOUND")) 
+      get_filename_component(SNDFILE_INCLUDES ${SNDFILE_LIB} DIRECTORY) 
+      get_filename_component(SNDFILE_INCLUDES ${SNDFILE_INCLUDES} 
+                                                DIRECTORY) 
+      set(SNDFILE_INCLUDES "${SNDFILE_INCLUDES}/nylsf/include") 
+      message(STATUS "found local static sndfile, include path 
+        ${SNDFILE_INCLUDES}")
+    endif(NOT (SNDFILE_LIB STREQUAL "SNDFILE_LIB-NOTFOUND"))
+    find_library(SNDFILE_LIB sndfile_s)
+  endif(NOT (${SNDFILE_LIB} STREQUAL "SNDFILE_LIB-NOTFOUND"))
+
+  # libsndfile also uses libogg and libvorbis. For these, we don't need
+  #   the include path because they are accessed only indirectly through 
+  #   libsndfile
+  find_library(OGG_LIB libogg.a PATHS ${FRIENDS}/ogg/src/.libs NO_DEFAULT_PATH)
+  find_library(OGG_LIB libogg.a PATHS ${FRIENDS}/ogg/src/.libs)
+  message(STATUS "OGG_LIB is ${OGG_LIB}")
+  
+  find_library(FLAC_LIB FLAC-static PATHS ${FRIENDS}/flac/src/libFLAC/.libs
+                        NO_DEFAULT_PATH)
+  find_library(FLAC_LIB flac_static FLAC-static
+                        PATHS "${FRIENDS}/nyquist"
+                        PATH_SUFFIXES Release Debug NO_DEFAULT_PATH)
+  find_library(FLAC_LIB FLAC-static)
+  message(STATUS "FLAC_LIB is ${FLAC_LIB}")
+
+  find_library(VORBIS_LIB libvorbis.a PATHS ${FRIENDS}/vorbis/lib/.libs
+                          NO_DEFAULT_PATH)
+  find_library(VORBIS_LIB libvorbis.a PATHS ${FRIENDS}/vorbis/lib/.libs) 
+
+  find_library(VORBISENC_LIB libvorbisenc.a PATHS ${FRIENDS}/vorbis/lib/.libs
+                             NO_DEFAULT_PATH)
+  find_library(VORBISENC_LIB libvorbisenc.a PATHS ${FRIENDS}/vorbis/lib/.libs) 
+
+  message(STATUS "VORBIS_LIB is ${VORBIS_LIB}, VORBISENC_LIB is ${VORBISENC_LIB}")
+
+  set(SNDFILE_LIBS ${SNDFILE_LIB} ${OGG_LIB} ${FLAC_LIB} ${VORBIS_LIB}
+                   ${VORBISENC_LIB})
+else(USE_STATIC_LIBS)
+  find_library(PORTAUDIO_LIB portaudio PATHS /usr/local/lib
+                             ${FRIENDS}/portaudio/lib)
+  find_library(SNDFILE_LIB sndfile PATHS
+                           /usr/local/lib ${FRIENDS}/libsndfile/src/.libs)
+  set(SNDFILE_LIBS ${SNDFILE_LIB})
+endif(USE_STATIC_LIBS)
+
+message(STATUS "PORTAUDIO_LIB ${PORTAUDIO_LIB} SNDFILE_LIBS ${SNDFILE_LIBS}")
+
+# add aura4/src -- builds audio and aura libraries
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)
+
+set(EXTENSION_INCLUDES ${ARCO_INCLUDES})
+add_subdirectory(${SERPENT_BASE_DIR}/64bit/src 
+                 ${CMAKE_CURRENT_BINARY_DIR}/serpent)
+
+# include_directories(${SERPENT_BASE_DIR}/64bit/src)
+message(STATUS "source is " ${SERPENT_EXTRAS_FULL})
+
+# set parameters to customize daserpent
+set(WXSERPENT_TARGET ${ARCO_TARGET_NAME})
+message(STATUS "target name is ${WXSERPENT_TARGET}")
+
+set(SRPLIB_PATH ${SERPENT_BASE_DIR}/64bit/src)
+
+list(APPEND CUSTOM_WXS_SRC ${ARCO4_SRC} ${ARCO4_APP_SRC}
+                           ${SERPENT_BASE_DIR}/wxs/wxspoll.cpp
+                           ${SERPENT_BASE_DIR}/wxs/wxspoll.h
+                           ${SERPENT_BASE_DIR}/wxs/serpinit.cpp
+                           ${SERPENT_BASE_DIR}/wxs/serpinit.h
+                           ${CMAKE_CURRENT_LIST_DIR}/src/arco4_init.cpp
+                           ${CMAKE_CURRENT_LIST_DIR}/src/arco4_init.h
+                           ${CMAKE_CURRENT_LIST_DIR}/src/sarco.cpp)
+message(STATUS "CUSTOM_WXS_SRC ${CUSTOM_WXS_SRC}")
+
+set(EXTENSION_INCLUDES ${ARCO_INCLUDE_DIRECTORIES}
+                       ${ARCO_APP_INCLUDE_DIRECTORIES})
+
+set(WXSLIBRARIES_DIRECTORIES ${ARCO_LINK_DIRECTORIES} ${ARCO_APP_LINK_DIRECTORIES})
+
+#set(WXSLIBRARIES "-force_load" arco4 ${AUDIO_UNIT_FRAMEWORK})
+set(WXSLIBRARIES  ${ARCO_LINK_LIBRARIES} ${ARCO_APP_LINK_LIBRARIES})
+
+set(EXTENSION_DEFINITIONS ${ARCO_DEFINITIONS})
+
+# create the executable
+include(${SERPENT_BASE_DIR}/wxs/wxs.cmakeinclude)
+
+# this does not seem to work  
+#target_link_options(${ARCO_TARGET_NAME} PRIVATE LINKER:-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_SOURCE_DIR}/src/info.plist)
+ 
+
+# replace the serpent Info.plist information with Arco information
+# first change will get the version into the compiler command line:
+SET(SERPENT_VERSION "s${SERPENT_VERSION}-a1") # really it's arco version
+# next change will get the version into Info.plist:
+SET(MACOSX_BUNDLE_BUNDLE_VERSION ${SERPENT_VERSION})
+SET(MACOSX_BUNDLE_BUNDLE_NAME "${WXSERPENT_TARGET}_launch")
+# where to find Aura's Info.plist template MacOSXBundleInfo.plist.in
+SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+
+# This copies info.plist to the target directory so you can read input 
+#add_custom_command(
+#    TARGET ${ARCO_TARGET_NAME} POST_BUILD 
+#    COMMAND ${CMAKE_COMMAND} -E copy "src/info.plist"
+#                      "${CMAKE_BINARY_DIR}/$<CONFIG>"
+#    COMMENT "Copying info.plist to build directory"
+#) 
+

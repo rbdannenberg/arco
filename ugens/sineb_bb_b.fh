@@ -1,0 +1,161 @@
+/* ------------------------------------------------------------
+author: "RBD"
+name: "sineb"
+version: "1.0"
+Code generated with Faust 2.37.3 (https://faust.grame.fr)
+Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
+------------------------------------------------------------ */
+
+#ifndef  __Sineb_H__
+#define  __Sineb_H__
+
+#ifndef FAUSTFLOAT
+#define FAUSTFLOAT float
+#endif 
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <math.h>
+
+static float ftbl0SinebSIG0[65536];
+
+#ifndef FAUSTCLASS 
+#define FAUSTCLASS Sineb
+#endif
+
+#ifdef __APPLE__ 
+#define exp10f __exp10f
+#define exp10 __exp10
+#endif
+
+#if defined(_WIN32)
+#define RESTRICT __restrict
+#else
+#define RESTRICT __restrict__
+#endif
+
+#define FAUST_INT_CONTROLS 0
+#define FAUST_REAL_CONTROLS 2
+
+class Sineb : public one_sample_dsp {
+	
+ private:
+	
+	FAUSTFLOAT fEntry0;
+	int fSampleRate;
+	float fConst0;
+	FAUSTFLOAT fEntry1;
+	float fRec1[2];
+	int iVec0[2];
+	int iRec0[2];
+	
+ public:
+	
+	void metadata(Meta* m) { 
+		m->declare("author", "RBD");
+		m->declare("basics.lib/name", "Faust Basic Element Library");
+		m->declare("basics.lib/version", "0.2");
+		m->declare("compile_options", "-lang cpp -os0 -light -es 1 -single -ftz 0");
+		m->declare("description", "Sine Unit Generator for Arco");
+		m->declare("filename", "sineb_bb_b.dsp");
+		m->declare("maths.lib/author", "GRAME");
+		m->declare("maths.lib/copyright", "GRAME");
+		m->declare("maths.lib/license", "LGPL with exception");
+		m->declare("maths.lib/name", "Faust Math Library");
+		m->declare("maths.lib/version", "2.5");
+		m->declare("name", "sineb");
+		m->declare("oscillators.lib/name", "Faust Oscillator Library");
+		m->declare("oscillators.lib/version", "0.1");
+		m->declare("platform.lib/name", "Generic Platform Library");
+		m->declare("platform.lib/version", "0.2");
+		m->declare("version", "1.0");
+	}
+
+	Sineb() {}
+	Sineb(int* icontrol, FAUSTFLOAT* fcontrol):one_sample_dsp(icontrol, fcontrol) {}
+	
+	virtual int getNumInputs() {
+		return 0;
+	}
+	virtual int getNumOutputs() {
+		return 1;
+	}
+	
+	static void classInit(int sample_rate) {}
+
+	void staticInit(int sample_rate) {
+		for (int l0_re0 = 0; (l0_re0 < 2); l0_re0 = (l0_re0 + 1)) {
+			iVec0[l0_re0] = 0;
+		}
+		for (int l1_re0 = 0; (l1_re0 < 2); l1_re0 = (l1_re0 + 1)) {
+			iRec0[l1_re0] = 0;
+		}
+		for (int i1_re0 = 0; (i1_re0 < 65536); i1_re0 = (i1_re0 + 1)) {
+			iVec0[0] = 1;
+			iRec0[0] = ((iVec0[1] + iRec0[1]) % 65536);
+			ftbl0SinebSIG0[i1_re0] = std::sin((9.58738019e-05f * float(iRec0[0])));
+			iVec0[1] = iVec0[0];
+			iRec0[1] = iRec0[0];
+		}
+	}
+	
+	virtual void instanceConstants(int sample_rate) {
+		fSampleRate = sample_rate;
+		fConst0 = (1.0f / std::min<float>(192000.0f, std::max<float>(1.0f, float(fSampleRate))));
+	}
+	
+	virtual void instanceResetUserInterface() {
+		fEntry0 = FAUSTFLOAT(0.10000000000000001f);
+		fEntry1 = FAUSTFLOAT(440.0f);
+	}
+	
+	virtual void instanceClear() {
+		for (int l2 = 0; (l2 < 2); l2 = (l2 + 1)) {
+			fRec1[l2] = 0.0f;
+		}
+	}
+	
+	virtual void init(int sample_rate) {
+		instanceInit(sample_rate);
+	}
+	
+	virtual void instanceInit(int sample_rate) {
+		staticInit(sample_rate);
+		instanceConstants(sample_rate);
+		instanceResetUserInterface();
+		instanceClear();
+	}
+	
+	virtual Sineb* clone() {
+		return new Sineb();
+	}
+	
+	virtual int getSampleRate() {
+		return fSampleRate;
+	}
+	
+	virtual void buildUserInterface(UI* ui_interface) {
+		ui_interface->openVerticalBox("sineb");
+		ui_interface->addNumEntry("amp", &fEntry0, FAUSTFLOAT(0.100000001f), FAUSTFLOAT(0.0f), FAUSTFLOAT(1.0f), FAUSTFLOAT(0.00999999978f));
+		ui_interface->addNumEntry("freq", &fEntry1, FAUSTFLOAT(440.0f), FAUSTFLOAT(1.0f), FAUSTFLOAT(10000.0f), FAUSTFLOAT(1.0f));
+		ui_interface->closeBox();
+	}
+	
+	virtual void control(int* RESTRICT iControl, FAUSTFLOAT* RESTRICT fControl) {
+		fControl[0] = float(fEntry0);
+		fControl[1] = (fConst0 * float(fEntry1));
+	}
+
+	virtual int getNumIntControls() { return 0; }
+	virtual int getNumRealControls() { return 2; }
+	
+	virtual void compute(FAUSTFLOAT* RESTRICT inputs, FAUSTFLOAT* RESTRICT outputs, int* RESTRICT iControl, FAUSTFLOAT* RESTRICT fControl) {
+		fRec1[0] = (fControl[1] + (fRec1[1] - std::floor((fControl[1] + fRec1[1]))));
+		outputs[0] = FAUSTFLOAT((fControl[0] * ftbl0SinebSIG0[int((65536.0f * fRec1[0]))]));
+		fRec1[1] = fRec1[0];
+	}
+
+};
+
+#endif

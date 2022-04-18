@@ -1,0 +1,575 @@
+# arco.srp -- Serpent library for controlling Arco
+#
+# Roger B. Dannenberg
+# Jan 2022
+
+# call arco_init(ensemble) to start
+# call arco_run() after setting up UI and or scheduling things
+# arco_ready is set to true when arco is ready for action
+
+require "debug"
+require "sched"
+require "o2util"
+require "utils"
+
+AR = 44100.0  // audio rate
+AP = 1 / AR // audio sample period
+BL = 32
+BL_RECIP = 1 / BL
+BR = AR / BL
+BP = 1 / BR
+
+# states:
+#    nil - initial value and after reset completes
+#    'discovery' - looking for "arco" service
+#    'initializing' - resetting the server
+#    'opening' - opening audio device(s)
+#    'running' - audio server is running
+#    'resetting' - shutting down audio server
+#
+arco_state = nil
+def set_arco_state(state): 
+    display "arco_state change", state
+    arco_state = state
+
+
+// atend types for Mix.ins():
+SIGNAL = 'signal'
+GAIN = 'gain'
+BOTH = 'both'
+// atend types for Pwlb.atend():
+MUTE = 'mute'
+
+
+ZERO_ID = 0
+ZEROB_ID = 1
+INPUT_ID = 2
+PREV_OUTPUT_ID = 3
+
+// shadow the sets of Ugens maintained by audio server:
+aud_output_set = []
+aud_run_set = []
+
+// manage action callbacks
+next_action_id = 1
+action_dict = {}
+
+def create_action(ugen, object, method, rest parameters):
+    var action_list
+    var action = [object, method, parameters]
+    if ugen.action_id:
+        action_list = action_dict.get(ugen.action_id)
+        if not action_list:
+            print "ERROR: create_action - action_id not found in action_dict",
+            print ugen.action_id
+        action_list.append(action)
+    else:
+        action_dict[next_action_id] = [action]
+        ugen.action_id = next_action_id
+        o2_send_cmd("/arco/" + tolower(ugen.classname) + "/act", 0, "ii",
+                    ugen.id, next_action_id)
+        next_action_id = next_action_id + 1
+    print "create_action for ugen", ugen.id, "action", ugen.action_id
+
+
+def actl_act(timestamp, address, types, rest parameters):
+    display "actl_act", types, parameters
+    action_list = action_dict.get(parameters[0])
+    if not action_list:
+        print "ERROR: actl_act - action_id not found in action_dict",
+        print parameters[0]
+        return
+    for action in action_list:
+        general_apply(action[0], action[1], action[2])
+
+
+def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t):
+    arco_input_chans = ins
+    arco_output_chans = outs
+    sched_init()
+    o2_network_enable(network)
+    o2_initialize(ensemble, t)
+    arco3_initialize()  // create audio shared memory interface
+    // o2_debug_flags("s")
+    o2_service_new("actl")
+    o2_method_new("/actl/act", "i", 'actl_act', t)
+    o2_method_new("/actl/starting", "", 'actl_starting', t)
+    o2_method_new("/actl/reset", "", 'actl_reset', t)
+    sched_select(rtsched)
+    set_arco_state('discovery')
+    sched_cause(0.1, nil, 'poll_for_arco')
+
+def arco_run():
+    sched_poll_function = 'arco_thread_poll'
+    sched_o2_enabled = true
+    if getfeatures() & OPTION_WXS == 0:
+        sched_run()
+
+
+# internal function: set up basics after connection established
+#
+def arco_initialization():
+    print "**** discovered arco service. initialization starting ****"
+    set_arco_state('initializing')
+    o2_send_cmd("/arco/reset", 0, "s", "actl")  // pass in this service name
+    // actl_reset()  // TEMP PATCH
+    
+def actl_reset(rest ignore):
+    # don't intialize anything if we are cleanly shutting down
+    if arco_state == 'resetting':
+        set_arco_state(nil)
+        return
+    print "**** arco was reset, starting initialization ****"
+    Ugen(ZERO_ID, "Zero", -1, 'a')
+    o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID)
+    // print "sent /arco/zero/new, id", ZERO_ID
+    zero().refcount = 1 << 48  // big number, within Serpent's max
+
+    Ugen(ZEROB_ID, "Zerob", -1, 'b')
+    o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID)
+    // print "sent /arco/zerob/new, id", ZEROB_ID
+    zerob().refcount = 1 << 48
+
+    Ugen(INPUT_ID, "Thru", arco_input_chans, 'a', 'input', zero())
+    Ugen(PREV_OUTPUT_ID, "Thru", arco_output_chans, 'a', 'input', zero())
+
+    set_arco_state('opening')
+    o2_send_cmd("/arco/devinf", 0, "s", "/host/openaggr")
+
+
+# internal function: wait for arco service, then run
+# arco_initialization
+#
+def poll_for_arco():
+    print "poll for arco"
+    if o2_status("arco") < O2_LOCAL:
+        sched_cause(1.0, nil, 'poll_for_arco')
+    else:
+        arco_initialization()
+
+
+# this is an O2 message handler for message sent by audio thread
+# when the audio stream is started:
+#
+def actl_starting(rest ignore):
+    set_arco_state('running')
+    arco_ready()
+
+
+# free ID management:
+free_nesting = 0  // recursion depth in Ugen free method
+to_be_freed = []  // list of id's to free
+ugen_table = array(1000)
+id_free_list = nil  // location of linked free list head in ugen_table
+next_free_id = 4
+def new_id():
+    if id_free_list:
+        var id = id_free_list
+        id_free_list = ugen_table[id]
+        ugen_table[id] = nil
+        return id
+    if next_free_id < len(ugen_table):
+        id = next_free_id
+        next_free_id = next_free_id + 1
+        return id
+    print "ERROR: no more free Unit Generator ID's"
+    return nil
+
+
+class Ugen:
+    var id  // index in the ugen_table
+    var refcount  // reference count, mirrors Arco Ugen
+    var classname  // name of Arco Unit Generator Class
+    var chans // output channels
+    var rate // output rate: 'a' or 'b'
+    var inputs  // dictionary of inputs
+
+    # init installs Ugen in table if id is not nil.  If id is nil,
+    # chans should be -1 (to suppress /arco/*/new message -- see below).
+    # If the Ugen has inputs, they are listed in inputs_ in order
+    # as param_symbol, param_value, param_symbol, param_value, ...
+    # Even though provided as an array so that we can get the order
+    # right when we send the /arco/*/new message, the inputs_ are
+    # retained in dictionary form for quick lookup in the set() method.
+    # special hack: if chans_ is negative, we do not send a new 
+    #    message so that caller can issue a special message, and
+    #    we IGNORE inputs_
+    def init(id_, classname_, chans_, rate_, rest inputs_):
+        id = id_
+        classname = classname_
+        chans = abs(chans_)
+        rate = rate_
+        inputs = {}  // mapping from input name (symbol) to a ugen
+        if id:  // Instruments pass id=nil and get the id from their output
+            if ugen_table[id]:
+                print "ERROR: Ugen init got id", id, "that is already in use."
+                display "     ", ugen_table[id]
+                id = new_id()
+                print "    Allocating a new one:", id
+            ugen_table[id] = this
+        refcount = 0
+        if chans_ >= 0:
+            // calling const() if needed will send a message, so
+            // we coerce all numbers to const() BEFORE constructing
+            // the /arco/*/new message:
+            for i = 1 to len(inputs_) by 2:
+                if isnumber(inputs_[i]):
+                    inputs_[i] = const(inputs_[i])
+            o2_send_start()  // build and send new method
+            o2_add_int32(id)
+            o2_add_int32(chans)
+            // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
+            for i = 0 to len(inputs_) by 2:
+                var inp = inputs_[i + 1]
+                o2_add_int32(inp.id)
+                // print inputs_[i], inp.id,
+                inputs[inputs_[i]] = inp  // build dictionary of inputs
+                inp.ref()
+            o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
+            // print
+
+    def free():
+        free_nesting = free_nesting + 1
+        if id:
+            to_be_freed.append(id)
+            aud_run_set.remove(this)     // in case it is being run
+            aud_output_set.remove(this)  // or output
+            ugen_table[id] = id_free_list
+            id_free_list = id
+            unref_inputs()
+            id = nil
+        free_nesting = free_nesting - 1
+        if free_nesting == 0:
+            // print "sent /arco/free",
+            o2_send_start()
+            for i in to_be_freed:
+                o2_add_int32(i)
+                // print i,
+            o2_send_finish(0, "/arco/free", true)
+            // print
+            to_be_freed.clear()
+        nil
+
+    # unref the inputs to this unit generator. This may be overridden
+    #     e.g., see Mix, which stores named inputs in pairs
+    def unref_inputs():
+        for inp in inputs.values():
+            inp.unref()
+
+
+    def ref():
+        refcount = refcount + 1
+        this
+
+
+    def unref():
+        refcount = refcount - 1
+        if refcount == 0:
+            free()
+        elif refcount < 0:
+            display "ERROR:", refcount, id, classname
+        nil
+
+
+    def play():
+        if id:
+            aud_output_set.append(this)
+            ref()
+            display "play", id
+            o2_send_cmd("/arco/output", 0, "i", id)
+        else:
+            print "ERROR: cannot play()", classname, "after it is freed"
+            return nil
+        this
+
+
+    def mute():
+        if id:
+            display "Ugen mute", id
+            aud_output_set.remove(this)
+            o2_send_cmd("/arco/mute", 0, "i", id)
+            unref()
+        // if you mute something twice, we ignore the redundancy
+        this
+
+
+    def get(ugen_name):
+        inputs[ugen_name]
+
+
+    def set(input, value, optional chan = 0):
+        var previous = inputs.get(input)
+        if not previous:
+            print "ERROR:", input, "not found in", classname
+            return
+        if isnumber(value):
+            if previous.rate == 'c':  // set the output of existing Const object
+                if chan >= previous.chans:
+                    print "ERROR: const", input, "of", classname, "has",
+                    print previous.chans, "channels but attempt to set channel",
+                    print chan
+                    return
+                o2_send_cmd("/arco/" + tolower(classname) + "/set_" + input,
+                            0, "iif", id, chan, value)
+                return
+            // otherwise, make a Const object to hold the value
+            value = const(value)  // replacing 'a' or 'b' with 'c'
+        // value is a Ugen which is the new input value
+        value.ref()
+        inputs[input] = value
+        o2_send_cmd("/arco/" + tolower(classname) + "/repl_" + input,
+                    0, "ii", id, value.id)
+        previous.unref()  // release whatever was there before
+        this
+
+
+    def atend(action, optional arg):
+        if action == MUTE:
+            create_action(this, arg, action)
+        else:
+            print "ERROR: Ugen atend - unknown action", repr(action)
+
+
+instr_stack = []
+def instr_begin():
+    instr_stack.append({})
+
+# After instr_begin(), you can define setable parameters in the Instrument
+# you are building by calling param. A "setable parameter" associates a
+# name to a particular ugen input as if the Instrument itself has that input.
+# E.g., if you use an oscillator in the construction of an Instrument and 
+# want the Instrument to have a setable parameter named 'myfreq' that
+# controls the oscillator frequency, then between instr_begin() and 
+# Instrument's init method, call param(oscillator, 'freq', 'myfreq').
+# Then you can call instrument.set('myfreq', 440).
+#
+# Important: the setable parameter connects to a specific unit generator.
+# If that unit generator is replaced in the Instrument graph, then setting
+# the parameter may not have any effect. The assumption is that the
+# Instrument graph is fixed.
+#
+# Parameters:
+#     ugen - the Ugen or Instrument to be controlled
+#     input - the symbol name of the ugen input to be controlled
+#     name - the setable parameter name (defaults to input)
+#
+def param(ugen, input, optional name):
+    if not name: name = input
+    var context = instr_stack.last()
+    var ugen_input = context.get(name)
+    if ugen_input:
+        print "ERROR: in param,", name, "is already defined."
+        return
+    // if ugen, input are abstractions, drill down to the actual ugen
+    while issubclass(ugen, Instrument):
+        ugen_input = ugen.parameter_bindings[input]
+        ugen = ugen_input[0]
+        input = ugen_input[1]
+    context[name] = [ugen, input]
+
+
+# After instr_begin(), you can define a named "member" of the Instrument
+# You can access members by name, usually to send them an update, e.g.
+#    member(pwl(...), 'env')
+#    myinstr = Instrument(...)
+#    myinstr.get('env').start()
+# The ugen parameter can be an Instrument, in which case the "member"
+# is the instrument object, not the Ugen serving as the Instrument output.
+#
+def member(ugen, name):
+    var context = instr_stack.last()
+    context[name] = ugen
+
+
+class Instrument (Ugen):
+    var parameter_bindings
+    var output
+
+
+    def init(name, ugen):
+        // pass -ugen.chans to suppress /arco/*/new message
+        super.init(nil, name, -ugen.chans, ugen.rate)
+        output = ugen
+        output.ref()
+        id = output.id
+        parameter_bindings = instr_stack.unappend()
+        for param in parameter_bindings.values():
+            param[0].ref() if isarray(param) else param.ref()
+
+
+    def get(input):
+        parameter_bindings[input]
+
+
+    def set(input, value, optional chan = 0):
+        var ugen_input = parameter_bindings[input]
+        var ugen = ugen_input[0]
+        input = ugen_input[1]
+        ugen.set(input, value, chan)
+
+
+    def free():  // params are param ([ugen, name]) or member (ugen)
+        display "Instrument free", id, classname
+        for param in parameter_bindings.values():
+            param[0].unref() if isarray(param) else param.unref()
+        output.unref()
+        
+
+def zero(): ugen_table[ZERO_ID]
+
+def zerob(): ugen_table[ZEROB_ID]
+
+def sine(freq, amp, optional chans = 1):
+    return Ugen(new_id(), "Sine", chans, 'a', 'freq', freq, 'amp', amp)
+
+def sineb(freq, amp, optional chans = 1):
+    if freq.rate == 'a' or amp.rate == 'a':
+        print "ERROR: passing audio rate Ugen to block rate sineb"
+        return nil
+    else:
+        return Ugen(new_id(), "Sineb", chans, 'b', {'freq': freq, 'amp': amp})
+
+def const(x):
+    var ugen = Ugen(new_id(), "Const", -1, 'c')
+    o2_send_cmd("/arco/const/newf", 0, "if", ugen.id, x)
+    // print "sent /arco/const/newf, id", ugen.id, "value", x
+    return ugen
+
+
+class Pwl (Ugen):
+    def init(points):
+        super.init(new_id(), "Pwl", -1, 'a')
+        o2_send_cmd("/arco/pwl/new", 0, "i", id)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+        o2_send_start()
+        o2_add_int32(id)
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0
+        var count = 0
+        for i = 0 to len(points) by 2:
+            time = time + points[i]
+            var samps = round(time * AR - count)
+            count = count + samps
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                o2_add_float(points[i + 1])  // the destination amplitude
+        o2_send_finish(0, "/arco/pwl/env", true)
+        this
+
+    def start():
+        o2_send_cmd("/arco/pwl/start", 0, "i", id)
+        this
+
+
+def pwl(rest points): Pwl(points)  # pwl as a function
+
+
+class Pwlb (Ugen):
+    var action_id
+
+    def init(points):
+        super.init(new_id(), "Pwlb", -1, 'b')
+        o2_send_cmd("/arco/pwlb/new", 0, "i", id)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+        display "Pwlb", points
+        o2_send_start()
+        o2_add_int32(id)
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0
+        var count = 0
+        print "               ";
+        for i = 0 to len(points) by 2:
+            time = time + points[i]
+            var samps = round(time * BR - count)
+            count = count + samps
+            print samps,
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                print points[i + 1],
+                o2_add_float(points[i + 1])  // the destination amplitude
+        print
+        o2_send_finish(0, "/arco/pwlb/env", true)
+        this
+
+    def start():
+        o2_send_cmd("/arco/pwlb/start", 0, "i", id)
+        this
+
+
+def pwlb(rest points): Pwlb(points)
+
+
+class Mix (Ugen):
+    var input_name  // for dictionary of inputs, we need to generate names
+
+    
+    def init(chans_):
+        input_name = 0
+        super.init(new_id(), "Mix", chans_, 'a')
+
+
+    def set(input, value, optional chan = 0):
+        print "ERROR: set method not available for Mix class"
+
+
+    def ins(ugen, gain, optional atend):
+        if isnumber(gain):
+            gain = const(gain)
+        ugen.ref()
+        gain.ref()
+        inputs[input_name] = [ugen, gain]
+        input_name = input_name + 1
+        o2_send_cmd("/arco/mix/ins", 0, "iii", id, ugen.id, gain.id)
+        if atend:
+            if atend == SIGNAL and issubclass(ugen, Instrument) and 
+               ugen.envelope:
+                create_action(ugen.envelope, this, 'rem', ugen)
+            elif atend == GAIN and issubclass(gain, Pwlb):
+                create_action(gain, this, 'rem', ugen)
+        return this
+    
+
+    # override Ugen unref_inputs because we keep inputs in pairs
+    def unref_inputs():
+        for inp in inputs.values():
+            inp[0].unref()
+            inp[1].unref()
+
+
+    def rem(ugen):
+        for key in inputs.keys():
+            if inputs[key][0] == ugen:
+                ugen.unref()
+                inputs[key][1].unref()
+                inputs.remove(key)
+                return this
+        return this
+
+
+    def set_gain(ugen, gain):
+        var i = inputs.index(ugen)
+        if i < 0:
+            print "ERROR: Mix set_gain cannot find ugen"
+        var gain_ugen = inputs[i + 2]
+        if isinstance(gain_ugen, Ugen) and gain_ugen.rate == "c":
+            o2_send_cmd("/arco/mix/set_gain", 0, "iif", id, ugen, gain)
+        else:  // have to replace with a const object
+            gain_ugen.unref()
+            if isnumber(gain):
+                gain = const(gain)
+            inputs[i + 2] = gain
+            o2_send_cmd("/arco/mix/repl_gain", 0, "iii", id, ugen, gain)
+    
+
+def mix(optional chans = 1):
+    return Mix(chans)

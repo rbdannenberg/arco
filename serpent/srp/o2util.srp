@@ -1,0 +1,42 @@
+# o2util.srp -- Serpent library for higher-level O2 sends
+#
+# Roger B. Dannenberg
+# Jan 2022
+
+TYPE_TO_ADD_TYPE = {
+  "i": 'o2_add_int32',
+  "f": 'o2_add_float',
+  "b": 'o2_add_blob',
+  "s": 'o2_add_string',
+  "h": 'o2_add_int64',
+  "d": 'o2_add_double',
+  "t": 'o2_add_time',
+  "S": 'o2_add_symbol',
+  "c": 'o2_add_char',
+  "m": 'o2_add_midi_helper',
+  "B": 'o2_add_bool',
+  "N": 'o2_add_nil_helper',
+  "I": 'o2_add_infinitum_helper' }
+
+def o2_add_midi_helper(arg): o2_add_midi(arg[0], arg[1], arg[2])
+def o2_add_nil_helper(arg): o2_add_nil()
+def o2_add_infinitum_helper(arg): o2_add_infinitum()
+
+def o2_send_cmd(addr, when, optional sig = "", rest rest_args):
+    o2_send_helper(true, addr, when, sig, rest_args)
+
+def o2_send(addr, when, optional sig = "", rest rest_args):
+    o2_send_helper(false, addr, when, sig, rest_args)
+
+def o2_send_helper(tcp, addr, when, sig, args):
+    if len(sig) != len(args):
+        print "ERROR: o2util o2_send_cmd bad args:", sig, args
+        return
+    o2_send_start()
+    for s at i in sig:
+        # display "o2_send_helper loop", s, i, args
+        funcall(TYPE_TO_ADD_TYPE[s], args[i])
+    // display "o2_send_helper", addr
+    o2_send_finish(when, addr, true)
+
+

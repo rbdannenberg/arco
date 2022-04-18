@@ -1,0 +1,15 @@
+# make_arco_interface -- create the serpent external function implementations
+# Roger B. Dannenberg
+# Feb 2022
+#
+# run this with serpent from this from the arco/apps directory using
+#     serpent common/make_arco_interface.srp 
+# so that the generated sarco.cpp file will be in apps. If it looks
+# right and you are ready to replace the previous sarco.cpp, move (mv)
+# the new one to this (arco/apps/common) directory.
+
+require "strparse"
+load "interface"
+interface_search_path = ["../arco3/src/", "../../o2/src/", "common/"]
+interf("sarco", ["audioio.h", "arco3_init.h"], ["arcotypes.h", "o2internal.h"])
+exit()
