@@ -3,7 +3,7 @@
 # This is an example of how to make an daserpent application. The idea
 # is that you can make special files to be linked in with all 
 # arco code to make a customized binary. You put that together with
-# Serpent code to further customizes the package.
+# Serpent code to further customize the package.
 
 # The version minimum is required by CMake
 cmake_minimum_required(VERSION 3.21)
@@ -21,5 +21,5 @@ set(CUSTOM_ARCO )
 set(WXSICON_DIRECTORY "${CMAKE_SOURCE_DIR}/")
 
 # This command pulls in all the greatness of Arco. The file
-# parameter is in the path to arco3.
+# parameter is in the path to arco4.
 include(../../serpent/arco4.cmakeinclude)

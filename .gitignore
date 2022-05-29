@@ -11,3 +11,7 @@ CMakeCache.txt
 CMakeFiles/
 CmakeScripts/
 .DS_Store/
+
+/apps/test/wxsbuild/
+
+/arco/cmake_install.cmake

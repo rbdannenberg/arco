@@ -89,7 +89,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t):
     sched_init()
     o2_network_enable(network)
     o2_initialize(ensemble, t)
-    arco3_initialize()  // create audio shared memory interface
+    arco4_initialize()  // create audio shared memory interface
     // o2_debug_flags("s")
     o2_service_new("actl")
     o2_method_new("/actl/act", "i", 'actl_act', t)

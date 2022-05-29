@@ -1,4 +1,4 @@
-/* arco3.cpp -- main program for arco3 server
+/* arco4.cpp -- main program for arco4 server
  *
  * Roger B. Dannenberg
  * Dec 2021
@@ -30,7 +30,7 @@ const char *help_strings[] = {
 const char *main_commands = "(A)udio device (B)lock size (L)atency "
                             "(S)tart/Stop (Q)uit (H)elp";
 
-static void arco3_initialize();
+static void arco4_initialize();
 
 Bridge_info *arco_bridge = NULL;
 
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
     int rslt = o2_shmem_initialize();
     assert(rslt == O2_SUCCESS);
     arco_bridge = o2_shmem_inst_new();
-    arco3_initialize();  // set up handler
+    arco4_initialize();  // set up handler
     audioio_initialize(arco_bridge);
 
     int running = true;
@@ -156,7 +156,7 @@ static void host_audinfo(O2_HANDLER_ARGS)
 }
 
 
-static void arco3_initialize()
+static void arco4_initialize()
 {
     o2_service_new("host");
     // O2 INTERFACE INITIALIZATION: (machine generated)
@@ -252,7 +252,7 @@ int action(int ch)
       case 'Q':  // quit
         return true;
       case 't':
-        o2_send_cmd("/arco/test1", 0, "s", "Test from arco3 (main)");
+        o2_send_cmd("/arco/test1", 0, "s", "Test from arco4 (main)");
         break;
       default:
         break;

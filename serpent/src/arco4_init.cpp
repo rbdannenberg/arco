@@ -16,7 +16,7 @@
 Bridge_info *arco_bridge = NULL;
 
 
-void arco3_initialize()
+void arco4_initialize()
 {
     int rslt = o2_shmem_initialize();
     assert(rslt == O2_SUCCESS);

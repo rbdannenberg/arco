@@ -303,7 +303,7 @@ static void output(char *buffer)
 
 static void refresh_screen()
 {
-    mvprintw(0, 0, "Arco3");
+    mvprintw(0, 0, "Arco4");
     mvprintw(0, 44, "Load:  0%%   Status: Stopped");
     move(1, 0);
     hline(ACS_HLINE, 72);

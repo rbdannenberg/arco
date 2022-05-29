@@ -732,7 +732,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
         arco_print("Aura selects input device: %s\n", info->name);
         actual_in_chans = req_in_chans;
         if (info->maxInputChannels < req_in_chans) {
-            arco_print("\n    WARNING: only %d input channels available.",
+            arco_print("\n    WARNING: only %d input channels available.\n",
                        info->maxInputChannels);
             actual_in_chans = info->maxInputChannels;
         }
@@ -750,7 +750,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
         arco_print("Aura selects output device: %s\n", info->name);
         actual_out_chans = req_out_chans;
         if (info->maxOutputChannels < req_out_chans) {
-            arco_print("\n    WARNING: only %d output channels available.",
+            arco_print("\n    WARNING: only %d output channels available.\n",
                        info->maxOutputChannels);
             actual_out_chans = info->maxOutputChannels;
         }
