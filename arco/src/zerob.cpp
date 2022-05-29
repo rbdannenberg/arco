@@ -14,7 +14,7 @@ const char *zerob_name = "Zerob";
 void arco_zerob_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     // end unpack message
 
     new Zerob(id);

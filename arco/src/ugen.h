@@ -42,7 +42,7 @@ class Ugen : public O2obj {
     int chans;
     Vec<Sample> output;
     Sample_ptr out_samps;  // pointer to actual sample memory
-    int64 current_block;
+    int64_t current_block;
 
     // to initialize a Ugen without installing in table, pass id = -1
     Ugen(int id, char ab, int nchans) {
@@ -109,7 +109,7 @@ class Ugen : public O2obj {
     
     virtual void real_run() = 0;
 
-    Sample_ptr run(int64 block_count) {
+    Sample_ptr run(int64_t block_count) {
         if (block_count > current_block) {
             out_samps = &output[0];
             current_block = block_count;
@@ -117,12 +117,12 @@ class Ugen : public O2obj {
         }
         return &output[0];
     }
-    void set_current_block(int64 n) { current_block = n; }
+    void set_current_block(int64_t n) { current_block = n; }
 };
 
 typedef Ugen *Ugen_ptr;
 
-Ugen_ptr id_to_ugen(int32 id, const char *classname, const char *operation);
+Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation);
 
 // Use this to convert an id to a Ugen of a given class.
 // This macro expands to 2 statements, and defines a variable, and it

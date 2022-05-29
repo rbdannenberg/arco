@@ -14,8 +14,8 @@ const char *Const_name = "Const";
 void arco_const_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 chans = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t chans = argv[1]->i;
     // end unpack message
 
     new Const(id, chans);
@@ -31,7 +31,7 @@ void arco_const_new(O2SM_HANDLER_ARGS)
 void arco_const_newf(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     float value = argv[1]->f;
     // end unpack message
 
@@ -44,8 +44,8 @@ void arco_const_newf(O2SM_HANDLER_ARGS)
 void arco_const_set(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 chan = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t chan = argv[1]->i;
     float value = argv[2]->f;
     // end unpack message
 

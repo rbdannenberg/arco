@@ -14,7 +14,7 @@ public:
     Vec<Upsample_state> states;
 
     Ugen_ptr input;
-    int32 input_stride;
+    int32_t input_stride;
 
     Upsample(int id, int nchans, Ugen_ptr input_) : Ugen(id, 'a', nchans) {
         input = input_;

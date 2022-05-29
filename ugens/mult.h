@@ -6,9 +6,7 @@
 /*------------- BEGIN FAUST PREAMBLE -------------*/
 
 /* ------------------------------------------------------------
-author: "RBD"
 name: "mult"
-version: "1.0"
 Code generated with Faust 2.37.3 (https://faust.grame.fr)
 Compilation options: -lang cpp -light -es 1 -single -ftz 0
 ------------------------------------------------------------ */
@@ -84,6 +82,12 @@ public:
         // initialize run_channel based on input types
         if (x1->rate == 'a' && x2->rate == 'a') {
             run_channel = &Mult::chan_aa_a;
+        } else if (x1->rate == 'a' && x2->rate != 'a') {
+            run_channel = &Mult::chan_ab_a;
+        } else if (x1->rate != 'a' && x2->rate == 'a') {
+            run_channel = &Mult::chan_ba_a;
+        } else if (x1->rate != 'a' && x2->rate != 'a') {
+            run_channel = &Mult::chan_bb_a;
         }
         else {
             if (x1->rate != 'a') {
@@ -132,6 +136,45 @@ public:
         FAUSTFLOAT* input1 = x2_samps;
         for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
             *out_samps++ = FAUSTFLOAT((float(input0[i0]) * float(input1[i0])));
+        }
+    }
+
+    void chan_ab_a(Mult_state *state) {
+        FAUSTFLOAT* input0 = x1_samps;
+        float fSlow0 = float(*x2_samps);
+        Sample x2_incr = (fSlow0 - state->x2_prev) * BL_RECIP;
+        Sample x2_prev = state->x2_prev;
+        state->x2_prev = fSlow0;
+        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
+            x2_prev += x2_incr;
+            *out_samps++ = FAUSTFLOAT((x2_prev * float(input0[i0])));
+        }
+    }
+
+    void chan_ba_a(Mult_state *state) {
+        FAUSTFLOAT* input0 = x2_samps;
+        float fSlow0 = float(*x1_samps);
+        Sample x1_incr = (fSlow0 - state->x1_prev) * BL_RECIP;
+        Sample x1_prev = state->x1_prev;
+        state->x1_prev = fSlow0;
+        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
+            x1_prev += x1_incr;
+            *out_samps++ = FAUSTFLOAT((x1_prev * float(input0[i0])));
+        }
+    }
+
+    void chan_bb_a(Mult_state *state) {
+        float fSlow0 = (float(*x1_samps) * float(*x2_samps));
+        Sample x2_incr = (fSlow0 - state->x2_prev) * BL_RECIP;
+        Sample x2_prev = state->x2_prev;
+        state->x2_prev = fSlow0;
+        Sample x1_incr = (fSlow0 - state->x1_prev) * BL_RECIP;
+        Sample x1_prev = state->x1_prev;
+        state->x1_prev = fSlow0;
+        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
+            x2_prev += x2_incr;
+            x1_prev += x1_incr;
+            *out_samps++ = FAUSTFLOAT(x1_prev);
         }
     }
 

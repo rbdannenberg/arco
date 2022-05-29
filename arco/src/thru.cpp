@@ -14,9 +14,9 @@ const char *Thru_name = "Thru";
 void arco_thru_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 chans = argv[1]->i;
-    int32 inp = argv[2]->i;
+    int32_t id = argv[0]->i;
+    int32_t chans = argv[1]->i;
+    int32_t inp = argv[2]->i;
     // end unpack message
 
     ANY_UGEN_FROM_ID(ugen, inp, "arco_thru_new");

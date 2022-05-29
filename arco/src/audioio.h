@@ -44,8 +44,8 @@ extern int actual_latency;
 
 
 extern int arco_state;
-extern int64 arco_frames_done;
-extern int64 arco_blocks_done;
+extern int64_t arco_frames_done;
+extern int64_t arco_blocks_done;
 
 void audioio_initialize(Bridge_info *bridge);
 

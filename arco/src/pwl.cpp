@@ -14,7 +14,7 @@ const char *Pwl_name = "Pwl";
 void arco_pwl_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     // end unpack message
 
     new Pwl(id);
@@ -51,7 +51,7 @@ static void arco_pwl_env(O2SM_HANDLER_ARGS)
 static void arco_pwl_start(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     // end unpack message
 
     UGEN_FROM_ID(Pwl, pwl, id, "arco_pwl_start");
@@ -64,7 +64,7 @@ static void arco_pwl_start(O2SM_HANDLER_ARGS)
 static void arco_pwl_decay(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     float d = argv[1]->f;
     // end unpack message
 

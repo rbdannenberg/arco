@@ -14,7 +14,7 @@ const char *Pwlb_name = "Pwlb";
 void arco_pwlb_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     // end unpack message
 
     new Pwlb(id);
@@ -27,8 +27,8 @@ void arco_pwlb_new(O2SM_HANDLER_ARGS)
 void arco_pwlb_act(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 action_id = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t action_id = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Pwlb, pwlb, id, "arco_pwlb_env");
@@ -66,7 +66,7 @@ static void arco_pwlb_env(O2SM_HANDLER_ARGS)
 static void arco_pwlb_start(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     // end unpack message
 
     UGEN_FROM_ID(Pwlb, pwlb, id, "arco_pwlb_start");
@@ -79,7 +79,7 @@ static void arco_pwlb_start(O2SM_HANDLER_ARGS)
 static void arco_pwlb_decay(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     float d = argv[1]->f;
     // end unpack message
 

@@ -4,7 +4,7 @@
 # Jan 2022
 
 """
-Assumes you have a Faust source file, e.g. sine_aa_a.dsp 
+Assumes you have a Faust source files, e.g., sine_aa_a.dsp,
 which is all audio parameters and output.  If there are no 
 parameters, append an underscore anyway, e.g. 
 "whitenoise__a.dsp" has zero inputs and one output.
@@ -352,17 +352,21 @@ def find_b_rate_parameter_faust_names(classname, param_info, src):
     bui = extract_method(classname, "buildUserInterface", src)
     if bui == None: return True
     bui = bui.split("\n")
+    printed_something = False
     for line in bui:
         loc = line.find("addNumEntry(")
         if loc >= 0:  # ... "amp", &fEntry0, ...
             args = line[loc + len("addNumEntry(") + 1 : ].split(",")
             print("line =", line, "args =", args)
+            printed_something = True
             arco_name = args[0][0 : -1]  # remove trailing quote
             faust_name = args[1].strip()[1 : ]  # remove leading &
             for p in param_info:  # make parameter[][2] be faust name
                 if p[0] == arco_name:
                     p.append(faust_name)
                     break;
+    if printed_something:  # print a separator for readability
+        print("------\n")
 
 
 def generate_channel_method(fhfile, classname, instvars, param_info, src, rate):
@@ -376,17 +380,20 @@ def generate_channel_method(fhfile, classname, instvars, param_info, src, rate):
     one channel method and don't need indirection of (this->*run_channel)(...)
     """
     param_types = fhfile[1][ : -2]  # e.g. ab_a -> ab
+    print("------compute method for " + fhfile[2])
+
     # full copy to avoid side effecting the original param_info list
     param_info = [p.copy() for p in param_info]
-    if 'b' in param_types or 'c' in param_types:
+    if 'b' in param_types or 'c' in param_types:  # update param_info
         find_b_rate_parameter_faust_names(classname, param_info, src)
     compute = extract_method(classname, "compute", src)
+    print(compute + "-----")
     if compute == None: return True
     compute = compute.replace("\t", "    ")
     print("param_info", repr(param_info))
-    print("------compute method for " + fhfile[2] + "\n" + compute + "-----")
     rslt = ["    void chan" + fhfile[1] + "(" + classname + "_state *state) {"]
     compute = compute.split("\n")[1 : -2]
+
     # lines are separated; remove the line that gets output0
     foundit = None
     for i, line in enumerate(compute):
@@ -402,16 +409,22 @@ def generate_channel_method(fhfile, classname, instvars, param_info, src, rate):
         compute = compute.replace("output0[i0]", "*out_samps++");
     else:  # change outputs[0] = ... to *out_samps = ...
         compute = compute.replace("outputs[0]", "*out_samps")
+
     # change count to BL
     compute = compute.replace("count", "BL")
+
     # change each inputs[n] to <param>_samps:
-    for i, param in enumerate(param_info):
+    # careful: n is the number of the a-rate input, so if inputs are ba,
+    #   n will be 0 for the 2nd parameter
+    i = 0
+    for param in param_info:
         arco_name = param[0] + "_samps"
         if len(param) > 2:
             faust_name = param[2]  # b-rate fEntry0, fEntry1, etc.
             arco_name = "*" + arco_name  # substitute with float
         else:
             faust_name = "inputs[" + str(i) + "]"  # a-rate inputs[0], ...
+            i += 1  # increment only for each a-rate parameter
         print("replace", faust_name, arco_name)  # substitute address of block
         compute = compute.replace(faust_name, arco_name)
         # also replace fControl[i] with arco_name
@@ -424,6 +437,7 @@ def generate_channel_method(fhfile, classname, instvars, param_info, src, rate):
     for iv in instvars:
         if not iv.isconst:
             compute = compute.replace(iv.name, "state->" + iv.name)
+
     # add code for interpolated parameters
     print("add code for interpolation, param_info is", param_info)
     for i, p in enumerate(param_info):

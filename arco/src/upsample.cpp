@@ -13,9 +13,9 @@ const char *Upsample_name = "Upsample";
 void arco_upsample_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 chans = argv[1]->i;
-    int32 input = argv[2]->i;
+    int32_t id = argv[0]->i;
+    int32_t chans = argv[1]->i;
+    int32_t input = argv[2]->i;
     // end unpack message
 
     ANY_UGEN_FROM_ID(ugen, input, "arco_upsample_new");
@@ -29,8 +29,8 @@ void arco_upsample_new(O2SM_HANDLER_ARGS)
 static void arco_upsample_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 input_id = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Upsample, upsample, id, "arco_upsample_repl_input");
@@ -44,8 +44,8 @@ static void arco_upsample_repl_input(O2SM_HANDLER_ARGS)
 static void arco_upsample_set_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 chan = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t chan = argv[1]->i;
     float val = argv[2]->f;
     // end unpack message
 

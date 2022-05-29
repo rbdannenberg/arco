@@ -124,7 +124,7 @@ void ugen_initialize()
 // Look up the Ugen associated with id: if id is out of bounds or
 // there is no ugen, or the ugen has an unexpected class, return NULL.
 // If the class of the Ugen does not matter, pass NULL for classname.
-Ugen_ptr id_to_ugen(int32 id, const char *classname, const char *operation)
+Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation)
 {
     if (!ugen_table.bounds_check(id)) {
         arco_error("Bad ugen index %d in %s\n", id, operation);

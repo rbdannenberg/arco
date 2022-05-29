@@ -39,8 +39,8 @@ void Mix::print_sources(int indent, bool print)
 void arco_mix_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 chans = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t chans = argv[1]->i;
     // end unpack message
 
     new Mix(id, chans);
@@ -52,9 +52,9 @@ void arco_mix_new(O2SM_HANDLER_ARGS)
 void arco_mix_ins(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 input = argv[1]->i;
-    int32 gain = argv[2]->i;
+    int32_t id = argv[0]->i;
+    int32_t input = argv[1]->i;
+    int32_t gain = argv[2]->i;
     // end unpack message
 
     UGEN_FROM_ID(Mix, mix,id,  "arco_mix_ins");
@@ -69,8 +69,8 @@ void arco_mix_ins(O2SM_HANDLER_ARGS)
 void arco_mix_rem(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 input = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t input = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Mix, mix,id,  "arco_mix_rem");
@@ -84,8 +84,8 @@ void arco_mix_rem(O2SM_HANDLER_ARGS)
 void arco_mix_set_gain(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 inp = argv[1]->i;
+    int32_t id = argv[0]->i;
+    int32_t inp = argv[1]->i;
     float gain = argv[2]->f;
     // end unpack message
 
@@ -100,9 +100,9 @@ void arco_mix_set_gain(O2SM_HANDLER_ARGS)
 void arco_mix_repl_gain(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
-    int32 inp = argv[1]->i;
-    int32 gain = argv[2]->i;
+    int32_t id = argv[0]->i;
+    int32_t inp = argv[1]->i;
+    int32_t gain = argv[2]->i;
     // end unpack message
 
     UGEN_FROM_ID(Mix, mix,id,  "arco_mix_repl_gain");

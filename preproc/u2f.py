@@ -60,11 +60,9 @@ def main():
     with open(shellfilename, "w") as genf:
         print("#!/bin/sh", file=genf)
         for cn in classnames:
-            print("py f2a.py", cn, file=genf)
-        print("cd ../..", file=genf)
+            print("py ../preproc/f2a.py", cn, file=genf)
         for cn in classnames:
-            print("py o2idc.py", "src/faust/" + cn + ".cpp", file=genf)
-        print("cd src/faust", file=genf)
+            print("py ../../o2/preproc/o2idc.py", cn + ".cpp", file=genf)
 
 
 def expand_signature(name, params, outputtype, types, impl):

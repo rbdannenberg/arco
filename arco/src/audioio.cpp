@@ -100,8 +100,8 @@ O2_context aud_o2_ctx;  // O2 context for audio thread
 
 int aud_state = UNINITIALIZED;
 bool aud_reset_request = false;
-int64 aud_frames_done = 0;
-int64 aud_blocks_done = 0;
+int64_t aud_frames_done = 0;
+int64_t aud_blocks_done = 0;
 
 int arco_in_device = -1;
 int arco_out_device = -1;
@@ -608,7 +608,7 @@ static int pa_callback(const void *input, void *output,
 static void arco_output(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     // end unpack message
     ANY_UGEN_FROM_ID(ugen, id, "aud_output");
 
@@ -631,7 +631,7 @@ static void arco_output(O2SM_HANDLER_ARGS)
 static void arco_mute(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 id = argv[0]->i;
+    int32_t id = argv[0]->i;
     // end unpack message
 
     if (!forget_ugen_id(id, output_set)) {
@@ -650,10 +650,10 @@ static void arco_mute(O2SM_HANDLER_ARGS)
 static void arco_open(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 in_device = argv[0]->i;
-    int32 out_device = argv[1]->i;
-    int32 latency_ms = argv[2]->i;
-    int32 buffer_size = argv[3]->i;
+    int32_t in_device = argv[0]->i;
+    int32_t out_device = argv[1]->i;
+    int32_t latency_ms = argv[2]->i;
+    int32_t buffer_size = argv[3]->i;
     char *ctrlservice = argv[4]->s;
     // end unpack message
 
@@ -924,8 +924,8 @@ static bool logfile_open(SNDFILE **file, char *name, char *init, int chans)
 void arco_logaud(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 enable = argv[0]->i;
-    int32 out = argv[1]->i;
+    int32_t enable = argv[0]->i;
+    int32_t out = argv[1]->i;
     char *filename = argv[2]->s;
     // end unpack message
 
@@ -959,7 +959,7 @@ void arco_logaud(O2SM_HANDLER_ARGS)
 void arco_load(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32 count = argv[0]->i;
+    int32_t count = argv[0]->i;
     // end unpack message
 
     cpuload = count;

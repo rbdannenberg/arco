@@ -6,9 +6,7 @@
 /*------------- BEGIN FAUST PREAMBLE -------------*/
 
 /* ------------------------------------------------------------
-author: "RBD"
 name: "sineb"
-version: "1.0"
 Code generated with Faust 2.37.3 (https://faust.grame.fr)
 Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
 ------------------------------------------------------------ */
