@@ -1,7 +1,7 @@
 # arco4 - sound synthesis engine and framework
 
 ## Roger B. Dannenberg
-reorganized April 2022
+reorganized April 2022, linux port May 2022
 
 ## Directories
 - apps -- applications where you can build customized versions of Arco servers with or without Serpent.

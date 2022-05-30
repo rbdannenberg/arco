@@ -58,10 +58,14 @@ set(VORBISENC_LIB VORBISENC_LIB-NOTFOUND)
 if(USE_STATIC_LIBS)
   message(STATUS "** Searching for static libs FRIENDS ${FRIENDS}")
 
-  # searches are in pairs - first look locally, then look for defaults
-
+  # Ubuntu's libportaudio.a will not link without a Jack library, so
+  # in this special case we'll look for the dynamic (.so) library first
+  if(UNIX AND NOT APPLE) # Linux
+    set(PREFERRED_PORTAUDIO_LIB libportaudio.so)
+  endif()
   find_library(PORTAUDIO_LIB
-               NAMES portaudio_static.a portaudio_static 
+               NAMES ${PREFERRED_PORTAUDIO_LIB}
+                     portaudio_static.a portaudio_static 
                      libportaudio.a portaudio
                PATHS "${FRIENDS}/nyquist/Release" 
                      "${FRIENDS}/nyquist/Debug" 
