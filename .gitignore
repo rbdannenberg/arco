@@ -15,3 +15,13 @@ CmakeScripts/
 /apps/test/wxsbuild/
 
 /arco/cmake_install.cmake
+
+/apps/test/Makefile
+
+/apps/test/daserpent
+
+/apps/test/libarco4lib.a
+
+/apps/test/libsrplib.a
+
+/apps/test/libwxslib.a

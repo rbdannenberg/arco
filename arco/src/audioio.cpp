@@ -83,7 +83,9 @@ filled with zero.
 #include "arcotypes.h"
 #include "arcoutil.h"
 #include "ugen.h"
+#if defined(__APPLE__)
 #include "recperm.h"
+#endif
 #include "audioio.h"
 #include "thru.h"
 
@@ -812,6 +814,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
         goto done;
     }
     if (input_params_ptr) {
+#if defined(__APPLE__)
         if (request_record_status() != 3) {
             request_record_permission();  // ask for audio input
         }
@@ -823,6 +826,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
         if (status != 3) {
             arco_warn("Audio input not authorized. Input will be zero.\n");
         }
+#endif
     }
 
     err = Pa_OpenStream(&audio_stream, input_params_ptr, output_params_ptr,

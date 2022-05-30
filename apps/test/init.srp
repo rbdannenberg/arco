@@ -12,7 +12,7 @@ require "arco"
 class Atone (Instrument):
     def init(freq, dur, nharm):
         instr_begin()
-        var env = member(pwlb(dur * 0.2, 1, dur * 0.8), 'env')
+        var env = member(pwlb(dur * 0.2, 0.1, dur * 0.8), 'env')
         env.atend(MUTE, this)
         var mix = mix(1)
         for i = 1 to nharm:
@@ -62,7 +62,7 @@ def atone_sequence():
 def host_openaggr(timestamp, address, types, info)
     var LATENCY_MS = 50
     print info
-    if find(info, "Aggregate") >= 0:
+    if find(info, "Aggregate") >= 0 or find(info, "default") >= 0:
         var id = int(info)
         print "  --> opening this device, id", id
         o2_send_cmd("/arco/open", 0, "iiiis", id, id, LATENCY_MS, 32, "actl");

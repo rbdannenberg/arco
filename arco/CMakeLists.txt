@@ -30,11 +30,14 @@ set(ARCO_SRC
     # the code, and to keep things simple, the unit generators are here:
     ../../ugens/mult.cpp ../../ugens/mult.h 
     ../../ugens/multb.cpp ../../ugens/multb.h 
-    recperm.mm recperm.h
     upsample.cpp upsample.h 
     ../../ugens/sine.cpp ../../ugens/sine.h 
     ../../ugens/sineb.cpp ../../ugens/sineb.h
 )
+
+if(APPLE)
+list(APPEND ARCO_SRC recperm.mm recperm.h)
+endif()
 
 list(TRANSFORM ARCO_SRC PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 
@@ -44,12 +47,14 @@ set(ARCO_INCLUDE_DIRECTORIES
     "${CMAKE_CURRENT_LIST_DIR}/../../portaudio/include"
     "${CMAKE_CURRENT_LIST_DIR}/../../nyquist/nylsf")
 
-find_library(COREAUDIO CoreAudio)
-find_library(COREFOUNDATION CoreFoundation)
-find_library(CORESERVICES CoreServices)
-find_library(AUDIOTOOLBOX AudioToolbox)
-find_library(AUDIOUNIT AudioUnit)
-find_library(AVFOUNDATION AVFoundation)
+if(APPLE)
+  find_library(COREAUDIO CoreAudio)
+  find_library(COREFOUNDATION CoreFoundation)
+  find_library(CORESERVICES CoreServices)
+  find_library(AUDIOTOOLBOX AudioToolbox)
+  find_library(AUDIOUNIT AudioUnit)
+  find_library(AVFOUNDATION AVFoundation)
+endif()
 
 set(ARCO_LINK_DIRECTORIES
     "${CMAKE_CURRENT_LIST_DIR}/../../o2"
@@ -57,20 +62,20 @@ set(ARCO_LINK_DIRECTORIES
     "${CMAKE_CURRENT_LIST_DIR}/../../nyquist")
 
 set(ARCO_LINK_LIBRARIES
-    "o2_static.a"
-    "portaudio_static"
-    "libflac_static.a"
-    "sndfile_static"
-    "vorbis_static"
-    "curses"
-    "form"
-    "m"
+    ${PORTAUDIO_LIB}
+    ${SNDFILE_LIBS}
+#   "curses" "form" -- removed because it is not found on Linux, but
+#                   -- we need to find it and link to it to use the
+#                   -- ncurses interface
+    "-lm"
     ${COREAUDIO}
     ${COREFOUNDATION}
     ${CORESERVICES}
     ${AUDIOTOOLBOX}
     ${AUDIOUNIT}
     ${AVFOUNDATION})
+
+message(STATUS "arco link with ${ARCO_LINK_LIBRARIES}")
 
 set(ARCO_DEFINITIONS O2_NO_O2DISCOVERY=1)
 
@@ -86,7 +91,8 @@ if(UNIX)
                         "LINKER:-force_load,$<TARGET_FILE:arco4lib>")
   else()
     # linux is handled through linker options 
-    list(APPEND WHOLE_LIBRARIES arco4lib) 
+    list(APPEND WHOLE_LIBRARIES libarco4lib.a)
+    list(APPEND EXTRA_DEPENDENCIES arco4lib)
   endif()
 else()
 # WINDOWS
@@ -96,13 +102,20 @@ else()
 endif()
 
 
-if(APPLE or WIN32)
-  list(APPEND WHOLE_LIBRARIES force_arco4lib)  
+if(APPLE OR WIN32)
+  list(APPEND EXTRA_DEPENDENCIES force_arco4lib)  
   target_link_libraries(force_arco4lib INTERFACE ${ARCO_LINK_LIBRARIES}) 
   target_link_directories(force_arco4lib INTERFACE ${ARCO_LINK_DIRECTORIES}) 
+  add_dependencies(force_arco4lib arco4lib)
+  list(APPEND EXTRA_DEPENDENCIES force_arco4lib)
+else() # linux
+  list(APPEND EXTRA_LIBRARIES ${ARCO_LINK_LIBRARIES})
 endif()
 
-add_dependencies(force_arco4lib arco4lib)
+set(EXTRA_LIBRARIES ${EXTRA_LIBRARIES} PARENT_SCOPE)
+set(WHOLE_LIBRARIES ${WHOLE_LIBRARIES} PARENT_SCOPE)
+set(EXTRA_DEPENDENCIES ${EXTRA_DEPENDENCIES} PARENT_SCOPE)
+
 message(STATUS 
     "include_directories force_arco4lib ${ARCO_INCLUDE_DIRECTORIES}") 
 

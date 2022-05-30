@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "curses.h"
 #include "o2internal.h"  // need internal to offer bridge
 #include "sharedmem.h"   // o2_shmem_inst_new()
 #include "arcotypes.h"
