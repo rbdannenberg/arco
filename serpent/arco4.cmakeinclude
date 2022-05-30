@@ -61,8 +61,14 @@ if(USE_STATIC_LIBS)
   # searches are in pairs - first look locally, then look for defaults
 
   find_library(PORTAUDIO_LIB
-               NAMES portaudio_s portaudio_static portaudio
-               PATHS "${FRIENDS}/portaudio/lib" "/usr/lib/x86_64-linux-gnu"
+               NAMES portaudio_static.a portaudio_static 
+                     libportaudio.a portaudio
+               PATHS "${FRIENDS}/nyquist/Release" 
+                     "${FRIENDS}/nyquist/Debug" 
+                     "${FRIENDS}/portaudio/lib" 
+                     "${FRIENDS}/portaudio/Release" 
+                     "${FRIENDS}/portaudio/Debug" 
+                     "/usr/lib/x86_64-linux-gnu"
                PATH-SUFFIXES Release Debug)
   message(STATUS "find_library PORTAUDIO_LIB -> ${PORTAUDIO_LIB}")
   # if we found the library locally, use local installation as include 
@@ -92,11 +98,12 @@ if(USE_STATIC_LIBS)
             CACHE FILEPATH "PortAudio library" FORCE)
   endif()
 
-  find_library(SNDFILE_LIB NAMES libsndfile.a sndfile.a
-                                 sndfile_s sndfile_static sndfile
+  find_library(SNDFILE_LIB NAMES libsndfile_static.a sndfile_static
+                                 libsndfile.a sndfile
                HINTS "${FRIENDS}/libsndfile"
                      "${FRIENDS}/libsndfile/src/.libs"
-                     "${FRIENDS}/nyquist"
+                     "${FRIENDS}/nyquist/Release"
+                     "${FRIENDS}/nyquist/Debug"
                      "/usr/lib/x86_64-linux-gnu"
                PATH_SUFFIXES Release Debug)
   message(STATUS "after find_library, PATHS has ${FRIENDS}/libsndfile, SNDFILE_LIB = ${SNDFILE_LIB}")
@@ -131,24 +138,30 @@ if(USE_STATIC_LIBS)
     # libsndfile also uses libogg and libvorbis. For these, we don't need
     #   the include path because they are accessed only indirectly through 
     #   libsndfile
-    find_library(OGG_LIB NAMES ogg-static libogg.a ogg
+    find_library(OGG_LIB NAMES ogg_static.a ogg_static libogg.a ogg
                  HINTS "${FRIENDS}/ogg/src/.libs" "${FRIENDS}/nyquist"
+                       "${FRIENDS}/nyquist/Release"
+                       "${FRIENDS}/nyquist/Debug"
                        "/usr/lib/x86_64-linux-gnu"
                  PATH_SUFFIXES Release Debug)
     message(STATUS "OGG_LIB is ${OGG_LIB}")
 
-    find_library(FLAC_LIB NAMES FLAC-static libFLAC.a FLAC
+    find_library(FLAC_LIB NAMES flac_static.a FLAC_static.a 
+                                flac_static FLAC_static 
+                                libflac.a libFLAC.a
+                                flac FLAC
                  HINTS "${FRIENDS}/flac/src/libFLAC/.libs" "${FRIENDS}/nyquist"
                        "/usr/lib/x86_64-linux-gnu"
                  PATH_SUFFIXES Release Debug)
     message(STATUS "FLAC_LIB is ${FLAC_LIB}")
 
-    find_library(VORBIS_LIB NAMES libvorbis.a vorbis
+    find_library(VORBIS_LIB NAMES vorbis_static.a vorbis_static vorbis.a vorbis
                  HINTS "${FRIENDS}/vorbis/lib/.libs" "${FRIENDS}/nyquist"
                        "/usr/lib/x86_64-linux-gnu"
                  PATH_SUFFIXES Release Debug)
 
-    find_library(VORBISENC_LIB NAMES libvorbisenc.a vorbisenc
+    find_library(VORBISENC_LIB NAMES vorbisenc_static.a vorbisenc_static 
+                                     vorbisenc.a vorbisenc
                  HINTS "${FRIENDS}/vorbis/lib/.libs" "${FRIENDS}/nyquist"
                        "/usr/lib/x86_64-linux-gnu"
                  PATH_SUFFIXES Release Debug)
