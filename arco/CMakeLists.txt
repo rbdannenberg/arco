@@ -84,8 +84,10 @@ if(UNIX)
     add_library(force_arco4lib INTERFACE)
     target_link_options(force_arco4lib INTERFACE
                         "LINKER:-force_load,$<TARGET_FILE:arco4lib>")
+  else()
+    # linux is handled through linker options 
+    list(APPEND WHOLE_LIBRARIES arco4lib) 
   endif()
-  # linux is handled through linker options
 else()
 # WINDOWS
   add_library(force_arco4lib INTERFACE)
@@ -93,8 +95,15 @@ else()
                       "LINKER:/WHOLEARCHIVE:$<TARGET_FILE:arco4lib>") 
 endif()
 
+
+if(APPLE or WIN32)
+  list(APPEND WHOLE_LIBRARIES force_arco4lib)  
+  target_link_libraries(force_arco4lib INTERFACE ${ARCO_LINK_LIBRARIES}) 
+  target_link_directories(force_arco4lib INTERFACE ${ARCO_LINK_DIRECTORIES}) 
+endif()
+
 add_dependencies(force_arco4lib arco4lib)
 message(STATUS 
     "include_directories force_arco4lib ${ARCO_INCLUDE_DIRECTORIES}") 
-target_link_libraries(force_arco4lib INTERFACE ${ARCO_LINK_LIBRARIES}) 
-target_link_directories(force_arco4lib INTERFACE ${ARCO_LINK_DIRECTORIES}) 
+
+
