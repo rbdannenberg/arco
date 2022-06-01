@@ -22,30 +22,51 @@ Arco synthesis engine running in a separater thread with an O2 shared memory int
 - WxWidgets is used by wxserpent
 
 ## CMake Overview
-Master CMakeLists.txt is in arco4/apps/*, e.g. see arco4/apps/test/CMakeLists.txt
+
+To build Arco, you need some other programs: O2, PortAudio, PortMidi, and
+Serpent. You also need some libraries, described below.
+
+Some things you *have* to build from sources. Others you may be able
+to find precompiled and install them. The things you *have* to
+install, should all be in the same directory (I use my home directory,
+so I have /home/rbd/o2, /home/rbd/portaudio, /home/rbd/portmidi,
+/home/rbd/serpent, and /home/rbd/arco4.) The directory names `o2`,
+`portaudio`, `portmidi`, and `serpent` must be lower case and spelled
+the same so that Arco CMake files can find them.
+
+This directory with the Arco repo clone can be named anything (I
+currently call it arco4), so we'll call it `ARCODIR` in the instructions
+that follow. Of course, use your top-level directory name instead of
+`ARCODIR`.
+
+
+Master CMakeLists.txt is in ARCODIR/apps/*, e.g. see ARCODIR/apps/test/CMakeLists.txt
 It includes:
-- arco4/apps/test/CMakeLists.txt
-  - arco4/serpent/arco4.cmakeinclude, which includes
-    - arco4/arco/CMakeLists.txt to build arco (mostly dsp) library
+- ARCODIR/apps/test/CMakeLists.txt
+  - ARCODIR/serpent/arco4.cmakeinclude, which includes
+    - ARCODIR/arco/CMakeLists.txt to build arco (mostly dsp) library
     - serpent/wxs/wxs.cmakeinclude to build wxserpent
       - serpent/src/CMakeLists.txt to build srplib library for wxserpent
 
-## Installation
+## Installation on Ubuntu Linux
 
 These instructions are not the only possible installation procedure,
 but they describe what I did.
 
+- if you don't have CMake (`ccmake` is the command line program), see https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line
 - clone and build serpent from SourceForge (serpent project: https://sourceforge.net/projects/serpent, see serpent/doc/ for installation guides -- I have not gotten wxWidgets to work without building from sources using the command lines in the guides)
 - clone and build o2 from github.com/rbdannenberg/
-- clone and build arco4 from github.com/rbdannenberg/arco
+- clone github.com/rbdannenberg/arco. My cloned repo is in
+  arco4, but we'll call it ARCODIR (see note above).
 - install portaudio (on Linux: libportaudio19-dev)
+- install Avahi (on Linux: lib-avahi-client-dev)
 - install libsndfile (note: on Ubuntu 20, the libsndfile1-dev install will not
      be usable unless you figure out how to link to log_finite and a bunch of
      other symbols. These come from vorbis, a dependency of libsndfile.
      Therefore, I compiled my own.)
   - get v1.1.0 Source code (zip) from
       https://github.com/libsndfile/libsndfile/releases
-  - extract to the same directory containing arco4 (e.g. your home directory)
+  - extract to the same directory containing ARCODIR (e.g. your home directory)
   - `mv libsndfile-1.1.0 to libsndfile`
   - `cd libsndfile`
   - `ccmake .`
@@ -57,16 +78,18 @@ but they describe what I did.
   - generate (type `g`) (this should quit cmake and return to shell)
   - `make`
   - you should end up with libsndfile.a in your current directory
-- cd arco4/apps/test
+- cd ARCODIR/apps/test
 - ccmake .
-- set CMAKE_BUILD_TYPE = Debug
-- set HAVE_WX_PACKAGE = OFF
-- set USE_GLCANVAS = ON
-- set USE_MIDI = ON
-- set USE_NETWORK = ON
-- set USE_STATIC_LIBS = ON
-- leave OFF: USE_PROC, USE_SHFILE, USE_ZEROMQ, WXS_STDOUT_WINDOW
-- set WX_BASE_PATH to your top wxWidgets path, e.g. /home/rbd/wxWidgets; there should be wx-build inside this directory
+- Use ccmake's `c` (configure) command to process files and offer
+  options to set. Then set them as follows:
+  - set CMAKE_BUILD_TYPE = Debug
+  - set HAVE_WX_PACKAGE = OFF
+  - set USE_GLCANVAS = ON
+  - set USE_MIDI = ON
+  - set USE_NETWORK = ON
+  - set USE_STATIC_LIBS = ON
+  - leave OFF: USE_PROC, USE_SHFILE, USE_ZEROMQ, WXS_STDOUT_WINDOW
+  - set WX_BASE_PATH to your top wxWidgets path, e.g. /home/rbd/wxWidgets; there should be wx-build inside this directory
 - Use ccmake's `c` (configure) and `g` (generate) commands to create a Makefile (or Xcode project)
 - make (or build with Xcode)
 - `source ../common/setpath.sh` to set SERPENTPATH (must be done once unless you switch or restart Terminal)
