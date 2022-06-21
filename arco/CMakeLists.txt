@@ -47,6 +47,13 @@ set(ARCO_INCLUDE_DIRECTORIES
     "${CMAKE_CURRENT_LIST_DIR}/../../portaudio/include"
     "${CMAKE_CURRENT_LIST_DIR}/../../nyquist/nylsf")
 
+# I think the includes and dependencies should be "inherited" when we
+# link with this library, but because we have to play tricks to include
+# all of the object code in the library, these dependencies do not
+# seem to work. Therefore, the user of this library (PARENT) must
+# explicitly add these include directories:
+set(ARCO_INCLUDE_DIRECTORIES ${ARCO_INCLUDE_DIRECTORIES} PARENT_SCOPE)
+
 if(APPLE)
   find_library(COREAUDIO CoreAudio)
   find_library(COREFOUNDATION CoreFoundation)
@@ -77,10 +84,9 @@ set(ARCO_LINK_LIBRARIES
 
 message(STATUS "arco link with ${ARCO_LINK_LIBRARIES}")
 
-set(ARCO_DEFINITIONS O2_NO_O2DISCOVERY=1)
-
 add_library(arco4lib STATIC ${ARCO_SRC} ${ARCO4_APP_SRC})
 target_include_directories(arco4lib PRIVATE ${ARCO_INCLUDE_DIRECTORIES})  
+message(STATUS "arco library compile definitions ${ARCO_DEFINITIONS}")
 target_compile_definitions(arco4lib PRIVATE ${ARCO_DEFINITIONS}) 
 
 # create interface to force load all of arco4lib because of Initializer class

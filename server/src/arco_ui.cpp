@@ -37,7 +37,10 @@
 #include <form.h>
 #include "cmtio.h"
 #include "o2internal.h"
+#include "prefs.h"
 #include "arco_ui.h"
+
+Vec<O2string> arco_device_info;
 
 #define ASCII_ESC 27
 
@@ -67,16 +70,6 @@ static int out_col = 0;
 
 int stop = false;
 
-struct Dminfo {
-    char type;  // 's', 'i', or 'f'
-    const char *label;
-    char comment[64];
-    union {
-        int *intptr;
-        float *floatptr;
-        char *charptr;
-    } varptr;
-};
 Vec<FIELD *> fields;
 Vec<Dminfo> dminfo;
 FORM *dmform;
@@ -102,12 +95,18 @@ static void show_help()
     int x, y;
     getmaxyx(curscr, y, x);
     int n = 0;
-    while (help_strings[n]) n++;
+    for (const char **hs = help_strings; *hs; hs++) {
+        if ((*hs)[0] != 'p') n++;
+    }
     move(y - 7 - n, 0);
     hline(ACS_HLINE, 72);
     // n is number of help strings
-    for (int i = 0; i < n; i++) {
-        mvprintw(y - 6 - n + i, 0, help_strings[i]);
+    int i = 0;
+    for (const char **hs = help_strings; *hs; hs++) {
+        if ((*hs)[0] != 'p') {
+            mvprintw(y - 6 - n + i, 0, (*hs) + 1);
+        }
+        i++;
     }
     // navigation commands:
     for (int i = 0; i < 4; i++) {
@@ -303,7 +302,8 @@ static void output(char *buffer)
 
 static void refresh_screen()
 {
-    mvprintw(0, 0, "Arco4");
+    mvprintw(0, 0, "Arco v4");
+    clrtoeol();
     mvprintw(0, 44, "Load:  0%%   Status: Stopped");
     move(1, 0);
     hline(ACS_HLINE, 72);
@@ -341,7 +341,7 @@ int ui_init(int count)  // count is how many output lines to save
     lines_max = count;
 
     refresh_screen();
-    return false;
+    return 0;
 }
 
 const int BUFFER_LEN = 80;
@@ -416,11 +416,11 @@ int ui_poll(int delay_ms)
         }
         switch (ch) {
           case 'H': { // help
-            int n = 0;
-            while (help_strings[n]) n++;
             // n is number of help strings; skip last 4
-            for (int i = 0; i < n - 4; i++) {
-                printf("%s\n", help_strings[i]);
+            for (const char **hs = help_strings; *hs; hs++) {
+                if ((*hs)[0] != 'c') {
+                    printf("%s\n", (*hs) + 1);
+                }
             }
             break;
           }
@@ -481,9 +481,9 @@ int ui_poll(int delay_ms)
               case KEY_DC:
                 form_driver(dmform, REQ_DEL_CHAR);
                 break;
-              case '!':
+              case 'C':
               case ASCII_ESC:
-                ui_end_dialog(ch == ASCII_ESC);
+                ui_end_dialog(ch == 'C');
                 break;
               default:
                 form_driver(dmform, ch);
@@ -575,7 +575,8 @@ void ui_start_dialog()
     direct_mode = false;
 }
 
-int ui_int_field(const char *prompt, int *value, int min, int max, int dflt)
+int ui_int_field(const char *prompt, int *value, int min, int max,
+                 int actual, int pref)
 {
     FIELD *field = new_field(1, 6, field_top, 3 + strlen(prompt), 0, 0);
     set_field_back(field, A_UNDERLINE);
@@ -590,12 +591,20 @@ int ui_int_field(const char *prompt, int *value, int min, int max, int dflt)
     Dminfo *fi = dminfo.append_space(1);
     fi->type = 'i';
     fi->label = prompt;
-    sprintf(fi->comment, "Current value is ");
-    if (dflt == -1) {
-        sprintf(fi->comment + 17, "not yet determined.");
+    fi->changed = false;
+    char actual_str[32];
+    if (actual == -1) {
+        sprintf(actual_str, "<default>");
     } else {
-        sprintf(fi->comment + 17, "%d.", dflt);
+        sprintf(actual_str, "%d", actual);
     }
+    char pref_str[32];
+    if (pref == -1) {
+        sprintf(pref_str, "<default>");
+    } else {
+        sprintf(pref_str, "%d", pref);
+    }
+    sprintf(fi->comment, "Actual: %s, Pref: %s", actual_str, pref_str);
     fi->varptr.intptr = value;
     fields.push_back(field);
     field_top += 1;
@@ -621,9 +630,16 @@ void ui_run_dialog(const char *title)
     }
     move(i + 2, 0);
     hline(ACS_HLINE, 72);
-    mvprintw(i + 3, 3, "Type ESC to exit with changes; "
-                       "or '!' to exit without changes.");
-    mvprintw(i + 4, 3, "Leave blank for default, which can "
+    i += 3;
+    move(i, 0);
+    int j;
+    for (j = 0; j < arco_device_info.size(); j++) {
+        mvprintw(i + j, 3, arco_device_info[j]);
+    }
+    i += j;
+    mvprintw(i, 3, "Type C(onfirm) to exit with changes; "
+                       "or ESC to exit without changes.");
+    mvprintw(i + 1, 3, "Leave blank for default, which can "
                        "change when devices are opened.");
     set_current_field(dmform, fields[0]); 
     form_driver(dmform, REQ_BEG_FIELD);
@@ -670,13 +686,14 @@ void ui_end_dialog(bool good)
                     // so do it here:
                     const char *ptr = buffer;
                     if (*ptr == '-') ptr++;
-                    if (!isdigit(*ptr)) continue;  // not digits, skip this entry
+                    if (!isdigit(*ptr)) continue;  // not digits, skip entry
                     while (*ptr && isdigit(*ptr)) ptr++;
-                    if (*ptr) continue;  // we found a non-digit, skip this entry
-                    (*fi->varptr.intptr) = atoi(buffer);
+                    if (*ptr) continue;  // we found a non-digit, skip entry
+                    *fi->varptr.intptr = atoi(buffer);
+                    fi->changed = true;
                     printf("field %d got %d\n", i, *fi->varptr.intptr);
                 } else if (fi->type == 'f') {
-                    (*fi->varptr.floatptr) = atof(buffer);
+                    *fi->varptr.floatptr = atof(buffer);
                 } else if (fi->type == 's') {
                     strcpy(fi->varptr.charptr, buffer);
                 }

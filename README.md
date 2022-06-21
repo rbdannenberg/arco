@@ -3,6 +3,14 @@
 ## Roger B. Dannenberg
 reorganized April 2022, linux port May 2022
 
+See design.md for technical design discussions/plans
+
+## Contents
+- Directories
+- Dependencies
+- CMake Overview
+- Installation on Ubuntu Linux
+
 ## Directories
 - apps -- applications where you can build customized versions of Arco servers with or without Serpent.
 - arco -- the Arco main synthesis engine code

@@ -10,7 +10,9 @@
 CMakeCache.txt
 CMakeFiles/
 CmakeScripts/
-.DS_Store/
+CmakeFiles/
+.DS_Store
+CMakeCache.txt
 
 /apps/test/wxsbuild/
 
@@ -25,3 +27,17 @@ CmakeScripts/
 /apps/test/libsrplib.a
 
 /apps/test/libwxslib.a
+
+/apps/basic/cmake_install.cmake
+
+/apps/basic/log.txt
+
+/apps/basic/.arco
+
+/apps/basic/arcobasic.build
+
+/apps/basic/Debug/
+
+/apps/basic/arco-build/
+
+/apps/basic/build/

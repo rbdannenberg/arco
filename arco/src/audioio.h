@@ -20,28 +20,19 @@ const int INPUT_ID = 2;
 const int PREV_OUTPUT_ID = 3;
 const int UGEN_BASE_ID = 4;
 
-// values that take precedent over everything when >= 0.
-// It is intended that these be set by a GUI.
-extern int arco_in_device;
-extern int arco_out_device;
-extern int arco_in_chans;
-extern int arco_out_chans;
-extern int arco_buffer_size;
-extern int arco_latency;
 
 // actual values used to open audio device
 extern char actual_in_name[80];
 extern char actual_out_name[80];
 
-extern int actual_in_device;
-extern int actual_out_device;
-extern int req_in_chans;      // this is what we ask for and save to prefs
-extern int req_out_chans;     // this is what we ask for and save to prefs
+/* these are now local to audioio module:
+extern int actual_in_id;
+extern int actual_out_id;
 extern int actual_in_chans;   // req_in_chans, but limited by device capacity
 extern int actual_out_chans;  // req_out_chans, limited by device capacity
 extern int actual_buffer_size;
 extern int actual_latency;
-
+*/
 
 extern int arco_state;
 extern int64_t arco_frames_done;

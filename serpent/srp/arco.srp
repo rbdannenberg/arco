@@ -93,7 +93,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t):
     // o2_debug_flags("s")
     o2_service_new("actl")
     o2_method_new("/actl/act", "i", 'actl_act', t)
-    o2_method_new("/actl/starting", "", 'actl_starting', t)
+    o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
     o2_method_new("/actl/reset", "", 'actl_reset', t)
     sched_select(rtsched)
     set_arco_state('discovery')
@@ -114,6 +114,7 @@ def arco_initialization():
     o2_send_cmd("/arco/reset", 0, "s", "actl")  // pass in this service name
     // actl_reset()  // TEMP PATCH
     
+
 def actl_reset(rest ignore):
     # don't intialize anything if we are cleanly shutting down
     if arco_state == 'resetting':
@@ -151,7 +152,10 @@ def poll_for_arco():
 # this is an O2 message handler for message sent by audio thread
 # when the audio stream is started:
 #
-def actl_starting(rest ignore):
+def actl_starting(timestamp, address, types, rest args):
+    print "Audio stream is starting: in", args[0], "("; args[2], "chan),",
+    print "out", args[1], "("; args[3], "chan),", "latency", args[4], 
+    print "ms, block size", args[5]
     set_arco_state('running')
     arco_ready()
 
@@ -161,7 +165,8 @@ free_nesting = 0  // recursion depth in Ugen free method
 to_be_freed = []  // list of id's to free
 ugen_table = array(1000)
 id_free_list = nil  // location of linked free list head in ugen_table
-next_free_id = 4
+next_free_id = 10   // 0, 1, 2, 3 are special. 4-9 are reserved for 
+                    // test tone and other server functions.
 def new_id():
     if id_free_list:
         var id = id_free_list

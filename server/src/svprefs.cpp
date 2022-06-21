@@ -18,6 +18,7 @@
 #include "string.h"
 #include "ctype.h"
 #include "prefs.h"
+#include "svprefs.h"
 
 char *find_nonspace(const char *str)
 {
@@ -37,8 +38,8 @@ void *trim_space(char *str)
 
 static bool get_number(const char *line, const char *key, int *value)
 {
-    if (strstr(line, key) == 0) {
-        const char *pd = find_nonspace(line);
+    if (strstr(line, key) != 0) {
+        const char *pd = find_nonspace(line + strlen(key));
         *value = atoi(pd);
         return true;
     }
@@ -46,7 +47,7 @@ static bool get_number(const char *line, const char *key, int *value)
 }
 
 
-void get_device_string(const char *line_ptr, char *p_device)
+void get_name(const char *line_ptr, char *p_device)
 {
     char *pd = find_nonspace(line_ptr + 13);
     bool is_quoted = false;
@@ -65,6 +66,7 @@ void get_device_string(const char *line_ptr, char *p_device)
     trim_space(p_device);
 }
 
+#include <errno.h>
 
 void prefs_read()
 {
@@ -78,12 +80,12 @@ void prefs_read()
     char *line_ptr = line;
     size_t line_len = 80;
     while (getline(&line_ptr, &line_len, pf) > 0) {
-        if (strstr(line_ptr, "audio_in_device:") == 0) {
-            get_device_string(line_ptr + 16, device);
-            prefs_set_in_device(device);
-        } else if (strstr(line_ptr, "audio_out_device:") == 0) {
-            get_device_string(line_ptr + 17, device);
-            prefs_set_out_device(device);
+        if (strstr(line_ptr, "audio_in_name:") != 0) {
+            get_name(line_ptr + 16, device);
+            prefs_set_in_name(device);
+        } else if (strstr(line_ptr, "audio_out_name:") != 0) {
+            get_name(line_ptr + 17, device);
+            prefs_set_out_name(device);
         } else if (get_number(line_ptr, "in_chans:", &n)) {
             prefs_set_in_chans(n);
         } else if (get_number(line_ptr, "out_chans:", &n)) {
@@ -104,13 +106,19 @@ void prefs_write()
 {
     FILE *pf = fopen(".arco", "w");
     if (!pf) return;
-    fprintf(pf, "audio_in_device: \"%s\"\n", p_in_device);
-    fprintf(pf, "audio_out_device: \"%s\"\n", p_out_device);
-    fprintf(pf, "in_chans: %d\b", p_in_chans);
-    fprintf(pf, "out_chans: %d\b", p_out_chans);
-    fprintf(pf, "buffer_size: %d\b", p_buffer_size);
-    fprintf(pf, "latency: %d\b", p_latency);
+    fprintf(pf, "audio_in_name: \"%s\"\n", prefs_in_name());
+    fprintf(pf, "audio_out_name: \"%s\"\n", prefs_out_name());
+    fprintf(pf, "in_chans: %d\n", prefs_in_chans());
+    fprintf(pf, "out_chans: %d\n", prefs_out_chans());
+    fprintf(pf, "buffer_size: %d\n", prefs_buffer_size());
+    fprintf(pf, "latency: %d\n", prefs_latency_ms());
     fclose(pf);
+    printf("audio_in_name: \"%s\"\n", prefs_in_name());
+    printf("audio_out_name: \"%s\"\n", prefs_out_name());
+    printf("in_chans: %d\n", prefs_in_chans());
+    printf("out_chans: %d\n", prefs_out_chans());
+    printf("buffer_size: %d\n", prefs_buffer_size());
+    printf("latency: %d\n", prefs_latency_ms());
 }
 
 

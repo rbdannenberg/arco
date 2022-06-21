@@ -33,7 +33,7 @@ get it running first, then switch over to actually using it.
 
 Audio Processing
 
-1. Audio input has actual_in_chans channels. These are
+1. Audio input has aud_in_chans channels. These are
 de-interleaved and copied to the *output* of:
 
 2. aud_input_ug. If there are too many input channels, extras are
@@ -56,14 +56,14 @@ outputs can be accessed in the next block, allowing feedback with a
 
 7. output is copied in interleaved form to a buffer
 
-8. If aud_out_chans > actual_out_chans, the extra output channels
-are "wrapped" and summed into the first actual_out_chans. E.g. if
+8. If aud_out_chans > aud_out_chans, the extra output channels
+are "wrapped" and summed into the first aud_out_chans. E.g. if
 there are 6 output channels but only 2 actual channels, channels 2 and
 4 are added to 0, and channels 3 and 5 are added to 1, so everything
 is routed to channels 0 or 1.
 
 9. The buffer is copied to the output samples area passed in by the
-callback. If aud_out_chans <= actual_out_chans, there is no
+callback. If aud_out_chans <= aud_out_chans, there is no
 wrapping, and the output samples memory block is used as the buffer to
 avoid an extra copy. If necessary extra actual output channels are
 filled with zero.
@@ -86,9 +86,15 @@ filled with zero.
 #if defined(__APPLE__)
 #include "recperm.h"
 #endif
+#include "prefs.h"
 #include "audioio.h"
 #include "thru.h"
 
+/* this is not used:
+const char *aud_state_name[] = {
+    "UNINITIALIZED", "IDLE", "STARTING", "STARTED",
+    "FIRST", "RUNNING", "STOPPING" };
+*/
 
 using std::min;
 
@@ -104,24 +110,14 @@ int aud_state = UNINITIALIZED;
 bool aud_reset_request = false;
 int64_t aud_frames_done = 0;
 int64_t aud_blocks_done = 0;
+bool aud_heartbeat = true;
 
-int arco_in_device = -1;
-int arco_out_device = -1;
-int arco_in_chans = -1;
-int arco_out_chans = -1;
-int arco_buffer_size = -1;
-int arco_latency = -1;
-
-int req_in_chans = -1;   // preferred or specified count
-int req_out_chans = -1;  // preferred or specified count
-int actual_in_chans;     // number of channels in callback
-int actual_out_chans;    // number of channels in callback
-int actual_latency = -1;
-int actual_buffer_size = -1;
-int actual_in_device = -1;
-int actual_out_device = -1;
-char actual_in_name[80] = "";
-char actual_out_name[80] = "";
+static int actual_in_chans = -1;     // number of channels in callback
+static int actual_out_chans = -1;    // number of channels in callback
+static int actual_latency_ms = -1;
+static int actual_buffer_size = BL;
+static int actual_in_id = -1;
+static int actual_out_id = -1;
 
 static int close_request;
 static PaStream *audio_stream;
@@ -207,6 +203,18 @@ static bool forget_ugen_id(int id, Vec<int> &set)
 }
 
 
+/* O2SM INTERFACE: /arco/hb int32 hb; -- enable/disable printing block counts */
+static void arco_hb(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int hb = argv[0]->i32;
+    // end unpack message
+
+    printf("Block count printing %s\n", hb ? "enabled" : "disabled");
+    aud_heartbeat = (hb != 0);
+}
+
+
 /* O2SM INTERFACE: /arco/test1 string s;
    To test if messages are being received, this function
    will print the string on receipt (followed by newline)
@@ -246,8 +254,10 @@ static void arco_prtree(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/prtree ;
-   Print a tree of all unit generators
+/* O2SM INTERFACE: /arco/reset string s;
+   Reset the server: stop audio, disconnect run set and outputs,
+   send to /<s>/reset, where <s> is the control service name
+   passed as an argument of this message.
 */
 static void arco_reset(O2SM_HANDLER_ARGS)
 {
@@ -256,6 +266,22 @@ static void arco_reset(O2SM_HANDLER_ARGS)
     // end unpack message
     set_control_service(s);
     aud_reset_request = true;
+}
+
+
+// req_in_chans -- get the number of input channels to request
+int req_in_chans(int in_chans)
+{
+    return (in_chans >= 0 ? in_chans :
+            (ugen_table[INPUT_ID] ? ugen_table[INPUT_ID]->chans : 0));
+}
+
+// req_out_chans -- get the number of input channels to request
+int req_out_chans(int out_chans)
+{
+    return (out_chans >= 0 ? out_chans :
+            (ugen_table[PREV_OUTPUT_ID] ?
+             ugen_table[PREV_OUTPUT_ID]->chans : 0));
 }
 
 
@@ -364,7 +390,7 @@ void mix_down_interleaved(Sample_ptr output, int actual_out_chans,
                 src += aud_out_chans;
             }
     }
-}    
+}
     
     
 // add channels to buffer while copying to output. Output is to be
@@ -568,7 +594,9 @@ static int pa_callback(const void *input, void *output,
     int result = paContinue;
     float *in = (float *) input;
     float *out = (float *) output;
-    if (aud_blocks_done % 1000 == 0) printf("%lld blocks\n", aud_blocks_done);
+    if (aud_heartbeat && aud_blocks_done && aud_blocks_done % 1000 == 0) {
+        printf("%lld blocks\n", aud_blocks_done);
+    }
     if (status_flags) {
         // only report this once per 100 callbacks
         if (underflow_count > 100) {
@@ -643,7 +671,8 @@ static void arco_mute(O2SM_HANDLER_ARGS)
 
 
 /* O2SM INTERFACE:  /arco/open
-       int32 in_device, int32 out_device,
+       int32 in_id, int32 out_id, 
+       int32 in_chans, int32 out_chans,
        int32 latency_ms, int32 buffer_size,
        string ctrlservice;
    Open audio device(s) for input and output and begin processing
@@ -652,11 +681,13 @@ static void arco_mute(O2SM_HANDLER_ARGS)
 static void arco_open(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int32_t in_device = argv[0]->i;
-    int32_t out_device = argv[1]->i;
-    int32_t latency_ms = argv[2]->i;
-    int32_t buffer_size = argv[3]->i;
-    char *ctrlservice = argv[4]->s;
+    int32_t in_id = argv[0]->i;
+    int32_t out_id = argv[1]->i;
+    int32_t in_chans = argv[2]->i;
+    int32_t out_chans = argv[3]->i;
+    int32_t latency_ms = argv[4]->i;
+    int32_t buffer_size = argv[5]->i;
+    char *ctrlservice = argv[6]->s;
     // end unpack message
 
     PaError err;
@@ -668,6 +699,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
     PaStreamParameters *output_params_ptr = &output_params;
     bool got_input = false;
     bool got_output = false;
+
 
     if (aud_state != UNINITIALIZED && aud_state != IDLE) {
         arco_warn("aud_open called but audio is already opened");
@@ -686,54 +718,25 @@ static void arco_open(O2SM_HANDLER_ARGS)
 
     aud_frames_done = 0;
     num_devices = Pa_GetDeviceCount();
-    // default is to follow the input size in the audio graph:
-    req_in_chans = (ugen_table[INPUT_ID] ? ugen_table[INPUT_ID]->chans : 0);
-    // preference file can override the graph:
-    req_in_chans = prefs_in_chans(req_in_chans);
-    // gui can override the preference file:
-    req_in_chans = (arco_in_chans >= 0 ? arco_in_chans : req_in_chans);
 
-    req_out_chans = (ugen_table[PREV_OUTPUT_ID] ?
-                         ugen_table[PREV_OUTPUT_ID]->chans : 0);
-    req_out_chans = prefs_out_chans(req_out_chans);
-    // gui can override the preference file:
-    req_out_chans = (arco_out_chans >= 0 ?
-                        arco_out_chans : req_out_chans);
+    actual_in_id = Pa_GetDefaultInputDevice();
+    actual_out_id = Pa_GetDefaultOutputDevice();
 
-    actual_in_device = Pa_GetDefaultInputDevice();
-    actual_out_device = Pa_GetDefaultOutputDevice();
-
-    // override Pa defaults with preferences:
-    const PaDeviceInfo *info;
-    for (PaDeviceIndex i = 0; i < num_devices; i++) {
-        info = Pa_GetDeviceInfo(i);
-        arco_print("Device %d: %s\n", i, info->name);
-        actual_in_device = prefs_in_device(info->name, i, &actual_in_device);
-        actual_out_device = prefs_in_device(info->name, i, &actual_out_device);
-    }
-    
     // /arco/open device specs override preferences
-    if (in_device >= 0) actual_in_device = in_device;
-    if (out_device >= 0) actual_out_device = out_device;
-
-    // GUI overrides /arco/open
-    actual_in_device = (arco_in_device >= 0 ? arco_in_device :
-                                              actual_in_device);
-    actual_out_device = (arco_out_device >= 0 ? arco_out_device :
-                                                actual_out_device);
-
+    if (in_id >= 0) actual_in_id = in_id;
+    if (out_id >= 0) actual_out_id = out_id;
+    
     suggested_latency = 0;
-    if (req_in_chans == 0) {
-        actual_in_device = paNoDevice;
+    in_chans = req_in_chans(in_chans);
+    if (in_chans == 0) {
+        actual_in_id = paNoDevice;
         arco_print("Zero input channels, so no input device to open.\n");
-        actual_in_name[0] = 0;  // empty string
+        actual_in_chans = 0;
     } else {
-        info = Pa_GetDeviceInfo(actual_in_device);
-        strncpy(actual_in_name, info->name, 80);
-        actual_in_name[79] = 0;  // make sure it is terminated
+        const PaDeviceInfo *info = Pa_GetDeviceInfo(actual_in_id);
         arco_print("Aura selects input device: %s\n", info->name);
-        actual_in_chans = req_in_chans;
-        if (info->maxInputChannels < req_in_chans) {
+        actual_in_chans = in_chans;
+        if (info->maxInputChannels < in_chans) {
             arco_print("\n    WARNING: only %d input channels available.\n",
                        info->maxInputChannels);
             actual_in_chans = info->maxInputChannels;
@@ -741,17 +744,17 @@ static void arco_open(O2SM_HANDLER_ARGS)
         suggested_latency = info->defaultLowInputLatency;
     }
 
-    if (req_out_chans == 0) {
-        actual_out_device = paNoDevice;
+
+    out_chans = req_out_chans(out_chans);
+    if (out_chans == 0) {
+        actual_out_id = paNoDevice;
         arco_print("Zero output channels, so no output device to open.\n");
-        actual_out_name[0] = 0;  // empty string
+        actual_out_chans = 0;
     } else {
-        info = Pa_GetDeviceInfo(actual_out_device);
-        strncpy(actual_out_name, info->name, 80);
-        actual_out_name[79] = 0;  // make sure it is terminated
+        const PaDeviceInfo *info = Pa_GetDeviceInfo(actual_out_id);
         arco_print("Aura selects output device: %s\n", info->name);
-        actual_out_chans = req_out_chans;
-        if (info->maxOutputChannels < req_out_chans) {
+        actual_out_chans = out_chans;
+        if (info->maxOutputChannels < out_chans) {
             arco_print("\n    WARNING: only %d output channels available.\n",
                        info->maxOutputChannels);
             actual_out_chans = info->maxOutputChannels;
@@ -762,37 +765,29 @@ static void arco_open(O2SM_HANDLER_ARGS)
         }
     }
 
-    actual_latency = (int) (suggested_latency * 1000 + 0.5);  // convert to ms
-    // override with prefs file:
-    actual_latency = prefs_latency(actual_latency);
+    actual_latency_ms = (int) (suggested_latency * 1000 + 0.5);  // convert to ms
     // override prefs with specified latency in open call
-    actual_latency = (latency_ms >= 0 ? latency_ms : actual_latency);
-    // override prefs in open call with GUI
-    actual_latency = (arco_latency >= 0 ? arco_latency : actual_latency);
-    arco_print("Audio latency = %d ms\n", actual_latency);
-    suggested_latency = actual_latency * 0.001;
+    actual_latency_ms = (latency_ms >= 0 ? latency_ms : actual_latency_ms);
+    arco_print("Audio latency = %d ms\n", actual_latency_ms);
+    suggested_latency = actual_latency_ms * 0.001;
 
-    input_params.device = actual_in_device;
+    input_params.device = actual_in_id;
     input_params.channelCount = actual_in_chans;
     input_params.sampleFormat = paFloat32;
     input_params.suggestedLatency = suggested_latency;
     input_params.hostApiSpecificStreamInfo = NULL;
     
-    output_params.device = actual_out_device;
+    output_params.device = actual_out_id;
     output_params.channelCount = actual_out_chans;
     output_params.sampleFormat = paFloat32;
     output_params.suggestedLatency = suggested_latency;
     output_params.hostApiSpecificStreamInfo = NULL;
     
     close_request = false;
-    actual_buffer_size = prefs_buffer_size(BL);
-    actual_buffer_size = (buffer_size >= 0 ? buffer_size :
-                          actual_buffer_size);
-    actual_buffer_size = (arco_buffer_size >= 0 ? arco_buffer_size :
-                          buffer_size);
 
+    actual_buffer_size = (buffer_size >= 0 ? buffer_size : BL);
     if (actual_buffer_size <= 0) {  // enforce minimum buffer_size
-        actual_buffer_size = 32;
+        actual_buffer_size = BL;
     }
     if (actual_buffer_size % BL) {  // enforce buffer_size multiple of BL
         actual_buffer_size = ((actual_buffer_size + (BL - 1)) / BL) * BL;
@@ -803,10 +798,10 @@ static void arco_open(O2SM_HANDLER_ARGS)
         arco_print("WARNING: audioio open buffer_size is %d\n",
                    actual_buffer_size);
     }
-    if (actual_in_chans == 0 || actual_in_device == -1) {
+    if (actual_in_chans == 0 || actual_in_id == -1) {
         input_params_ptr = NULL;
     }
-    if (actual_out_chans == 0 || actual_out_device == -1) {
+    if (actual_out_chans == 0 || actual_out_id == -1) {
         output_params_ptr = NULL;
     }
     if (!input_params_ptr && !output_params_ptr) {
@@ -839,6 +834,12 @@ static void arco_open(O2SM_HANDLER_ARGS)
     // notify control service that audio is finally starting
     o2sm_send_start();
     strcpy(control_service_addr + control_service_addr_len, "starting");
+    o2sm_add_int32(actual_in_id);
+    o2sm_add_int32(actual_out_id);
+    o2sm_add_int32(actual_in_chans);
+    o2sm_add_int32(actual_out_chans);
+    o2sm_add_int32(actual_latency_ms);
+    o2sm_add_int32(actual_buffer_size);
     o2sm_send_finish(0.0, control_service_addr, true);
 
     err = Pa_StartStream(audio_stream);
@@ -848,12 +849,12 @@ static void arco_open(O2SM_HANDLER_ARGS)
     }
     arco_print("audioio open completed\n");
 done:
-    arco_print("Requested input chans: %d\n", req_in_chans);
-    arco_print("Requested output chans: %d\n", req_out_chans);
+    arco_print("Requested input chans: %d\n", req_in_chans(in_chans));
+    arco_print("Requested output chans: %d\n", req_out_chans(out_chans));
     arco_print("Actual device input chans: %d\n", actual_in_chans);
     arco_print("Actual device output chans: %d\n", actual_out_chans);
-    arco_print("Input device: %d\n", actual_in_device);
-    arco_print("Output device: %d\n", actual_out_device);
+    arco_print("Input device: %d\n", actual_in_id);
+    arco_print("Output device: %d\n", actual_out_id);
     const PaStreamInfo *stream_info = Pa_GetStreamInfo(audio_stream);
     if (stream_info) {
         arco_print("Reported input latency: %g\n", stream_info->inputLatency);
@@ -1004,8 +1005,8 @@ void arco_thread_poll()
                 ugen->unref();
             }
         }
-        actual_in_chans = 0;
-        actual_out_chans = 0;
+//        actual_in_chans = 0;
+//        actual_out_chans = 0;
 
         // notify the control service that reset is finished
         o2sm_send_start();
@@ -1031,16 +1032,17 @@ void audioio_initialize(Bridge_info *bridge)
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);
     o2sm_method_new("/arco/output", "i", arco_output, NULL, true, true);
     o2sm_method_new("/arco/mute", "i", arco_mute, NULL, true, true);
-    o2sm_method_new("/arco/open", "iiiis", arco_open, NULL, true, true);
+    o2sm_method_new("/arco/open", "iiiiiis", arco_open, NULL, true, true);
     o2sm_method_new("/arco/close", "", arco_close, NULL, true, true);
     o2sm_method_new("/arco/logaud", "iis", arco_logaud, NULL, true, true);
     o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
+    o2sm_method_new("/arco/hb", "i", arco_hb, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     Pa_Initialize();
     ugen_initialize();
-    actual_in_chans = 0;  // no input open yet
-    actual_out_chans = 0;  // no output open yet
+//    actual_in_chans = 0;  // no input open yet
+//    actual_out_chans = 0;  // no output open yet
     
     o2_ctx = save;  // restore caller (probably main O2 thread)'s context
     // now that o2_ctx is restored, we can set the clock source:

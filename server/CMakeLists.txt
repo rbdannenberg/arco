@@ -1,25 +1,19 @@
-# arco4 incorporated with serpent into a custom application
-# Roger B. Dannenberg
-# Feb 2022
+# CMakeList for arco server interface
 
-# This is based on serpent/64bit/CMakeLists.txt
-
-# Structure of the CMake system:
-# 
-# apps/test/CMakeLists.txt
-#     serpent/arco4.cmakeinclude
+# Structure of the CMake system (PROJ = server instance name)
+#
+# apps/PROJ/CMakeLists.txt
+#     server/arco4.cmakeinclude
 #         arco/CMakeLists.txt -- arco sources for arco library
-#         ../serpent/64bit/src/CMakeLists.txt
-#         ../serpent/wxs/CMakeLists.txt
 #
 # library organization:
-#    wxslib -- wxWidgets gui and main for serpent, arco interface functions
-#    srplib -- serpent implementation sans main program
-#    arco4lib -- arco audio processing, including unit generators
-#    o2_static, portmidi_static, portaudio_static, libflac_static, 
-#        sndfile_static, vorbis_static -- arco depends on these too
+#    arco4lib -- arco audio processingm, including unit generators
+#    o2_static, portaudio_static, libflac_static, sndfile_static,
+#        vorbis_static -- arco depends on these
 
-cmake_minimum_required(VERSION 3.21)
+
+# The version minimum is required by CMake 
+cmake_minimum_required(VERSION 3.21) 
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -31,10 +25,6 @@ message(STATUS CMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR} " "
 get_filename_component(FRIENDS ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
 get_filename_component(FRIENDS ${FRIENDS} DIRECTORY)
 
-set(SERPENT_BASE_DIR ${FRIENDS}/serpent)
-get_filename_component(SERPENT_BASE_DIR ${SERPENT_BASE_DIR} REALPATH)
-message(STATUS SERPENT_BASE_DIR=${SERPENT_BASE_DIR})
-
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING
               "Semicolon-separated list of supported configuration types"
               FORCE)
@@ -44,16 +34,34 @@ set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "only build forx86_64" FORCE)
 option(USE_STATIC_LIBS "Build with static libs?" TRUE)
 option(USE_LIBSNDFILE_EXTERNALS "Link with Ogg, Vorbis, and FLAC" FALSE)
 
-# should all this be in arco/CMakeLists.txt?
-
 # since libraries depend on the USE_STATIC_LIBS option, clear the libraries
 #  from the cache
-# portmidi is handled by serpent
 set(SNDFILE_LIB SNDFILE_LIB-NOTFOUND)
 set(OGG_LIB OGG_LIB-NOTFOUND) 
 set(FLAC_LIB FLAC_LIB-NOTFOUND)
 set(VORBIS_LIB VORBIS_LIB-NOTFOUND)
 set(VORBISENC_LIB VORBISENC_LIB-NOTFOUND) 
+
+SET(SOURCES src/arco4.cpp src/arco_ui.cpp src/arco_ui.h
+            src/cmtio.c src/cmtio.h  
+            src/svprefs.cpp src/svprefs.h)  
+ 
+add_executable(${ARCO_SERVER_NAME} ${SOURCES}) 
+
+if(APPLE) 
+  set(FRAMEWORK_PATH ${CMAKE_OSX_SYSROOT}/System/Library/Frameworks 
+      CACHE INTERNAL "framework path depending on OSX_SYSROOT") 
+  target_include_directories(${ARCO_SERVER_NAME} PRIVATE 
+      ${CMAKE_OSX_SYSROOT}/Developer/Headers/FlatCarbon) 
+  target_link_libraries(${ARCO_SERVER_NAME} PRIVATE 
+      # yes, serpent needs core audio for time functions (get nanos) 
+      "${FRAMEWORK_PATH}/CoreAudio.framework"
+#      "${FRAMEWORK_PATH}/CoreFoundation.framework"
+      "${FRAMEWORK_PATH}/Foundation.framework"
+      "${FRAMEWORK_PATH}/CoreMIDI.framework"
+      "${FRAMEWORK_PATH}/CoreServices.framework") 
+endif() 
+
 
 if(USE_STATIC_LIBS)
   message(STATUS "** Searching for static libs FRIENDS ${FRIENDS}")
@@ -189,40 +197,14 @@ message(STATUS "PORTAUDIO_LIB ${PORTAUDIO_LIB} SNDFILE_LIBS ${SNDFILE_LIBS}")
 # add arco -- builds audio and arco libraries
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)
 
-set(EXTENSION_INCLUDES ${ARCO_INCLUDES})
-add_subdirectory(${SERPENT_BASE_DIR}/64bit/src 
-                 ${CMAKE_CURRENT_BINARY_DIR}/serpent)
+target_include_directories(${ARCO_SERVER_NAME} PRIVATE ${ARCO_INCLUDE_DIRECTORIES})
+target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
+                      force_arco4lib o2_static form curses)
 
-# include_directories(${SERPENT_BASE_DIR}/64bit/src)
-message(STATUS "source is " ${SERPENT_EXTRAS_FULL})
+set(ARCO_DEFINITIONS O2_NO_O2DISCOVERY=1 CACHE STRING
+                     "definitions for all compiles" FORCE)
+ 
+target_compile_definitions(${ARCO_SERVER_NAME} PRIVATE ${ARCO_DEFINITIONS}) 
 
-# set parameters to customize daserpent
-set(WXSERPENT_TARGET ${ARCO_TARGET_NAME})
-add_executable(${ARCO_TARGET_NAME})
-
-message(STATUS "target name is ${WXSERPENT_TARGET}")
-
-# Arco-related sources added to wxslib:
-set(ARCO_WXS_SOURCES src/arco4_init.cpp src/arco4_init.h src/sarco.cpp
-                     ../arco/src/arcotypes.h)
-list(TRANSFORM ARCO_WXS_SOURCES PREPEND "${CMAKE_CURRENT_LIST_DIR}/")
-list(APPEND CUSTOM_WXS_SRC ${ARCO_WXS_SOURCES})
-set(CUSTOM_WXS_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../arco/src")
-message(STATUS "CUSTOM_WXS_SRC ${CUSTOM_WXS_SRC} 
-    CUSTOM_WXS_INCLUDE_DIRECTORIES ${CUSTOM_WXS_INCLUDE_DIRECTORIES}")
-
-set(WXSLIBRARIES_DIRECTORIES ${ARCO_LINK_DIRECTORIES} 
-                             ${ARCO_APP_LINK_DIRECTORIES})
-
-# create the executable
-add_subdirectory(${SERPENT_BASE_DIR}/wxs "${CMAKE_CURRENT_BINARY_DIR}/wxsbuild")
-
-# replace the serpent Info.plist information with Arco information
-# first change will get the version into the compiler command line:
-SET(SERPENT_VERSION "s${SERPENT_VERSION}-a1") # really it's arco version
-# next change will get the version into Info.plist:
-SET(MACOSX_BUNDLE_BUNDLE_VERSION ${SERPENT_VERSION})
-SET(MACOSX_BUNDLE_BUNDLE_NAME "${WXSERPENT_TARGET}_launch")
-# where to find Aura's Info.plist template MacOSXBundleInfo.plist.in
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+# pick a discovery method (must match how O2 was compiled):
 

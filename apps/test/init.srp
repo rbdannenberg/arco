@@ -65,7 +65,8 @@ def host_openaggr(timestamp, address, types, info)
     if find(info, "Aggregate") >= 0 or find(info, "default") >= 0:
         var id = int(info)
         print "  --> opening this device, id", id
-        o2_send_cmd("/arco/open", 0, "iiiis", id, id, LATENCY_MS, 32, "actl");
+        o2_send_cmd("/arco/open", 0, "iiiiiis", id, id, 2, 2, LATENCY_MS, 32, 
+                    "actl");
         o2_send_cmd("/arco/prtree", o2_time_get() + 1, "");
         
 
