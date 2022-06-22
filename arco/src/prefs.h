@@ -13,10 +13,10 @@ int prefs_out_chans();
 int prefs_buffer_size();
 int prefs_latency_ms();
 
-int prefs_set_latency(int latency);
-int prefs_set_in_name(const char *name);
-int prefs_set_out_name(const char *name);
-int prefs_set_in_chans(int chans);
-int prefs_set_out_chans(int chans);
-int prefs_set_buffer_size(int size);
+void prefs_set_latency(int latency);
+void prefs_set_in_name(const char *name);
+void prefs_set_out_name(const char *name);
+void prefs_set_in_chans(int chans);
+void prefs_set_out_chans(int chans);
+void prefs_set_buffer_size(int size);
 

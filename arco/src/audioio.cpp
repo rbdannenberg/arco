@@ -75,6 +75,7 @@ filled with zero.
 #include <algorithm>  // min
 #include <xmmintrin.h>
 #include <string.h>
+#include <inttypes.h>
 #include "sndfile.h"
 #include "portaudio.h"
 #include "o2internal.h"
@@ -595,7 +596,7 @@ static int pa_callback(const void *input, void *output,
     float *in = (float *) input;
     float *out = (float *) output;
     if (aud_heartbeat && aud_blocks_done && aud_blocks_done % 1000 == 0) {
-        printf("%lld blocks\n", aud_blocks_done);
+        printf("%" PRId64 " blocks\n", aud_blocks_done);
     }
     if (status_flags) {
         // only report this once per 100 callbacks

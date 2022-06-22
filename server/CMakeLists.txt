@@ -70,6 +70,9 @@ if(USE_STATIC_LIBS)
   # in this special case we'll look for the dynamic (.so) library first
   if(UNIX AND NOT APPLE) # Linux
     set(PREFERRED_PORTAUDIO_LIB libportaudio.so)
+    set(CURSES_LIB ncurses)
+  else()
+    set(CURSES_LIB curses)
   endif()
   find_library(PORTAUDIO_LIB
                NAMES ${PREFERRED_PORTAUDIO_LIB}
@@ -194,16 +197,37 @@ endif(USE_STATIC_LIBS)
 
 message(STATUS "PORTAUDIO_LIB ${PORTAUDIO_LIB} SNDFILE_LIBS ${SNDFILE_LIBS}")
 
+set(O2_BASE_PATH "${CMAKE_SOURCE_DIR}/../../../o2")
+message(STATUS "O2_BASE_PATH ${O2_BASE_PATH}")
+find_library(O2_DBG_LIB NAMES o2_static o2
+             HINTS ${O2_BASE_PATH}/x64/Debug ${O2_BASE_PATH}/Debug
+                   ${O2_BASE_PATH}/lib ${O2_BASE_PATH})
+find_library(O2_OPT_LIB NAMES o2_static o2
+             HINTS ${O2_BASE_PATH}/x64/Release ${O2_BASE_PATH}/Release
+                   ${O2_BASE_PATH}/lib ${O2_BASE_PATH})
+
+
 # add arco -- builds audio and arco libraries
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)
 
-target_include_directories(${ARCO_SERVER_NAME} PRIVATE ${ARCO_INCLUDE_DIRECTORIES})
-target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
-                      force_arco4lib o2_static form curses)
+target_include_directories(${ARCO_SERVER_NAME} PRIVATE
+                                               ${ARCO_INCLUDE_DIRECTORIES})
 
-set(ARCO_DEFINITIONS O2_NO_O2DISCOVERY=1 CACHE STRING
-                     "definitions for all compiles" FORCE)
- 
+if(APPLE OR NOT UNIX)
+  target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
+      force_arco4lib debug ${O2_DBG_LIB} optimized ${O2_OPT_LIB}
+      form ${CURSES_LIB})
+else()
+  # linux
+  set(SERVER_LIBRARIES ${O2_OPT_LIB} -lncurses)
+  list(APPEND SERVER_LIBRARIES ${EXTRA_LIBRARIES})
+  message(STATUS "CMAKE_BINARY_DIR ${CMAKE_BINARY_DIR} SERVER_LIBRARIES ${SERVER_LIBRARIES}")
+  target_link_options(${ARCO_SERVER_NAME} PRIVATE
+      -Wl,--whole-archive ${CMAKE_BINARY_DIR}/libarco4lib.a -Wl,--no-whole-archive
+      ${SERVER_LIBRARIES})
+  add_dependencies(${ARCO_SERVER_NAME} arco4lib)
+endif()
+
 target_compile_definitions(${ARCO_SERVER_NAME} PRIVATE ${ARCO_DEFINITIONS}) 
 
 # pick a discovery method (must match how O2 was compiled):

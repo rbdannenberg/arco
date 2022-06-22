@@ -355,7 +355,7 @@ static void (*got_string_fn)(const char *s);
 static int skip_newlines = 0;
 
 
-int ui_get_string(const char *prompt, void (*callback)(const char *s))
+void ui_get_string(const char *prompt, void (*callback)(const char *s))
 {
     assert(!getting_string);  // not reentrant
     buffer_x = 0;
@@ -575,7 +575,7 @@ void ui_start_dialog()
     direct_mode = false;
 }
 
-int ui_int_field(const char *prompt, int *value, int min, int max,
+void ui_int_field(const char *prompt, int *value, int min, int max,
                  int actual, int pref)
 {
     FIELD *field = new_field(1, 6, field_top, 3 + strlen(prompt), 0, 0);

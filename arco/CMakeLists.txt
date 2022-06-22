@@ -5,6 +5,9 @@
 
 cmake_minimum_required(VERSION 3.10)
 
+set(ARCO_DEFINITIONS O2_NO_O2DISCOVERY=1 CACHE STRING
+                     "definitions for all compiles" FORCE)
+ 
 set(ARCO_SRC
     arcougen.h
     audioio.cpp audioio.h

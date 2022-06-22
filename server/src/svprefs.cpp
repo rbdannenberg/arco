@@ -27,7 +27,7 @@ char *find_nonspace(const char *str)
 }
 
 
-void *trim_space(char *str)
+void trim_space(char *str)
 {
     int len = (int) strlen(str) - 1;
     while (len >= 0 && isspace(str[len])) {

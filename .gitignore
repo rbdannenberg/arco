@@ -41,3 +41,7 @@ CMakeCache.txt
 /apps/basic/arco-build/
 
 /apps/basic/build/
+
+/apps/basic/Makefile
+
+/apps/basic/libarco4lib.a

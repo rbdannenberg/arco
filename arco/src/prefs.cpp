@@ -85,22 +85,22 @@ int prefs_buffer_size() { return p_buffer_size; }
 int prefs_latency_ms() { return p_latency_ms; }
 
 
-int prefs_set_in_name(const char *name) 
+void prefs_set_in_name(const char *name) 
 { 
     strncpy(p_in_name, name, 80);
     p_in_name[79] = 0;
 }
     
 
-int prefs_set_out_name(const char *name)
+void prefs_set_out_name(const char *name)
 { 
     strncpy(p_out_name, name, 80);
     p_out_name[79] = 0;
 }
     
 
-int prefs_set_latency(int latency_ms) { p_latency_ms = latency_ms; }
-int prefs_set_in_chans(int chans) { p_in_chans = chans; }
-int prefs_set_out_chans(int chans) { p_out_chans = chans; }
-int prefs_set_buffer_size(int size) { p_buffer_size = size; }
+void prefs_set_latency(int latency_ms) { p_latency_ms = latency_ms; }
+void prefs_set_in_chans(int chans) { p_in_chans = chans; }
+void prefs_set_out_chans(int chans) { p_out_chans = chans; }
+void prefs_set_buffer_size(int size) { p_buffer_size = size; }
 

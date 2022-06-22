@@ -23,9 +23,6 @@ int     IOinputfd;      /* input file descriptor (usually 0) */
 int     IOnochar;       /* Value to be returned by IOgetchar()
                    where there is no input to be had */
 
-static  struct sgttyb IOoldmodes, IOcurrentmodes;
-                /* Initial and current tty modes */
-
 
 static void IOdiegracefully(int sig)
 {
@@ -55,7 +52,35 @@ static void IOdiegracefully(int sig)
 
 void (*interrupt_handler)();
 
-int IOsetup(inputfd)
+#if __linux__
+#include <termio.h>
+
+static  struct termio IOoldmodes, IOcurrentmodes;
+                /* Initial and current tty modes */
+
+int IOsetup(int inputfd)
+{
+    struct termio tty;
+    IOinputfd = inputfd;
+    IOnochar = NOCHAR;
+    if (ioctl(IOinputfd, TCGETA,  &IOoldmodes) < 0)
+        ERROR("IOsetup");
+
+    IOcurrentmodes = IOoldmodes;
+    IOcurrentmodes.c_lflag |= ISIG; // CBREAK;
+    IOcurrentmodes.c_lflag &= ~ECHO;
+    if(ioctl(IOinputfd, TCSETA,  &IOcurrentmodes))
+        ERROR("IOsetup-2");
+
+    if( (interrupt_handler = signal(SIGINT, &IOdiegracefully)) != 0)
+        signal(SIGINT, interrupt_handler);
+    return 0;
+}
+#else
+static  struct sgttyb IOoldmodes, IOcurrentmodes;
+                /* Initial and current tty modes */
+
+int IOsetup(int inputfd)
 {
     IOinputfd = inputfd;
     IOnochar = NOCHAR;
@@ -72,7 +97,7 @@ int IOsetup(inputfd)
         signal(SIGINT, interrupt_handler);
     return 0;
 }
-
+#endif
 
 /*
  * IOcleanup()
@@ -85,8 +110,13 @@ int IOsetup(inputfd)
 
 int IOcleanup(void)
 {
-    if(ioctl(IOinputfd, TIOCSETP,  &IOoldmodes) < 0)
+#if __linux__
+    if (ioctl(IOinputfd, TCSETA, &IOoldmodes) < 0)
         ERROR("IOclean");
+#else
+    if (ioctl(IOinputfd, TIOCSETP,  &IOoldmodes) < 0)
+        ERROR("IOclean");
+#endif
     return 0;
 }
 
