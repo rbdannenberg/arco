@@ -1,0 +1,101 @@
+# CMake macros for building Arco with Serpent
+# Roger B. Dannenberg, Jun 2022
+#
+# copied from ../../../serpent/src/srp_cmake_macros.txt -- this
+# file does the same thing.
+
+# To get consistent compiler defines and includes, we want to
+#     process everything in the project, using global (cache)
+#     variables to accumulate properties and paths. Then, in a
+#     second pass, we apply the defines and includes to all
+#     targets. (We cannot just leave the accumulated defines
+#     and includes in the cache because then we would never be
+#     able to delete anything -- so we have to force clear all
+#     at the beginning of processing.
+# In main CMakeLists.txt, call globals_initialize() to clear lists.
+# To append to a path call append_to_global(VARNAME value)
+# To announce a target for these common properties, call
+#     register_target(target)
+# At the end of main CMakeFile, call apply_common_settings()
+# 
+#
+macro(globals_initialize)
+  set(ALL_TARGETS "" CACHE INTERNAL "global")
+  set(ALL_LINK_DIRECTORIES "" CACHE INTERNAL "global")
+  set(ALL_INCLUDE_DIRECTORIES "" CACHE INTERNAL "global")
+  set(ALL_COMPILE_DEFINITIONS "" CACHE INTERNAL "global")
+endmacro()
+
+macro(register_target target)
+  append_to_global(ALL_TARGETS ${target})
+  # message(STATUS "$$$$$ added ${target} : ${ALL_TARGETS}")
+endmacro()
+
+macro(show_global_settings) 
+  message(STATUS "    ALL_INCLUDE_DIRECTORIES ${ALL_INCLUDE_DIRECTORIES}")
+  message(STATUS "    ALL_COMPILE_DEFINITIONS ${ALL_COMPILE_DEFINITIONS}")
+  message(STATUS "    ALL_LINK_DIRECTORIES $(ALL_LINK_DIRECTORIES)")
+endmacro()
+
+if(WIN32)
+  option(VERBOSE_LINK "Use VERBOSE switch when linking")
+endif()
+
+macro(apply_common_settings)
+  show_global_settings()
+
+  foreach(target ${ALL_TARGETS})
+    message(STATUS "Doing ${target}")
+    target_include_directories(${target} PRIVATE ${ALL_INCLUDE_DIRECTORIES}) 
+    target_compile_definitions(${target} PRIVATE ${ALL_COMPILE_DEFINITIONS})
+    if(APPLE) 
+      set_target_properties(${target} PROPERTIES 
+          XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-"
+          XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED ON) 
+      # -Xlinker -v tells linker to tell us the Library search paths 
+      target_link_options(${target} PRIVATE -Xlinker -v)
+    elseif(WIN32 AND VERBOSE_LINK)
+      target_link_options(${target} PRIVATE "/VERBOSE:LIB")
+    endif()
+  endforeach()
+endmacro()
+
+macro(append_to_global name item)
+#  message(STATUS "***** append ${item} to ${name}=${${name}}")
+#
+  set(ATGTEMP ${${name}})
+  list(APPEND ATGTEMP ${item})
+  list(REMOVE_DUPLICATES ATGTEMP)
+  set(${name} ${ATGTEMP} CACHE INTERNAL "a global" FORCE)
+#
+# The following should work and work in a test, but with Serpent, I 
+# could only get the above code to work!
+#  list(APPEND ${name} ${item})
+#  list(REMOVE_DUPLICATES ${name})
+#  set(${name} ${${name}} CACHE INTERNAL "a global") 
+#  message(STATUS "=====> ${${name}}")
+endmacro()
+
+# Loading a whole library:
+set(CMAKE_LINK_LIBRARY_USING_load_archive_SUPPORTED TRUE)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  set(CMAKE_LINK_LIBRARY_USING_load_archive "-force_load <LIB_ITEM>")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(CMAKE_LINK_LIBRARY_USING_load_archive
+      "LINKER:--push-state,--whole-archive" "<LINK_ITEM>" "LINKER:--pop-state")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  set(CMAKE_LINK_LIBRARY_USING_load_archive "/WHOLEARCHIVE:<LIBRARY>")
+else()
+  set(CMAKE_LINK_LIBRARY_USING_load_archive_SUPPORTED FALSE)
+  message(STATUS "**** WARNING: NOT ABLE TO load whole library")
+endif()
+
+macro(target_link_whole_library target libname)
+  if(CMAKE_LINK_LIBRARY_USING_load_archive_SUPPORTED)
+    target_link_libraries(${target} PRIVATE
+                          "$<LINK_LIBRARY:load_archive,${libname}>")
+  else()
+    message(STATUS "**** WARNING: NOT ABLE TO load whole library ${libname}")
+  endif()
+endmacro()
+

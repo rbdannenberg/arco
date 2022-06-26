@@ -145,6 +145,7 @@ void automation()
 int main(int argc, char *argv[])
 {
     prefs_read();
+    printf("main: initial latency %d\n", prefs_latency_ms());
     has_curses = ui_init(200) >= 0;  // <0 means error, no curses interface
     o2_network_enable(false);
     o2_debug_flags("rs");
