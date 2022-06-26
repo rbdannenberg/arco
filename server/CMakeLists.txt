@@ -15,6 +15,8 @@
 # The version minimum is required by CMake 
 cmake_minimum_required(VERSION 3.24)
 
+include("../apps/common/libraries.txt")  # audio and O2 library prefs
+
 include("../apps/common/arco_cmake_macros.txt")
 globals_initialize()
 
@@ -53,16 +55,19 @@ endif()
 # O2 is not in arcolib because it is already in wxslib (if you link
 # with wxserpent), but this server version does not use wxserpent,
 # so we have to find and add O2 libraries here
-set(O2_BASE_PATH "${CMAKE_SOURCE_DIR}/../../../o2")
-message(STATUS "O2_BASE_PATH ${O2_BASE_PATH}")
-find_library(O2_DBG_LIB NAMES o2_static o2
-             HINTS ${O2_BASE_PATH}/x64/Debug ${O2_BASE_PATH}/Debug
-                   ${O2_BASE_PATH}/lib ${O2_BASE_PATH})
-find_library(O2_OPT_LIB NAMES o2_static o2
-             HINTS ${O2_BASE_PATH}/x64/Release ${O2_BASE_PATH}/Release
-                   ${O2_BASE_PATH}/lib ${O2_BASE_PATH})
 append_to_global(ALL_COMPILE_DEFINITIONS "O2_NO_O2DISCOVERY=1") 
-append_to_global(ALL_COMPILE_DEFINITIONS "USE_O2=1") # is this serpent only?
+if(O2_INCL)
+  append_to_global(ALL_INCLUDE_DIRECTORIES "${O2_INCL}") 
+endif()  # otherwise, assume portmidi.h is on default include paths
+# if no O2_OPT_LIB or O2_DBG_LIB, look for an installed one:
+find_library(O2_OPT_LIB NAMES o2_static.a o2.a o2) 
+find_library(O2_DBG_LIB NAMES o2_static.a o2.a o2) 
+target_link_libraries(${ARCO_SERVER_NAME} PRIVATE debug ${O2_DBG_LIB}
+                                                  optimized ${O2_OPT_LIB}) 
+if(UNIX AND NOT APPLE)  # linux
+  target_link_libraries(srplib PRIVATE avahi-client avahi-common atomic rt)
+endif()
+
 
 # add arco -- builds audio and arco libraries
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)

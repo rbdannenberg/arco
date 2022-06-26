@@ -32,6 +32,14 @@ set(SERPENT_BASE_DIR ${FRIENDS}/serpent)
 get_filename_component(SERPENT_BASE_DIR ${SERPENT_BASE_DIR} REALPATH)
 message(STATUS SERPENT_BASE_DIR=${SERPENT_BASE_DIR})
 
+include("../common/libraries.txt")  # audio and O2 library prefs
+# there are more prefs in Serpent that are normally included by the
+# serpent/64bit/CMakeLists.txt so that both serpent64 and wxserpent64
+# see the libraries. But we are not using serpent/64bit/CMakeLists.txt,
+# so we need to include the file here (our ../common/libraries.txt takes
+# priority though).
+include("${SERPENT_BASE_DIR}/64bit/libraries.txt")
+
 # get macro definitions and initialize variables and settings; assumes
 # the current directory is <arco-root>/apps/<this-app-name>/:
 include("${SERPENT_BASE_DIR}/src/srp_cmake_macros.txt")
