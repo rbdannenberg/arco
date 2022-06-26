@@ -65,7 +65,8 @@ find_library(O2_DBG_LIB NAMES o2_static.a o2.a o2)
 target_link_libraries(${ARCO_SERVER_NAME} PRIVATE debug ${O2_DBG_LIB}
                                                   optimized ${O2_OPT_LIB}) 
 if(UNIX AND NOT APPLE)  # linux
-  target_link_libraries(srplib PRIVATE avahi-client avahi-common atomic rt)
+  target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
+                        avahi-client avahi-common atomic rt)
 endif()
 
 
