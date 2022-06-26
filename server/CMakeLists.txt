@@ -66,12 +66,15 @@ append_to_global(ALL_COMPILE_DEFINITIONS "USE_O2=1") # is this serpent only?
 
 # add arco -- builds audio and arco libraries
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)
-target_link_libraries(arco4lib PRIVATE avahi-client avahi-common atomic rt)
 
 target_link_whole_library(${ARCO_SERVER_NAME} arco4lib)
 target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
                       debug ${O2_DBG_LIB} optimized ${O2_OPT_LIB})
 target_link_libraries(${ARCO_SERVER_NAME} PRIVATE form ${CURSES_LIB})
+
+if(UNIX AND NOT APPLE)  # linux
+  target_link_libraries(arco4lib PRIVATE avahi-client avahi-common atomic rt) 
+endif()
 
 apply_common_settings()
 message(STATUS "--------- bottom of server/CMakeLists.txt ---------")
