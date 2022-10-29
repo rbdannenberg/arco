@@ -10,6 +10,7 @@ See design.md for technical design discussions/plans
 - Dependencies
 - CMake Overview
 - Installation on Ubuntu Linux
+- Unit Generators
 
 ## Directories
 - apps -- applications where you can build customized versions of Arco servers with or without Serpent.
@@ -126,3 +127,95 @@ another test case for another string. Ultimately, the plan was to
 gather the devices, build a menu, let the user choose a device, and
 save the device in preferences.
 - You should hear smooth electronic tones with random pitch and random timing.
+
+# Unit Generators
+## General Design
+### Unit Generators and Multi-Channel
+
+Every UG has:
+- `rate`: `'a'`, `'b'`, or `'c'`
+- `chans`: number of channels
+- `block`: block count, intially -1. Updated to current block number by `run(block)`
+- `output`: a vector of Samples. 
+  - A-rate output has one audio block per channel, flattened to an array of length `chans * BLOCK_LEN`. 
+  - B-rate output has `chans` samples.
+- `states`: a vector of `chans` structures, where each structure contains all
+   the state for one channel of the unit generator
+- *C-rate parameters*: for each C-rate parameter, there is a vector of 
+  length `chans` to store it.
+- *A-rate/B-rate parameters*: for each A- or B-rate parameter, there is a source pointer of type `Ugen *` and a pointer to the Ugen's output vector.
+
+Computation basically involves a loop to compute each channel while updating input
+and output pointers.
+
+Inputs must have either 1 channel or the same number of channels as the Ugen. If 1 channel, the same channel is used for each channel of the Ugen.
+- audio rate input
+  - 1 channel: *param*_stride = -BL
+  - *n* channel: *param*_stride = 0 // next channel is where previous one ends
+- block rate input
+  - 1 channel: *param*_stride = 0
+  - *n* channel: *param*_stride = 1 // 1 sample per channel
+- constant rate input
+  - 1 channel: *param*_stride = 0
+  - *n* channel: *param*_stride = 1 // 1 sample per channel
+
+### Messages
+Every Unit Generator is reference counted and shadowed by the creator.
+
+Each class of Ugen has a top-level node in the address space, and each
+parameter is a sub-node. Most messages take an ID as a parameter to identify the ugen instance. This avoids updating the addresses with many entries when we add a ugen instance. We could route all messages to one place and decode without using O2 address mapping, e.g. the object ID could be in the address and we could use the ID as an index to find the object, but it's easier to use O2 address decoding and message dispatching to specific handlers, and passing the ID as parameter is a bit easier than using string manipulation to put the ID into the address string.
+````
+/arco/fmosc/freq
+````
+
+So IDs are passed as parameters and decoded with a simple array lookup. We
+require the controlling process manage the IDs's.
+
+To create a Ugen:
+````
+/arco/fmosc/new ID chans input1 input2 ...
+````
+where inputs are ID's for other UGens or 0 for C-rate input (to be followed by a message to initialize the values).
+
+To release a Ugen, free the ID, but the ugen is actually deleted only when all references to it are deleted. When a Ugen is deleted, its references are also deleted, which may cause other Ugens to be deleted.
+````
+/arco/free ID
+````
+
+To change a parameter, there are two possibilities. A constant (a Ugen of class Const)
+can be updated with a new value. A constant can have multiple channels (so it can be
+seen as a vector of floats), so the update includes a channel. You can update a
+constant directly using:
+```
+/arco/const/set ID chan float
+```
+But you can also free the Const Ugen after it has been assigned as the input to
+some other Ugen. Since the refcount is greater than 1, releasing the ID does not
+delete the constant, and some Ugen holds the reference. But every Ugen has
+commands to follow the reference to the Const object and set a value:
+````
+/arco/fmosc/set_freq ID chan float
+````
+This message only works if the current input is a Const and is recommended because the client can free its direct reference to the Const object. Also, it seems more direct to set an *input* parameter of the ugen as opposed to an *output* parameter of a Const.
+
+However, if the Const is shared by other ugens, setting the *input* of one of those ugens changes the input of other ugens. In that case, it is better to treat the Const object as a shared variable and set the Const object directly.
+
+If the current input is A-rate or B-rate, you can *replace* the input
+(and also unref the current one) by using a replace command:
+```
+/arco/fmosc/repl_freq ID freqID
+```
+where freqID is the ID of the replacement input.
+
+## pwl
+`/arco/pwl/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
+
+`/arco/pwl/env id d0 y0 d1 y1 ... dn-1 [yn-1]` - set the envelope or function shape for object with id. All remaining parameters are floats, alternating segment durations (in samples) and segment final values. The envelope starts at the current output value and ends at yn-1 (defaults to 0).
+
+`/arco/pwl/start id` - starts object with id.
+
+`/arco/pwl/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
+
+## delay
+`/arco/delay/new id` - Create a new delay generator with audio input and output. `id` is the object id.
+

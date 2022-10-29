@@ -316,8 +316,6 @@ int arco_latency_ms = -1;
 
 void audio_dialog()
 {
-    int in_id = -1;
-    int out_id = -1;
     // look up device numbers in preferences
     for (int i = 0; i < arco_device_info.size(); i++) {
         const char *info = arco_device_info[i];
@@ -325,6 +323,13 @@ void audio_dialog()
         prefs_in_id = prefs_in_lookup(info, id);
         prefs_out_id = prefs_out_lookup(info, id);
     }
+    if (arco_in_id == -1) arco_in_id = prefs_in_id;
+    if (arco_out_id == -1) arco_out_id = prefs_out_id;
+    if (arco_in_chans == -1) arco_in_chans = prefs_in_chans();
+    if (arco_out_chans == -1) arco_out_chans = prefs_out_chans();
+    if (arco_buffer_size == -1) arco_buffer_size = prefs_buffer_size();
+    if (arco_latency_ms == -1) arco_latency_ms = prefs_latency_ms();
+
     ui_start_dialog();
     // "Current" values are displayed as information to user from
     // host_* variables unless there is no actual value yet,

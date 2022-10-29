@@ -455,7 +455,6 @@ int ui_poll(int delay_ms)
         }
     } else {
         if (dialog_submode) {
-            printf("dialog_submode key is %d\n", ch);
             switch (ch) {
               case KEY_DOWN:
               case '\n':
@@ -647,7 +646,7 @@ void ui_run_dialog(const char *title)
 }
 
 
-// finish dialog -- use the data from the form if good is true
+// ui_end_dialog() - finish dialog -- use the data from the form if good is true
 //
 void ui_end_dialog(bool good)
 {
@@ -656,8 +655,6 @@ void ui_end_dialog(bool good)
     if (good) {
         for (int i = 0; i < fields.size(); i++) {
             FIELD *field = fields[i];
-            printf("field %d is %s status %d\n", i, 
-                   field_buffer(field, 0), field_status(field));
             if (field_status(field)) {
                 Dminfo *fi = &dminfo[i];
                 const char *buffer = field_buffer(field, 0);
@@ -691,7 +688,6 @@ void ui_end_dialog(bool good)
                     if (*ptr) continue;  // we found a non-digit, skip entry
                     *fi->varptr.intptr = atoi(buffer);
                     fi->changed = true;
-                    printf("field %d got %d\n", i, *fi->varptr.intptr);
                 } else if (fi->type == 'f') {
                     *fi->varptr.floatptr = atof(buffer);
                 } else if (fi->type == 's') {

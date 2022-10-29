@@ -49,27 +49,27 @@ static bool get_number(const char *line, const char *key, int *value)
 
 void get_name(const char *line_ptr, char *p_device)
 {
-    char *pd = find_nonspace(line_ptr + 13);
+    char *pd = find_nonspace(line_ptr);
     bool is_quoted = false;
     if (*pd == '"') {
         is_quoted = true;
         pd++;
     }
+    trim_space(pd);  // remove any trailing newline or space
     size_t len = strlen(pd);
-    if (is_quoted != (pd[len - 1] == '"')) {
-        return;
-    }
-    if (is_quoted) {
+
+    // otherwise remove existing final quote if quoted
+    if (is_quoted && pd[len - 1] == '"') {
         pd[len - 1] = 0; 
     }
     strcpy(p_device, pd);
-    trim_space(p_device);
 }
 
 #include <errno.h>
 
 void prefs_read()
 {
+    printf("prefs_read called\n");
     FILE *pf = fopen(".arco", "r");
     if (!pf) {
         return;
@@ -81,10 +81,10 @@ void prefs_read()
     size_t line_len = 80;
     while (getline(&line_ptr, &line_len, pf) > 0) {
         if (strstr(line_ptr, "audio_in_name:") != 0) {
-            get_name(line_ptr + 16, device);
+            get_name(line_ptr + 14, device);
             prefs_set_in_name(device);
         } else if (strstr(line_ptr, "audio_out_name:") != 0) {
-            get_name(line_ptr + 17, device);
+            get_name(line_ptr + 15, device);
             prefs_set_out_name(device);
         } else if (get_number(line_ptr, "in_chans:", &n)) {
             prefs_set_in_chans(n);
