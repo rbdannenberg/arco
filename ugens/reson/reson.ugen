@@ -1,0 +1,17 @@
+# reson.ugen -- reson unit generator
+#
+# Roger B. Dannenberg
+# Nov 2022
+# reson(sound, center, bandwidth)
+
+reson(ab, ab, ab): a
+resonb(b, b, b): b
+
+FAUST
+
+declare description "Reson Unit Generator for Arco";
+
+#import("stdfaust.lib");
+import("filters.lib");
+
+process(snd, center, bandwidth) = resonlp(center, bandwidth, sound);

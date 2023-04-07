@@ -13,7 +13,7 @@ import sys
 def main():
     # find files
     if len(sys.argv) != 2:
-        print("Usage: py u2f.py classname[.ugen]")
+        print("Usage: python3 u2f.py classname[.ugen]")
         exit(-1)
     source = sys.argv[1]  # can pass "sine.ugen" or just "sine"
     if source.find(".") < 0:

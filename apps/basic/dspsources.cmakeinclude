@@ -1,0 +1,7 @@
+set(ARCO_SRC ${ARCO_SRC}
+    src/pwl.cpp src/pwl.h
+    src/pwlb.cpp src/pwlb.h
+    src/mix.cpp src/mix.h
+    /Users/rbd/arco4/ugens/sine/sine.cpp /Users/rbd/arco4/ugens/sine/sine.h
+    /Users/rbd/arco4/ugens/mult/mult.cpp /Users/rbd/arco4/ugens/mult/mult.h
+)

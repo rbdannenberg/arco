@@ -556,6 +556,7 @@ int ui_finish()
     }
     free(lines);
     fclose(logfile);
+    fields.finish();
     puts("back to normal");
     return false;
 }

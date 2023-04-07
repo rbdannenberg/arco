@@ -3,7 +3,7 @@
 These are definitions for arco unit generators represented by
 .ugen files.
 
-At the time of writing, there are 3 unit generator types:
+At the time of writing, there are 2 unit generator types:
 sine and mult.
 
 To generate sine unit generators:

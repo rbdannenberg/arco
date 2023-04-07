@@ -1,0 +1,19 @@
+# notchw.ugen -- notch filter unit generator
+#
+# Roger B. Dannenberg
+# Jan 2023
+# notch(sound, center, bandwidth)
+
+notch(ab, ab, ab): a
+notchb(b, b, b): b
+
+FAUST
+
+declare name "notch";
+declare description "Notch Unit Generator for Arco";
+
+#import("stdfaust.lib");
+import("filters.lib");
+
+process(snd, center, bandwidth) = notchw(bandwidth, center, snd);
+

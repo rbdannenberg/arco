@@ -34,11 +34,16 @@ extern int actual_buffer_size;
 extern int actual_latency;
 */
 
-extern int arco_state;
+extern int aud_state;
+// communication with main thread: when aud_quit_request
+// and aud_state == IDLE, call o2sm_finish()
+extern int aud_quit_request;
+
 extern int64_t arco_frames_done;
 extern int64_t arco_blocks_done;
 
 void audioio_initialize(Bridge_info *bridge);
+void audioio_finish(Bridge_info *bridge);
 
 O2time arco_time(void *rock);
 

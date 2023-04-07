@@ -42,7 +42,7 @@ const char *help_strings[] = {
     " B - block count messages ON",
     " b - block count messages OFF",
     " H - describe commands like this",
-    "cP - Save latest selections to preferences",
+    " P - Save latest selections to preferences",
     " p - Print audio ugen tree",
     " Q - Quit the program",
     " S - Start or Stop",
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
     printf("main: initial latency %d\n", prefs_latency_ms());
     has_curses = ui_init(200) >= 0;  // <0 means error, no curses interface
     o2_network_enable(false);
-    o2_debug_flags("rs");
+    o2_debug_flags("");
     o2_initialize("arco");
     o2_clock_set(NULL, NULL);  // we are the reference clock
     int rslt = o2_shmem_initialize();
@@ -158,8 +158,20 @@ int main(int argc, char *argv[])
     audioio_initialize(arco_bridge);
 
     int running = true;
-    while (running) {
-        running = !ui_poll(2);  // 2 ms polling period
+    int shutting_down = false;
+    while (running || shutting_down) {
+        running &= !ui_poll(2);  // 2 ms polling period
+        if (!running) {  // User entered the Quit command
+            if (!shutting_down) {
+                aud_quit_request = true;  // o2sm_finish() when state is IDLE
+                o2_send_cmd("/arco/close", 0, "");
+                shutting_down = true;  // wait for O2sm_info to be deleted
+            } else {  // test for O2sm_info deleted before exiting loop
+                shutting_down = (o2_shmem_inst_count() > 0);
+                // when no more shared memory instances, shutting_down becomes
+                // false, and this will be the last time through the loop
+            }
+        }
         o2_poll();
         arco_thread_poll();
         if (!arco_ready) {
@@ -172,7 +184,15 @@ int main(int argc, char *argv[])
         // automation();
         o2_sleep(0.01);
     }
+    o2_bridges_finish();
     ui_finish();
+    
+    for (int i = 0; i < arco_device_info.size(); i++) {
+        O2_FREE((void *) arco_device_info[i]);
+    }
+    arco_device_info.finish();
+    dminfo.finish();
+    
     o2_finish();
 }
 

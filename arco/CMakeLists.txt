@@ -16,9 +16,15 @@ set(ARCO_SRC
     zero.cpp zero.h 
     zerob.cpp zerob.h 
     const.cpp const.h 
-    pwl.cpp pwl.h 
-    pwlb.cpp pwlb.h 
-    mix.cpp mix.h 
+    upsample.cpp upsample.h 
+
+
+#    pwl.cpp pwl.h 
+#    pwlb.cpp pwlb.h
+#    delay.cpp delay.h
+#    mix.cpp mix.h
+
+
     testtone.cpp testtone.h
     # NOTE: list of desired unit generators should be moved to
     # CMakeLists for individual applications so that we do not
@@ -28,27 +34,51 @@ set(ARCO_SRC
     # to scan the user's code to determine what unit generators are
     # instantiated. For now, we're focused on a server that has all
     # the code, and to keep things simple, the unit generators are here:
-    ../../ugens/mult.cpp ../../ugens/mult.h 
-    ../../ugens/multb.cpp ../../ugens/multb.h 
-    upsample.cpp upsample.h 
-    ../../ugens/sine.cpp ../../ugens/sine.h 
-    ../../ugens/sineb.cpp ../../ugens/sineb.h
+
+
+#    ../../ugens/mult/mult.cpp ../../ugens/mult/mult.h 
+#    ../../ugens/mult/multb.cpp ../../ugens/mult/multb.h 
+#    ../../ugens/sine/sine.cpp ../../ugens/sine/sine.h 
+#    ../../ugens/sine/sineb.cpp ../../ugens/sine/sineb.h
+#    ../../ugens/reson/reson.cpp ../../ugens/reson/reson.h
+#    ../../ugens/reson/resonb.cpp ../../ugens/reson/resonb.h
 )
 
-if(APPLE)
-  list(APPEND ARCO_SRC recperm.mm recperm.h)
-endif()
+if(APPLE) 
+  list(APPEND ARCO_SRC recperm.mm recperm.h) 
+endif() 
 
-list(TRANSFORM ARCO_SRC PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+list(TRANSFORM ARCO_SRC PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/") 
+
+
+# find arco base directory
+cmake_path(GET CMAKE_CURRENT_LIST_DIR PARENT_PATH ARCO_PATH)
+cmake_path(GET ARCO_PATH PARENT_PATH FRIENDS_PATH)
+
+# make dspmakefile and dspsources.cmakeinclude from dspmanifest.txt:
+#
+execute_process(COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
+                    ${ARCO_PATH}
+                    ${CMAKE_SOURCE_DIR}/dspmanifest.txt
+                    ${CMAKE_SOURCE_DIR}/dspmakefile
+                    ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude)
+#
+# run the dspmakefile at build time to make sure source code is generated
+add_custom_target(ALL
+    COMMAND pushd ${CMAKE_SOURCE_DIR}; make -m makedspmakefile; popd
+    DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
+# now that sources are made, add them here:
+include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude")
+message(STATUS "ARCO_SRC: ${ARCO_SRC}")
 
 append_to_global(ALL_INCLUDE_DIRECTORIES
                  "${CMAKE_CURRENT_LIST_DIR}/src")
 append_to_global(ALL_INCLUDE_DIRECTORIES
-                 "${CMAKE_CURRENT_LIST_DIR}/../../o2/src")
+                 "${FRIENDS_PATH}/o2/src")
 append_to_global(ALL_INCLUDE_DIRECTORIES
-                 "${CMAKE_CURRENT_LIST_DIR}/../../portaudio/include")
+                 "${FRIENDS_PATH}/portaudio/include")
 append_to_global(ALL_INCLUDE_DIRECTORIES
-                 "${CMAKE_CURRENT_LIST_DIR}/../../nyquist/nylsf")
+                 "${FRIENDS_PATH}/nyquist/nylsf")
 
 if(APPLE)
   find_library(COREAUDIO CoreAudio)

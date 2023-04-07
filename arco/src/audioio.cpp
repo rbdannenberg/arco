@@ -108,11 +108,13 @@ using std::min;
 O2_context aud_o2_ctx;  // O2 context for audio thread
 
 int aud_state = UNINITIALIZED;
+int aud_quit_request = false;  // request to o2sm_finish() at a clean spot
 bool aud_reset_request = false;
 int64_t aud_frames_done = 0;
 int64_t aud_blocks_done = 0;
 bool aud_heartbeat = true;
 
+static bool arco_thread_exited = false;  // stop processing after o2sm_finish()
 static int actual_in_chans = -1;     // number of channels in callback
 static int actual_out_chans = -1;    // number of channels in callback
 static int actual_latency_ms = -1;
@@ -450,7 +452,7 @@ static int callback_entry(float *input, float *output,
     // Impose artificial load, but stop for a second if underflows happen.
     // I don't think the optimizer will remove a function call.
     if (cpuload && underflow_count > 1000) {
-        for (long i = 0; i < cpuload; i++) busywork(i);
+        for (int i = 0; i < cpuload; i++) busywork(i);
     }
 
     if (log_input) {
@@ -463,7 +465,7 @@ static int callback_entry(float *input, float *output,
     }
     */
 
-    o2sm_poll();
+    o2sm_poll();  // called here to get block-accurate timing
     aud_frames_done += BL;
     Ugen_ptr input_ug = ugen_table[INPUT_ID];
     Sample_ptr aout;
@@ -971,11 +973,26 @@ void arco_load(O2SM_HANDLER_ARGS)
     cpuload = count;
 }
 
+void arco_free_all_ugens()
+{
+    output_set.clear();
+    run_set.clear();
+    for (int i = 0; i < ugen_table.size(); i++) {
+        Ugen_ptr ugen = ugen_table[i];
+        if (ugen) {
+            ugen_table[i] = NULL;
+            ugen->unref();
+        }
+    }
+}
 
 // called to keep this zone running when there are no audio callbacks
 // this can be called directly from the main O2 thread.
 void arco_thread_poll()
 {
+    if (arco_thread_exited) {
+        return;
+    }
     if (aud_state == RUNNING || aud_state == FIRST) return;
     if (aud_state == STARTED) {
         aud_state = FIRST;
@@ -997,15 +1014,7 @@ void arco_thread_poll()
     if (aud_reset_request &&
         (aud_state == UNINITIALIZED || aud_state == IDLE)) {
         aud_reset_request = false;  // clear the request
-        output_set.clear();
-        run_set.clear();
-        for (int i = 0; i < ugen_table.size(); i++) {
-            Ugen_ptr ugen = ugen_table[i];
-            if (ugen) {
-                ugen_table[i] = NULL;
-                ugen->unref();
-            }
-        }
+        arco_free_all_ugens();
 //        actual_in_chans = 0;
 //        actual_out_chans = 0;
 
@@ -1014,7 +1023,20 @@ void arco_thread_poll()
         strcpy(control_service_addr + control_service_addr_len, "reset");
         o2sm_send_finish(0.0, control_service_addr, true);
     }
+    // we're IDLE now, so if quit is requested, do it now:
+    if (aud_quit_request) {
+        arco_free_all_ugens();
+        ugen_table.finish();
+        
+        assert(run_set.size() == 0);
+        run_set.finish();
+        
+        assert(output_set.size() == 0);
+        output_set.finish();
 
+        o2sm_finish();
+        arco_thread_exited = true;  // stop further polling of audio
+    }
     // restore thread local context
     o2_ctx = save_ctx;
 }
