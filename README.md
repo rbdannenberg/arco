@@ -2,6 +2,8 @@
 
 **Roger B. Dannenberg**
 
+STATUS: Basic framework is complete, simple demo now runs, needs
+much more work to define and build out a library of unit generators.
 
 ## Introduction
 Arco is a sound synthesis engine that offers dynamic patching of
