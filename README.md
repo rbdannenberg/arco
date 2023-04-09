@@ -9,10 +9,15 @@ much more work to define and build out a library of unit generators.
 Arco is a sound synthesis engine that offers dynamic patching of
 of unit generators. It is designed to operate as a small embedded
 server, running either in its own process or within an application.
-There is no Arco programming language as in Csound, SuperCollider
-or ChucK, and even most of the DSP primitives are written in FAUST,
-but the author mainly uses Arco with Serpent, a real-time
-Python-like scripting language. Other language bindings are possible.
+In the spirit of "smaller is better," Arco DSP is mainly delegated
+to FAUST, leveraging a wide range of existing algorithms. Arco
+control is delegated to external languages connecting through O2,
+which supports running Arco within the same application, in a
+separate process or even on a remote networked host.
+Arco should be a nice alternative to `libpd` as an embedded sound
+engine. The author is mainly using Arco in tandem with Serpent,
+a real-time Python-like scripting language, but other language
+bindings are possible.
 
 If you are familiar with other computer music sound synthesis systems,
 it may be useful to know how Arco is differs. Some of the distictive
