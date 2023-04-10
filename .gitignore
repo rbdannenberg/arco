@@ -53,3 +53,7 @@ CMakeCache.txt
 /apps/basic/dspmakefile
 
 /ugens/sine/generate_sine.sh
+
+/apps/test/dspmakefile
+
+/apps/test/dspsources.cmakeinclude

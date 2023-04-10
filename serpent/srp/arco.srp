@@ -26,7 +26,33 @@ BP = 1 / BR
 #    'opening' - opening audio device(s)
 #    'running' - audio server is running
 #    'resetting' - shutting down audio server
+#    'quiting' - 
 #
+# state transitions:
+#    start state is nil
+#    main program calls arco_init(): nil -> 'discovery',
+#        poll for discovery of "arco" service until found
+#    on discovery: arco_initialization() sends /arco/reset, 
+#        'discovery' -> 'initializing'
+#        Arco replies to /actl/reset handled by actl_reset()
+#        new objects are created and send to /arco/devinf
+#        'initializing' -> 'opening'
+#    Arco sends device info to /host/openaggr (implemented by application)
+#        application makes input and output device selections and
+#            sends to /arco/open with reply-to set to "actl"
+#        Arco replies to /actl/starting, handled by actl_starting()
+#        'opening' -> 'running'
+#    (an arco_initialization() sending /arco/reset can happen here)
+#    Shutdown:
+#         application calls arco_quit() (one way to implement this
+#            is to set default_window.method = 'arco_main_win_handler'. This
+#            will call arco_quit() when the main window is closed,
+#            delaying exit until a clean shutdown is complete.)
+#        arco_quit sends /arco/quit and begins polling with poll_for_no_arco
+#        Arco stops running and calls o2sm_finish()
+#        poll_for_no_arco detects Arco finish with 
+#            o2_shmem_inst_count() == 0 and calls exit()
+#        
 arco_state = nil
 def set_arco_state(state): 
     display "arco_state change", state
@@ -83,6 +109,38 @@ def actl_act(timestamp, address, types, rest parameters):
         general_apply(action[0], action[1], action[2])
 
 
+# assign default_window.method = 'arco_main_win_handler' to quit Arco
+# before quitting your main program. default_window is defined by
+# require "wxserpent" -- works with wxserpent64 only (not serpent64)
+def arco_main_win_handler(obj, event, x, y):
+    if event == WXS_CLOSE_WINDOW:
+        // request Arco to shut down
+        arco_quit()
+        // event is handled, so we do not actually quit yet
+
+
+# To quit, application should call arco_quit(). Alternatively, 
+# set default_window.method = 'arco_main_win_handler' to catch
+# when main window closes (which would normally shut down the
+# application) and instead call arco_quit() to clean up and
+# THEN exit the application.
+#
+def arco_quit():
+    o2_send_cmd("/arco/quit", 0)
+    o2_send_cmd("/arco/close", 0)
+    poll_for_no_arco()
+
+
+def poll_for_no_arco()
+    print "poll for no arco"
+    if o2_shmem_inst_count() == 0:
+        arco_thread_poll() // <- just a test to make sure this does not crash
+                           // Arco. It should know that Arco is shut down and
+                           // just return.
+        exit()
+    sched_cause(0.1, nil, 'poll_for_no_arco')
+
+
 def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t):
     arco_input_chans = ins
     arco_output_chans = outs
@@ -120,6 +178,7 @@ def actl_reset(rest ignore):
     if arco_state == 'resetting':
         set_arco_state(nil)
         return
+    // else arco_state is 'initializing' and we are starting up
     print "**** arco was reset, starting initialization ****"
     Ugen(ZERO_ID, "Zero", -1, 'a')
     o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID)
@@ -163,11 +222,13 @@ def actl_starting(timestamp, address, types, rest args):
 # free ID management:
 free_nesting = 0  // recursion depth in Ugen free method
 to_be_freed = []  // list of id's to free
-ugen_table = array(1000)
+ugen_table = array(1000)  // 1000 must match Arco's ugen_table size.
 id_free_list = nil  // location of linked free list head in ugen_table
 next_free_id = 10   // 0, 1, 2, 3 are special. 4-9 are reserved for 
                     // test tone and other server functions.
-def new_id():
+def new_id(optional allow_nil_return):
+# allocate a new id. If there are no more id's, return nil if
+#     allow_nil_return; otherwise, raise an error
     if id_free_list:
         var id = id_free_list
         id_free_list = ugen_table[id]
@@ -177,8 +238,10 @@ def new_id():
         id = next_free_id
         next_free_id = next_free_id + 1
         return id
-    print "ERROR: no more free Unit Generator ID's"
-    return nil
+    if allow_nil_return:
+        return nil
+    else:
+        error("ERROR: no more free Unit Generator ID's")
 
 
 class Ugen:

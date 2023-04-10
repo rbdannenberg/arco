@@ -7,6 +7,8 @@
 # call arco_run() after setting up UI and or scheduling things
 # arco_ready is set to true when arco is ready for action
 
+require "debug"
+require "wxserpent"
 require "arco"
 
 class Atone (Instrument):
@@ -75,7 +77,9 @@ def host_openaggr_init()
     o2_method_new("/host/openaggr", "s", 'host_openaggr', t)
 
 
+
 def main():
+    default_window.method = 'arco_main_win_handler'
     arco_init(network = false)
     // this should be replaced by a preference and menu system to select
     // and open audio device(s):

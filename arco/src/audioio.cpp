@@ -272,6 +272,19 @@ static void arco_reset(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/reset string s;
+   Reset the server: stop audio, disconnect run set and outputs,
+   send to /<s>/reset, where <s> is the control service name
+   passed as an argument of this message.
+*/
+static void arco_quit(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    // end unpack message
+    aud_quit_request = true;
+}
+
+
 // req_in_chans -- get the number of input channels to request
 int req_in_chans(int in_chans)
 {
@@ -364,9 +377,12 @@ void sum_from_into(Sample_ptr x, Sample_ptr y, int n)
 void mix_down_interleaved(Sample_ptr output, int actual_out_chans,
                           Sample_ptr buffer, int aud_out_chans)
 {
-    // Note: aud_out_chans > actual_out_chans, and
+    if (actual_out_chans == 0) {
+        return;  // if no real output, no place or need to mix any samples
+    }
+    // Note: aud_out_chans > actual_out_chans > 0, and
     //       buffer is bigger than output
-    // just copy the first actual_out_chans of each frame
+    // Begin by copying the first actual_out_chans of each frame:
     Sample_ptr src = buffer;
     Sample_ptr dst = output;
     for (int i = 0; i < BL; i++) {
@@ -376,7 +392,7 @@ void mix_down_interleaved(Sample_ptr output, int actual_out_chans,
         }
         src += aud_out_chans;  // skip to next frame
     }
-    // add in the rest, actual_out_chans at a time
+    // Add the rest, actual_out_chans at a time, until all channels are output
     for (int c = actual_out_chans; c < aud_out_chans;
          c += actual_out_chans) {
         // mix up to next actual_out_chans into first actual_out_chans
@@ -494,8 +510,23 @@ static int callback_entry(float *input, float *output,
     }
 #else
     Ugen_ptr prev_output = ugen_table[PREV_OUTPUT_ID];
-    if (actual_out_chans > 0 && output_set.size() > 0 &&
-        prev_output && prev_output->chans > 0) {
+    // The commented conditions will stop computation of audio output
+    // when there is no real output stream to write to. It seems
+    // reasonable not to compute audio when it is not needed, but maybe
+    // the intended output is monitored by some analysis that generates some
+    // outgoing O2 messages, or maybe if output is not processed, then
+    // sounds are created but never terminate, exhausting the available
+    // Ugen namespace, or maybe we are only interested in getting a log
+    // of the computed audio. Since failing to output sound could have side
+    // effects like this, we always compute output even when there is no
+    // stream to send it to.
+    //     Probably, it is a bug not to have prev_output, and it should
+    // be created automatically, and probably it is OK for prev_output
+    // to have zero channels, but can we specify that? At least there is
+    // code below (see else part) to output zeros when Arco produces no
+    // output but the audio device expects output.
+    if (/* actual_out_chans > 0 && output_set.size() > 0 &&
+        prev_output && */ prev_output->chans > 0) {
 
         // Compute the output to be copied to prev_output, then copy,
         // then interleave and mix down to actual output.
@@ -506,7 +537,7 @@ static int callback_entry(float *input, float *output,
         if (actual_out_chans >= aud_out_chans) {
             buffer = output;  // output is big enough
         } else {
-            buffer = (Sample_ptr) alloca(aud_out_chans * sizeof(Sample));
+            buffer = (Sample_ptr) alloca(aud_out_chans * BLOCK_BYTES);
         }
 
         Sample_ptr outptr;
@@ -515,6 +546,9 @@ static int callback_entry(float *input, float *output,
         for (int i = 0; i < output_set.size(); i++) {
             Ugen_ptr output_ug = ugen_table[output_set[i]];
             output_ug->run(aud_blocks_done);
+            if (aud_out_chans == 0) {
+                continue;
+            }
             outptr = &output_ug->output[0];
             int n = min(output_ug->chans, aud_out_chans);
             if (i == 0) {  // copy and fill
@@ -1060,6 +1094,7 @@ void audioio_initialize(Bridge_info *bridge)
     o2sm_method_new("/arco/logaud", "iis", arco_logaud, NULL, true, true);
     o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
     o2sm_method_new("/arco/hb", "i", arco_hb, NULL, true, true);
+    o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     Pa_Initialize();

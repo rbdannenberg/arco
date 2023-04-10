@@ -4,6 +4,7 @@
 # April 2023
 
 import sys
+import os
 
 """
 Command line should have three parameters:
@@ -102,6 +103,12 @@ def main():
     manifest_name = sys.argv[2]
     makefile_name = sys.argv[3]
     inclfile_name = sys.argv[4]
+    # first remove existing inclfile_name in case we fail
+    try:
+        os.remove(inclfile_name)
+    except:
+        print("Did not find or remove", inclfile_name)
+    # read the manifest
     with open(manifest_name, "r") as inf:
         manifest = inf.readlines()
     # remove comments
