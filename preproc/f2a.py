@@ -867,6 +867,7 @@ def run_faust(classname, file, outfile):
     blockrate = ""
     if file.find("b.dsp") >= 0:
         blockrate = "-os "  # one sample if b-rate
+    print("In f2a.py, PATH=" + os.environ['PATH'])
     err = os.system("faust -light -cn " + classname + " " + blockrate +
                     file + " -o " + outfile)
     if err != 0:

@@ -57,17 +57,40 @@ cmake_path(GET ARCO_PATH PARENT_PATH FRIENDS_PATH)
 
 # make dspmakefile and dspsources.cmakeinclude from dspmanifest.txt:
 #
+message(STATUS "----- executing makedspmakefile.py")  
 execute_process(COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
                     ${ARCO_PATH}
                     ${CMAKE_SOURCE_DIR}/dspmanifest.txt
                     ${CMAKE_SOURCE_DIR}/dspmakefile
                     ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude)
 #
-# run the dspmakefile at build time to make sure source code is generated
-add_custom_target(ALL
-    COMMAND pushd ${CMAKE_SOURCE_DIR}; make -m makedspmakefile; popd
+# run the dspmakefile at CMake Configure time to make sure there are
+# source files in place when CMake looks to add them to the project.
+# To run make properly, we need set the PATH because CMake the app
+# does not set up paths the way a shell does in a terminal window.
+# Thus, we first make a shell command and put it in the project
+# directory, then we run it. We can also set up dependencies
+# to run it at build time whenever something changes.
+#
+file(WRITE "${CMAKE_SOURCE_DIR}/make_faust_ugens.sh"
+     "export PATH=$PATH:${FAUST_PATH}\n"
+     "make --makefile=dspmakefile\n")
+#
+# now we run make by running the shell command
+#
+message(STATUS "----- executing make_faust_ugens.sh")
+execute_process(COMMAND sh make_faust_ugens.sh 
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+#
+# also run make_faust_ugens at build time to make sure source code is generated
+add_custom_target(make_faust_ugens ALL
+    COMMAND sh make_faust_ugens.sh 
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
-# now that sources are made, add them here:
+#
+# now that sources are made, add them here using the cmakeinclude file
+# made by makedspmakefile.py called by make_faust_ugens.sh
+#
 include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude")
 message(STATUS "ARCO_SRC: ${ARCO_SRC}")
 
@@ -100,6 +123,7 @@ append_to_global(ALL_LINK_DIRECTORIES
 
 add_library(arco4lib STATIC ${ARCO_SRC} ${ARCO4_APP_SRC})  
 register_target(arco4lib)
+add_dependencies(arco4lib make_faust_ugens) 
 
 #-----------------------------------------------------------------------
 #------ libsndfile and externals ---------------------------------------

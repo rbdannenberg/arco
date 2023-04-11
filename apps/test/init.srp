@@ -8,21 +8,31 @@
 # arco_ready is set to true when arco is ready for action
 
 require "debug"
+require "prob"
 require "wxserpent"
 require "arco"
 
 class Atone (Instrument):
     def init(freq, dur, nharm):
+        display "Atone", dur
         instr_begin()
-        var env = member(pwlb(dur * 0.2, 0.1, dur * 0.8), 'env')
+        var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
         env.atend(MUTE, this)
         var mix = mix(1)
         for i = 1 to nharm:
             mix.ins(sine(freq * i, 0.8 ** i), env)
+        if pr_coin(0.5):
+            var renv = member(pwlb(random(), pr_unif(4, 10) * freq, 
+                                   5.0, 200.0, max(5.0, dur * 2)), 'renv')
+            var q = pr_unif(0.5, 2.0)
+            mix = reson(mix, renv, q)
         super.init("Atone", mix)
 
     def start():
         get('env').start()
+        var renv = get('renv')
+        if renv:
+            renv.start()
         this
 
 
@@ -49,14 +59,12 @@ def arco_ready():
 def atone_sequence():
     var step = 40 + irandom(40)
     var freq = 440.0 * (2.0 ** (1/12)) ** (step - 69)
-    var dur = random()
-    dur = dur * dur * 10 + 0.05
+    var dur = pr_unif(0.5, 10)
     var nharm = irandom(15) + 2
     display "atone_sequence", freq, dur, nharm
     var atone = Atone(freq, dur, nharm).play().start()
     // sched_cause(dur + 0.2, atone, 'mute')
-    var ioi = random()
-    ioi = ioi * ioi * 2 + 0.05
+    var ioi = pr_unif(0.25, 2.0) ** 2
     sched_cause(ioi, nil, 'atone_sequence')
 
 

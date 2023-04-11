@@ -47,17 +47,18 @@ def make_makefile(arco_path, manifest, outf):
             else:
                 sources.append(ugen)
 
-    print("all:", file=outf)
+    print("all:  ", end="", file=outf)
     for source in sources:
-        print(" " + arco_path + "/ugens/" + source + ".cpp", 
-              end="", file=outf)
+        print(" \\\n    " + arco_path + "/ugens/" + source + "/" + \
+                  source + ".cpp", end="", file=outf)
     print("\n", file=outf)
     
     # for each source, write the command to generate it
     # this generates all variants (a-rate, b-rate) and both .cpp and .h
     for source in sources:
         src_path = arco_path + "/ugens/" + source + "/"
-        print(src_path + source + ".cpp: " + src_path + source + ".ugen", file=outf)
+        print(src_path + source + ".cpp: " + src_path + source + ".ugen " + \
+              arco_path + "/preproc/u2f.py", file=outf)
         print("\tcd " + arco_path + "/ugens/" + source + \
               "; python3 " + arco_path + "/preproc/u2f.py " + source,
               file=outf)

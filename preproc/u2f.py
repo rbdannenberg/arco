@@ -9,6 +9,14 @@ various combinations of b-rate and a-rate parameters and output.
 """
 
 import sys
+import subprocess
+
+def has_upper(s):
+    for c in s:
+        if c.isupper():
+            return True
+    return False
+
 
 def main():
     # find files
@@ -18,6 +26,15 @@ def main():
     source = sys.argv[1]  # can pass "sine.ugen" or just "sine"
     if source.find(".") < 0:
         source += ".ugen"
+    elif source.find(".ugen") < 0 or has_upper(source):
+        print("Error: command line argument " + source + \
+              "must be class name (lower case) with or without " + \
+              ".ugen extension")
+        return
+    # now strip off .ugen because we need the directory name too
+    classnamelc = source[ : -5]
+    print("**** Cleaning out old sources")
+    subprocess.run(["rm " + classnamelc + "_*.{dsp,fh}"], shell=True)
     print("**** Translating", source)
     with open(source, "r") as srcf:
         src = srcf.readlines()
@@ -54,15 +71,17 @@ def main():
         # gather up all classnames, e.g. ["sine", "sineb"] for later:
         if s[0] not in classnames:
             classnames.append(s[0])
-    classnamelc = source[ : -5]
     shellfilename = "generate_" + classnamelc + ".sh"
     print("**** Generating", shellfilename)
     with open(shellfilename, "w") as genf:
         print("#!/bin/sh", file=genf)
+        print('echo "In', shellfilename, 'running python3, path=$PATH"',
+              file=genf)
         for cn in classnames:
-            print("py ../preproc/f2a.py", cn, file=genf)
+            print("python3 ../../preproc/f2a.py", cn, file=genf)
         for cn in classnames:
-            print("py ../../o2/preproc/o2idc.py", cn + ".cpp", file=genf)
+            print("python3 ../../../o2/preproc/o2idc.py", cn + ".cpp",
+                  file=genf)
 
 
 def expand_signature(name, params, outputtype, types, impl):

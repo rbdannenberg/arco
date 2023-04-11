@@ -466,7 +466,7 @@ class Instrument (Ugen):
 
 
     def get(input):
-        parameter_bindings[input]
+        parameter_bindings.get(input)
 
 
     def set(input, value, optional chan = 0):
@@ -495,7 +495,7 @@ def sineb(freq, amp, optional chans = 1):
         print "ERROR: passing audio rate Ugen to block rate sineb"
         return nil
     else:
-        return Ugen(new_id(), "Sineb", chans, 'b', {'freq': freq, 'amp': amp})
+        return Ugen(new_id(), "Sineb", chans, 'b', 'freq', freq, 'amp', amp)
 
 def const(x):
     var ugen = Ugen(new_id(), "Const", -1, 'c')
@@ -641,3 +641,27 @@ class Mix (Ugen):
 
 def mix(optional chans = 1):
     return Mix(chans)
+
+
+def reson(input, center, bandwidth, optional chans = 1):
+    if input.rate != 'a':
+        print "ERROR: input to audio rate reson is not audio rate"
+        return nil
+    return Ugen(new_id(), "Reson", chans, 'a', 'input', input, 
+                'center', center, 'bandwidth', bandwidth)
+
+def resonb(input, center, bandwidth, optional chans = 1):
+    if input.rate == 'a' or center.rate == 'a' or bandwidth.rate == 'a':
+        print "ERROR: passing audio rate Ugen to block rate resonb"
+        return nil
+    return Ugen(new_id(), "Resonb", chans, 'b', 'input', input, 
+                'center', center, 'bandwidth', bandwidth)
+
+def mult(x, y, optional chans = 1):
+    return Ugen(new_id(), "Mult", chans, 'a', 'x', x, 'y', y)
+
+def multb(x, y, optional chans = 1):
+    if x.rate == 'a' or x.rate == 'a':
+        print "ERROR: passing audio rate Ugen to block rate multb"
+        return nil
+    return Ugen(new_id(), "Multb", chans, 'b', 'x', x, 'y', y)

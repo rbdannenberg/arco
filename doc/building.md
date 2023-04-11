@@ -73,31 +73,64 @@ rather large set into `apps/test` and `apps/basic`, so you can
 to build the `dspmanifest.txt` automatically from declarations in
 source files.
 
+## Running CMake
+Once dspmanifest.txt is in place, you can run CMake in/on your
+`apps/test` directory, and if all goes well, you can generate a
+project for XCode, Visual Studio, or a Makefile for Linux.
+
+If there are problems, you may see a lot of text in CMake's output. If
+you are trying to debug FAUST code and your `.ugen` files, you may
+prefer to run make in a terminal window. The section below on
+**Details** gives some options.
+
 ## Making a Server
 
 ## Linking with wxSerpent
 
 ## Details: The Preprocessor Pipeline
 
-- dspmanifest.txt tells the build system what unit generators you want
+- `dspmanifest.txt` tells the build system what unit generators you want
 
-- makedspmakefile.py reads dspmanifest.txt and creates:
-  - dspmakefile (input to make to generate the unit generator sources)
+- `CMake` calls `makedspmakefile.py` to build a makefile:
 
-  - dspsources.cmakeinclude (tells the project to compile and link the
+- `makedspmakefile.py` reads `dspmanifest.txt` and creates:
+  - `dspmakefile` (input to make to generate the unit generator
+    sources). *Notes:*
+    - Once `CMake` has created this, you can just run
+    `make --makefile=dspmakefile` in your `apps/project` directory to
+    rerun FAUST. This is recommended if you are debugging
+    FAUST code because the output appears in the terminal instead of
+    in CMake's output window.
+
+    - Perhaps even better, you can make a particular unit generator
+      with ``make --makefile=dspmakefile <path-to-a-ugen>/<a-ugen>.cpp`
+      in your `apps/project` directory to remake one unit generator.
+
+  - `dspsources.cmakeinclude` (tells the project to compile and link the
     unit generator sources)
 
-- CMake invokes make on makedspmakefile which invokes u2f.py and
-  f2a.py
+- `CMake` invokes `make --makefile=dspmakefile` which invokes `u2f.py` and
+  `generate_<ugenname>.sh`
 
-- u2f.py reads a .ugen file describing variants of the unit generator
+- `u2f.py` reads a `.ugen` file describing variants of the unit generator
   based on what sample rates (audio-rate or block-rate) can be handled
   as inputs and what output rates are to be produced. It creates:
-  - multiple .dsp files for FAUST
 
-- f2a.py runs faust to translate .dsp files to .cpp and .h
-files. These are then combined to create a unit generator files for
-Arco (also .cpp and .h files). In general, two unit generators are
+  - multiple `.dsp` files for FAUST
+
+  - `generate_<ugenname>.sh` (scripts immediately invoked by `dspmakefile` )
+
+- `generate_<ugenname>.sh` runs `f2a.py` and `o2idc.py` to generate audio-rate and block-rate versions unit generators for Arco.
+
+- `f2a.py` reads multiple `.cpp` and `.h` files written by FAUST and creates:
+  - `.cpp` and `.h` files that become Arco sources.
+
+- `o2idc.py` is O2's interface description compiler. It reads some comments
+  from the `.cpp` and `.h` files and expands them into code to extract O2
+  message parameters into local variables in message-handling functions.
+  It also writes code to register the functions as handlers for O2 messages.
+
+In general, two unit generators are
 created for each basic DSP algorithm. For example, `sine.ugen` directs
 the build system to create the Arco unit generators `Sine` and `Sineb`
 which produce audio-rate and block-rate signals, respectively.
