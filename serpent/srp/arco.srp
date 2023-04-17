@@ -147,8 +147,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t):
     sched_init()
     o2_network_enable(network)
     o2_initialize(ensemble, t)
-    arco4_initialize()  // create audio shared memory interface
-    // o2_debug_flags("s")
+    arco_initialize()  // create audio shared memory interface
     o2_service_new("actl")
     o2_method_new("/actl/act", "i", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
@@ -253,15 +252,16 @@ class Ugen:
     var inputs  // dictionary of inputs
 
     # init installs Ugen in table if id is not nil.  If id is nil,
-    # chans should be -1 (to suppress /arco/*/new message -- see below).
+    # chans_ should be negative (to suppress /arco/*/new message -- see below).
     # If the Ugen has inputs, they are listed in inputs_ in order
     # as param_symbol, param_value, param_symbol, param_value, ...
     # Even though provided as an array so that we can get the order
     # right when we send the /arco/*/new message, the inputs_ are
     # retained in dictionary form for quick lookup in the set() method.
-    # special hack: if chans_ is negative, we do not send a new 
-    #    message so that caller can issue a special message, and
-    #    we IGNORE inputs_
+    # SPECIAL HACK: if chans_ is negative, we set chans to abs(chans_)
+    #   so you can still initialize the channel count, but we do not 
+    #    send a new message so that caller can issue a special message,
+    #    and we IGNORE inputs_
     def init(id_, classname_, chans_, rate_, rest inputs_):
         id = id_
         classname = classname_
@@ -665,3 +665,31 @@ def multb(x, y, optional chans = 1):
         print "ERROR: passing audio rate Ugen to block rate multb"
         return nil
     return Ugen(new_id(), "Multb", chans, 'b', 'x', x, 'y', y)
+
+def strplay(filename, optional chans = 2, start = 0, end = 0, cycle, mix, expand)
+    return Strplay(filename, chans, start, end, cycle, mix, expand)
+
+class Strplay (Ugen):
+
+    def init(filename, chans, start, end, cycle, mix, expand):
+        // -chans cuts off standard creation:
+        super.init(new_id(), "Strplay", -chans, 'a')
+        o2_send_start()  // make our own new message
+        o2_add_int32(id)
+        o2_add_string(filename)
+        o2_add_int32(chans)
+        o2_add_float(start)
+        o2_add_float(end)
+        o2_add_bool(cycle)
+        o2_add_bool(mix)
+        o2_add_bool(expand)
+        o2_send_finish(0, "/arco/strplay/new", true)
+
+    def go(optional play_flag = true):
+        o2_send_start()  // make our own new message
+        o2_add_int32(id)
+        o2_add_bool(play_flag)
+        o2_send_finish(0, "/arco/strplay/play", true)
+    
+    def stop():
+        go(false)

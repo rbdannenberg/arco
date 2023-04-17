@@ -79,8 +79,10 @@ filled with zero.
 #include "sndfile.h"
 #include "portaudio.h"
 #include "o2internal.h"
+#include "sharedmem.h"
 #include "sharedmemclient.h"
 #include "prefs.h"
+#include "arcoinit.h"
 #include "arcotypes.h"
 #include "arcoutil.h"
 #include "ugen.h"
@@ -107,12 +109,14 @@ using std::min;
 // o2_ctx.
 O2_context aud_o2_ctx;  // O2 context for audio thread
 
+
 int aud_state = UNINITIALIZED;
 int aud_quit_request = false;  // request to o2sm_finish() at a clean spot
 bool aud_reset_request = false;
 int64_t aud_frames_done = 0;
 int64_t aud_blocks_done = 0;
 bool aud_heartbeat = true;
+static Bridge_info *audio_bridge;
 
 static bool arco_thread_exited = false;  // stop processing after o2sm_finish()
 static int actual_in_chans = -1;     // number of channels in callback
@@ -281,6 +285,7 @@ static void arco_quit(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     // end unpack message
+    o2sm_send_cmd("/fileio/quit", 0, "");
     aud_quit_request = true;
 }
 
@@ -1076,10 +1081,24 @@ void arco_thread_poll()
 }
 
 
-void audioio_initialize(Bridge_info *bridge)
+// to be called from the main thread - creates audio shared memory thread,
+// except the "thread" is provided by both a polling function called from
+// the main thread and PortAudio callbacks (when PortAudio is actually
+// streaming audio and after proper handshakes to hand off control of this
+// "thread" from the main thread. The main thread regains control and 
+// continues polling when a PortAudio stream ends.
+void audioio_initialize()
 {
+    int rslt = o2_shmem_initialize();
+    // it is ok if some other shared memory action has already started
+    // the shared memory bridge in O2:
+    assert(rslt == O2_SUCCESS || rslt == O2_ALREADY_RUNNING);
+    assert(audio_bridge == NULL);  // not OK if this bridge was already created
+    audio_bridge = o2_shmem_inst_new();  // make our bridge
+
     O2_context *save = o2_ctx;
-    o2sm_initialize(&aud_o2_ctx, bridge);
+    o2sm_initialize(&aud_o2_ctx, audio_bridge);
+
     o2sm_service_new("arco", NULL);
 
     // O2SM INTERFACE INITIALIZATION: (machine generated)

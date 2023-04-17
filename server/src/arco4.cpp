@@ -56,9 +56,9 @@ const char *main_commands = "(A)udio device (S)tart/Stop (Q)uit (H)elp";
 bool arco_ready = false;
 bool has_curses = false;  // curses interface exists
 
-static void arco4_initialize();
+static void host_initialize();
 
-Bridge_info *arco_bridge = NULL;
+
 
 
 /* O2 INTERFACE: /host/openaggr string info;
@@ -80,8 +80,7 @@ void host_openaggr(O2_HANDLER_ARGS)
         printf("  --> opening this device, id %d\n", id);
         // open audio, 50ms latency is conservative
         o2_send_cmd("/arco/open", 0, "iiiis", id, id, LATENCY_MS, BL, "host");
-        o2_send_cmd("/arco/prtree", o2_time_get() + 1, "");
-//        o2_send_cmd("/arco/open", 0, "iiii", 0, 1, LATENCY_MS, BL);
+        o2_send_cmd("/arco/prtree", o2_time_get() + 1);
         /* Log some audio:
         o2_send_cmd("/arco/logaud", 0, "iis", 1, 1, "log.wav");
         o2_send_cmd("/arco/logaud", o2_time_get() + 1, "iis", 0, 1, "");
@@ -151,11 +150,8 @@ int main(int argc, char *argv[])
     o2_debug_flags("");
     o2_initialize("arco");
     o2_clock_set(NULL, NULL);  // we are the reference clock
-    int rslt = o2_shmem_initialize();
-    assert(rslt == O2_SUCCESS);
-    arco_bridge = o2_shmem_inst_new();
-    arco4_initialize();  // set up handler
-    audioio_initialize(arco_bridge);
+    host_initialize();  // set up handlers
+    arco_initialize();
 
     int running = true;
     int shutting_down = false;
@@ -164,7 +160,7 @@ int main(int argc, char *argv[])
         if (!running) {  // User entered the Quit command
             if (!shutting_down) {
                 aud_quit_request = true;  // o2sm_finish() when state is IDLE
-                o2_send_cmd("/arco/close", 0, "");
+                o2_send_cmd("/arco/close", 0);
                 shutting_down = true;  // wait for O2sm_info to be deleted
             } else {  // test for O2sm_info deleted before exiting loop
                 shutting_down = (o2_shmem_inst_count() > 0);
@@ -292,7 +288,7 @@ char *arco_name_lookup(int id)
 }
 
 
-static void arco4_initialize()
+static void host_initialize()
 {
     o2_service_new("host");
     // O2 INTERFACE INITIALIZATION: (machine generated)
@@ -392,7 +388,7 @@ int action(int ch)
       case 'S':  // start/stop
         if (arco_started) {
             printf("Closing audio devices.\n");
-            o2_send_cmd("/arco/close", 0, "");
+            o2_send_cmd("/arco/close", 0);
         } else if (arco_reset) {
             /* printf("Open device %d (in, %d chans) and %d (out, %d chans), "
                    "latency %d ms, buffer size %d\n", prefs_in_id,
@@ -409,7 +405,7 @@ int action(int ch)
         prefs_write();
         break;
       case 'p':  // print the audio tree
-        o2_send_cmd("/arco/prtree", 0, "");
+        o2_send_cmd("/arco/prtree", 0);
         break;
       case 'Q':  // quit
         return true;

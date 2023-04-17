@@ -11,5 +11,5 @@
 require "strparse"
 load "interface"
 interface_search_path = ["../arco4/src/", "../../o2/src/", "common/"]
-interf("sarco", ["audioio.h", "arco4_init.h"], ["arcotypes.h", "o2internal.h"])
+interf("sarco", ["audioio.h", "arcoinit.h"], ["arcotypes.h", "o2internal.h"])
 exit()

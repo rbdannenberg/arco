@@ -4,5 +4,6 @@
  * Feb 2022
  */
 
-void arco4_initialize();
-/*SER void arco4_initialize() PENT*/
+
+void arco_initialize();
+/*SER void arco_initialize() PENT*/

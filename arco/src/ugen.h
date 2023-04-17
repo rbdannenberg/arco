@@ -4,6 +4,9 @@
  * Dec 2021
  */
 
+// conversion factor: int16 to float:
+#define INT16_TO_FLOAT_SAMPLE 3.05176e-05F
+
 // flags for Unit generators to cooperate with audioio
 const int IN_OUTPUT_SET = 1;
 const int IN_RUN_SET = 2;
@@ -136,3 +139,6 @@ Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation);
 // Use this to convert an id to any Ugen
 #define ANY_UGEN_FROM_ID(var, id, op) \
     Ugen *var = id_to_ugen(id, NULL, op); if (!var) return;
+
+#define imin(x, y) ((x) <= (y) ? (x) : (y))
+

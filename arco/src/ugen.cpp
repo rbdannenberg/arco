@@ -29,7 +29,7 @@ int set_control_service(const char *ctrlservice)
         control_service_addr_len = 0;
         return 1;  // error return
     }
-    control_service_addr_len = csalen + 2;
+    control_service_addr_len = (int) (csalen + 2);
     control_service_addr[0] = '!';
     strcpy(control_service_addr + 1, ctrlservice);
     strcat(control_service_addr, "/");

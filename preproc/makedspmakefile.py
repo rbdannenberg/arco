@@ -24,7 +24,7 @@ In the last case (sine*), both sine.cpp and sineb.cpp are created
 in the same sine subdirectory named ugens/sine/
 """
 
-NONFAUST = ["pwl", "pwlb", "delay", "mix"]
+NONFAUST = ["pwl", "pwlb", "delay", "mix", "strplay", "fileio"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -70,6 +70,20 @@ def make_makefile(arco_path, manifest, outf):
 
 def make_inclfile(arco_path, manifest, outf):
     "make the CMake include file that lists all the sources"
+
+    # we need either fileio or nofileio
+    # use fileio if either fileio or strplay is in manifest
+    #
+    if ("strplay" in manifest) or ("fileio" in manifest):
+        needed = "fileio"
+        rejected = "nofileio"
+    else:
+        needed = "nofileio"
+        rejected = "fileio"
+    if needed not in manifest:
+        manifest.append(needed)
+    if rejected in manifest:
+        manifest.remove(rejected)
 
     print("set(ARCO_SRC ${ARCO_SRC}", file=outf)
 

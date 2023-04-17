@@ -8,6 +8,7 @@
 # arco_ready is set to true when arco is ready for action
 
 require "debug"
+require "wxserpent"
 require "prob"
 require "wxserpent"
 require "arco"
@@ -45,7 +46,7 @@ def arco_ready():
         sine(1320.0, 0.07).play()
         sine(1760.0, 0.05).play()
     
-    if false: // mixer test
+    elif false: // mixer test
         m1 = mix(1)
         m1.ins(sine(440.0, 0.1), 1)
         m1.ins(sine(880.0, 0.1), 1)
@@ -53,7 +54,10 @@ def arco_ready():
         m1.ins(sine(1760.0, 0.05), 1)
         m1.play()
 
-    if true: // Atone instrument test
+    elif true:
+        print "ready!"
+
+    elif true: // Atone instrument test
         atone_sequence()
         
 def atone_sequence():
@@ -85,9 +89,25 @@ def host_openaggr_init()
     o2_method_new("/host/openaggr", "s", 'host_openaggr', t)
 
 
+sound_file_path = "/Users/rbd/Music/soundscape1/digichoir1.wav"
+
+// handler for psfbutton: play the sound file 
+def play_sound_file(rest ignore):
+    m1 = mix(2)
+    sp = strplay(sound_file_path, 2)
+    m1.ins(sp, 1)
+    m1.play()
+    sp.go()
+
 
 def main():
-    default_window.method = 'arco_main_win_handler'
+    var win = default_window
+    win.set_rgb(180, 100, 180)
+    win.method = 'arco_main_win_handler'
+    Button(win, "Play sound file", 10, 10, 100, 20, 'psfbutton')
+    psfbutton.add_target_method(nil, 'play_sound_file')
+
+    o2_debug_flags("") // ("SsBl")
     arco_init(network = false)
     // this should be replaced by a preference and menu system to select
     // and open audio device(s):

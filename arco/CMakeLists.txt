@@ -6,6 +6,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 set(ARCO_SRC
+    arcoinit.cpp arcoinit.h
     arcougen.h
     audioio.cpp audioio.h
     ugen.cpp ugen.h
@@ -17,6 +18,7 @@ set(ARCO_SRC
     zerob.cpp zerob.h 
     const.cpp const.h 
     upsample.cpp upsample.h 
+    fileio.cpp fileio.h audioblock.h
 
 
 #    pwl.cpp pwl.h 

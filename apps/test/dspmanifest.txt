@@ -4,3 +4,4 @@ mix
 sine*
 mult*
 reson*
+strplay
