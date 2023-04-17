@@ -39,26 +39,24 @@ class Atone (Instrument):
 
 def arco_ready():
     # called when arco is intialized and ready to make sound
-    print "**** arco ready! starting to play ... ****"
-    if false:  // simple test
-        sine(440.0, 0.1).play()
-        sine(880.0, 0.1).play()
-        sine(1320.0, 0.07).play()
-        sine(1760.0, 0.05).play()
-    
-    elif false: // mixer test
-        m1 = mix(1)
-        m1.ins(sine(440.0, 0.1), 1)
-        m1.ins(sine(880.0, 0.1), 1)
-        m1.ins(sine(1320.0, 0.07), 1)
-        m1.ins(sine(1760.0, 0.05), 1)
-        m1.play()
+    print "**** arco ready! ****"
+    var win = default_window
 
-    elif true:
-        print "ready!"
+    Button(win, "Simple test", 10, 10, 170, 20, 'stbutton')
+    stbutton.add_target_method(nil, 'play_simple_test')
 
-    elif true: // Atone instrument test
-        atone_sequence()
+    Button(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtbutton')
+    mtbutton.add_target_method(nil, 'play_mixer_test')
+
+    Button(win, "Atonal sequence", 'S', 'D', 'S', 'S', 'atbutton')
+    atbutton.add_target_method(nil, 'play_atone_test')
+
+    Button(win, "Atonal sequence stop", 'S', 'D', 'S', 'S', 'atsbutton')
+    atsbutton.add_target_method(nil, 'stop_atone_test')
+
+    Button(win, "Play sound file", 'S', 'D', 'S', 'S', 'psfbutton')
+    psfbutton.add_target_method(nil, 'play_sound_file')
+
         
 def atone_sequence():
     var step = 40 + irandom(40)
@@ -69,7 +67,8 @@ def atone_sequence():
     var atone = Atone(freq, dur, nharm).play().start()
     // sched_cause(dur + 0.2, atone, 'mute')
     var ioi = pr_unif(0.25, 2.0) ** 2
-    sched_cause(ioi, nil, 'atone_sequence')
+    if atone_running:
+        sched_cause(ioi, nil, 'atone_sequence')
 
 
 // handler for /host/openaggr messages with param info (a string)
@@ -89,6 +88,36 @@ def host_openaggr_init()
     o2_method_new("/host/openaggr", "s", 'host_openaggr', t)
 
 
+######### Synthesis Tests ##############
+
+// handler for stbutton: play some sine tones
+def play_simple_test(rest ignore):
+    sine(440.0, 0.01).play()
+    sine(880.0, 0.01).play()
+    sine(1320.0, 0.007).play()
+    sine(1760.0, 0.005).play()
+    
+
+// handler for mtbutton: play some sine tones
+def play_mixer_test(rest ignore):
+    m1 = mix(1)
+    m1.ins(sine(440.0, 0.01), 1)
+    m1.ins(sine(880.0, 0.01), 1)
+    m1.ins(sine(1320.0, 0.007), 1)
+    m1.ins(sine(1760.0, 0.005), 1)
+    m1.play()
+
+
+// handler for atbutton: play an algorithmic composition
+def play_atone_test(rest ignore):
+    atone_running = true
+    atone_sequence()
+
+// handler for atbutton: play an algorithmic composition
+def stop_atone_test(rest ignore):
+    atone_running = false
+
+
 sound_file_path = "/Users/rbd/Music/soundscape1/digichoir1.wav"
 
 // handler for psfbutton: play the sound file 
@@ -100,15 +129,11 @@ def play_sound_file(rest ignore):
     sp.go()
 
 
-def main():
-    var win = default_window
-    win.set_rgb(180, 100, 180)
-    win.method = 'arco_main_win_handler'
-    Button(win, "Play sound file", 10, 10, 100, 20, 'psfbutton')
-    psfbutton.add_target_method(nil, 'play_sound_file')
+########## Main Initialization ################
 
+def main():
     o2_debug_flags("") // ("SsBl")
-    arco_init(network = false)
+    arco_init(network = false, title = "Arco Test")
     // this should be replaced by a preference and menu system to select
     // and open audio device(s):
     host_openaggr_init()

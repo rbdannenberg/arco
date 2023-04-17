@@ -34,3 +34,5 @@ CMakeCache.txt
 /ugens/*/*.fh
 /ugens/*/*.dsp
 /ugens/*/*.bak
+
+/rbdtodo.txt

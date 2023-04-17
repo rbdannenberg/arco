@@ -125,7 +125,7 @@ def arco_main_win_handler(obj, event, x, y):
 # application) and instead call arco_quit() to clean up and
 # THEN exit the application.
 #
-def arco_quit():
+def arco_quit(rest ignore):
     o2_send_cmd("/arco/quit", 0)
     o2_send_cmd("/arco/close", 0)
     poll_for_no_arco()
@@ -141,7 +141,19 @@ def poll_for_no_arco()
     sched_cause(0.1, nil, 'poll_for_no_arco')
 
 
-def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t):
+def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t, 
+              color, title):
+    // set title and Quit handlers to shut down Arco on exit
+    if symbol_value('WXS_DEFAULT_WINDOW') == 0:  // is this wxserpent?
+        if title:
+            default_window.set_string(title)
+        if not color:
+            color = [160, 210, 210]
+        default_window.set_rgb(color[0], color[1], color[2])
+        default_window.method = 'arco_main_win_handler'
+        var file_menu = default_window.get_menu("File")
+        file_menu.item("Quit", "quit the application", nil, nil, 'arco_quit')
+        
     arco_input_chans = ins
     arco_output_chans = outs
     sched_init()
