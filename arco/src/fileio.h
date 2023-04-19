@@ -47,12 +47,16 @@ are "expanded" round-robin to fill the available output channels.
 Otherwise, extra output channels are zero-filled and extra input
 channels are discarded. This sends a request to the fileio service:
 
-    /fileio/strplay/new "isffB" id filename start end cycle
+    /fileio/strplay/new "hsffB" addr filename start end cycle
+
+where addr is the address of the Strplay instance. (It is tempting
+to send id, but if the Strplay is freed by the client, then the id
+will no longer work.
 
 When the file is opened, the first buffer is read and sent (see
 /arco/strplay/samps) and then a ready message is sent:
 
-    /arco/strplay/ready "iiB" id chans ready
+    /arco/strplay/ready "hiB" addr chans ready
 
 If the file could not be opened, chans is 0. Otherwise chans is the
 actual number of channels in the file. The number of channels returned
@@ -74,22 +78,27 @@ read and sent (see /arco/strplay/samps).
 As each buffer is (Audioblock) is output from the Strplay Ugen,
 request to refill with the next block of samples from the file:
 
-    /fileio/strplay/read "i" id
+    /fileio/strplay/read "h" addr
 
 The reply with the block of samples is:
 
-    /arco/strplay/samps "ih" id address
+    /arco/strplay/samps "hh" addr address
 
 where address is a pointer to the data (this of course assumes shared
 memory) and last is true if this is the last block of the file.
 
 To end playback and close the file:
 
-    /fileio/strplay/play "iB" id play (= false)
+    /fileio/strplay/play "hB" addr play (= false)
 
 (It is acceptable to close the file and delete the reader object if
 cycle is false and the last samples of the file have been sent. The
 play message can simply be ignored because id will not match.)
+
+To shut down the entire fileio bridge and thread:
+
+    /fileio/quit ""
+
 */
 
 int fileio_initialize();
@@ -100,9 +109,9 @@ extern Vec<Fileio_obj *> fileio_objs;
 
 class Fileio_obj {
 public:
-    int32_t id;
+    int64_t addr;
 
-    Fileio_obj(int id_) { id = id_; };
+    Fileio_obj(int64_t addr_) { addr = addr_; };
 
     ~Fileio_obj() { 
         for (int i = 0; i < fileio_objs.size(); i++) {

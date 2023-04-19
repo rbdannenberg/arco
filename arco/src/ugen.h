@@ -120,7 +120,16 @@ class Ugen : public O2obj {
         }
         return &output[0];
     }
+
     void set_current_block(int64_t n) { current_block = n; }
+
+    void send_action_id(int &action_id) {
+        o2sm_send_start();
+        o2sm_add_int32(action_id);
+        strcpy(control_service_addr + control_service_addr_len, "act");
+        o2sm_send_finish(0.0, control_service_addr, true);
+        action_id = 0;  // one-shot
+    }
 };
 
 typedef Ugen *Ugen_ptr;

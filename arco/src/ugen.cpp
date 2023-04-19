@@ -77,7 +77,7 @@ void Ugen::print_tree(int indent, bool print, const char *param)
         for (int i = 0; i < indent; i++) {
             arco_print("  ");
         }
-        arco_print("%s_%d (%s)\n", classname(), id, param);
+        arco_print("%s_%d #%d (%s)\n", classname(), id, refcount, param);
         flags |= UGEN_MARK;
     } else {
         if (!(flags & UGEN_MARK)) {
@@ -99,7 +99,7 @@ void arco_free(O2SM_HANDLER_ARGS)
         int id = ap->i;
         ANY_UGEN_FROM_ID(ugen, id, "arco_free");
         if (ugen) {
-            printf("arco_free handler freeing %d\n", id);
+            printf("arco_free handler freeing %d #%d\n", id, ugen->refcount);
             ugen_table[id] = NULL;
             // special case: check for run set or output set references
             if (ugen->flags & (IN_RUN_SET | IN_OUTPUT_SET)) {

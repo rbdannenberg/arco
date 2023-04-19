@@ -8,12 +8,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "o2internal.h"  // need internal to offer bridge
+#include "o2atomic.h"
 #include "sharedmem.h"   // o2_shmem_inst_new()
 #include "arcotypes.h"
 #include "audioio.h"
 #include "fileio.h"
-
-Bridge_info *audio_bridge = NULL;
 
 
 void arco_initialize()

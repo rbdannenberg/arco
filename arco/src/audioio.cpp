@@ -79,6 +79,7 @@ filled with zero.
 #include "sndfile.h"
 #include "portaudio.h"
 #include "o2internal.h"
+#include "o2atomic.h"
 #include "sharedmem.h"
 #include "sharedmemclient.h"
 #include "prefs.h"
@@ -109,6 +110,7 @@ using std::min;
 // o2_ctx.
 O2_context aud_o2_ctx;  // O2 context for audio thread
 
+O2queue *arco_msg_queue = NULL;
 
 int aud_state = UNINITIALIZED;
 int aud_quit_request = false;  // request to o2sm_finish() at a clean spot
@@ -116,7 +118,7 @@ bool aud_reset_request = false;
 int64_t aud_frames_done = 0;
 int64_t aud_blocks_done = 0;
 bool aud_heartbeat = true;
-static Bridge_info *audio_bridge;
+O2sm_info *audio_bridge = NULL;
 
 static bool arco_thread_exited = false;  // stop processing after o2sm_finish()
 static int actual_in_chans = -1;     // number of channels in callback
@@ -259,6 +261,21 @@ static void arco_prtree(O2SM_HANDLER_ARGS)
     }
     arco_print("---------------------------------------\n");
 }
+
+
+/* O2SM INTERFACE: /arco/prugens ;  -- print all ugens */
+static void arco_prugens(O2SM_HANDLER_ARGS)
+{
+    arco_print("------------ Ugen List ----------------\n");
+    for (int i = 0; i < ugen_table.size(); i++) {
+        Ugen_ptr ugen = ugen_table[i];
+        if (ugen) {
+            arco_print("%s_%d #%d\n", ugen->classname(), i, ugen->refcount);
+        }   
+    }
+    arco_print("---------------------------------------\n");
+}
+
 
 
 /* O2SM INTERFACE: /arco/reset string s;
@@ -1104,6 +1121,7 @@ void audioio_initialize()
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/test1", "s", arco_test1, NULL, true, true);
     o2sm_method_new("/arco/prtree", "", arco_prtree, NULL, true, true);
+    o2sm_method_new("/arco/prugens", "", arco_prugens, NULL, true, true);
     o2sm_method_new("/arco/reset", "s", arco_reset, NULL, true, true);
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);
     o2sm_method_new("/arco/output", "i", arco_output, NULL, true, true);

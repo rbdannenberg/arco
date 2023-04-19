@@ -26,17 +26,9 @@ public:
         next_point_index = 0;    //     become constant zero.
         action_id = 0; }
 
-    ~Pwlb() { if (action_id) send_action_id(); }
+    ~Pwlb() { if (action_id) send_action_id(action_id); }
 
     const char *classname() { return Pwlb_name; }
-
-    void send_action_id() {
-        o2sm_send_start();
-        o2sm_add_int32(action_id);
-        strcpy(control_service_addr + control_service_addr_len, "act");
-        o2sm_send_finish(0.0, control_service_addr, true);
-        action_id = 0;  // one-shot
-    }
 
     void real_run() {
         if (seg_togo == 0) { // set up next segment
@@ -45,7 +37,7 @@ public:
                 seg_togo = INT_MAX;
                 seg_incr = 0.0f;
                 if (current == 0.0f && action_id) {
-                    send_action_id();
+                    send_action_id(action_id);
                 }
             } else {
                 seg_togo = (int) points[next_point_index++];

@@ -404,6 +404,14 @@ class Ugen:
 
 
     def atend(action, optional arg):
+    # When this unit generator ends, action will be sent to this or, if
+    # provided, to arg, which in either case must handle /arco/<class>/act
+    # which is currently handled by Pwlb and Strplay classes. Currently, 
+    # action must be 'mute' or, equivalently, MUTE.
+    #     Note that if arg is a Ugen, we are storing a reference in the
+    # action but we are not bumping the reference count. The caller should
+    # take care of this. (Often the caller just hands off its reference
+    # and no ref() or unref() is needed.)
         if action == MUTE:
             create_action(this, arg, action)
         else:
@@ -612,10 +620,12 @@ class Mix (Ugen):
         o2_send_cmd("/arco/mix/ins", 0, "iii", id, ugen.id, gain.id)
         if atend:
             if atend == SIGNAL and issubclass(ugen, Instrument) and 
-               ugen.envelope:
+               ugen.get['envelope']:
                 create_action(ugen.envelope, this, 'rem', ugen)
             elif atend == GAIN and issubclass(gain, Pwlb):
                 create_action(gain, this, 'rem', ugen)
+            else:
+                print "Mix.ins() ignoring unknown atend parameter -", atend
         return this
     
 
@@ -632,6 +642,7 @@ class Mix (Ugen):
                 ugen.unref()
                 inputs[key][1].unref()
                 inputs.remove(key)
+                o2_send_cmd("/arco/mix/rem", 0, "ii", id, ugen.id)
                 return this
         return this
 
@@ -681,7 +692,9 @@ def multb(x, y, optional chans = 1):
 def strplay(filename, optional chans = 2, start = 0, end = 0, cycle, mix, expand)
     return Strplay(filename, chans, start, end, cycle, mix, expand)
 
+
 class Strplay (Ugen):
+    var action_id
 
     def init(filename, chans, start, end, cycle, mix, expand):
         // -chans cuts off standard creation:
@@ -705,3 +718,4 @@ class Strplay (Ugen):
     
     def stop():
         go(false)
+

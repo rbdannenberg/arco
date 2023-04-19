@@ -10,7 +10,6 @@
 require "debug"
 require "wxserpent"
 require "prob"
-require "wxserpent"
 require "arco"
 
 class Atone (Instrument):
@@ -23,6 +22,7 @@ class Atone (Instrument):
         for i = 1 to nharm:
             mix.ins(sine(freq * i, 0.8 ** i), env)
         if pr_coin(0.5):
+            // reson filter center frequency envelope:
             var renv = member(pwlb(random(), pr_unif(4, 10) * freq, 
                                    5.0, 200.0, max(5.0, dur * 2)), 'renv')
             var q = pr_unif(0.5, 2.0)
@@ -32,7 +32,7 @@ class Atone (Instrument):
     def start():
         get('env').start()
         var renv = get('renv')
-        if renv:
+        if renv:  // start the reson filter envelope too if it exists
             renv.start()
         this
 
@@ -122,11 +122,33 @@ sound_file_path = "/Users/rbd/Music/soundscape1/digichoir1.wav"
 
 // handler for psfbutton: play the sound file 
 def play_sound_file(rest ignore):
-    m1 = mix(2)
-    sp = strplay(sound_file_path, 2)
-    m1.ins(sp, 1)
-    m1.play()
-    sp.go()
+# We could simply play the Strplay Ugen, but we're using a
+# Mix(er) to provide an (unused) gain control and also to
+# show how the Mix and Strplay can be freed when the sound
+# finishes.
+    var m1 = mix(2)
+    var sp = strplay(sound_file_path, 2)
+    m1.ins(sp, 1)  // sp reference handed off to m1
+    m1.play()  // connect mixer to output
+    sp.atend(MUTE, m1)  // "when the sound file finishes, mute m1"
+    // The mute method will delete m1. If it were not a local var,
+    // we would call m1.ref() here.
+    sp.go()     // play the sound file. Technically, we do not have
+    // a reference because we gave it to m1, but this is non-preemptive
+    // and our local m1 shadow holds the reference.
+    o2_send_cmd("/arco/prtree", 0, "")  // this tells Arco to print the Ugen
+    // tree -- it can be useful for debugging.
+    sched_select(rtsched)
+    // To confirm the objects are deleted, we can schedule the printing of
+    // all unit generators in the ugen_table. You can compare Ugen numbers
+    // to the tree printout earlier.
+    sched_cause(10, nil, 'o2_send_cmd', "/arco/prugens", 0, "")
+    // Not all unit generators are necessarily in the ugen_table. The
+    // table is needed for clients to address individual unit generators,
+    // but unit generators can be accessed by other unit generators and
+    // they can be rooted in the Audioio output list, so let's print
+    // the tree again after things should be cleaned up.
+    sched_cause(10.01, nil, 'o2_send_cmd', "/arco/prtree", 0, "")
 
 
 ########## Main Initialization ################

@@ -2,6 +2,15 @@
 
 **Roger B. Dannenberg**
 
+## Contents:
+- Preferences
+- Unit Generator Design
+- The Ugen Abstract Class
+- Memory Management
+- Instruments in Serpent
+- End-of-Sound Actions
+
+
 ## Preferences
 Preferences within Arco source code are confusing enough that you
 will need this to understand the code:
@@ -153,7 +162,7 @@ variant, with source code generated from specification file
 that includes both FAUST code and some annotations about
 which variant are required. (link to details should go here.)
 
-### The Ugen abstract class
+### The Ugen Abstract Class
 
 Every Ugen has:
 - `rate`: `'a'` (audio), `'b'` (block), or `'c'` (rate)
@@ -230,5 +239,142 @@ and there are no direct messages to Arco. Languages with
 garbage collectors that call "cleanup code" when objects
 are freed could use this to free Arco IDs.
 
+## Instruments in Serpent
+A client-side library for Arco is written in Serpent. You can use Arco
+directly, but the approach with Serpent is to create classes and
+objects that "shadow" the Arco objects and make it easier to allocate,
+free, connect, and control a collection of Ugens in Arco.
+
+In Serpent (using the arco.srp library), you create unit generators by
+calling functions, e.g. `sine` to instantiate a `Sine` Ugen in the
+Arco server. An important abstraction in this library is the
+`Instrument` class, which represents a collection of unit generators
+that are instantiated and destroyed as a unit. An `Instrument` has no
+direct representation on the Arco server side. There, it is just a set
+of independent unit generators. On the Serpent (client) side, the
+`Instrument` is a real object. You can subclass `Instrument` to make
+various kinds of instruments, inheriting the general behavior, which
+includes a set of named components, named parameters that can be set,
+a designated output unit generator that represents the output of the
+`Instrument`, and a `free` operation that releases all the unit
+generators in the `Instrument`.
+
+To define an `Instrument`, the `init` method of a subclass calls
+`instr_begin` which initializes a container for components of the
+instrument. As each component is created, you call `member` to say
+that the created Ugen is a member of the instrument, e.g.,
+```
+    var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
+```
+This example creates a piece-wise linear envelope generator (`pwlb`),
+adds it as a member to the instrument, and gives it the name
+`'env'`. It also keeps a reference to the `Pwlb` in the local variable
+`env`. Later, you can use `instrument.get('env')` to retrieve the
+`pwlb` component, e.g. to start the envelope:
+```
+    instrument.get('env').start()
+```
+Alternatively, you could also store it
+as an instance variable and write a `start` method for the instrument,
+e.g.:
+```
+    def start(): env.start()  // new method in instrument
+...
+    instrument.start()  // called to start the instrument's envelope
+```
+You can also create named, setable parameters. The problem here is
+that you might want your instrument to have parameters `freq` or
+`amp`, but the instrument is not a real unit generator and has no
+inherent parameters. You could write a method for each parameter, but
+that is a little awkward. Consider implementing a settable frequency:
+```
+    var mysine  // this is in the class declaration
+
+    def init():
+        ...
+        mysine = member(sine(220.0, 0.5), 'sine')
+        ...
+
+    def set_freq(f): mysine.set('freq', 440.0)
+```
+Then, you can change frequency by calling: `instrument.set_freq(440.0)`.
+
+Alternatively, there is a special `set` method in
+Instrument that avoids defining a method for every parameter.
+To make this work, call `param` in `init`. For example, consider this
+from the instrument `init` function:
+```
+    def init():
+        ...
+        var mysine = sine(220.0, 0.5)`, you can call:
+        param(mysine, 'freq', 'myfreq')
+        ...
+```
+This creates a Sine Ugen in the instrument and says that `'myfreq'`
+will name the sine's `'freq'` parameter. Then, you can call
+`instrument.set('myfreq', 440.0)`.
+
+
+## End-of-Sound Actions
+A general problem is: once you launch a collection of
+Ugens to make a sound, how do you reclaim them when
+the sound event completes?
+
+A good example is the Pwlb subclass of Ugen, which is
+a general-purpose piece-wise linear function generator
+with output at the block rate, and typically used as
+an amplitude envelope. We want to get a notice when
+an instance of Pwlb reaches the last breakpoint
+(typically with amplitude zero) in its list of breakpoints.
+
+The mechanism is an O2 message to any designated service
+with an ID number representing the end-of-envelope event.
+To request a message, send `/arco/pwlb/act id action_id` to
+the Pwlb instance (indicated by the `id` parameter). The
+`action_id` is an arbitrary `int32` integer other than 0,
+which means "no action notice." When the pwlb envelope ends,
+a message is sent: `/actl/act action_id`, where `actl` is
+the control service (`ctrlservice`) parameter passed in
+the `/arco/open` message to initialize the Arco server.
+
+### Serpent Implementaton
+In Serpent, this mechanism is used to implement end-of-sound
+actions. The most important is muting an instrument when an
+envelope ends. To do this for an envelope `env`, we call
+`env.atend(MUTE, this)`, where `atend` should be read
+"at end," MUTE is the action to take, and `this` is an
+optional parameter, which in this case refers to the
+Instrument or Ugen we want to mute. (MUTE is the only implemented
+action at this point.)
+
+`atend` calls `create_action` which makes a unique new `action_id` and
+sends `/arco/pwlb/act id action_id`. It also adds an action
+description to a dictionary mapping action ids to action descriptions.
+
+When the envelope ends, the handler for `/actl/act action_id`
+retrieves the action from the dictionary and calls it, invoking
+`instrument.mute()`, where `instrument` is the argument that was
+the Instrument (`this`) passed to `atend`.  The `mute` method removes
+the instrument from the Arco output collection and unreferences the
+instrument, which normally frees the instrument and all its component
+Ugens.
+
+The `MUTE` action is only good for removing an Instrument or Ugen from
+the output list in Arco, but the `create_action` method specify any
+object, method and parameters to invoke, and you can even tie multiple
+method invocations to a single end-of-envelope action.
+
+The mixer `ins` method inserts a unit generator signal and a separate
+gain into the mix, and there is an optional `atend` parameter which
+can be one of:
+- `SIGNAL` requires the unit generator to be an Instrument with a
+  parameter named `envelope` that can send an action when it
+  ends. When the envelope ends, the unit generator and the gain
+  control are removed from the mix.
+
+- `GAIN` requires that the gain be a `Pwllb` envelope. When the
+  envelope ends, both the unit generator and gain control are removed
+  from the mix.
+  
 
 

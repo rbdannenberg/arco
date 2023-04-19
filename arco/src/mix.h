@@ -44,6 +44,7 @@ public:
         init_param(inp, input->input, ignore_stride);
         init_param(gain, input->gain, ignore_stride);
         input->prev_gain = 0.0f;
+        arco_print("after Mix::ins, inp->refcount %d\n", inp->refcount);
     }
 
 
