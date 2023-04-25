@@ -12,22 +12,44 @@ require "wxserpent"
 require "prob"
 require "arco"
 
+SIMPLE = false
+gc_watch_set = false;
+
+watching = {}
+
+def watch(ugen, name):
+    watching[arco_ugen_id(ugen.id)] = name
+    watched_action(ugen, "Watching")
+
+def watched_action(ugen, msg):
+    var name = watching.get(arco_ugen_id(ugen.id))
+    if name:
+        display "Watched action", msg, ugen, ugen.id, name
+
+
 class Atone (Instrument):
     def init(freq, dur, nharm):
         display "Atone", dur
         instr_begin()
         var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
+        display "In Atone", env, env.id, id(env.id)
+        if not gc_watch_set:
+            dbg_gc_watch(id(env.id))
+            watch(env, "pwlb")
         env.atend(MUTE, this)
         var mix = mix(1)
-        for i = 1 to nharm:
+        for i = 0 to nharm:
             mix.ins(sine(freq * i, 0.8 ** i), env)
-        if pr_coin(0.5):
+        if not SIMPLE and pr_coin(0.5):
             // reson filter center frequency envelope:
             var renv = member(pwlb(random(), pr_unif(4, 10) * freq, 
                                    5.0, 200.0, max(5.0, dur * 2)), 'renv')
             var q = pr_unif(0.5, 2.0)
             mix = reson(mix, renv, q)
         super.init("Atone", mix)
+        if not gc_watch_set:
+            watch(this, "Atone")
+        gc_watch_set = true
 
     def start():
         get('env').start()
@@ -37,32 +59,55 @@ class Atone (Instrument):
         this
 
 
+gccyclesst = nil // text boxes are created after Arco audio is started
+cpuloadst = nil
+
 def arco_ready():
     # called when arco is intialized and ready to make sound
     print "**** arco ready! ****"
     var win = default_window
 
-    Button(win, "Simple test", 10, 10, 170, 20, 'stbutton')
-    stbutton.add_target_method(nil, 'play_simple_test')
+    Button(win, "Print Ugen Tree", 10, 10, 170, 20, 'ptbutton')
+    ptbutton.add_target_method(nil, 'print_ugen_tree')
+    
+    Checkbox(win, "Simple test", 'S', 'D', 'S', 'S', 'stcheckbox')
+    stcheckbox.add_target_method(nil, 'play_simple_test')
 
-    Button(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtbutton')
-    mtbutton.add_target_method(nil, 'play_mixer_test')
+    Checkbox(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtcheckbox')
+    mtcheckbox.add_target_method(nil, 'play_mixer_test')
 
-    Button(win, "Atonal sequence", 'S', 'D', 'S', 'S', 'atbutton')
-    atbutton.add_target_method(nil, 'play_atone_test')
-
-    Button(win, "Atonal sequence stop", 'S', 'D', 'S', 'S', 'atsbutton')
-    atsbutton.add_target_method(nil, 'stop_atone_test')
+    Checkbox(win, "Atonal sequence", 'S', 'D', 'S', 'S', 'atcheckbox')
+    atcheckbox.add_target_method(nil, 'play_atone_test')
 
     Button(win, "Play sound file", 'S', 'D', 'S', 'S', 'psfbutton')
     psfbutton.add_target_method(nil, 'play_sound_file')
 
-        
+    Statictext(win, "GC cycles: 0", 'S', 'D', 'S', 'S', 'gccyclesst')
+    Statictext(win, "CPU Load:", 'S', 'D', 'S', 'S', 'cpuloadst')
+    Statictext(win, "Max Ugen ID: 0", 'S', 'D', 'S', 'S', 'maxugenidst')
+
+
+def poll_for_status():
+    if gccyclesst:
+        gccyclesst.set_string("GC cycles: " + str(gc_cycles()))
+        maxugenidst.set_string("Max Ugen ID: " + str(max_ugen_id_used))
+        arco_get_cpu_load('show_cpu_load')
+    sched_cause(1.0, nil, 'poll_for_status')
+
+
+def show_cpu_load(cpu):
+    cpuloadst.set_string("CPU Load: " + str(cpu))
+
+
+def print_ugen_tree(rest ignore):
+    arco_prtree()
+
+
 def atone_sequence():
     var step = 40 + irandom(40)
     var freq = 440.0 * (2.0 ** (1/12)) ** (step - 69)
     var dur = pr_unif(0.5, 10)
-    var nharm = irandom(15) + 2
+    var nharm = 1 if SIMPLE else irandom(15) + 2 
     display "atone_sequence", freq, dur, nharm
     var atone = Atone(freq, dur, nharm).play().start()
     // sched_cause(dur + 0.2, atone, 'mute')
@@ -78,6 +123,7 @@ def host_openaggr(timestamp, address, types, info)
     if find(info, "Aggregate") >= 0 or find(info, "default") >= 0:
         var id = int(info)
         print "  --> opening this device, id", id
+        arco_open(id, id, 2, 2, LATENCY_MS, 32)
         o2_send_cmd("/arco/open", 0, "iiiiiis", id, id, 2, 2, LATENCY_MS, 32, 
                     "actl");
         o2_send_cmd("/arco/prtree", o2_time_get() + 1, "");
@@ -90,32 +136,43 @@ def host_openaggr_init()
 
 ######### Synthesis Tests ##############
 
-// handler for stbutton: play some sine tones
-def play_simple_test(rest ignore):
-    sine(440.0, 0.01).play()
-    sine(880.0, 0.01).play()
-    sine(1320.0, 0.007).play()
-    sine(1760.0, 0.005).play()
-    
+// handler for stcheckbox: play/stop some sine tones
+def play_simple_test(obj, event, x, y):
+    display "play_simple_test", x
+    if x:
+        sin1 = sine(440.0, 0.01).play()
+        sin2 = sine(880.0, 0.01).play()
+        sin3 = sine(1320.0, 0.007).play()
+        sin4 = sine(1760.0, 0.005).play()
+    else:
+        sin1.mute()
+        sin1 = nil  // delete reference for garbage collection
+        sin2.mute()
+        sin2 = nil
+        sin3.mute()
+        sin3 = nil
+        sin4.mute()
+        sin4 = nil
 
-// handler for mtbutton: play some sine tones
-def play_mixer_test(rest ignore):
-    m1 = mix(1)
-    m1.ins(sine(440.0, 0.01), 1)
-    m1.ins(sine(880.0, 0.01), 1)
-    m1.ins(sine(1320.0, 0.007), 1)
-    m1.ins(sine(1760.0, 0.005), 1)
-    m1.play()
+// handler for mtcheckbox: play/stop some sine tones
+def play_mixer_test(obj, event, x, y):
+    if x:
+        m1 = mix(1)
+        m1.ins(sine(440.0, 0.01), 1)
+        m1.ins(sine(880.0, 0.01), 1)
+        m1.ins(sine(1320.0, 0.007), 1)
+        m1.ins(sine(1760.0, 0.005), 1)
+        m1.play()
+    else
+        m1.mute()
+        m1 = nil  // delete reference
 
 
-// handler for atbutton: play an algorithmic composition
-def play_atone_test(rest ignore):
-    atone_running = true
-    atone_sequence()
-
-// handler for atbutton: play an algorithmic composition
-def stop_atone_test(rest ignore):
-    atone_running = false
+// handler for atcheckbox: play/stop an algorithmic composition
+def play_atone_test(obj, event, x, y)
+    atone_running = x
+    if x:
+        atone_sequence()
 
 
 sound_file_path = "/Users/rbd/Music/soundscape1/digichoir1.wav"
@@ -151,6 +208,7 @@ def play_sound_file(rest ignore):
     sched_cause(10.01, nil, 'o2_send_cmd', "/arco/prtree", 0, "")
 
 
+
 ########## Main Initialization ################
 
 def main():
@@ -160,5 +218,7 @@ def main():
     // and open audio device(s):
     host_openaggr_init()
     arco_run()
+    sched_select(rtsched)
+    poll_for_status()
 
 main()

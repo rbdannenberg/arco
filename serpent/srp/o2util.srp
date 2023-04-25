@@ -16,11 +16,13 @@ TYPE_TO_ADD_TYPE = {
   "m": 'o2_add_midi_helper',
   "B": 'o2_add_bool',
   "N": 'o2_add_nil_helper',
-  "I": 'o2_add_infinitum_helper' }
+  "I": 'o2_add_infinitum_helper',
+  "U": 'o2_add_ugen_id'}  // special Serpent-only code to handle Ugen_id objects
 
 def o2_add_midi_helper(arg): o2_add_midi(arg[0], arg[1], arg[2])
 def o2_add_nil_helper(arg): o2_add_nil()
 def o2_add_infinitum_helper(arg): o2_add_infinitum()
+def o2_add_ugen_id(arg): o2_add_int32(arco_ugen_id(arg))
 
 def o2_send_cmd(addr, when, optional sig = "", rest rest_args):
     o2_send_helper(true, addr, when, sig, rest_args)

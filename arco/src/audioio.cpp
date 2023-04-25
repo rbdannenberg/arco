@@ -5,6 +5,9 @@
  */
 
 /*
+
+Internal States
+
 Supports running O2SM even when audio callbacks are not functioning.
 
 Let's assume that it can take awhile for audio to start up, so we'll
@@ -34,39 +37,58 @@ get it running first, then switch over to actually using it.
 Audio Processing
 
 1. Audio input has aud_in_chans channels. These are
-de-interleaved and copied to the *output* of:
+de-interleaved and copied to the *output* of ugen_table[INPUT_ID].
 
-2. aud_input_ug. If there are too many input channels, extras are
-ignored. (But initially, we only open as many channels as we can 
-use.) If there are too few, extra channels are zero.
+2. ugen_table[INPUT_ID] is a Ugen of subclass Thru.  If there are too
+many input channels, extras are ignored. (But initially, we only open
+as many channels as we can use.) If there are too few, extra channels
+are zero.
 
-3. Audio graphs can reference aud_input_ug, which acts as a source, to
-get samples.
+3. Audio graphs can reference ugen_table[INPUT_ID], which acts as a
+source, to get samples.
 
 4. run_set contains unit generators that must be run, but which are
 not producing audio output, e.g., an audio feature computation. These
 are computed after input is available.
 
-5. synthesize() is run and computed audio is written to aud_output_ug,
-which has a vector of channels.
+5. output_set contains a set of unit generators whose output should be
+summed to form audio output.  Each is run to compute audio written to
+an output buffer. If the actual number of output channels (the number
+of channels sent to the PortAudio output stream) is as large as the
+number of computed channels, we use the PortAudio output area as the
+buffer because it is already allocated. Otherwise, we allocate enough
+space on the stack for the buffer.  Either way, the buffer is a vector
+of channels (not interleaved). This is the wrong format for PortAudio,
+but at this point the PortAudio output area is just serving as a
+temporary buffer area to sum channels.
 
-6. output is copied to the outputs of aud_prev_output_ug. (These
-outputs can be accessed in the next block, allowing feedback with a
-1-block delay.)
+6. After all output is summed, the buffer is copied to the outputs of
+ugen_table[PREV_OUTPUT_ID]. (These outputs can be accessed in the next
+block, allowing feedback with a 1-block delay. Until the run_set and 
+output_set are computed, ugen_table[PREV_OUTPUT_ID] has valid samples
+from the previous block, so we cannot write current output directly.)
 
-7. output is copied in interleaved form to a buffer
+7. ugen_table[PREV_OUTPUT_ID] output is then interleaved to form true
+audio output. If the output has a different number of channels, the
+following adaptation is used:
 
-8. If aud_out_chans > aud_out_chans, the extra output channels
-are "wrapped" and summed into the first aud_out_chans. E.g. if
-there are 6 output channels but only 2 actual channels, channels 2 and
-4 are added to 0, and channels 3 and 5 are added to 1, so everything
-is routed to channels 0 or 1.
+8. Let aud_out_chans = prev_output->chans. If aud_out_chans >
+actual_out_chans, the extra output channels are "wrapped" and summed
+into the first aud_out_chans. E.g. if there are 6 output channels but
+only 2 actual channels, channels 2 and 4 are added to 0, and channels
+3 and 5 are added to 1, so everything is routed to channels 0 or 1. If
+aud_out_chans < actual_out_chans, the extra channels are filled with
+zeros.
 
 9. The buffer is copied to the output samples area passed in by the
 callback. If aud_out_chans <= aud_out_chans, there is no
 wrapping, and the output samples memory block is used as the buffer to
 avoid an extra copy. If necessary extra actual output channels are
 filled with zero.
+
+External Control
+
+See doc/design.md
 
 */
 
@@ -293,10 +315,8 @@ static void arco_reset(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/reset string s;
-   Reset the server: stop audio, disconnect run set and outputs,
-   send to /<s>/reset, where <s> is the control service name
-   passed as an argument of this message.
+/* O2SM INTERFACE: /arco/quit;
+   Arco is quitting -- shut down the whole application, audio first
 */
 static void arco_quit(O2SM_HANDLER_ARGS)
 {
@@ -551,7 +571,7 @@ static int callback_entry(float *input, float *output,
         prev_output && */ prev_output->chans > 0) {
 
         // Compute the output to be copied to prev_output, then copy,
-        // then interleave and mix down to actual output.
+        // then interleave and mix do<wn to actual output.
         // Use the actual output as a buffer for the first step if it
         // is big enough; otherwise, allocate a buffer on the stack:
         Sample_ptr buffer = NULL;
@@ -563,6 +583,7 @@ static int callback_entry(float *input, float *output,
         }
 
         Sample_ptr outptr;
+        bool wrote_buffer = false;
 
         // compute all outputs, first is copy and zero fill, rest sum to output
         for (int i = 0; i < output_set.size(); i++) {
@@ -573,12 +594,13 @@ static int callback_entry(float *input, float *output,
             }
             outptr = &output_ug->output[0];
             int n = min(output_ug->chans, aud_out_chans);
-            if (i == 0) {  // copy and fill
+            if (!wrote_buffer) {  // copy and fill
                 memcpy(buffer, outptr, n * BLOCK_BYTES);
                 if (n < aud_out_chans) {
                     memset(buffer + BL * n, 0,
                            (aud_out_chans - n) * BLOCK_BYTES);
                 }
+                wrote_buffer = true;
             } else {  // 2nd sound: add to buffer, no fill needed
                 sum_from_into(buffer, outptr, n * BL);
             }
@@ -588,6 +610,9 @@ static int callback_entry(float *input, float *output,
                 sum_from_into(buffer, outptr + BL * n, count * BL);
                 n += count;
             }
+        }
+        if (!wrote_buffer) {  // No sound was written to buffer!
+            memset(buffer, 0, aud_out_chans * BLOCK_BYTES);
         }
 
         // copy computed output to prev_output
@@ -703,12 +728,11 @@ static void arco_output(O2SM_HANDLER_ARGS)
 
     if (ugen->rate == 'a') {
         // make sure this is not already in output set
-        for (int i = 0; i < output_set.size(); i++) {
-            if (output_set[i] == id) {
-                arco_warn("/arco/output %d already in output set\n", id);
-                return;
-            }
+        if (ugen->flags & IN_OUTPUT_SET) {
+            arco_warn("/arco/output %d already in output set\n", id);
+            return;
         }
+        ugen->flags |= IN_OUTPUT_SET;
         output_set.push_back(id);
     } else {
         arco_warn("arco_output %d not audio rate, ignored\n", id);
@@ -723,7 +747,11 @@ static void arco_mute(O2SM_HANDLER_ARGS)
     int32_t id = argv[0]->i;
     // end unpack message
 
-    if (!forget_ugen_id(id, output_set)) {
+    ANY_UGEN_FROM_ID(ugen, id, "arco_mute");
+    if (ugen && (ugen->flags & IN_OUTPUT_SET)) {
+        forget_ugen_id(id, output_set);
+        ugen->flags &= ~IN_OUTPUT_SET;
+    } else {
         arco_warn("/arco/mute %d not in output set, ignored\n", id);
     }
 }
@@ -1012,6 +1040,20 @@ void arco_logaud(O2SM_HANDLER_ARGS)
     }
 }
 
+/* O2SM INTERFACE: /arco/cpu; -- get the estimated CPU load */
+void arco_cpu(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    // end unpack message
+    float load = 0;
+    if (audio_stream) {
+        load = Pa_GetStreamCpuLoad(audio_stream);
+    }
+    o2sm_send_start();
+    o2sm_add_float(load);
+    strcpy(control_service_addr + control_service_addr_len, "cpu");
+    o2sm_send_finish(0.0, control_service_addr, true);
+}
 
 /* O2SM INTERFACE: /arco/load  
        int32 count;
@@ -1036,6 +1078,7 @@ void arco_free_all_ugens()
     for (int i = 0; i < ugen_table.size(); i++) {
         Ugen_ptr ugen = ugen_table[i];
         if (ugen) {
+            ugen->flags &= ~IN_OUTPUT_SET & ~IN_RUN_SET;
             ugen_table[i] = NULL;
             ugen->unref();
         }
@@ -1132,6 +1175,7 @@ void audioio_initialize()
     o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
     o2sm_method_new("/arco/hb", "i", arco_hb, NULL, true, true);
     o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
+    o2sm_method_new("/arco/cpu", "", arco_cpu, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     Pa_Initialize();

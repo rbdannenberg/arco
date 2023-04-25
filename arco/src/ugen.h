@@ -73,6 +73,7 @@ class Ugen : public O2obj {
             }
         }
         this->id = id;
+        flags = 0;
         rate = ab;
         chans = nchans;
         output.init(nchans * (rate == 'a' ? BL : 1));
@@ -83,8 +84,10 @@ class Ugen : public O2obj {
     virtual ~Ugen() { /* printf("Ugen delete %d\n", id) */ ; }
 
     virtual const char *classname() = 0;
+    
+    void indent_spaces(int indent);
 
-    void print_tree(int indent, bool print, const char *param);
+    virtual void print_tree(int indent, bool print, const char *param);
 
     // inherit print_sources if there are no inputs:
     virtual void print_sources(int indent, bool print) { ; }

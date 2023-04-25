@@ -21,4 +21,6 @@ public:
     const char *classname() { return Const_name; }
 
     void real_run() { ; }
+
+    void print_tree(int indent, bool print, const char *parm);
 };

@@ -4,5 +4,6 @@
 #include "sharedmemclient.h"
 #include "arcotypes.h"
 #include "arcoutil.h"
+#include "ugenid.h"
 #include "ugen.h"
 #include "upsample.h"

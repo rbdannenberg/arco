@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.24)
 
 set(ARCO_SRC
     arcoinit.cpp arcoinit.h
-    arcougen.h
+    ugenid.h arcougen.h
     audioio.cpp audioio.h
     ugen.cpp ugen.h
     arcoutil.cpp arcoutil.h

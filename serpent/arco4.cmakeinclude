@@ -72,7 +72,10 @@ add_executable(${ARCO_TARGET_NAME})
 message(STATUS "target name is ${WXSERPENT_TARGET}")
 
 # Arco-related sources added to wxslib:
-set(ARCO_WXS_SOURCES src/sarco.cpp ../arco/src/arcotypes.h)
+set(ARCO_WXS_SOURCES src/sarco.cpp ../arco/src/arcotypes.h
+                     src/arcougenid.cpp src/arcougenid.h
+                     src/sugenid.cpp)
+
 list(TRANSFORM ARCO_WXS_SOURCES PREPEND "${CMAKE_CURRENT_LIST_DIR}/")
 list(APPEND CUSTOM_WXS_SRC ${ARCO_WXS_SOURCES})
 set(CUSTOM_WXS_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../arco/src")

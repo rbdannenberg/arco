@@ -36,3 +36,5 @@ CMakeCache.txt
 /ugens/*/*.bak
 
 /rbdtodo.txt
+
+/serpent/srp/arco-refcount.srp

@@ -35,14 +35,16 @@ BP = 1 / BR
 #    on discovery: arco_initialization() sends /arco/reset, 
 #        'discovery' -> 'initializing'
 #        Arco replies to /actl/reset handled by actl_reset()
-#        new objects are created and send to /arco/devinf
+#        send to /arco/devinf
 #        'initializing' -> 'opening'
 #    Arco sends device info to /host/openaggr (implemented by application)
-#        application makes input and output device selections and
-#            sends to /arco/open with reply-to set to "actl"
+#        application makes input and output device selections and calls
+#        arco_open()n
+#    arco_open() creates standard Ugens and sends to /arco/open with
 #        Arco replies to /actl/starting, handled by actl_starting()
-#        'opening' -> 'running'
-#    (an arco_initialization() sending /arco/reset can happen here)
+#    actl_starting() does 'opening' -> 'running' and calls application's
+#        arco_ready().  Application now has running audio.
+#
 #    Shutdown:
 #         application calls arco_quit() (one way to implement this
 #            is to set default_window.method = 'arco_main_win_handler'. This
@@ -80,6 +82,19 @@ aud_run_set = []
 next_action_id = 1
 action_dict = {}
 
+max_ugen_id_used = 0
+
+def create_ugen_id():
+    var uid = arco_ugen_new()
+    if arco_ugen_id(uid) > max_ugen_id_used:
+        max_ugen_id_used = arco_ugen_id(uid)
+    uid
+
+
+# Ugen.action_id is an integer key. Arco sends /actl/act with the key
+# when the Ugen finishes.
+# action_dict[key] is a list of actions of the form [object, method, params]
+#
 def create_action(ugen, object, method, rest parameters):
     var action_list
     var action = [object, method, parameters]
@@ -92,21 +107,24 @@ def create_action(ugen, object, method, rest parameters):
     else:
         action_dict[next_action_id] = [action]
         ugen.action_id = next_action_id
-        o2_send_cmd("/arco/" + tolower(ugen.classname) + "/act", 0, "ii",
+        o2_send_cmd("/arco/" + tolower(ugen.classname) + "/act", 0, "Ui",
                     ugen.id, next_action_id)
         next_action_id = next_action_id + 1
     print "create_action for ugen", ugen.id, "action", ugen.action_id
+    watched_action(ugen, "action_list[" + str(ugen.action_id) + "] gets")
 
 
 def actl_act(timestamp, address, types, rest parameters):
     display "actl_act", types, parameters
-    action_list = action_dict.get(parameters[0])
+    var key = parameters[0]
+    action_list = action_dict.get(key)
     if not action_list:
-        print "ERROR: actl_act - action_id not found in action_dict",
-        print parameters[0]
+        print "ERROR: actl_act - action_id not found in action_dict", key
         return
     for action in action_list:
         general_apply(action[0], action[1], action[2])
+    watched_action(action[0], "action_list[" + str(key) + "] removing")
+    action_dict.remove(key)  // allow garbage collection
 
 
 # assign default_window.method = 'arco_main_win_handler' to quit Arco
@@ -164,15 +182,60 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     o2_method_new("/actl/act", "i", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
     o2_method_new("/actl/reset", "", 'actl_reset', t)
+    o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
     sched_select(rtsched)
     set_arco_state('discovery')
     sched_cause(0.1, nil, 'poll_for_arco')
+
 
 def arco_run():
     sched_poll_function = 'arco_thread_poll'
     sched_o2_enabled = true
     if getfeatures() & OPTION_WXS == 0:
         sched_run()
+
+
+# Called by application after selecting devices to open. inchan and
+# outchan should be the number of input and output channels in the
+# PortAudio streams.  These numbers might be adjusted if they do not
+# match the device capabilities, which were reported in the /devinfo
+# messages. The application sees possibly different numbers of
+# channels, which are available in the globals arco_input_chans and
+# arco_output_chans. The application should not change these, and they
+# are set by passing optional values to arco_init().
+#
+def arco_open(indev, outdev, inchan, outchan, latency, buffersize):
+    create_standard_ugens()
+    o2_send_cmd("/arco/open", 0, "iiiiiis", indev, outdev,
+                inchan, outchan, latency, buffersize, "actl");
+
+
+arco_get_cpu_load_continuation = nil
+arco_get_cpu_load_data = nil
+
+def arco_get_cpu_load(continuation, optional data):
+    arco_get_cpu_load_continuation = continuation
+    arco_get_cpu_load_data = data
+    o2_send_cmd("/arco/cpu", 0, "")  // get and display cpu load
+
+
+# request a callback with estimated cpu load. Callback can have a
+# non-nil 2nd parameter, data, if provided in this call.
+def actl_cpu(timestamp, address, types, rest args):
+    if arco_get_cpu_load_continuation:
+        if arco_get_cpu_load_data:
+            funcall(arco_get_cpu_load_continuation, args[0],
+                    arco_get_cpu_load_data)
+        else:
+            funcall(arco_get_cpu_load_continuation, args[0])
+            
+
+# Ask Arco to print tree of Ugens:
+def arco_prtree():
+    o2_send_cmd("/arco/prtree", 0, "");
+
+
+arco_poll_to_free_ugens_id = 0
 
 
 # internal function: set up basics after connection established
@@ -182,7 +245,26 @@ def arco_initialization():
     set_arco_state('initializing')
     o2_send_cmd("/arco/reset", 0, "s", "actl")  // pass in this service name
     // actl_reset()  // TEMP PATCH
-    
+    arco_poll_to_free_ugens_id = arco_poll_to_free_ugens_id + 1
+    arco_poll_to_free_ugens(arco_poll_to_free_ugens_id)
+
+
+last_gc_cycles = 0
+
+def arco_poll_to_free_ugens(id):
+    if id == arco_poll_to_free_ugens_id:
+        arco_ugen_gc()  // free Ugen id's on server for all ugen_id's 
+        // that the Serpent garbage collector has collected
+        sched_cause(0.1, nil, 'arco_poll_to_free_ugens',
+                    arco_poll_to_free_ugens_id)
+    return
+    // debugging information tells when GC happens (disabled)
+    if last_gc_cycles != gc_cycles():
+        print "******************************************",
+        print "Completed", gc_cycles() - last_gc_cycles, 
+        print "more GC cycles. Cycle count", gc_cycles()
+        last_gc_cycles = gc_cycles()
+
 
 def actl_reset(rest ignore):
     # don't intialize anything if we are cleanly shutting down
@@ -191,21 +273,29 @@ def actl_reset(rest ignore):
         return
     // else arco_state is 'initializing' and we are starting up
     print "**** arco was reset, starting initialization ****"
-    Ugen(ZERO_ID, "Zero", -1, 'a')
-    o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID)
-    // print "sent /arco/zero/new, id", ZERO_ID
-    zero().refcount = 1 << 48  // big number, within Serpent's max
-
-    Ugen(ZEROB_ID, "Zerob", -1, 'b')
-    o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID)
-    // print "sent /arco/zerob/new, id", ZEROB_ID
-    zerob().refcount = 1 << 48
-
-    Ugen(INPUT_ID, "Thru", arco_input_chans, 'a', 'input', zero())
-    Ugen(PREV_OUTPUT_ID, "Thru", arco_output_chans, 'a', 'input', zero())
-
+    arco_ugen_reset()  // new epoch of ugen_id's; all existing are invalidated
     set_arco_state('opening')
     o2_send_cmd("/arco/devinf", 0, "s", "/host/openaggr")
+
+
+def create_standard_ugens()
+    zero_ugen = Ugen(arco_ugen_new_id(ZERO_ID), "Zero", -1, 'a')
+    o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID)
+    // print "sent /arco/zero/new, id", ZERO_ID
+
+    zerob_ugen = Ugen(arco_ugen_new_id(ZEROB_ID), "Zerob", -1, 'b')
+    o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID)
+    // print "sent /arco/zerob/new, id", ZEROB_ID
+
+    thru_ugen = Ugen(arco_ugen_new_id(INPUT_ID), "Thru",
+                     arco_input_chans, 'a', 'input', zero())
+
+    // previous output can be read here on the next block:
+    var tmp = arco_ugen_new_id(PREV_OUTPUT_ID)
+    display "made new ugen_id 3 with", arco_ugen_id(tmp)
+    output_ugen = Ugen(tmp, "Thru", 
+                       arco_output_chans, 'a', 'input', zero())
+    display "made prev_output", output_ugen, arco_ugen_id(output_ugen.id)
 
 
 # internal function: wait for arco service, then run
@@ -230,34 +320,8 @@ def actl_starting(timestamp, address, types, rest args):
     arco_ready()
 
 
-# free ID management:
-free_nesting = 0  // recursion depth in Ugen free method
-to_be_freed = []  // list of id's to free
-ugen_table = array(1000)  // 1000 must match Arco's ugen_table size.
-id_free_list = nil  // location of linked free list head in ugen_table
-next_free_id = 10   // 0, 1, 2, 3 are special. 4-9 are reserved for 
-                    // test tone and other server functions.
-def new_id(optional allow_nil_return):
-# allocate a new id. If there are no more id's, return nil if
-#     allow_nil_return; otherwise, raise an error
-    if id_free_list:
-        var id = id_free_list
-        id_free_list = ugen_table[id]
-        ugen_table[id] = nil
-        return id
-    if next_free_id < len(ugen_table):
-        id = next_free_id
-        next_free_id = next_free_id + 1
-        return id
-    if allow_nil_return:
-        return nil
-    else:
-        error("ERROR: no more free Unit Generator ID's")
-
-
 class Ugen:
-    var id  // index in the ugen_table
-    var refcount  // reference count, mirrors Arco Ugen
+    var id  // ugen_id object: our encapsulated Arco id
     var classname  // name of Arco Unit Generator Class
     var chans // output channels
     var rate // output rate: 'a' or 'b'
@@ -280,14 +344,6 @@ class Ugen:
         chans = abs(chans_)
         rate = rate_
         inputs = {}  // mapping from input name (symbol) to a ugen
-        if id:  // Instruments pass id=nil and get the id from their output
-            if ugen_table[id]:
-                print "ERROR: Ugen init got id", id, "that is already in use."
-                display "     ", ugen_table[id]
-                id = new_id()
-                print "    Allocating a new one:", id
-            ugen_table[id] = this
-        refcount = 0
         if chans_ >= 0:
             // calling const() if needed will send a message, so
             // we coerce all numbers to const() BEFORE constructing
@@ -296,79 +352,31 @@ class Ugen:
                 if isnumber(inputs_[i]):
                     inputs_[i] = const(inputs_[i])
             o2_send_start()  // build and send new method
-            o2_add_int32(id)
+            o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
             o2_add_int32(chans)
             // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
             for i = 0 to len(inputs_) by 2:
                 var inp = inputs_[i + 1]
-                o2_add_int32(inp.id)
+                o2_add_int32(arco_ugen_id(inp.id))
                 // print inputs_[i], inp.id,
                 inputs[inputs_[i]] = inp  // build dictionary of inputs
-                inp.ref()
             o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
             // print
 
-    def free():
-        free_nesting = free_nesting + 1
-        if id:
-            to_be_freed.append(id)
-            aud_run_set.remove(this)     // in case it is being run
-            aud_output_set.remove(this)  // or output
-            ugen_table[id] = id_free_list
-            id_free_list = id
-            unref_inputs()
-            id = nil
-        free_nesting = free_nesting - 1
-        if free_nesting == 0:
-            // print "sent /arco/free",
-            o2_send_start()
-            for i in to_be_freed:
-                o2_add_int32(i)
-                // print i,
-            o2_send_finish(0, "/arco/free", true)
-            // print
-            to_be_freed.clear()
-        nil
-
-    # unref the inputs to this unit generator. This may be overridden
-    #     e.g., see Mix, which stores named inputs in pairs
-    def unref_inputs():
-        for inp in inputs.values():
-            inp.unref()
-
-
-    def ref():
-        refcount = refcount + 1
-        this
-
-
-    def unref():
-        refcount = refcount - 1
-        if refcount == 0:
-            free()
-        elif refcount < 0:
-            display "ERROR:", refcount, id, classname
-        nil
-
 
     def play():
-        if id:
-            aud_output_set.append(this)
-            ref()
-            display "play", id
-            o2_send_cmd("/arco/output", 0, "i", id)
-        else:
-            print "ERROR: cannot play()", classname, "after it is freed"
-            return nil
+        aud_output_set.append(this)
+        watched_action(this, "play: ugen added to aud_output_set")
+        display "play", id
+        o2_send_cmd("/arco/output", 0, "U", id)
         this
 
 
     def mute():
-        if id:
-            display "Ugen mute", id
-            aud_output_set.remove(this)
-            o2_send_cmd("/arco/mute", 0, "i", id)
-            unref()
+        display "Ugen mute", id
+        aud_output_set.remove(this)
+        watched_action(this, "mute: ugen removed from aud_output_set")
+        o2_send_cmd("/arco/mute", 0, "U", id)
         // if you mute something twice, we ignore the redundancy
         this
 
@@ -390,16 +398,14 @@ class Ugen:
                     print chan
                     return
                 o2_send_cmd("/arco/" + tolower(classname) + "/set_" + input,
-                            0, "iif", id, chan, value)
+                            0, "Uif", id, chan, value)
                 return
             // otherwise, make a Const object to hold the value
             value = const(value)  // replacing 'a' or 'b' with 'c'
         // value is a Ugen which is the new input value
-        value.ref()
         inputs[input] = value
         o2_send_cmd("/arco/" + tolower(classname) + "/repl_" + input,
-                    0, "ii", id, value.id)
-        previous.unref()  // release whatever was there before
+                    0, "UU", id, value.id)
         this
 
 
@@ -408,10 +414,6 @@ class Ugen:
     # provided, to arg, which in either case must handle /arco/<class>/act
     # which is currently handled by Pwlb and Strplay classes. Currently, 
     # action must be 'mute' or, equivalently, MUTE.
-    #     Note that if arg is a Ugen, we are storing a reference in the
-    # action but we are not bumping the reference count. The caller should
-    # take care of this. (Often the caller just hands off its reference
-    # and no ref() or unref() is needed.)
         if action == MUTE:
             create_action(this, arg, action)
         else:
@@ -467,6 +469,7 @@ def param(ugen, input, optional name):
 def member(ugen, name):
     var context = instr_stack.last()
     context[name] = ugen
+    ugen
 
 
 class Instrument (Ugen):
@@ -478,11 +481,12 @@ class Instrument (Ugen):
         // pass -ugen.chans to suppress /arco/*/new message
         super.init(nil, name, -ugen.chans, ugen.rate)
         output = ugen
-        output.ref()
+        watched_action(ugen, "ugen is output of " + name)
         id = output.id
         parameter_bindings = instr_stack.unappend()
-        for param in parameter_bindings.values():
-            param[0].ref() if isarray(param) else param.ref()
+        for key in parameter_bindings.keys():
+            var ug = parameter_bindings[key]
+            watched_action(ug, "ugen is " + str(key))
 
 
     def get(input):
@@ -496,38 +500,31 @@ class Instrument (Ugen):
         ugen.set(input, value, chan)
 
 
-    def free():  // params are param ([ugen, name]) or member (ugen)
-        display "Instrument free", id, classname
-        for param in parameter_bindings.values():
-            param[0].unref() if isarray(param) else param.unref()
-        output.unref()
-        
+def zero(): zero_ugen
 
-def zero(): ugen_table[ZERO_ID]
-
-def zerob(): ugen_table[ZEROB_ID]
+def zerob(): zerob_ugen
 
 def sine(freq, amp, optional chans = 1):
-    return Ugen(new_id(), "Sine", chans, 'a', 'freq', freq, 'amp', amp)
+    return Ugen(create_ugen_id(), "Sine", chans, 'a', 'freq', freq, 'amp', amp)
 
 def sineb(freq, amp, optional chans = 1):
     if freq.rate == 'a' or amp.rate == 'a':
         print "ERROR: passing audio rate Ugen to block rate sineb"
         return nil
     else:
-        return Ugen(new_id(), "Sineb", chans, 'b', 'freq', freq, 'amp', amp)
+        return Ugen(create_ugen_id(), "Sineb", chans, 'b', 'freq', freq, 'amp', amp)
 
 def const(x):
-    var ugen = Ugen(new_id(), "Const", -1, 'c')
-    o2_send_cmd("/arco/const/newf", 0, "if", ugen.id, x)
+    var ugen = Ugen(create_ugen_id(), "Const", -1, 'c')
+    o2_send_cmd("/arco/const/newf", 0, "Uf", ugen.id, x)
     // print "sent /arco/const/newf, id", ugen.id, "value", x
     return ugen
 
 
 class Pwl (Ugen):
     def init(points):
-        super.init(new_id(), "Pwl", -1, 'a')
-        o2_send_cmd("/arco/pwl/new", 0, "i", id)
+        super.init(create_ugen_id(), "Pwl", -1, 'a')
+        o2_send_cmd("/arco/pwl/new", 0, "U", id)
         set_point_array(points)
 
     def set_points(rest points):
@@ -561,36 +558,36 @@ class Pwlb (Ugen):
     var action_id
 
     def init(points):
-        super.init(new_id(), "Pwlb", -1, 'b')
-        o2_send_cmd("/arco/pwlb/new", 0, "i", id)
+        super.init(create_ugen_id(), "Pwlb", -1, 'b')
+        o2_send_cmd("/arco/pwlb/new", 0, "U", id)
         set_point_array(points)
 
     def set_points(rest points):
         set_point_array(points)
 
     def set_point_array(points):
-        display "Pwlb", points
+        // display "Pwlb", points
         o2_send_start()
-        o2_add_int32(id)
+        o2_add_int32(arco_ugen_id(id))
         # track cummulative time and samples to avoid accumulated time error
         var time = 0
         var count = 0
-        print "               ";
+        // print "               ";
         for i = 0 to len(points) by 2:
             time = time + points[i]
             var samps = round(time * BR - count)
             count = count + samps
-            print samps,
+            // print samps,
             o2_add_float(samps)  // the number of samples to ramp
             if i + 1 < len(points):  // allowed to omit final zero amplitude
                 print points[i + 1],
                 o2_add_float(points[i + 1])  // the destination amplitude
-        print
+        // print
         o2_send_finish(0, "/arco/pwlb/env", true)
         this
 
     def start():
-        o2_send_cmd("/arco/pwlb/start", 0, "i", id)
+        o2_send_cmd("/arco/pwlb/start", 0, "U", id)
         this
 
 
@@ -603,7 +600,7 @@ class Mix (Ugen):
     
     def init(chans_):
         input_name = 0
-        super.init(new_id(), "Mix", chans_, 'a')
+        super.init(create_ugen_id(), "Mix", chans_, 'a')
 
 
     def set(input, value, optional chan = 0):
@@ -613,11 +610,9 @@ class Mix (Ugen):
     def ins(ugen, gain, optional atend):
         if isnumber(gain):
             gain = const(gain)
-        ugen.ref()
-        gain.ref()
         inputs[input_name] = [ugen, gain]
         input_name = input_name + 1
-        o2_send_cmd("/arco/mix/ins", 0, "iii", id, ugen.id, gain.id)
+        o2_send_cmd("/arco/mix/ins", 0, "UUU", id, ugen.id, gain.id)
         if atend:
             if atend == SIGNAL and issubclass(ugen, Instrument) and 
                ugen.get['envelope']:
@@ -629,37 +624,40 @@ class Mix (Ugen):
         return this
     
 
-    # override Ugen unref_inputs because we keep inputs in pairs
-    def unref_inputs():
-        for inp in inputs.values():
-            inp[0].unref()
-            inp[1].unref()
-
-
     def rem(ugen):
         for key in inputs.keys():
             if inputs[key][0] == ugen:
-                ugen.unref()
-                inputs[key][1].unref()
                 inputs.remove(key)
-                o2_send_cmd("/arco/mix/rem", 0, "ii", id, ugen.id)
+                o2_send_cmd("/arco/mix/rem", 0, "UU", id, ugen.id)
                 return this
         return this
 
 
+    def find_name_of(ugen):
+        for key in inputs.keys():
+            if inputs[key][0] == ugen:
+                return key
+        return nil
+
+
     def set_gain(ugen, gain):
-        var i = inputs.index(ugen)
-        if i < 0:
-            print "ERROR: Mix set_gain cannot find ugen"
-        var gain_ugen = inputs[i + 2]
+    # general set gain to either a Ugen or float (constant value)
+        // inputs are "named" by numbers that start at 0 and increment for
+        // each ins() operation. We do not reuse numbers.
+        // Start by finding the input name:
+        var i = find_name_of(ugen)
+        if not i:
+            print "ERROR: Mix set_gain cannot find ugen", ugen
+            return
+        var gain_ugen = inputs[i][1]
         if isinstance(gain_ugen, Ugen) and gain_ugen.rate == "c":
-            o2_send_cmd("/arco/mix/set_gain", 0, "iif", id, ugen, gain)
-        else:  // have to replace with a const object
-            gain_ugen.unref()
+            // a Const exists, so we just write to it using set_gain
+            o2_send_cmd("/arco/mix/set_gain", 0, "UUf", id, ugen, gain)
+        else:  // have to replace with either gain as Ugen or make a const
             if isnumber(gain):
                 gain = const(gain)
-            inputs[i + 2] = gain
-            o2_send_cmd("/arco/mix/repl_gain", 0, "iii", id, ugen, gain)
+            inputs[i][1] = gain
+            o2_send_cmd("/arco/mix/repl_gain", 0, "UUU", id, ugen, gain)
     
 
 def mix(optional chans = 1):
@@ -670,24 +668,24 @@ def reson(input, center, bandwidth, optional chans = 1):
     if input.rate != 'a':
         print "ERROR: input to audio rate reson is not audio rate"
         return nil
-    return Ugen(new_id(), "Reson", chans, 'a', 'input', input, 
+    return Ugen(create_ugen_id(), "Reson", chans, 'a', 'input', input, 
                 'center', center, 'bandwidth', bandwidth)
 
 def resonb(input, center, bandwidth, optional chans = 1):
     if input.rate == 'a' or center.rate == 'a' or bandwidth.rate == 'a':
         print "ERROR: passing audio rate Ugen to block rate resonb"
         return nil
-    return Ugen(new_id(), "Resonb", chans, 'b', 'input', input, 
+    return Ugen(create_ugen_id(), "Resonb", chans, 'b', 'input', input, 
                 'center', center, 'bandwidth', bandwidth)
 
 def mult(x, y, optional chans = 1):
-    return Ugen(new_id(), "Mult", chans, 'a', 'x', x, 'y', y)
+    return Ugen(create_ugen_id(), "Mult", chans, 'a', 'x', x, 'y', y)
 
 def multb(x, y, optional chans = 1):
     if x.rate == 'a' or x.rate == 'a':
         print "ERROR: passing audio rate Ugen to block rate multb"
         return nil
-    return Ugen(new_id(), "Multb", chans, 'b', 'x', x, 'y', y)
+    return Ugen(create_ugen_id(), "Multb", chans, 'b', 'x', x, 'y', y)
 
 def strplay(filename, optional chans = 2, start = 0, end = 0, cycle, mix, expand)
     return Strplay(filename, chans, start, end, cycle, mix, expand)
@@ -698,9 +696,9 @@ class Strplay (Ugen):
 
     def init(filename, chans, start, end, cycle, mix, expand):
         // -chans cuts off standard creation:
-        super.init(new_id(), "Strplay", -chans, 'a')
+        super.init(create_ugen_id(), "Strplay", -chans, 'a')
         o2_send_start()  // make our own new message
-        o2_add_int32(id)
+        o2_add_int32(arco_ugen_id(id))
         o2_add_string(filename)
         o2_add_int32(chans)
         o2_add_float(start)
@@ -712,7 +710,7 @@ class Strplay (Ugen):
 
     def go(optional play_flag = true):
         o2_send_start()  // make our own new message
-        o2_add_int32(id)
+        o2_add_int32(arco_ugen_id(id))
         o2_add_bool(play_flag)
         o2_send_finish(0, "/arco/strplay/play", true)
     

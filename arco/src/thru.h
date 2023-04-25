@@ -12,6 +12,7 @@ public:
     int input_stride;
 
     Thru(int id, int nchans, Ugen_ptr inp) : Ugen(id, 'a', nchans) {
+        printf("Thru@%p created, id %d, ugen_table[id] %p\n", this, id, ugen_table[id]);
         init_input(inp);
     };
 

@@ -9,6 +9,22 @@
 
 const char *Const_name = "Const";
 
+
+void Const::print_tree(int indent, bool print, const char *parm)
+{
+    if (print) {
+        indent_spaces(indent);
+        arco_print("%s_%d #%d (%s) [", classname(), id, refcount, parm);
+        bool need_comma = false;
+        for (int i = 0; i < chans; i++) {
+            arco_print("%s%g", need_comma ? ", " : "", output[i]);
+            need_comma = true;
+        }
+        arco_print("]\n");
+    }
+}
+
+
 /* O2SM INTERFACE: /arco/const/new int32 id, int32 chans;
  */
 void arco_const_new(O2SM_HANDLER_ARGS)

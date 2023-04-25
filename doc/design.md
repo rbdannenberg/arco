@@ -3,6 +3,7 @@
 **Roger B. Dannenberg**
 
 ## Contents:
+- External Control
 - Preferences
 - Unit Generator Design
 - The Ugen Abstract Class
@@ -10,6 +11,52 @@
 - Instruments in Serpent
 - End-of-Sound Actions
 
+## External Control
+This section describes protocols and interaction between a client and
+Arco, mainly the Audioio class that implements audio IO.
+
+See also Internal States in `audioio.cpp`.
+
+Initially, the audio thread is run by the host, which must call
+`arco_thread_poll` periodically. If audio is being processed, the
+audio thread control is safely handed off to audio callbacks, and
+calls to `arco_thread_poll` will return immediately.
+
+Arco receives `/arco/devinf`: gets return address and sends info
+strings about audio devices, terminated by empty string.
+
+Arco sends to reply address: info strings about audio devices.
+
+Arco receives `/arco/reset`: shuts down audio thread, deletes all
+Ugens, sets reply service (here, we assume it is "actl"), sends
+confirmation. Do this first, even before `/arco/open`.
+ 
+Arco sends `/actl/reset`: confirms audio stream closed and Ugens are
+deleted. Client can send `/arco/open` again.
+
+Client creates Zero and Thru Ugens for `INPUT_ID` and `PREV_OUTPUT_ID`
+with:
+- `/arco/zero/new ZERO_ID`
+- `/arco/bzero/new ZEROB_ID`
+- `/arco/thru/new INPUT_ID input_channels ZERO_ID`
+- `/arco/thru/new PREV_OUTPUT_ID output_channels ZERO_ID`
+
+Note that audio input and previous output are represented by Thru
+Ugens whose outputs are written directly by the Audioio callback, and
+their `real_run` methods are never called.
+ 
+Arco receives `/arco/open`: opens audio IO, specifying devices,
+channels, latency and buffer size (in frames). (Control or reply
+service is also specified, but by convention it should be the same
+service passed to `/arco/reset`. Here, we assume `/actl`.
+
+Arco sends `/actl/starting`: gives actual device ids, actual channel
+counts, actual latency and actual buffer size (in frames).
+
+Arco receives `/arco/close`: close audio stream, but keep Ugens in
+place.
+
+Arco sends `/actl/closed`: confirms audio stream closed.
 
 ## Preferences
 Preferences within Arco source code are confusing enough that you
@@ -238,6 +285,130 @@ mirror objects. The client works as this level of abstraction
 and there are no direct messages to Arco. Languages with
 garbage collectors that call "cleanup code" when objects
 are freed could use this to free Arco IDs.
+
+## Unit Generator References in Serpent
+Serpent could use the basic integer-as-reference interface as is,
+but this means that Serpent users have to manage reference counts
+if they want to dynamically create and destroy unit generators in
+Arco. Serpent has garbage collection, so why not tie GC to Unit
+Generators?
+
+Unfortunately, Serpent does not have programmable actions when
+Serpent objects are freed. This would require objects about to
+be freed to execute an "about to be freed" method, which would
+essentially create a new reference to the object and possibly
+create additional references to the object, making it unsafe to
+actually free it. Rather than solving this problem, we can make
+"external" objects that run C++ code when they are freed. This
+does not require entering the Serpent interpreter and as long as
+we require that the C++ code does not create new references, the
+object can be freed immediately after running the code.
+
+For Ugens, we will create an external object called Ugen_id that
+holds a 32-bit Arco id and a 32-bit epoch number. The epoch is
+incremented whenever Arco is reset, clearing all unit generators.
+After a reset, all references are invalid, so we need a way of
+invalidating them.
+
+How safe should this be? Since users can construct arbitrary O2
+message and send to Arco, it's always possible to circumvent any
+Ugen management mechanism, e.g. we can send a message like
+`/arco/free 25`. Since this loophole is available, we can be
+relaxed about other loopholes, e.g. we can allow Serpent programs
+to extract integer id's from Ugen_id objects, but we want to
+automate things for users as much as possible to avoid mistakes.
+
+Currently, users normally send O2 messages from Serpent using
+`o2_send_cmd` with a type string to specify types in the message.
+We will add a special type character code "U" for Ugen that expects
+a Ugen_id object, checks the epoch number to make sure it is valid,
+extracts the Ugen_id, and adds it to the message using `o2_add_int32`.
+
+Ugen_id objects are created by consulting an array of integers. The
+array is initialized as a linked list, where each array element
+contains the index of the next array element. To create a Ugen_id, pop
+an entry off the linked list to get an integer. Mark the array element
+at that index with its own index to mean *allocated*. Set the current
+epoch number in the Ugen_id.
+
+Note that Serpent can have any number of references to a Ugen_id and
+it can be freely copied (because assignment of an object assigns the
+object address). When a Ugen_id is freed by GC, we will send an
+`/arco/free` message and return the id to the free list.
+
+If we construct messages in the normal way, the message construction
+primitives beginning with `o2_msg_start` and ending with
+`o2_msg_finish` are *not* reentrant, which means we cannot send a
+message from within the garbage collector, which can be invoked
+between Serpent instructions. To solve this, we'll have the GC keep
+another list of freed id's and provide a C++-level function that
+once called runs without invoking GC and sends `/arco/free` messages
+for all freed ids. We might optimize `/arco/free` by allowing it to
+carry an arbitrary number of id's so we can free them in a batch.
+
+Since Serpent will have to periodically call a function to check for
+freed id's and send `/arco/free` there will be some delay between
+freeing a Ugen on the Serpent (client) side and actually releasing the
+id and Ugen on the Arco (server) side. There might be cases where we
+want to release a Ugen immediately. We can add a `delete` method to
+the Serpent Ugen class that makes the Ugen invalid. The method will
+call a function that immediately sends `/arco/free` and marks the ugen
+array entry with -id. Later, GC will actually free
+the reference, and the -id will indicate that the `/arco/free` message
+has been sent and the id can be moved to the free list (not the
+to-be-freed list). (If the array entry is id, it means the id is
+allocated. We put the array entry in the to-be-freed list which will
+give the array entry the value to another index or -1 (end of
+list). We want to delay moving the id to the free list for 
+two reasons: (1) we need to keep the array entry -1 to tell GC that
+the id is already free, and (2) if we immediately put the id back on
+the free list, another object could be created for the id, leaving
+twoand a second object would then have the same id number.
+
+Functions available to Serpent are:
+- `arco_ugen_new()` -- allocate an id and construct a new Ugen_id
+
+- `arco_ugen_new_id(id)` -- construct a new Ugen_id from known id
+
+- `arco_ugen_id(ugen_id)` -- extract the Arco id from the Ugen_id
+  object. Returns -1 if the epoch is not current or ugen_id was freed
+  using `arco_ugen_free`.
+
+- `arco_ugen_epoch(ugen_id)` -- extract the epoch number from the Ugen_id
+  object.
+
+- `arco_ugen_free(ugen_id)` -- explicitly free the associated
+  Ugen. The `arco_ugen_id` will become -1 for the remaining lifetime
+  of this object, thus any references to the object will also lose
+  their ability to reference the Ugen.
+
+- `arco_ugen_gc()` -- when ugen_id objects are garbage collected,
+  their id's are collected in a list, but the associated Ugens in Arco
+  are not immediately freed. Calling `arco_ugen_gc` will free the
+  associated Ugens in Arco and return their id's to the pool of unused
+  id's on the Serpent side for reuse by `arco_ugen_new`. If there are
+  no id's to be freed and more than half of the available Ugen id's
+  are allocated, `arco_ugen_gc` runs an incremental step of
+  garbage collection. Garbage collection is somewhat self-balancing in
+  Serpent because more memory can be allocated. The more memory
+  allocated, the more memory is freed after each mark-sweep cycle, so
+  GC becomes more efficient when computation produces more
+  garbage. But Ugens have a fixed set of id's and we do not want to
+  run out. If we allocate lots of Ugens with relatively little
+  computation (GC activity is roughly proportional to the amount of
+  computation performed), we could run out of id's. Therefore, we want
+  to spend more time on GC when we are running short of id's. Arco
+  expects periodic calls to `arco_ugen_gc` even when there is nothing
+  in particular to compute. This will give Arco a chance to make extra
+  increments in the GC computation when running out of id's. If id's
+  run out, it is pretty catastrophic, and the solutions are to
+  recompile with a larger `UGEN_TABLE_SIZE` or to call `arco_ugen_gc`
+  more often, or make more monolithic unit generators so you do not
+  allocate so many in the first place.
+
+- `arco_ugen_reset()` -- increment the epoch, invalidating all current
+  Ugen_id objects. Returns the new epoch number.
+
 
 ## Instruments in Serpent
 A client-side library for Arco is written in Serpent. You can use Arco

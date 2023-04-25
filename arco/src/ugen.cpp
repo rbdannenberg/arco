@@ -8,6 +8,7 @@
 #include "sharedmemclient.h"
 #include "arcoutil.h"
 #include "arcotypes.h"
+#include "ugenid.h"
 #include "ugen.h"
 #include "audioio.h"
 
@@ -65,6 +66,13 @@ void Ugen::unref() {
 }
 
 
+void Ugen::indent_spaces(int indent)
+{
+    for (int i = 0; i < indent; i++) {
+        arco_print("  ");
+    }
+}
+
 // this method runs a mark and print algorithm when print is true
 // it simply unmarks everything when print is false
 //
@@ -74,9 +82,7 @@ void Ugen::print_tree(int indent, bool print, const char *param)
         if (flags & UGEN_MARK) {
             return;  // cut off the search; we've been here before
         }
-        for (int i = 0; i < indent; i++) {
-            arco_print("  ");
-        }
+        indent_spaces(indent);
         arco_print("%s_%d #%d (%s)\n", classname(), id, refcount, param);
         flags |= UGEN_MARK;
     } else {
@@ -99,7 +105,7 @@ void arco_free(O2SM_HANDLER_ARGS)
         int id = ap->i;
         ANY_UGEN_FROM_ID(ugen, id, "arco_free");
         if (ugen) {
-            printf("arco_free handler freeing %d #%d\n", id, ugen->refcount);
+            // printf("arco_free handler freeing %d #%d\n", id, ugen->refcount);
             ugen_table[id] = NULL;
             // special case: check for run set or output set references
             if (ugen->flags & (IN_RUN_SET | IN_OUTPUT_SET)) {
@@ -114,7 +120,7 @@ void arco_free(O2SM_HANDLER_ARGS)
 
 void ugen_initialize()
 {
-    ugen_table.init(1000, true);  // fill with zero
+    ugen_table.init(UGEN_TABLE_SIZE, true);  // fill with zero
     Initializer::init();  // add all message handlers to O2sm
 
     o2sm_method_new("/arco/free", NULL, arco_free, NULL, false, false);
