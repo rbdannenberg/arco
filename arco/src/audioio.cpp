@@ -567,9 +567,9 @@ static int callback_entry(float *input, float *output,
     // to have zero channels, but can we specify that? At least there is
     // code below (see else part) to output zeros when Arco produces no
     // output but the audio device expects output.
-    if (/* actual_out_chans > 0 && output_set.size() > 0 &&
-        prev_output && */ prev_output->chans > 0) {
-
+    if (!prev_output) {
+        printf("WARNING (Arco audio callback): prev_output is NULL\n");
+    } else if (prev_output->chans > 0) {
         // Compute the output to be copied to prev_output, then copy,
         // then interleave and mix do<wn to actual output.
         // Use the actual output as a buffer for the first step if it

@@ -36,7 +36,7 @@ def o2_send_helper(tcp, addr, when, sig, args):
         return
     o2_send_start()
     for s at i in sig:
-        # display "o2_send_helper loop", s, i, args
+        // display "o2_send_helper loop", s, i, args
         funcall(TYPE_TO_ADD_TYPE[s], args[i])
     // display "o2_send_helper", addr
     o2_send_finish(when, addr, true)

@@ -11,6 +11,9 @@ require "debug"
 require "sched"
 require "o2util"
 require "utils"
+require "prefs"
+
+prefs = Prefs("arco")
 
 AR = 44100.0  // audio rate
 AP = 1 / AR // audio sample period
@@ -19,46 +22,94 @@ BL_RECIP = 1 / BL
 BR = AR / BL
 BP = 1 / BR
 
+// BPS is set to zero when audio stops to avoid activity that
+// cannot be processed by the audio server. BPS is restored
+// using this variable:
+saved_vtsched_bps = 1.0  // default "tempo"
+
 # states:
-#    nil - initial value and after reset completes
+#    nil - initial value
 #    'discovery' - looking for "arco" service
 #    'initializing' - resetting the server
-#    'opening' - opening audio device(s)
+#    'stopped' - initialized, audio is not open
+#    'opening' - collecting device info and opening audio device(s)
 #    'running' - audio server is running
 #    'resetting' - shutting down audio server
-#    'quiting' - 
+#    'quitting' - application is quitting
 #
 # state transitions:
-#    start state is nil
-#    main program calls arco_init(): nil -> 'discovery',
-#        poll for discovery of "arco" service until found
-#    on discovery: arco_initialization() sends /arco/reset, 
-#        'discovery' -> 'initializing'
-#        Arco replies to /actl/reset handled by actl_reset()
-#        send to /arco/devinf
-#        'initializing' -> 'opening'
-#    Arco sends device info to /host/openaggr (implemented by application)
-#        application makes input and output device selections and calls
-#        arco_open()n
-#    arco_open() creates standard Ugens and sends to /arco/open with
-#        Arco replies to /actl/starting, handled by actl_starting()
-#    actl_starting() does 'opening' -> 'running' and calls application's
-#        arco_ready().  Application now has running audio.
+# (Note: ANY state can transition to 'quitting' when arco_quit() is called.
+#  'quitting' is the final state, you cannot transition out of it.)
 #
-#    Shutdown:
-#         application calls arco_quit() (one way to implement this
-#            is to set default_window.method = 'arco_main_win_handler'. This
-#            will call arco_quit() when the main window is closed,
-#            delaying exit until a clean shutdown is complete.)
-#        arco_quit sends /arco/quit and begins polling with poll_for_no_arco
-#        Arco stops running and calls o2sm_finish()
-#        poll_for_no_arco detects Arco finish with 
-#            o2_shmem_inst_count() == 0 and calls exit()
+#    nil: start state
+#        Action: none
+#        -> 'discovery' when arco_init() called by main program
+#    'discovery': polling for "arco" service
+#        Action: arco_init() polls for discovery of "arco"
+#        -> 'initializing' when "arco" service discovered
+#    'initializing': waiting for Arco to reset, will open audio
+#        Action: reset_arco_handler() sends to /arco/reset
+#        -> 'devinf' when receive /actl/reset
+#    'devinf': waiting for device info, will open audio
+#        Action: actl_reset() sends to /arco/devinf, open_audio_handler()
+#                is called when last devinf message is received
+#        -> 'opening' when open_audio_handler() calls arco_open()
+#        -> 'stopped' when open_audio_handler() has nothing to open
+#    'opening': waiting for Arco audio streaming to start
+#        Action: call arco_open(), sends /arco/open
+#        -> 'running' when /actl/starting called
+#    'running': computing and streaming audio
+#        Action: actl_starting()
+#        -> 'stopped' when code calls close_audio_handler() or
+#                          Close Audio menu selected
+#    'devinf2': waiting for device info, will not open audio
+#        Action: rescan_audio_handler() sends /arco/devinf
+#        -> 'stopped' when last devinf message received
+#    'stopped': initialized, but audio is not running
+#        Action: none
+#        -> 'devinf2' when Rescan Audio Devices menu selected
+#        -> 'opening' when user code calls arco_open() or 
+#                          Open Audio menu selected
+#        -> 'initializing2' when user code calls reset_arco_handler() or
+#                                Reset Arco menu selected
+#    'initializing2': waiting for Arco to reset, will not open audio
+#        Action: send to /arco/reset
+#        -> 'devinf2' when receive /actl/reset
+#    'quitting': application is shutting down
+#        Action: send to /arco/quit
+#
+# Shutdown:
+#     application calls arco_quit() (one way to implement this
+#        is to set default_window.method = 'arco_main_win_handler'. This
+#        will call arco_quit() when the main window is closed,
+#        delaying exit until a clean shutdown is complete.)
+#    arco_quit sends /arco/quit and begins polling with poll_for_no_arco
+#    Arco stops running and calls o2sm_finish()
+#    poll_for_no_arco detects Arco finish with 
+#        o2_shmem_inst_count() == 0 and calls exit()
 #        
 arco_state = nil
-def set_arco_state(state): 
-    display "arco_state change", state
-    arco_state = state
+arco_allowed_state_transitions = {  // maps new state to allowed current states
+    'discovery': [nil], 'initializing': 'discovery', 'devinf': 'initializing',
+    'opening': ['devinf', 'stopped'], 'running': 'opening',
+    'stopped': ['opening', 'running', 'initializing2'],
+    'devinf2': ['initializing2', 'stopped']}
+
+# This function checks if a transition to newstate is legal. If legal,
+# arco_state is changed and return value is true. Otherwise, stay in the
+# current state, print a warning and return false.
+def set_arco_state(newstate): 
+    if newstate != 'quitting':
+        allowed = arco_allowed_state_transitions[newstate]
+        if arco_state != allowed and ((not isarray(allowed)) or 
+                                      (arco_state not in allowed)):
+            print "*****************************************************"
+            print "* WARNING: Unexpected state transition from", 
+            print arco_state, "to", newstate; "."
+            return false
+    display "arco_state change to", newstate
+    arco_state = newstate
+    return true
 
 
 // atend types for Mix.ins():
@@ -111,7 +162,6 @@ def create_action(ugen, object, method, rest parameters):
                     ugen.id, next_action_id)
         next_action_id = next_action_id + 1
     print "create_action for ugen", ugen.id, "action", ugen.action_id
-    watched_action(ugen, "action_list[" + str(ugen.action_id) + "] gets")
 
 
 def actl_act(timestamp, address, types, rest parameters):
@@ -123,7 +173,6 @@ def actl_act(timestamp, address, types, rest parameters):
         return
     for action in action_list:
         general_apply(action[0], action[1], action[2])
-    watched_action(action[0], "action_list[" + str(key) + "] removing")
     action_dict.remove(key)  // allow garbage collection
 
 
@@ -145,7 +194,6 @@ def arco_main_win_handler(obj, event, x, y):
 #
 def arco_quit(rest ignore):
     o2_send_cmd("/arco/quit", 0)
-    o2_send_cmd("/arco/close", 0)
     poll_for_no_arco()
 
 
@@ -159,10 +207,67 @@ def poll_for_no_arco()
     sched_cause(0.1, nil, 'poll_for_no_arco')
 
 
-def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t, 
-              color, title):
+IS_WXSERPENT = symbol_value('WXS_DEFAULT_WINDOW') == 0  // is this wxserpent?
+
+audio_devices = []
+
+if IS_WXSERPENT:
+    audio_devices_menu = default_window.get_menu("File")
+    require "audiodev"
+
+
+def audio_device_handler(obj, event, x, y):
+    display "adh", x, y
+
+def actl_devinf(timestamp, address, types, info):
+    if info == "":
+        if arco_state == 'devinf':
+            // auto-open in discovery->initializing->devinf->opening->running
+            //     sequence:
+            auto_open_audio()
+            return
+        // else user just asked to rescan devices (state is 'devinf2'):
+        set_arco_state('stopped')
+        if IS_WXSERPENT:
+            create_device_selections()  // build the radio button selections
+        return  // done with devices
+    if IS_WXSERPENT:
+        audio_devices.append(info)
+    elif find(info, "Aggregate") >= 0 or find(info, "default") >= 0:
+        var id = int(info)
+        print "  --> opening this device, id", id
+        arco_open(id, id, arco_input_chans, arco_output_chans,
+                  arco_latency, arco_buffersize)
+        o2_send_cmd("/arco/prtree", o2_time_get() + 1, "");
+
+
+def find_one_audio_device(selections, dir):
+    var id
+    for s in selections:
+        var pos = find(s, "(") + 1
+        if pos == -1:
+            display "Internal error in find_one_audio_device", s, pos
+            return nil
+        if dir == "outs":
+            pos = find(s, ",", pos) + 1
+        var chans = int(subseq(s, pos))
+        if chans > 0:
+            if id:
+                print "Multiple devices selected for", 
+                print "input." if dir == "ins" else "output."
+                return nil
+            id = int(s)
+    display "find_one_audio_device returns", dir, id
+    return id
+
+
+def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
+              latency = 30, buffersize = BL,
+              color, title, o2trace):
+    if not set_arco_state('discovery'):
+        return
     // set title and Quit handlers to shut down Arco on exit
-    if symbol_value('WXS_DEFAULT_WINDOW') == 0:  // is this wxserpent?
+    if IS_WXSERPENT
         if title:
             default_window.set_string(title)
         if not color:
@@ -174,17 +279,19 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
         
     arco_input_chans = ins
     arco_output_chans = outs
+    arco_latency = latency
+    arco_buffersize = buffersize
     sched_init()
     o2_network_enable(network)
-    o2_initialize(ensemble, t)
+    o2_initialize(ensemble, o2trace)
     arco_initialize()  // create audio shared memory interface
     o2_service_new("actl")
+    o2_method_new("/actl/devinf", "s", 'actl_devinf', t)
     o2_method_new("/actl/act", "i", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
     o2_method_new("/actl/reset", "", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
     sched_select(rtsched)
-    set_arco_state('discovery')
     sched_cause(0.1, nil, 'poll_for_arco')
 
 
@@ -198,14 +305,15 @@ def arco_run():
 # Called by application after selecting devices to open. inchan and
 # outchan should be the number of input and output channels in the
 # PortAudio streams.  These numbers might be adjusted if they do not
-# match the device capabilities, which were reported in the /devinfo
+# match the device capabilities, which were reported in the /devinf
 # messages. The application sees possibly different numbers of
 # channels, which are available in the globals arco_input_chans and
 # arco_output_chans. The application should not change these, and they
 # are set by passing optional values to arco_init().
 #
 def arco_open(indev, outdev, inchan, outchan, latency, buffersize):
-    create_standard_ugens()
+    if not zero_ugen:
+        create_standard_ugens()
     o2_send_cmd("/arco/open", 0, "iiiiiis", indev, outdev,
                 inchan, outchan, latency, buffersize, "actl");
 
@@ -240,13 +348,17 @@ arco_poll_to_free_ugens_id = 0
 
 # internal function: set up basics after connection established
 #
-def arco_initialization():
-    print "**** discovered arco service. initialization starting ****"
-    set_arco_state('initializing')
+def reset_arco():
+    if not set_arco_state('initializing' if arco_state == 'discovery'
+                                         else 'initializing2'):
+        return
     o2_send_cmd("/arco/reset", 0, "s", "actl")  // pass in this service name
-    // actl_reset()  // TEMP PATCH
     arco_poll_to_free_ugens_id = arco_poll_to_free_ugens_id + 1
     arco_poll_to_free_ugens(arco_poll_to_free_ugens_id)
+    zero_ugen = nil
+    zerob_ugen = nil
+    thru_ugen = nil
+    output_ugen = nil
 
 
 last_gc_cycles = 0
@@ -266,19 +378,21 @@ def arco_poll_to_free_ugens(id):
         last_gc_cycles = gc_cycles()
 
 
+
 def actl_reset(rest ignore):
-    # don't intialize anything if we are cleanly shutting down
-    if arco_state == 'resetting':
-        set_arco_state(nil)
+    if not set_arco_state('devinf'):
         return
     // else arco_state is 'initializing' and we are starting up
     print "**** arco was reset, starting initialization ****"
     arco_ugen_reset()  // new epoch of ugen_id's; all existing are invalidated
-    set_arco_state('opening')
-    o2_send_cmd("/arco/devinf", 0, "s", "/host/openaggr")
+    audio_devices.clear()
+    o2_send_cmd("/arco/devinf", 0, "s", "/actl/devinf")
 
 
-def create_standard_ugens()
+def create_standard_ugens():
+    if zero_ugen:
+        print "WARNING: create_stanard_ugens -- ugens already created"
+        return
     zero_ugen = Ugen(arco_ugen_new_id(ZERO_ID), "Zero", -1, 'a')
     o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID)
     // print "sent /arco/zero/new, id", ZERO_ID
@@ -298,25 +412,27 @@ def create_standard_ugens()
     display "made prev_output", output_ugen, arco_ugen_id(output_ugen.id)
 
 
-# internal function: wait for arco service, then run
-# arco_initialization
+# internal function: wait for arco service, then reset Arco server
 #
 def poll_for_arco():
     print "poll for arco"
     if o2_status("arco") < O2_LOCAL:
         sched_cause(1.0, nil, 'poll_for_arco')
     else:
-        arco_initialization()
+        print "**** discovered arco service. initialization starting ****"
+        reset_arco()
 
 
 # this is an O2 message handler for message sent by audio thread
 # when the audio stream is started:
 #
 def actl_starting(timestamp, address, types, rest args):
+    vtsched.set_bps(saved_vtsched_bps)  // continue advancing time
     print "Audio stream is starting: in", args[0], "("; args[2], "chan),",
     print "out", args[1], "("; args[3], "chan),", "latency", args[4], 
     print "ms, block size", args[5]
-    set_arco_state('running')
+    if not set_arco_state('running'):
+        return
     arco_ready()
 
 
@@ -366,7 +482,6 @@ class Ugen:
 
     def play():
         aud_output_set.append(this)
-        watched_action(this, "play: ugen added to aud_output_set")
         display "play", id
         o2_send_cmd("/arco/output", 0, "U", id)
         this
@@ -375,7 +490,6 @@ class Ugen:
     def mute():
         display "Ugen mute", id
         aud_output_set.remove(this)
-        watched_action(this, "mute: ugen removed from aud_output_set")
         o2_send_cmd("/arco/mute", 0, "U", id)
         // if you mute something twice, we ignore the redundancy
         this
@@ -481,12 +595,10 @@ class Instrument (Ugen):
         // pass -ugen.chans to suppress /arco/*/new message
         super.init(nil, name, -ugen.chans, ugen.rate)
         output = ugen
-        watched_action(ugen, "ugen is output of " + name)
         id = output.id
         parameter_bindings = instr_stack.unappend()
         for key in parameter_bindings.keys():
             var ug = parameter_bindings[key]
-            watched_action(ug, "ugen is " + str(key))
 
 
     def get(input):

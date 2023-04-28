@@ -13,19 +13,6 @@ require "prob"
 require "arco"
 
 SIMPLE = false
-gc_watch_set = false;
-
-watching = {}
-
-def watch(ugen, name):
-    watching[arco_ugen_id(ugen.id)] = name
-    watched_action(ugen, "Watching")
-
-def watched_action(ugen, msg):
-    var name = watching.get(arco_ugen_id(ugen.id))
-    if name:
-        display "Watched action", msg, ugen, ugen.id, name
-
 
 class Atone (Instrument):
     def init(freq, dur, nharm):
@@ -33,9 +20,6 @@ class Atone (Instrument):
         instr_begin()
         var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
         display "In Atone", env, env.id, id(env.id)
-        if not gc_watch_set:
-            dbg_gc_watch(id(env.id))
-            watch(env, "pwlb")
         env.atend(MUTE, this)
         var mix = mix(1)
         for i = 0 to nharm:
@@ -47,9 +31,7 @@ class Atone (Instrument):
             var q = pr_unif(0.5, 2.0)
             mix = reson(mix, renv, q)
         super.init("Atone", mix)
-        if not gc_watch_set:
-            watch(this, "Atone")
-        gc_watch_set = true
+
 
     def start():
         get('env').start()
@@ -61,11 +43,15 @@ class Atone (Instrument):
 
 gccyclesst = nil // text boxes are created after Arco audio is started
 cpuloadst = nil
+ui_initialized = false
 
 def arco_ready():
-    # called when arco is intialized and ready to make sound
-    print "**** arco ready! ****"
+    # called when arco is intialized and ready to make sound or when
+    # arco audio stream has been reopened
+    print "**** arco audio is running! ****"
     var win = default_window
+    if ui_initialized:
+        return
 
     Button(win, "Print Ugen Tree", 10, 10, 170, 20, 'ptbutton')
     ptbutton.add_target_method(nil, 'print_ugen_tree')
@@ -85,6 +71,8 @@ def arco_ready():
     Statictext(win, "GC cycles: 0", 'S', 'D', 'S', 'S', 'gccyclesst')
     Statictext(win, "CPU Load:", 'S', 'D', 'S', 'S', 'cpuloadst')
     Statictext(win, "Max Ugen ID: 0", 'S', 'D', 'S', 'S', 'maxugenidst')
+
+    ui_initialized = true
 
 
 def poll_for_status():
@@ -172,6 +160,7 @@ def play_mixer_test(obj, event, x, y):
 def play_atone_test(obj, event, x, y)
     atone_running = x
     if x:
+        sched_select(vtsched)  // vtsched stops when audio stops
         atone_sequence()
 
 
@@ -216,7 +205,6 @@ def main():
     arco_init(network = false, title = "Arco Test")
     // this should be replaced by a preference and menu system to select
     // and open audio device(s):
-    host_openaggr_init()
     arco_run()
     sched_select(rtsched)
     poll_for_status()

@@ -1,0 +1,179 @@
+# audiodev.srp -- select and control audio devices
+#
+# Roger B. Dannenberg
+# April 2023
+
+# Do not load this directly. It is loaded automatically by arco when
+# running in wxserpent.
+
+
+def audiodev_init()
+    audio_devices_menu.item("Configure Audio",
+                            "open a window to select audio devices", nil, nil,
+                            'configure_audio_handler')
+    configure_audio = nil  // must be initialized to know window is not open
+
+
+# this is called when the application starts. If devices are selected, we can
+# open them. Otherwise, we open the Audio Configuration window for the user.
+def auto_open_audio():
+    var ca = configure_audio
+    if not ca
+        configure_audio_handler()
+    configure_audio.open_audio_handler()
+    if not ca
+        config_win.delete()
+        configure_audio = nil
+
+
+# open window to select audio devices
+def configure_audio_handler(rest ignore):
+    if not configure_audio:
+        configure_audio = Configure_audio()
+
+
+def find_channels(item, dir):
+    var pos = find(item, "(") + 1
+    if pos == -1:
+        display "Internal error in find_channels", item, pos
+        return 0
+    if dir == 'out':
+        pos = find(item, ",", pos) + 1
+    var chans = int(subseq(item, pos))
+    return chans
+
+
+# makes a list of device descriptions where the number of input or output
+# channels > 0. dir is 'in' or 'out'. Also strips off the device id but
+# constructs a mapping from descriptions to device ids in audio_devices_map.
+def find_devices(devs, dir):
+    var found = ["None", "Default"]
+    for item in devs:
+        if find_channels(item, dir) > 0:
+            var dev = int(item)
+            var pos = find(item, " - ")
+            if pos > 0:
+                var name = subseq(item, pos + 3)
+                audio_devices_map[name] = dev
+                found.append(name)
+    return found
+
+
+def button_set_top(button, top):
+    button.set_position(button.get_left(), top)
+
+
+// references to controls. These are tested to 
+// see if controls exist yet, so must be initialized:
+config_win = nil
+audio_input_rb = nil
+
+def select_preference(rb, items, attr):
+    var pref = prefs.get(attr, "Default")
+    for name at i in items:
+        if name == pref:
+            rb.set_value(i)
+
+
+def create_device_selections():
+    if not config_win:
+        return
+    if audio_input_rb:
+        audio_input_rb.delete()
+        audio_output_rb.delete()
+
+    // audio devices are listed in audio_devices as strings
+    audio_devices_map = {"None": -2, "Default": -1}
+    var input_items = find_devices(audio_devices, 'in')
+    var rbheight = 40 + len(input_items) * 20
+    Radiobox(config_win, "Audio Input", input_items, 
+             10, 10, 400, rbheight, 'audio_input_rb')
+    var bottom = wxs_y + wxs_h
+    select_preference(audio_input_rb, input_items, 'audio_in_dev')
+
+    var output_items = find_devices(audio_devices, 'out')
+    rbheight = 40 + len(output_items) * 20
+    Radiobox(config_win, "Audio Output", output_items, 
+             'R', 'S', 'S', rbheight, 'audio_output_rb')
+    bottom = max(bottom, wxs_y + wxs_h) + 10
+    select_preference(audio_output_rb, output_items, 'audio_out_dev')
+
+    // relocate buttons:
+    button_set_top(open_audio_button, bottom)
+    button_set_top(close_audio_button, bottom)
+    button_set_top(rescan_audio_button, bottom)
+    button_set_top(reset_audio_button, bottom)
+
+
+class Configure_audio:
+    def init():
+        Window("Configure Audio", 520, 20, 850, 360, 'config_win')
+        config_win.set_rgb(200, 230, 200)
+        config_win.add_target_method(this, 'win_handler')
+
+        Button(config_win, "Open Audio", 10, 10, 100, 'H', 
+               'open_audio_button')
+        open_audio_button.add_target_method(this, 'open_audio_handler')
+
+        Button(config_win, "Close Audio", 'R', 'S', 'S', 'H', 
+               'close_audio_button')
+        close_audio_button.add_target_method(this, 'close_audio_handler')
+
+        Button(config_win, "Rescan Audio", 'R', 'S', 'S', 'H', 
+               'rescan_audio_button')
+        rescan_audio_button.add_target_method(this, 'rescan_audio_handler')
+
+        Button(config_win, "Reset Audio", 'R', 'S', 'S', 'H', 
+               'reset_audio_button')
+        reset_audio_button.add_target_method(this, 'reset_audio_handler')
+
+        create_device_selections()
+
+
+    def win_handler(obj, event, x, y):
+        if event == WXS_CLOSE_WINDOW:
+            config_win.delete()    // destroy the window and components
+            configure_audio = nil  // destroy reference to this object
+        wxs_event_not_handled()    // allow window to close
+
+
+    def device_id(rb, attr):  // compute device id, given radio button
+        var dev = rb.item_string(rb.value())
+        prefs.set(attr, dev, t)
+        audio_devices_map[dev]
+
+
+    def open_audio_handler(rest ignore):
+        if not set_arco_state('opening'):
+            return
+
+        var in_dev = device_id(audio_input_rb, 'audio_in_dev')
+        var out_dev = device_id(audio_output_rb, 'audio_out_dev')
+
+        display "Calling arco_open", in_dev, out_dev
+        // Indicate no input or no output by setting channels to zero:
+        arco_open(in_dev, out_dev, 0 if in_dev == -2 else arco_input_chans,
+                  0 if out_dev == -2 else arco_output_chans,
+                  arco_latency, arco_buffersize)
+
+
+    def close_audio_handler(rest ignore):
+        if not set_arco_state('stopped'):
+            return
+        saved_vtsched_bps = vtsched.bps
+        o2_send_cmd("/arco/close", 0, "")
+
+
+    def rescan_audio_handler(rest ignore):
+        if not set_arco_state('devinf2'):
+            return
+        audio_devices.clear()
+        audio_devices_map.clear()
+        o2_send_cmd("/arco/devinf", 0, "s", "/actl/devinf")
+        
+
+    def reset_audio_handler(rest ignore):
+        reset_arco()
+
+
+audiodev_init()
