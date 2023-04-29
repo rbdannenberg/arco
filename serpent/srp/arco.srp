@@ -90,10 +90,14 @@ saved_vtsched_bps = 1.0  // default "tempo"
 #        
 arco_state = nil
 arco_allowed_state_transitions = {  // maps new state to allowed current states
-    'discovery': [nil], 'initializing': 'discovery', 'devinf': 'initializing',
-    'opening': ['devinf', 'stopped'], 'running': 'opening',
-    'stopped': ['opening', 'running', 'initializing2'],
-    'devinf2': ['initializing2', 'stopped']}
+    'discovery': [nil],
+    'initializing': 'discovery',
+    'devinf': 'initializing',
+    'opening': ['devinf', 'stopped'],
+    'running': 'opening',
+    'stopped': ['opening', 'running', 'devinf2'],
+    'devinf2': ['initializing2', 'stopped'],
+    'initializing2': 'stopped'}
 
 # This function checks if a transition to newstate is legal. If legal,
 # arco_state is changed and return value is true. Otherwise, stay in the
@@ -221,6 +225,7 @@ def audio_device_handler(obj, event, x, y):
 
 def actl_devinf(timestamp, address, types, info):
     if info == "":
+        display "actl_devinf", repr(info), arco_state
         if arco_state == 'devinf':
             // auto-open in discovery->initializing->devinf->opening->running
             //     sequence:
@@ -380,7 +385,8 @@ def arco_poll_to_free_ugens(id):
 
 
 def actl_reset(rest ignore):
-    if not set_arco_state('devinf'):
+    if not set_arco_state('devinf' if arco_state == 'initializing' 
+                                   else 'devinf2'):
         return
     // else arco_state is 'initializing' and we are starting up
     print "**** arco was reset, starting initialization ****"
@@ -434,6 +440,9 @@ def actl_starting(timestamp, address, types, rest args):
     if not set_arco_state('running'):
         return
     arco_ready()
+    sched_select(rtsched)
+    poll_for_status_id = poll_for_status_id + 1
+    poll_for_status(poll_for_status_id)
 
 
 class Ugen:

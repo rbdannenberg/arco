@@ -116,6 +116,8 @@ See doc/design.md
 #include "audioio.h"
 #include "thru.h"
 
+static const int ZERO_PAD_COUNT = 4410;  // how many zeros to write when closing
+
 /* this is not used:
 const char *aud_state_name[] = {
     "UNINITIALIZED", "IDLE", "STARTING", "STARTED",
@@ -150,7 +152,8 @@ static int actual_buffer_size = BL;
 static int actual_in_id = -1;
 static int actual_out_id = -1;
 
-static int close_request;
+static int aud_close_request;
+static int aud_zero_fill_count = 0;
 static PaStream *audio_stream;
 
 static Vec<int> run_set;  // UG ID's to refresh every block
@@ -311,6 +314,8 @@ static void arco_reset(O2SM_HANDLER_ARGS)
     const char *s = argv[0]->s;
     // end unpack message
     set_control_service(s);
+    aud_close_request = true;
+    aud_zero_fill_count = 0;
     aud_reset_request = true;
 }
 
@@ -323,6 +328,8 @@ static void arco_quit(O2SM_HANDLER_ARGS)
     // begin unpack message (machine-generated):
     // end unpack message
     o2sm_send_cmd("/fileio/quit", 0, "");
+    aud_close_request = true;
+    aud_reset_request = true;
     aud_quit_request = true;
 }
 
@@ -488,13 +495,19 @@ static int callback_entry(float *input, float *output,
 {
     o2_ctx = &aud_o2_ctx;  // make thread context available to o2 functions
     
-    if (aud_state == RUNNING) {
+    if (aud_state == RUNNING && !aud_close_request) {
         // arco time will suffer from audio computation time jitter, and
         // if PortAudio blocks are large (e.g. multiple Arco blocks), time
         // will tend to advance in big steps on each callback.
         arco_wall_time += BP; // time is advanced by block period
     } else {
         memset(output, 0, BL * sizeof(float) * actual_out_chans);
+        if (aud_close_request) {
+            if (aud_zero_fill_count >= ZERO_PAD_COUNT) {
+                 return paComplete;
+            }
+            aud_zero_fill_count += BL;
+        }
         return paContinue;
     }
     // we are RUNNING on the callback
@@ -542,15 +555,6 @@ static int callback_entry(float *input, float *output,
         }
     }
 
-#ifdef TESTTONE
-    // this generates a triangle wave to bypass Arco synthesis and just
-    // output audio -- used for debugging and latency feasibility test.
-    for (int i = 0; i < BL; i++) {
-        float phase = (i - 16) / 16.0;  // -1 to +1
-        output[i * 2] = (abs(phase) - 0.5) * 0.1;
-        output[i * 2 + 1] = output[i * 2];
-    }
-#else
     Ugen_ptr prev_output = ugen_table[PREV_OUTPUT_ID];
     // The commented conditions will stop computation of audio output
     // when there is no real output stream to write to. It seems
@@ -655,16 +659,7 @@ static int callback_entry(float *input, float *output,
     } else if (actual_out_chans > 0) {  // no synthesized output, so zero output
         memset(output, 0, BL * actual_out_chans * sizeof(*output));
     }
-#endif
-    if (close_request) {
-        return paComplete;
-    }
-    /*
-    for (int i = 0; i < BL * 2; i += 2) {
-        printf("%d:[%g, %g] ", i / 2, output[i], output[i + 1]);
-    }
-    printf("\n");
-     */
+
     return paContinue;
 }
 
@@ -699,9 +694,10 @@ static int pa_callback(const void *input, void *output,
         for (unsigned long i = 0; i < frame_count; i += BL) {
             int r = callback_entry(in + i * actual_in_chans,
                     out + i * actual_out_chans, status_flags);
+            // if any block returns non-paContinue, remember it
             if (r != paContinue) result = r;
         }
-        if (result != paContinue || aud_reset_request) {
+        if (result != paContinue) {
             // since some time has elapsed computing audio (maybe), call
             // precise_secs() again to compute precise offset.
             switch_to_o2_time();
@@ -870,7 +866,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
     output_params.suggestedLatency = suggested_latency;
     output_params.hostApiSpecificStreamInfo = NULL;
     
-    close_request = false;
+    aud_close_request = false;
 
     actual_buffer_size = (buffer_size >= 0 ? buffer_size : BL);
     if (actual_buffer_size <= 0) {  // enforce minimum buffer_size
@@ -962,7 +958,8 @@ done:
 static void arco_close(O2SM_HANDLER_ARGS)
 {
     if (aud_state == IDLE) return;
-    close_request = true;
+    aud_close_request = true;
+    aud_zero_fill_count = 0;
 }
 
 

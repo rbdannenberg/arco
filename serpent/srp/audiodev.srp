@@ -23,6 +23,7 @@ def auto_open_audio():
     configure_audio.open_audio_handler()
     if not ca
         config_win.delete()
+        display "auto_open_audio - deleting config_win", gccyclesst, maxugenst
         configure_audio = nil
 
 
@@ -30,6 +31,8 @@ def auto_open_audio():
 def configure_audio_handler(rest ignore):
     if not configure_audio:
         configure_audio = Configure_audio()
+        poll_for_status_id = poll_for_status_id + 1
+        poll_for_status(poll_for_status_id)
 
 
 def find_channels(item, dir):
@@ -59,10 +62,6 @@ def find_devices(devs, dir):
     return found
 
 
-def button_set_top(button, top):
-    button.set_position(button.get_left(), top)
-
-
 // references to controls. These are tested to 
 // see if controls exist yet, so must be initialized:
 config_win = nil
@@ -76,6 +75,7 @@ def select_preference(rb, items, attr):
 
 
 def create_device_selections():
+# create radio boxes to select audio input. Y coord is device_selections_y
     if not config_win:
         return
     if audio_input_rb:
@@ -87,7 +87,7 @@ def create_device_selections():
     var input_items = find_devices(audio_devices, 'in')
     var rbheight = 40 + len(input_items) * 20
     Radiobox(config_win, "Audio Input", input_items, 
-             10, 10, 400, rbheight, 'audio_input_rb')
+             10, device_selections_y, 400, rbheight, 'audio_input_rb')
     var bottom = wxs_y + wxs_h
     select_preference(audio_input_rb, input_items, 'audio_in_dev')
 
@@ -98,12 +98,28 @@ def create_device_selections():
     bottom = max(bottom, wxs_y + wxs_h) + 10
     select_preference(audio_output_rb, output_items, 'audio_out_dev')
 
-    // relocate buttons:
-    button_set_top(open_audio_button, bottom)
-    button_set_top(close_audio_button, bottom)
-    button_set_top(rescan_audio_button, bottom)
-    button_set_top(reset_audio_button, bottom)
 
+poll_for_status_id = 0
+
+def poll_for_status(id):
+    if id != poll_for_status_id or not config_win:
+        return  // quit this "process"
+    display "poll_for_status", gccyclesst, maxugenst
+    if gccyclesst:
+        gccyclesst.set_string("GC cycles: " + str(gc_cycles()))
+        maxugenst.set_string("Max Ugen ID: " + str(max_ugen_id_used))
+        arco_get_cpu_load('show_cpu_load')
+    sched_cause(1.0, nil, 'poll_for_status', id)
+
+
+def show_cpu_load(cpu):
+    if cpuloadst:  // caution: Static_text control may have been deleted
+        cpuloadst.set_string("CPU Load: " + str(round(cpu, 2)))
+        cpuloadgauge.set_value(int(100 * cpu))
+
+
+gccyclesst = nil // text boxes are created after Arco audio is started
+cpuloadst = nil
 
 class Configure_audio:
     def init():
@@ -127,6 +143,15 @@ class Configure_audio:
                'reset_audio_button')
         reset_audio_button.add_target_method(this, 'reset_audio_handler')
 
+        Statictext(config_win, "Cpu Load:", 10, 'D', 110, 20, 'cpuloadst')
+        var y = wxs_y  // save y offset
+        Gauge(config_win, 100, 'R', y - 3, 120, 20, 'cpuloadgauge')
+        wxs_w = 140  // give extra space before GC cycles
+        Statictext(config_win, "GC cycles: 0", 'R', y, 100, 20, 'gccyclesst')
+        Statictext(config_win, "Max Ugen ID: 0", 'R', y, 130, 20, 'maxugenst')
+
+        wxs_compute_coordinates('S', 'D', 'S', 'S')  // compute Y below maxugenst
+        device_selections_y = wxs_y  // save coordinate for future layout
         create_device_selections()
 
 
@@ -161,7 +186,9 @@ class Configure_audio:
         if not set_arco_state('stopped'):
             return
         saved_vtsched_bps = vtsched.bps
+        vtsched.set_bps(STOPPED_BPS)
         o2_send_cmd("/arco/close", 0, "")
+        poll_for_status_id = poll_for_status_id + 1
 
 
     def rescan_audio_handler(rest ignore):

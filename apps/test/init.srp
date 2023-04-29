@@ -41,8 +41,6 @@ class Atone (Instrument):
         this
 
 
-gccyclesst = nil // text boxes are created after Arco audio is started
-cpuloadst = nil
 ui_initialized = false
 
 def arco_ready():
@@ -68,23 +66,7 @@ def arco_ready():
     Button(win, "Play sound file", 'S', 'D', 'S', 'S', 'psfbutton')
     psfbutton.add_target_method(nil, 'play_sound_file')
 
-    Statictext(win, "GC cycles: 0", 'S', 'D', 'S', 'S', 'gccyclesst')
-    Statictext(win, "CPU Load:", 'S', 'D', 'S', 'S', 'cpuloadst')
-    Statictext(win, "Max Ugen ID: 0", 'S', 'D', 'S', 'S', 'maxugenidst')
-
     ui_initialized = true
-
-
-def poll_for_status():
-    if gccyclesst:
-        gccyclesst.set_string("GC cycles: " + str(gc_cycles()))
-        maxugenidst.set_string("Max Ugen ID: " + str(max_ugen_id_used))
-        arco_get_cpu_load('show_cpu_load')
-    sched_cause(1.0, nil, 'poll_for_status')
-
-
-def show_cpu_load(cpu):
-    cpuloadst.set_string("CPU Load: " + str(cpu))
 
 
 def print_ugen_tree(rest ignore):
@@ -96,7 +78,7 @@ def atone_sequence():
     var freq = 440.0 * (2.0 ** (1/12)) ** (step - 69)
     var dur = pr_unif(0.5, 10)
     var nharm = 1 if SIMPLE else irandom(15) + 2 
-    display "atone_sequence", freq, dur, nharm
+    display "atone_sequence", freq, dur, nharm, sched_current, vtsched, sched_vtime
     var atone = Atone(freq, dur, nharm).play().start()
     // sched_cause(dur + 0.2, atone, 'mute')
     var ioi = pr_unif(0.25, 2.0) ** 2
@@ -207,6 +189,6 @@ def main():
     // and open audio device(s):
     arco_run()
     sched_select(rtsched)
-    poll_for_status()
+
 
 main()
