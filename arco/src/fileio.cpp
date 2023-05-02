@@ -80,7 +80,7 @@ public:
         blocks[0] = audioblock_alloc(chans);
         blocks[1] = audioblock_alloc(chans);
 
-        int rslt;
+        int rslt = -1;  // result is error until successful seek
         if (start > 0.0 && file_is_open) {
             rslt = (int) sf_seek(snd_in, (sf_count_t)
                                  (start * snd_in_info.samplerate), SEEK_SET);
@@ -96,7 +96,7 @@ public:
         o2_send_start();
         o2_add_int64(addr);
         o2_add_int32(file_is_open ? chans : 0);
-        o2_add_bool(rslt < 0);
+        o2_add_bool(rslt >= 0);
         O2message_ptr msg = o2_message_finish(0.0, "/arco/strplay/ready", true);
         audio_bridge->outgoing.push((O2list_elem *) msg);
 

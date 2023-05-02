@@ -1,0 +1,78 @@
+# pwl.srp -- piece-wise linear envelope
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Pwl (Ugen):
+    def init(points):
+        super.init(create_ugen_id(), "Pwl", -1, 'a', "")
+        o2_send_cmd("/arco/pwl/new", 0, "U", id)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+        o2_send_start()
+        o2_add_int32(id)
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0
+        var count = 0
+        for i = 0 to len(points) by 2:
+            time = time + points[i]
+            var samps = round(time * AR - count)
+            count = count + samps
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                o2_add_float(points[i + 1])  // the destination amplitude
+        o2_send_finish(0, "/arco/pwl/env", true)
+        this
+
+    def start():
+        o2_send_cmd("/arco/pwl/start", 0, "i", id)
+        this
+
+
+def pwl(rest points): Pwl(points)  # pwl as a function
+
+
+class Pwlb (Ugen):
+    var action_id
+
+    def init(points):
+        super.init(create_ugen_id(), "Pwlb", -1, 'b', "")
+        o2_send_cmd("/arco/pwlb/new", 0, "U", id)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+        // display "Pwlb", points
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0
+        var count = 0
+        // print "               ";
+        for i = 0 to len(points) by 2:
+            time = time + points[i]
+            var samps = round(time * BR - count)
+            count = count + samps
+            // print samps,
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                print points[i + 1],
+                o2_add_float(points[i + 1])  // the destination amplitude
+        // print
+        o2_send_finish(0, "/arco/pwlb/env", true)
+        this
+
+    def start():
+        o2_send_cmd("/arco/pwlb/start", 0, "U", id)
+        this
+
+
+def pwlb(rest points): Pwlb(points)
+
+

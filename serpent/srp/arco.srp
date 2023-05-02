@@ -130,8 +130,8 @@ INPUT_ID = 2
 PREV_OUTPUT_ID = 3
 
 // shadow the sets of Ugens maintained by audio server:
-aud_output_set = []
-aud_run_set = []
+arco_output_set = []
+arco_run_set = []
 
 // manage action callbacks
 next_action_id = 1
@@ -148,11 +148,14 @@ def create_ugen_id():
 
 # Ugen.action_id is an integer key. Arco sends /actl/act with the key
 # when the Ugen finishes.
-# action_dict[key] is a list of actions of the form [object, method, params]
+# action_dict[key] is a list of actions of the form
+# [ugen, object, method, params], where ugen is the holder of the
+# action_id, which equals key, and the remaining [object, method, params]
+# is the method or function to invoke to perform the action.
 #
 def create_action(ugen, object, method, rest parameters):
     var action_list
-    var action = [object, method, parameters]
+    var action = [ugen, object, method, parameters]
     if ugen.action_id:
         action_list = action_dict.get(ugen.action_id)
         if not action_list:
@@ -175,8 +178,10 @@ def actl_act(timestamp, address, types, rest parameters):
     if not action_list:
         print "ERROR: actl_act - action_id not found in action_dict", key
         return
+    var ugen = action_list[0][0]  // all actions start with the same ugen
+    ugen.action_id = nil     // clear the action so we can install a new one
     for action in action_list:
-        general_apply(action[0], action[1], action[2])
+        general_apply(action[1], action[2], action[3])
     action_dict.remove(key)  // allow garbage collection
 
 
@@ -399,22 +404,22 @@ def create_standard_ugens():
     if zero_ugen:
         print "WARNING: create_stanard_ugens -- ugens already created"
         return
-    zero_ugen = Ugen(arco_ugen_new_id(ZERO_ID), "Zero", -1, 'a')
+    zero_ugen = Ugen(arco_ugen_new_id(ZERO_ID), "Zero", -1, 'a', "")
     o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID)
     // print "sent /arco/zero/new, id", ZERO_ID
 
-    zerob_ugen = Ugen(arco_ugen_new_id(ZEROB_ID), "Zerob", -1, 'b')
+    zerob_ugen = Ugen(arco_ugen_new_id(ZEROB_ID), "Zerob", -1, 'b', "")
     o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID)
     // print "sent /arco/zerob/new, id", ZEROB_ID
 
     thru_ugen = Ugen(arco_ugen_new_id(INPUT_ID), "Thru",
-                     arco_input_chans, 'a', 'input', zero())
+                     arco_input_chans, 'a', "U", 'input', zero())
 
     // previous output can be read here on the next block:
     var tmp = arco_ugen_new_id(PREV_OUTPUT_ID)
     display "made new ugen_id 3 with", arco_ugen_id(tmp)
     output_ugen = Ugen(tmp, "Thru", 
-                       arco_output_chans, 'a', 'input', zero())
+                       arco_output_chans, 'a', "U", 'input', zero())
     display "made prev_output", output_ugen, arco_ugen_id(output_ugen.id)
 
 
@@ -463,7 +468,22 @@ class Ugen:
     #   so you can still initialize the channel count, but we do not 
     #    send a new message so that caller can issue a special message,
     #    and we IGNORE inputs_
-    def init(id_, classname_, chans_, rate_, rest inputs_):
+    #
+    # When initial parameters are numbers, they can represent either
+    # int32, int64, double, float, time, or be coerced into a Const
+    # unit generator. To handle these different interpretations, we
+    # require a types_ parameter, which is a string similar to an
+    # O2 types string consisting of letters from "sihdft" and also "U"
+    # which means "unit generator" - the number is coerced to a Const.
+    # If the type is "U", the actual parameter may also be an array of
+    # floats with a length equal to chans_. A Const with multiple 
+    # channels is created. inputs_ are in pairs, with the name (a symbol)
+    # followed by value. If the type is not "U", the name must still be
+    # present as a place-holder, and by convention should be a helpful
+    # parameter name, but it is ignored. Otherwise, names allow the
+    # set method to replace the Ugen input with another Ugen.
+    #
+    def init(id_, classname_, chans_, rate_, types_, rest inputs_):
         id = id_
         classname = classname_
         chans = abs(chans_)
@@ -474,33 +494,64 @@ class Ugen:
             // we coerce all numbers to const() BEFORE constructing
             // the /arco/*/new message:
             for i = 1 to len(inputs_) by 2:
-                if isnumber(inputs_[i]):
+                if types_[idiv(i, 2)] == "U" and (isnumber(inputs_[i]) or
+                                                  isarray(inputs_[i])):
                     inputs_[i] = const(inputs_[i])
             o2_send_start()  // build and send new method
             o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
             o2_add_int32(chans)
             // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
+
+            // send the "new" message with parameters to create the Ugen:
             for i = 0 to len(inputs_) by 2:
                 var inp = inputs_[i + 1]
-                o2_add_int32(arco_ugen_id(inp.id))
+                if types_[idiv(i, 2)] == "U":  // it's a Ugen
+                    o2_add_int32(arco_ugen_id(inp.id))
+                    inputs[inputs_[i]] = inp  // build dictionary of inputs
+                else:  // add a normal value, use code from o2util.srp:
+                    funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 2)]], inp)
                 // print inputs_[i], inp.id,
-                inputs[inputs_[i]] = inp  // build dictionary of inputs
             o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
             // print
 
 
-    def play():
-        aud_output_set.append(this)
-        display "play", id
-        o2_send_cmd("/arco/output", 0, "U", id)
+    def play():  # connect this Ugen to audio output
+        if this not in arco_output_set:
+            arco_output_set.append(this)
+            display "Ugen play", id
+            o2_send_cmd("/arco/output", 0, "U", id)
+        else:
+            print "WARNING: in play(), Ugen already in output set", this
         this
 
 
-    def mute():
-        display "Ugen mute", id
-        aud_output_set.remove(this)
-        o2_send_cmd("/arco/mute", 0, "U", id)
-        // if you mute something twice, we ignore the redundancy
+    def mute():  # disconnect this Ugen from audio output
+        if this in arco_output_set:
+            display "Ugen mute", id
+            arco_output_set.remove(this)
+            o2_send_cmd("/arco/mute", 0, "U", id)
+        else:
+            print "WARNING: in mute(), Ugen is not in output set", this
+        this
+
+
+    def run():  # add this Ugen to the run set
+        if this not in arco_run_set:
+            arco_run_set.append(this)
+            display "Ugen run", id
+            o2_send_cmd("/arco/run", 0, "U", id)
+        else:
+            print "WARNING: in run(), Ugen already in run set", this
+        this
+
+
+    def unrun():  # remove this Ugen from the run set
+        if this in arco_run_set:
+            display "Ugen unrun", id
+            arco_run_set.remove(this)
+            o2_send_cmd("/arco/unrun", 0, "U", id)
+        else:
+            print "WARNING: in unrun(), Ugen is not in run set", this 
         this
 
 
@@ -538,7 +589,7 @@ class Ugen:
     # which is currently handled by Pwlb and Strplay classes. Currently, 
     # action must be 'mute' or, equivalently, MUTE.
         if action == MUTE:
-            create_action(this, arg, action)
+            create_action(this, arg if arg else this, action)
         else:
             print "ERROR: Ugen atend - unknown action", repr(action)
 
@@ -602,7 +653,7 @@ class Instrument (Ugen):
 
     def init(name, ugen):
         // pass -ugen.chans to suppress /arco/*/new message
-        super.init(nil, name, -ugen.chans, ugen.rate)
+        super.init(nil, name, -ugen.chans, ugen.rate, "")
         output = ugen
         id = output.id
         parameter_bindings = instr_stack.unappend()
@@ -625,216 +676,70 @@ def zero(): zero_ugen
 
 def zerob(): zerob_ugen
 
-def sine(freq, amp, optional chans = 1):
-    return Ugen(create_ugen_id(), "Sine", chans, 'a', 'freq', freq, 'amp', amp)
+//def sine(freq, amp, optional chans = 1):
+//    Ugen(create_ugen_id(), "Sine", chans, 'a', "UU", 'freq', freq, 'amp', amp)
+//
+//def sineb(freq, amp, optional chans = 1):
+//    if freq.rate == 'a' or amp.rate == 'a':
+//        print "ERROR: passing audio rate Ugen to block rate sineb"
+//        return nil
+//    else:
+//        return Ugen(create_ugen_id(), "Sineb", chans, 'b', "UU", 
+//                    'freq', freq, 'amp', amp)
 
-def sineb(freq, amp, optional chans = 1):
-    if freq.rate == 'a' or amp.rate == 'a':
-        print "ERROR: passing audio rate Ugen to block rate sineb"
-        return nil
-    else:
-        return Ugen(create_ugen_id(), "Sineb", chans, 'b', 'freq', freq, 'amp', amp)
 
 def const(x):
-    var ugen = Ugen(create_ugen_id(), "Const", -1, 'c')
-    o2_send_cmd("/arco/const/newf", 0, "Uf", ugen.id, x)
+    var chans = 1
+    if isarray(x):
+        chans = len(x)
+    var ugen = Ugen(create_ugen_id(), "Const", -chans, 'c', "")
+    if isarray(x):
+        o2_send_cmd("/arco/const/new", 0, "Ui", ugen.id, chans)
+        for f at i in x:  // send "set" message for each channel
+            o2_send_start()
+            o2_add_int32(arco_ugen_id(ugen.id))
+            o2_add_int32(i)
+            o2_add_float(real(f))
+            o2_send_finish(0, "/arco/const/set", true)
+    else: // simple case - 1 channel Const and initial value in one message
+        o2_send_cmd("/arco/const/newf", 0, "Uf", ugen.id, x)
     // print "sent /arco/const/newf, id", ugen.id, "value", x
     return ugen
 
 
-class Pwl (Ugen):
-    def init(points):
-        super.init(create_ugen_id(), "Pwl", -1, 'a')
-        o2_send_cmd("/arco/pwl/new", 0, "U", id)
-        set_point_array(points)
 
-    def set_points(rest points):
-        set_point_array(points)
-
-    def set_point_array(points):
-        o2_send_start()
-        o2_add_int32(id)
-        # track cummulative time and samples to avoid accumulated time error
-        var time = 0
-        var count = 0
-        for i = 0 to len(points) by 2:
-            time = time + points[i]
-            var samps = round(time * AR - count)
-            count = count + samps
-            o2_add_float(samps)  // the number of samples to ramp
-            if i + 1 < len(points):  // allowed to omit final zero amplitude
-                o2_add_float(points[i + 1])  // the destination amplitude
-        o2_send_finish(0, "/arco/pwl/env", true)
-        this
-
-    def start():
-        o2_send_cmd("/arco/pwl/start", 0, "i", id)
-        this
+//def reson(input, center, bandwidth, optional chans = 1):
+//    if input.rate != 'a':
+//        print "ERROR: input to reson is not audio rate"
+//        return nil
+//    Ugen(create_ugen_id(), "Reson", chans, 'a', "UUU", 'input', input, 
+//         'center', center, 'bandwidth', bandwidth)
+//
+//
+//def resonb(input, center, bandwidth, optional chans = 1):
+//    if input.rate == 'a' or center.rate == 'a' or bandwidth.rate == 'a':
+//        print "ERROR: passing audio rate Ugen to block rate resonb"
+//        return nil
+//    Ugen(create_ugen_id(), "Resonb", chans, 'b', "UUU", 'input', input, 
+//         'center', center, 'bandwidth', bandwidth)
+//
+//
+//def mult(x, y, optional chans = 1):
+//    Ugen(create_ugen_id(), "Mult", chans, 'a', "UU", 'x', x, 'y', y)
+//
+//
+//def multb(x, y, optional chans = 1):
+//    if x.rate == 'a' or y.rate == 'a':
+//        print "ERROR: passing audio rate Ugen to block rate multb"
+//        return nil
+//    Ugen(create_ugen_id(), "Multb", chans, 'b', "UU", 'x', x, 'y', y)
 
 
-def pwl(rest points): Pwl(points)  # pwl as a function
 
 
-class Pwlb (Ugen):
-    var action_id
-
-    def init(points):
-        super.init(create_ugen_id(), "Pwlb", -1, 'b')
-        o2_send_cmd("/arco/pwlb/new", 0, "U", id)
-        set_point_array(points)
-
-    def set_points(rest points):
-        set_point_array(points)
-
-    def set_point_array(points):
-        // display "Pwlb", points
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        # track cummulative time and samples to avoid accumulated time error
-        var time = 0
-        var count = 0
-        // print "               ";
-        for i = 0 to len(points) by 2:
-            time = time + points[i]
-            var samps = round(time * BR - count)
-            count = count + samps
-            // print samps,
-            o2_add_float(samps)  // the number of samples to ramp
-            if i + 1 < len(points):  // allowed to omit final zero amplitude
-                print points[i + 1],
-                o2_add_float(points[i + 1])  // the destination amplitude
-        // print
-        o2_send_finish(0, "/arco/pwlb/env", true)
-        this
-
-    def start():
-        o2_send_cmd("/arco/pwlb/start", 0, "U", id)
-        this
 
 
-def pwlb(rest points): Pwlb(points)
 
 
-class Mix (Ugen):
-    var input_name  // for dictionary of inputs, we need to generate names
-
-    
-    def init(chans_):
-        input_name = 0
-        super.init(create_ugen_id(), "Mix", chans_, 'a')
-
-
-    def set(input, value, optional chan = 0):
-        print "ERROR: set method not available for Mix class"
-
-
-    def ins(ugen, gain, optional atend):
-        if isnumber(gain):
-            gain = const(gain)
-        inputs[input_name] = [ugen, gain]
-        input_name = input_name + 1
-        o2_send_cmd("/arco/mix/ins", 0, "UUU", id, ugen.id, gain.id)
-        if atend:
-            if atend == SIGNAL and issubclass(ugen, Instrument) and 
-               ugen.get['envelope']:
-                create_action(ugen.envelope, this, 'rem', ugen)
-            elif atend == GAIN and issubclass(gain, Pwlb):
-                create_action(gain, this, 'rem', ugen)
-            else:
-                print "Mix.ins() ignoring unknown atend parameter -", atend
-        return this
-    
-
-    def rem(ugen):
-        for key in inputs.keys():
-            if inputs[key][0] == ugen:
-                inputs.remove(key)
-                o2_send_cmd("/arco/mix/rem", 0, "UU", id, ugen.id)
-                return this
-        return this
-
-
-    def find_name_of(ugen):
-        for key in inputs.keys():
-            if inputs[key][0] == ugen:
-                return key
-        return nil
-
-
-    def set_gain(ugen, gain):
-    # general set gain to either a Ugen or float (constant value)
-        // inputs are "named" by numbers that start at 0 and increment for
-        // each ins() operation. We do not reuse numbers.
-        // Start by finding the input name:
-        var i = find_name_of(ugen)
-        if not i:
-            print "ERROR: Mix set_gain cannot find ugen", ugen
-            return
-        var gain_ugen = inputs[i][1]
-        if isinstance(gain_ugen, Ugen) and gain_ugen.rate == "c":
-            // a Const exists, so we just write to it using set_gain
-            o2_send_cmd("/arco/mix/set_gain", 0, "UUf", id, ugen, gain)
-        else:  // have to replace with either gain as Ugen or make a const
-            if isnumber(gain):
-                gain = const(gain)
-            inputs[i][1] = gain
-            o2_send_cmd("/arco/mix/repl_gain", 0, "UUU", id, ugen, gain)
-    
-
-def mix(optional chans = 1):
-    return Mix(chans)
-
-
-def reson(input, center, bandwidth, optional chans = 1):
-    if input.rate != 'a':
-        print "ERROR: input to audio rate reson is not audio rate"
-        return nil
-    return Ugen(create_ugen_id(), "Reson", chans, 'a', 'input', input, 
-                'center', center, 'bandwidth', bandwidth)
-
-def resonb(input, center, bandwidth, optional chans = 1):
-    if input.rate == 'a' or center.rate == 'a' or bandwidth.rate == 'a':
-        print "ERROR: passing audio rate Ugen to block rate resonb"
-        return nil
-    return Ugen(create_ugen_id(), "Resonb", chans, 'b', 'input', input, 
-                'center', center, 'bandwidth', bandwidth)
-
-def mult(x, y, optional chans = 1):
-    return Ugen(create_ugen_id(), "Mult", chans, 'a', 'x', x, 'y', y)
-
-def multb(x, y, optional chans = 1):
-    if x.rate == 'a' or x.rate == 'a':
-        print "ERROR: passing audio rate Ugen to block rate multb"
-        return nil
-    return Ugen(create_ugen_id(), "Multb", chans, 'b', 'x', x, 'y', y)
-
-def strplay(filename, optional chans = 2, start = 0, end = 0, cycle, mix, expand)
-    return Strplay(filename, chans, start, end, cycle, mix, expand)
-
-
-class Strplay (Ugen):
-    var action_id
-
-    def init(filename, chans, start, end, cycle, mix, expand):
-        // -chans cuts off standard creation:
-        super.init(create_ugen_id(), "Strplay", -chans, 'a')
-        o2_send_start()  // make our own new message
-        o2_add_int32(arco_ugen_id(id))
-        o2_add_string(filename)
-        o2_add_int32(chans)
-        o2_add_float(start)
-        o2_add_float(end)
-        o2_add_bool(cycle)
-        o2_add_bool(mix)
-        o2_add_bool(expand)
-        o2_send_finish(0, "/arco/strplay/new", true)
-
-    def go(optional play_flag = true):
-        o2_send_start()  // make our own new message
-        o2_add_int32(arco_ugen_id(id))
-        o2_add_bool(play_flag)
-        o2_send_finish(0, "/arco/strplay/play", true)
-    
-    def stop():
-        go(false)
-
+        
+        

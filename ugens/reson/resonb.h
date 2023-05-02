@@ -51,6 +51,9 @@ extern const char *Resonb_name;
 class Resonb : public Ugen {
 public:
     struct Resonb_state {
+        FAUSTFLOAT fEntry0;
+        FAUSTFLOAT fEntry1;
+        FAUSTFLOAT fEntry2;
         float fRec0[3];
     };
     Vec<Resonb_state> states;
@@ -145,8 +148,15 @@ public:
         q_samps = q->run(current_block); // update input
         Resonb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            state->fRec0[0] = (fControl[4] - (fControl[3] * ((fControl[5] * state->fRec0[2]) + (fControl[6] * state->fRec0[1]))));
-            *out_samps = FAUSTFLOAT((fControl[3] * (state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1])))));
+            FAUSTFLOAT tmp_0 = (1.0f / std::max<float>(float(*q_samps), 0.100000001f));
+            FAUSTFLOAT tmp_1 = std::tan((fConst0 * std::max<float>(float(*center_samps), 0.100000001f)));
+            FAUSTFLOAT tmp_2 = (1.0f / tmp_1);
+            FAUSTFLOAT tmp_3 = (1.0f / (((tmp_0 + tmp_2) / tmp_1) + 1.0f));
+            FAUSTFLOAT tmp_4 = float(*snd_samps);
+            FAUSTFLOAT tmp_5 = (((tmp_2 - tmp_0) / tmp_1) + 1.0f);
+            FAUSTFLOAT tmp_6 = (2.0f * (1.0f - (1.0f / Resonb_faustpower2_f(tmp_1))));
+            state->fRec0[0] = (tmp_4 - (tmp_3 * ((tmp_5 * state->fRec0[2]) + (tmp_6 * state->fRec0[1]))));
+            *out_samps++ = FAUSTFLOAT((tmp_3 * (state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1])))));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
             state++;

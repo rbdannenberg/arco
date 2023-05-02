@@ -1,0 +1,29 @@
+# recplay.srp -- record and play audio in memory
+#
+# Roger B. Dannenberg
+# May 2023
+
+def recplay(input, optional chans = 1, optional gain = 1, 
+            fade_time = 0.1, loop = false):
+    Recplay(chans, input, gain, fade_time, loop)
+
+
+class Recplay (Ugen):
+    var action_id
+
+    def init(chans, input, gain, fade_time, loop):
+        super.init(create_ugen_id(), "Recplay", chans, 'a', "UUfB",
+                   'input', input, 'gain', gain, 'fade_time', fade_time,
+                   'loop', loop)
+
+    def record(record_flag):
+        o2_send_cmd("/arco/recplay/rec", 0, "UB", id, record_flag)
+
+    def start(start_time):
+    # start playing recording from offset start_time
+        o2_send_cmd("/arco/recplay/start", 0, "Ud", id, start_time)
+
+    def stop():
+        o2_send_cmd("/arco/recplay/stop", 0, "U", id)
+        
+

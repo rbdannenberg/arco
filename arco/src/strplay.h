@@ -76,6 +76,9 @@ public:
 
     // this is a notice from Fileio that it is ready to start.
     void ready(bool is_ready) {
+        if (!is_ready) {
+            arco_warn("Strplay - failure to start reading from file");
+        }
         unref();
     }
 

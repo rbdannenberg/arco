@@ -11,6 +11,7 @@ require "debug"
 require "wxserpent"
 require "prob"
 require "arco"
+require "allugens"
 
 SIMPLE = false
 
@@ -20,7 +21,7 @@ class Atone (Instrument):
         instr_begin()
         var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
         display "In Atone", env, env.id, id(env.id)
-        env.atend(MUTE, this)
+        env.atend(MUTE, this)  # target to mute is this, not env!
         var mix = mix(1)
         for i = 0 to nharm:
             mix.ins(sine(freq * i, 0.8 ** i), env)
@@ -66,6 +67,12 @@ def arco_ready():
     Button(win, "Play sound file", 'S', 'D', 'S', 'S', 'psfbutton')
     psfbutton.add_target_method(nil, 'play_sound_file')
 
+    Checkbox(win, "Record Output", 'S', 'D', 'S', 'S', 'rocheckbox')
+    rocheckbox.add_target_method(nil, 'record_output')
+
+    Checkbox(win, "Play Recorded Output", 'S', 'D', 'S', 'S', 'procheckbox')
+    procheckbox.add_target_method(nil, 'play_recorded_output')
+
     ui_initialized = true
 
 
@@ -78,7 +85,8 @@ def atone_sequence():
     var freq = 440.0 * (2.0 ** (1/12)) ** (step - 69)
     var dur = pr_unif(0.5, 10)
     var nharm = 1 if SIMPLE else irandom(15) + 2 
-    display "atone_sequence", freq, dur, nharm, sched_current, vtsched, sched_vtime
+    display "atone_sequence", freq, dur, nharm, sched_current, 
+    display     vtsched, sched_vtime
     var atone = Atone(freq, dur, nharm).play().start()
     // sched_cause(dur + 0.2, atone, 'mute')
     var ioi = pr_unif(0.25, 2.0) ** 2
@@ -137,6 +145,36 @@ def play_mixer_test(obj, event, x, y):
         m1.mute()
         m1 = nil  // delete reference
 
+########## PLAYREC TESTS ##################
+
+recplay1 = nil
+
+def record_output(obj, event, x, y):
+    display "record_output", x
+    if x:
+        if not recplay1:  // long fade time to test this feature
+            recplay1 = recplay(output_ugen, 2, 0.5, 3.0, false)
+        recplay1.run()  # needs be in run set to make active
+        recplay1.record(true)
+    elif not recplay1:
+        print "WARNING: There is no recplay1 Ugen!"
+    else:
+        recplay1.record(false)
+        recplay1.unrun()  # does not need to be active now
+
+
+def play_recorded_output(obj, event, x, y):
+    display "play_recorded_output", x
+    if x and recplay1:
+        // note that Recplay might end playback immediately upon starting,
+        // so we need to set up the atend action before sending 'start':
+        recplay1.play().atend(MUTE)
+        recplay1.start(0.0)
+    elif (not x) and recplay1:
+        recplay1.stop()  // atend is already set up to mute when finished
+
+
+############ ATONE: INSTRUMENT AND NOTE SEQUENCE ##############
 
 // handler for atcheckbox: play/stop an algorithmic composition
 def play_atone_test(obj, event, x, y)

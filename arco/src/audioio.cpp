@@ -241,7 +241,7 @@ static bool forget_ugen_id(int id, Vec<int> &set)
 static void arco_hb(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    int hb = argv[0]->i32;
+    int32_t hb = argv[0]->i;
     // end unpack message
 
     printf("Block count printing %s\n", hb ? "enabled" : "disabled");
@@ -256,7 +256,7 @@ static void arco_hb(O2SM_HANDLER_ARGS)
 static void arco_test1(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    const char *s = argv[0]->s;
+    char *s = argv[0]->s;
     // end unpack message
 
     printf("%s\n", s);
@@ -268,9 +268,6 @@ static void arco_test1(O2SM_HANDLER_ARGS)
 */
 static void arco_prtree(O2SM_HANDLER_ARGS)
 {
-    // begin unpack message (machine-generated):
-    // end unpack message
-
     arco_print("------------ Ugen Tree ----------------\n");
     for (int i = 0; i < output_set.size(); i++) {
         Ugen_ptr ugen = ugen_table[output_set[i]];
@@ -311,8 +308,9 @@ static void arco_prugens(O2SM_HANDLER_ARGS)
 static void arco_reset(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    const char *s = argv[0]->s;
+    char *s = argv[0]->s;
     // end unpack message
+
     set_control_service(s);
     aud_close_request = true;
     aud_zero_fill_count = 0;
@@ -325,8 +323,6 @@ static void arco_reset(O2SM_HANDLER_ARGS)
 */
 static void arco_quit(O2SM_HANDLER_ARGS)
 {
-    // begin unpack message (machine-generated):
-    // end unpack message
     o2sm_send_cmd("/fileio/quit", 0, "");
     aud_close_request = true;
     aud_reset_request = true;
@@ -720,7 +716,8 @@ static void arco_output(O2SM_HANDLER_ARGS)
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     // end unpack message
-    ANY_UGEN_FROM_ID(ugen, id, "aud_output");
+
+    ANY_UGEN_FROM_ID(ugen, id, "arco_output");
 
     if (ugen->rate == 'a') {
         // make sure this is not already in output set
@@ -753,6 +750,44 @@ static void arco_mute(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE:  /arco/run int32 id; -- add Ugen to run set */
+static void arco_run(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    // end unpack message
+
+    ANY_UGEN_FROM_ID(ugen, id, "arco_run");
+
+    // make sure this is not already in run set
+    if (ugen->flags & IN_RUN_SET) {
+        arco_warn("/arco/run %d @ %p already in run set\n", id, ugen);
+        return;
+    }
+    ugen->flags |= IN_RUN_SET;
+    run_set.push_back(id);
+    printf("arco_run %d @ %p inserted, flags %x\n", id, ugen, ugen->flags);
+}
+
+
+/* O2SM INTERFACE:  /arco/unrun int32 id; -- remove Ugen from run set */
+static void arco_unrun(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    // end unpack message
+
+    ANY_UGEN_FROM_ID(ugen, id, "arco_unrun");
+    if (ugen && (ugen->flags & IN_RUN_SET)) {
+        forget_ugen_id(id, run_set);
+        ugen->flags &= ~IN_RUN_SET;
+        printf("arco_unrun %d @ %p removed, flags %x\n", id, ugen, ugen->flags);
+    } else {
+        arco_warn("/arco/unrun %d not in run set, ignored\n", id);
+    }
+}
+
+
 /* O2SM INTERFACE:  /arco/open
        int32 in_id, int32 out_id, 
        int32 in_chans, int32 out_chans,
@@ -780,9 +815,6 @@ static void arco_open(O2SM_HANDLER_ARGS)
     PaStreamParameters *input_params_ptr = &input_params;
     PaStreamParameters output_params;
     PaStreamParameters *output_params_ptr = &output_params;
-    bool got_input = false;
-    bool got_output = false;
-
 
     if (aud_state != UNINITIALIZED && aud_state != IDLE) {
         arco_warn("aud_open called but audio is already opened");
@@ -1040,8 +1072,6 @@ void arco_logaud(O2SM_HANDLER_ARGS)
 /* O2SM INTERFACE: /arco/cpu; -- get the estimated CPU load */
 void arco_cpu(O2SM_HANDLER_ARGS)
 {
-    // begin unpack message (machine-generated):
-    // end unpack message
     float load = 0;
     if (audio_stream) {
         load = Pa_GetStreamCpuLoad(audio_stream);
@@ -1111,9 +1141,6 @@ void arco_thread_poll()
         (aud_state == UNINITIALIZED || aud_state == IDLE)) {
         aud_reset_request = false;  // clear the request
         arco_free_all_ugens();
-//        actual_in_chans = 0;
-//        actual_out_chans = 0;
-
         // notify the control service that reset is finished
         o2sm_send_start();
         strcpy(control_service_addr + control_service_addr_len, "reset");
@@ -1159,20 +1186,22 @@ void audioio_initialize()
     o2sm_service_new("arco", NULL);
 
     // O2SM INTERFACE INITIALIZATION: (machine generated)
+    o2sm_method_new("/arco/hb", "i", arco_hb, NULL, true, true);
     o2sm_method_new("/arco/test1", "s", arco_test1, NULL, true, true);
     o2sm_method_new("/arco/prtree", "", arco_prtree, NULL, true, true);
     o2sm_method_new("/arco/prugens", "", arco_prugens, NULL, true, true);
     o2sm_method_new("/arco/reset", "s", arco_reset, NULL, true, true);
+    o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);
     o2sm_method_new("/arco/output", "i", arco_output, NULL, true, true);
     o2sm_method_new("/arco/mute", "i", arco_mute, NULL, true, true);
+    o2sm_method_new("/arco/run", "i", arco_run, NULL, true, true);
+    o2sm_method_new("/arco/unrun", "i", arco_unrun, NULL, true, true);
     o2sm_method_new("/arco/open", "iiiiiis", arco_open, NULL, true, true);
     o2sm_method_new("/arco/close", "", arco_close, NULL, true, true);
     o2sm_method_new("/arco/logaud", "iis", arco_logaud, NULL, true, true);
-    o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
-    o2sm_method_new("/arco/hb", "i", arco_hb, NULL, true, true);
-    o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
     o2sm_method_new("/arco/cpu", "", arco_cpu, NULL, true, true);
+    o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     Pa_Initialize();

@@ -1,7 +1,7 @@
-pwl
-pwlb
+pwl*
 mix
 sine*
 mult*
 reson*
 strplay
+recplay

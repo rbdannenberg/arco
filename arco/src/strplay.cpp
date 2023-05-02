@@ -35,9 +35,9 @@ Strplay::~Strplay()
 
 
 /* O2SM INTERFACE: /arco/strplay/new
-       int32 id, 
-       string filename,
+       int32 id,
        int32 channels,
+       string filename,
        float start,
        float end,
        bool cycle,
@@ -48,8 +48,8 @@ void arco_strplay_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    char *filename = argv[1]->s;
-    int32_t channels = argv[2]->i;
+    int32_t channels = argv[1]->i;
+    char *filename = argv[2]->s;
     float start = argv[3]->f;
     float end = argv[4]->f;
     bool cycle = argv[5]->B;
@@ -104,7 +104,7 @@ void arco_strplay_play(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/pwlb/act int32 id int32 action_id;
+/* O2SM INTERFACE: /arco/strplay/act int32 id, int32 action_id;
  *    set the action_id
  */
 void arco_strplay_act(O2SM_HANDLER_ARGS)
@@ -123,7 +123,7 @@ void arco_strplay_act(O2SM_HANDLER_ARGS)
 static void strplay_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/strplay/new", "isiffBBB", arco_strplay_new, NULL, true, true);
+    o2sm_method_new("/arco/strplay/new", "iisffBBB", arco_strplay_new, NULL, true, true);
     o2sm_method_new("/arco/strplay/samps", "hh", arco_strplay_samps, NULL, true, true);
     o2sm_method_new("/arco/strplay/ready", "hiB", arco_strplay_ready, NULL, true, true);
     o2sm_method_new("/arco/strplay/play", "iB", arco_strplay_play, NULL, true, true);

@@ -47,6 +47,8 @@ extern const char *Multb_name;
 class Multb : public Ugen {
 public:
     struct Multb_state {
+        FAUSTFLOAT fEntry0;
+        FAUSTFLOAT fEntry1;
     };
     Vec<Multb_state> states;
     void (Multb::*run_channel)(Multb_state *state);
@@ -116,7 +118,8 @@ public:
         x2_samps = x2->run(current_block); // update input
         Multb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            *out_samps = FAUSTFLOAT(*x1_samps);
+            FAUSTFLOAT tmp_0 = (float(*x1_samps) * float(*x2_samps));
+            *out_samps++ = FAUSTFLOAT(tmp_0);
             state++;
             x1_samps += x1_stride;
             x2_samps += x2_stride;

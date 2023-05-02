@@ -22,9 +22,14 @@ of the following three lines:
     sine* -- both audio and control rate generators
 In the last case (sine*), both sine.cpp and sineb.cpp are created
 in the same sine subdirectory named ugens/sine/
+
+The makefile also makes allugens.srp by appending all the ugen.srp
+files corresponding to classes in the manifest. allugens.srp is
+written to the same folder as dspmanifest.txt.
 """
 
-NONFAUST = ["pwl", "pwlb", "delay", "mix", "strplay", "fileio"]
+NONFAUST = ["pwl", "pwlb", "delay", "mix", "strplay", \
+            "fileio", "recplay"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -39,33 +44,45 @@ def make_makefile(arco_path, manifest, outf):
     # ignore b-rate versions, so sine* just describes dependent sine.cpp, but
     # when sine.cpp is generated, so are sine.h, sineb.cpp, sineb.h
     sources = []
+    srp_srcs = []
+    srp_path = arco_path + "/serpent/srp/"
+    ugens_path = arco_path + "/ugens/"
     for ugen in manifest:
-        if ugen not in NONFAUST:
-            if ugen[-1 : ] == "*":
-                sources.append(ugen[0 : -1])
-                # sources.append(ugen[0 : -1] + "b")
-            else:
-                sources.append(ugen)
+        basename = ugen
+        if ugen[-1 : ] == "*":
+            basename = ugen[0 : -1]
+        if basename in NONFAUST:
+            srp_srcs.append(srp_path + basename + ".srp")
+        else:
+            sources.append(ugens_path + basename + "/" + basename + ".cpp")
+            srp_srcs.append(ugens_path + basename + "/" + basename + ".srp")
 
     print("all:  ", end="", file=outf)
     for source in sources:
-        print(" \\\n    " + arco_path + "/ugens/" + source + "/" + \
-                  source + ".cpp", end="", file=outf)
-    print("\n", file=outf)
+        print(" \\\n    " + source, end="", file=outf)
+    print(" \\\n    allugens.srp", file=outf)
     
     # for each source, write the command to generate it
     # this generates all variants (a-rate, b-rate) and both .cpp and .h
     for source in sources:
-        src_path = arco_path + "/ugens/" + source + "/"
-        print(src_path + source + ".cpp: " + src_path + source + ".ugen " + \
+        sans_extension = source[ : -3]
+        src_path, basename = sans_extension.rsplit("/", 1)
+        print(source + ": " + sans_extension + "ugen " + \
               arco_path + "/preproc/u2f.py", file=outf)
-        print("\tcd " + arco_path + "/ugens/" + source + \
-              "; python3 " + arco_path + "/preproc/u2f.py " + source,
-              file=outf)
-        print("\tcd " + arco_path + "/ugens/" + source + \
-              "; sh generate_" + source + ".sh", file=outf)
+        print("\tcd " + src_path + "; python3 " + arco_path + \
+              "/preproc/u2f.py " + source, file=outf)
+        print("\tcd " + src_path + "; sh " + src_path + \
+              "/generate_" + basename + "sh", file=outf)
         print("\n", file=outf)
 
+    # write the code to make allugens.srp
+    print("allugens.srp:", end="", file=outf)
+    for src in srp_srcs:
+        print(" " + src, end="", file=outf)
+    print("\n\trm -f allugens.srp", file=outf)
+    print("\ttouch allugens.srp", file=outf)
+    for src in srp_srcs:
+        print("\tcat", src, ">> allugens.srp", file=outf)
 
 
 def make_inclfile(arco_path, manifest, outf):
@@ -88,19 +105,29 @@ def make_inclfile(arco_path, manifest, outf):
     print("set(ARCO_SRC ${ARCO_SRC}", file=outf)
 
     for ugen in manifest:
-        ug = ugen[0 : -1]
-        if ugen in NONFAUST:
-            print("    src/" + ugen + ".cpp src/" + ugen + ".h", file=outf)
-        elif ugen[-1 : ] == "*":
-            src = arco_path + "/ugens/" + ug + "/" + ug
+        both = False
+        basename = ugen
+        if ugen[-1 : ] == "*":
+            both = True
+            basename = ugen[0 : -1]
+        if basename in NONFAUST:
+            # if manifest had ugen*, include both ugen and ugenb. Otherwise,
+            # just include the specified ugen.
+            if both or basename == ugen:
+                print("    src/" + basename + ".cpp src/" + basename + ".h", \
+                      file=outf)
+            if both:
+                print("    src/" + basename + "b.cpp src/" + basename + "b.h", \
+                      file=outf)
+        elif both:
+            src = arco_path + "/ugens/" + basename + "/" + basename
             print("    " + src + ".cpp " + src + ".h", file=outf)
+            print("    " + src + "b.cpp " + src + "b.h", file=outf)
         else:
-            src = arco_path + "/ugens/" + ug + "/" + ug + "b"
-            print("    " + arco_path + "/" + src + "/" + src + ".cpp " + \
-                  arco_path + "/" + src + "/" + src + ".h", file=outf)
+            src = arco_path + "/ugens/" + basename + "/" + ugen
+            print("    " + src + ".cpp " + src + ".h", file=outf)
 
     print(")", file=outf)
-
 
 
 def is_a_unit_generator(line):
@@ -118,6 +145,7 @@ def main():
     manifest_name = sys.argv[2]
     makefile_name = sys.argv[3]
     inclfile_name = sys.argv[4]
+
     # first remove existing inclfile_name in case we fail
     try:
         os.remove(inclfile_name)
@@ -135,5 +163,6 @@ def main():
         make_makefile(arco_path, manifest, outf)
     with open(inclfile_name, "w") as outf:
         make_inclfile(arco_path, manifest, outf)
+
 
 main()

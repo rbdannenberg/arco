@@ -211,11 +211,11 @@ public:
         FAUSTFLOAT* input1 = center_samps;
         FAUSTFLOAT* input2 = q_samps;
         for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            float fTemp0 = (1.0f / std::max<float>(float(input2[i0]), 0.100000001f));
-            float fTemp1 = std::tan((fConst0 * std::max<float>(float(input1[i0]), 0.100000001f)));
-            float fTemp2 = (1.0f / fTemp1);
-            float fTemp3 = (((fTemp0 + fTemp2) / fTemp1) + 1.0f);
-            state->fRec0[0] = (float(input0[i0]) - (((state->fRec0[2] * (1.0f - ((fTemp0 - fTemp2) / fTemp1))) + (2.0f * (state->fRec0[1] * (1.0f - (1.0f / Reson_faustpower2_f(fTemp1)))))) / fTemp3));
+            float fTemp0 = std::tan((fConst0 * std::max<float>(float(input1[i0]), 0.100000001f)));
+            float fTemp1 = (1.0f / fTemp0);
+            float fTemp2 = (1.0f / std::max<float>(float(input2[i0]), 0.100000001f));
+            float fTemp3 = (((fTemp2 + fTemp1) / fTemp0) + 1.0f);
+            state->fRec0[0] = (float(input0[i0]) - (((state->fRec0[2] * (((fTemp1 - fTemp2) / fTemp0) + 1.0f)) + (2.0f * (state->fRec0[1] * (1.0f - (1.0f / Reson_faustpower2_f(fTemp0)))))) / fTemp3));
             *out_samps++ = FAUSTFLOAT(((state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1]))) / fTemp3));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];

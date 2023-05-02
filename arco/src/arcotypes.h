@@ -10,7 +10,8 @@ typedef Sample *Sample_ptr;
 const int ARCO_STRINGMAX = 128;
 const double AR = 44100.0;
 const double AP = 1.0 / AR;
-const int BL = 32;
+const int LOG2_BL = 5;
+const int BL = 1 << LOG2_BL;  // = 32
 const float BL_RECIP = 1.0F / BL;
 const double BR = AR / BL;
 const double BP = 1.0 / BR;

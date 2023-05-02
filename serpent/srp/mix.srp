@@ -1,0 +1,74 @@
+# mix.srp -- audio mixer
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Mix (Ugen):
+    var input_name  // for dictionary of inputs, we need to generate names
+
+    
+    def init(chans_):
+        input_name = 0
+        super.init(create_ugen_id(), "Mix", chans_, 'a', "")
+
+
+    def set(input, value, optional chan = 0):
+        print "ERROR: set method not available for Mix class"
+
+
+    def ins(ugen, gain, optional atend):
+        if isnumber(gain):
+            gain = const(gain)
+        inputs[input_name] = [ugen, gain]
+        input_name = input_name + 1
+        o2_send_cmd("/arco/mix/ins", 0, "UUU", id, ugen.id, gain.id)
+        if atend:
+            if atend == SIGNAL and issubclass(ugen, Instrument) and 
+               ugen.get['envelope']:
+                create_action(ugen.envelope, this, 'rem', ugen)
+            elif atend == GAIN and issubclass(gain, Pwlb):
+                create_action(gain, this, 'rem', ugen)
+            else:
+                print "Mix.ins() ignoring unknown atend parameter -", atend
+        return this
+    
+
+    def rem(ugen):
+        for key in inputs.keys():
+            if inputs[key][0] == ugen:
+                inputs.remove(key)
+                o2_send_cmd("/arco/mix/rem", 0, "UU", id, ugen.id)
+                return this
+        return this
+
+
+    def find_name_of(ugen):
+        for key in inputs.keys():
+            if inputs[key][0] == ugen:
+                return key
+        return nil
+
+
+    def set_gain(ugen, gain):
+    # general set gain to either a Ugen or float (constant value)
+        // inputs are "named" by numbers that start at 0 and increment for
+        // each ins() operation. We do not reuse numbers.
+        // Start by finding the input name:
+        var i = find_name_of(ugen)
+        if not i:
+            print "ERROR: Mix set_gain cannot find ugen", ugen
+            return
+        var gain_ugen = inputs[i][1]
+        if isinstance(gain_ugen, Ugen) and gain_ugen.rate == "c":
+            // a Const exists, so we just write to it using set_gain
+            o2_send_cmd("/arco/mix/set_gain", 0, "UUf", id, ugen, gain)
+        else:  // have to replace with either gain as Ugen or make a const
+            if isnumber(gain):
+                gain = const(gain)
+            inputs[i][1] = gain
+            o2_send_cmd("/arco/mix/repl_gain", 0, "UUU", id, ugen, gain)
+    
+
+def mix(optional chans = 1):
+    Mix(chans)
+
