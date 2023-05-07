@@ -1,3 +1,25 @@
+# vu.srp -- record and play audio in memory
+#
+# Roger B. Dannenberg
+# May 2023
+
+def vu(reply_addr, period):
+    Vu(reply_addr, period)
+
+
+class Vu (Ugen):
+    def init(reply_addr, period)
+        super.init(create_ugen_id(), "Vu", 0, '', "sf",
+                   'reply_addr', reply_addr, 'period', period)
+
+    def start(reply_addr, period):
+        o2_send_cmd("/arco/vu/start", 0, "sf", reply_addr, period)
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'inp'
+        inputs['inp'] = value
+        display "Vu set", id, value.id
+        o2_send_cmd("/arco/vu/repl_inp", 0, "UU", id, value.id)
 # pwl.srp -- piece-wise linear envelope
 #
 # Roger B. Dannenberg
@@ -204,28 +226,50 @@ def resonb(snd, center, q, optional chans = 1):
         return nil
     Ugen(create_ugen_id(), "resonb", chans, 'b', "UUU", 'snd', snd, 'center', center, 'q', q)
 
-# strplay.srp -- stream audio from file
+# fileplay.srp -- stream audio from file
 #
 # Roger B. Dannenberg
 # May 2023
 
-def strplay(filename, optional chans = 2, start = 0, end = 0, 
+def fileplay(filename, optional chans = 2, start = 0, end = 0, 
             cycle, mix, expand)
-    Strplay(chans, filename, start, end, cycle, mix, expand)
+    Fileplay(chans, filename, start, end, cycle, mix, expand)
 
 
 
-class Strplay (Ugen):
+class Fileplay (Ugen):
     var action_id
 
     def init(chans, filename, start, end, cycle, mix, expand):
         // -chans cuts off standard creation:
-        super.init(create_ugen_id(), "Strplay", chans, 'a', "sffBBB",
+        super.init(create_ugen_id(), "Fileplay", chans, 'a', "sffBBB",
                    'filename', filename, 'start', start,'end', end,
                    'cycle', cycle, 'mix', mix, 'expand', expand)
 
     def go(optional play_flag = true):
-        o2_send_cmd("/arco/strplay/play", 0, "UB", id, play_flag)
+        o2_send_cmd("/arco/fileplay/play", 0, "UB", id, play_flag)
+    
+    def stop():
+        go(false)
+# filerec.srp -- stream audio from file
+#
+# Roger B. Dannenberg
+# May 2023
+
+def filerec(filename, inp, optional chans = 2)
+    Filerec(chans, filename, inp)
+
+
+
+class Filerec (Ugen):
+    var action_id
+
+    def init(chans, filename, inp):
+        super.init(create_ugen_id(), "Filerec", chans, 0, "sU",
+                   'filename', filename, 'inp', inp)
+
+    def go(optional rec_flag = true):
+        o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
     
     def stop():
         go(false)
@@ -258,3 +302,49 @@ class Recplay (Ugen):
         o2_send_cmd("/arco/recplay/stop", 0, "U", id)
         
 
+# thru.srp -- audio pass-through
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Thru (Ugen):
+
+    def init(inp, optional chans, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Thru", chans, 'a', "U", 'inp', inp)
+
+    def set_alternate(alt):
+        o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt)
+
+
+# DO NOT DEFINE thru() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN thru_ugen
+# def thru(): purposefully not defined here!
+
+
+
+# zero.srp -- audio zero
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Zero (Ugen):
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zero", -1, 'a', "")
+        o2_send_cmd("/arco/zero/new", 0, "i", arco_ugen_id(id))
+
+
+# DO NOT DEFINE zero() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN zero_ugen
+# def zero(): purposefully not defined here!
+
+
+class Zerob (Ugen)
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zerob", -1, 'b', "")
+        o2_send_cmd("/arco/zerob/new", 0, "i", arco_ugen_id(id))
+
+# DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen
+# def zerob(): purposefully not defined here!

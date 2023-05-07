@@ -18,15 +18,17 @@ polling overhead will be very low. This will give a rather
 high latency for file io requests, but if you are doing file io, you
 should be using buffers and prefetching enough that you can tolerate a
 lot of latency. We'll assume audio file reads and writes are in 8K
-sample frames, or 167 msec at 48000 sample rate. The message has to
-go through the O2 process to get to the file io thread, and it has to
-get to the file io thread, so it has to wait for 4 polling loops. The
+sample frames, or 167 msec at 48000 sample rate. If the message
+goes through the O2 process to get to the file io thread, and it has to
+get to the file io thread, then it has to wait for 4 polling loops. The
 last wait is for the Arco thread to poll which we assume is short, so
 that leaves at least 50 msec latency for the O2 and the file io thread.
 This seems very safe. (There is no latency to read the file because we
 assume as soon as a buffer is requested, file io can begin filling the
 next one.) This is just a thought experiment -- all parameters
-are adjustable, but I think these are doable and conservative.
+are adjustable, but I think these are doable and conservative. Also,
+our implementation bypasses the main thread and queue messages directly
+between the audio and fileio threads.
 
 API
 
@@ -36,9 +38,9 @@ control on the unit generator side. We're going to do the
 reading/converting on the reader side (no need to do this in a
 real-time thread). 
 
-Create the Ugen Strplay with filename, channels, start time, end
+Create the Ugen Fileplay with filename, channels, start time, end
 time, cycle flag, mix, expand:
-    /arco/strplay/new "isiffBBB" id filename chans start end cycle
+    /arco/fileplay/new "isiffBBB" id filename chans start end cycle
 This means play from start to end, and if cycle is true continue
 playing from start after you reach end. Output the number of
 channels: if mix is true, extra file channels are mixed round-robin
@@ -47,57 +49,99 @@ are "expanded" round-robin to fill the available output channels.
 Otherwise, extra output channels are zero-filled and extra input
 channels are discarded. This sends a request to the fileio service:
 
-    /fileio/strplay/new "hsffB" addr filename start end cycle
+    /fileio/fileplay/new "hsffB" addr filename start end cycle
 
-where addr is the address of the Strplay instance. (It is tempting
-to send id, but if the Strplay is freed by the client, then the id
-will no longer work.
+where addr is the address of the Fileplay instance. (It is tempting
+to send id, but if the Fileplay is freed by the client, then the id
+will no longer work. See "References and reference counting" in
+fileplay.h.
 
 When the file is opened, the first buffer is read and sent (see
-/arco/strplay/samps) and then a ready message is sent:
+/arco/fileplay/samps) and then a ready message is sent:
 
-    /arco/strplay/ready "hiB" addr chans ready
+    /arco/fileplay/ready "hiB" addr chans ready
 
 If the file could not be opened, chans is 0. Otherwise chans is the
 actual number of channels in the file. The number of channels returned
 in Audioblocks will be this number, independent of the actual channels
 output by the unit generator. If the start time requested is beyond
 the end of file or there was some other error getting ready to stream
-the file, ready will be false. The Arco side can still issue a "play"
-message (the reply will be a buffer with no samples and last will be
-set), and the Arco side should issue a "stop" message. If the file is
-opened successfully, ready will be true.
+the file, ready will be false.
+
+IMPORTANT: When ready is false, the Fileio_obj is deleted and this
+is the last message from the object.  No further messages can be sent.
 
 A separate message starts or stops playing:
 
-    /arco/strplay/play "iB" id play
+    /fileio/fileplay/play "iB" id play
 
 When "play" is received to start playing, the second buffer is
-read and sent (see /arco/strplay/samps).
+read and sent (see /arco/fileplay/samps).
 
-As each buffer is (Audioblock) is output from the Strplay Ugen,
+As each buffer is (Audioblock) is output from the Fileplay Ugen,
 request to refill with the next block of samples from the file:
 
-    /fileio/strplay/read "h" addr
+    /fileio/fileplay/read "h" addr
 
 The reply with the block of samples is:
 
-    /arco/strplay/samps "hh" addr address
+    /arco/fileplay/samps "hh" addr address
 
 where address is a pointer to the data (this of course assumes shared
 memory) and last is true if this is the last block of the file.
 
 To end playback and close the file:
 
-    /fileio/strplay/play "hB" addr play (= false)
+    /fileio/fileplay/play "hB" addr play (= false)
 
-(It is acceptable to close the file and delete the reader object if
-cycle is false and the last samples of the file have been sent. The
-play message can simply be ignored because id will not match.)
+This can be asynchronous with respect to file reading, so it is
+possible for Arco to then receive an /arco/fileplay/samps
+message. However, eventually, a reply will be sent:
+
+    /arco/fileplay/ready "hiB" addr chans ready (= false)
+
+which indicates the Fileio_obj has been deleted and no further
+messages will follow for addr.
 
 To shut down the entire fileio bridge and thread:
 
     /fileio/quit ""
+
+Writing
+-------
+
+To write a file, we use a similar protocol with Ugen Filerec:
+
+    /fileio/filerec/new "hsi" addr filename chans
+
+where addr is the address of the Filerec instance.
+
+When the file is opened, a ready message is sent:
+
+    /arco/filerec/ready "hiB" addr ready
+
+If the file could not be opened, or if the start time requested is
+beyond the end of file or there was some other error getting ready to
+stream the file, ready will be false and Fileio_obj will be
+deleted. If the file is opened successfully, ready will be true.
+
+As each buffer (Audioblock) is prepared by the Filerec Ugen, it is
+sent to be written (the Audioblock last flag is set if this is the
+last block and the file can be closed.
+
+    /fileio/filerec/write "hh" addr address
+
+The reply to release the block of samples is:
+
+    /arco/filerec/samps "h" addr
+
+The blocks are "owned" by the Filerec object, which knows which block
+is being freed. The last flag is preserved in the Audioblock, and if
+set, the fileio object is deleted, the file is closed, and no further
+messages for addr are sent.
+
+There is no final /arco/filerec/ready with ready == false; instead
+there is /arco/filerec/samps with the last flag set.
 
 */
 

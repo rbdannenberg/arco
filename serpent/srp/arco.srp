@@ -14,6 +14,7 @@ require "utils"
 require "prefs"
 
 prefs = Prefs("arco")
+audiomaster_gain = prefs.get('master_gain', -12.0)
 
 AR = 44100.0  // audio rate
 AP = 1 / AR // audio sample period
@@ -174,13 +175,14 @@ def create_action(ugen, object, method, rest parameters):
 def actl_act(timestamp, address, types, rest parameters):
     display "actl_act", types, parameters
     var key = parameters[0]
-    action_list = action_dict.get(key)
+    var action_list = action_dict.get(key)
     if not action_list:
         print "ERROR: actl_act - action_id not found in action_dict", key
         return
     var ugen = action_list[0][0]  // all actions start with the same ugen
     ugen.action_id = nil     // clear the action so we can install a new one
     for action in action_list:
+        action[3].insert(0, parameters[1])  // make status be first parameter
         general_apply(action[1], action[2], action[3])
     action_dict.remove(key)  // allow garbage collection
 
@@ -224,9 +226,6 @@ if IS_WXSERPENT:
     audio_devices_menu = default_window.get_menu("File")
     require "audiodev"
 
-
-def audio_device_handler(obj, event, x, y):
-    display "adh", x, y
 
 def actl_devinf(timestamp, address, types, info):
     if info == "":
@@ -297,13 +296,14 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     arco_initialize()  // create audio shared memory interface
     o2_service_new("actl")
     o2_method_new("/actl/devinf", "s", 'actl_devinf', t)
-    o2_method_new("/actl/act", "i", 'actl_act', t)
+    o2_method_new("/actl/act", "ii", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
     o2_method_new("/actl/reset", "", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
     sched_select(rtsched)
     sched_cause(0.1, nil, 'poll_for_arco')
-
+    if IS_WXSERPENT:
+        audiodev_init()
 
 def arco_run():
     sched_poll_function = 'arco_thread_poll'
@@ -346,11 +346,15 @@ def actl_cpu(timestamp, address, types, rest args):
                     arco_get_cpu_load_data)
         else:
             funcall(arco_get_cpu_load_continuation, args[0])
-            
+
 
 # Ask Arco to print tree of Ugens:
 def arco_prtree():
     o2_send_cmd("/arco/prtree", 0, "");
+
+
+def arco_gain(x):
+    o2_send_cmd("/arco/gain", 0, "f", x)
 
 
 arco_poll_to_free_ugens_id = 0
@@ -367,8 +371,8 @@ def reset_arco():
     arco_poll_to_free_ugens(arco_poll_to_free_ugens_id)
     zero_ugen = nil
     zerob_ugen = nil
-    thru_ugen = nil
-    output_ugen = nil
+    input_ugen = nil
+    prev_output_ugen = nil
 
 
 last_gc_cycles = 0
@@ -404,23 +408,11 @@ def create_standard_ugens():
     if zero_ugen:
         print "WARNING: create_stanard_ugens -- ugens already created"
         return
-    zero_ugen = Ugen(arco_ugen_new_id(ZERO_ID), "Zero", -1, 'a', "")
-    o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID)
-    // print "sent /arco/zero/new, id", ZERO_ID
-
-    zerob_ugen = Ugen(arco_ugen_new_id(ZEROB_ID), "Zerob", -1, 'b', "")
-    o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID)
-    // print "sent /arco/zerob/new, id", ZEROB_ID
-
-    thru_ugen = Ugen(arco_ugen_new_id(INPUT_ID), "Thru",
-                     arco_input_chans, 'a', "U", 'input', zero())
-
+    zero_ugen = Zero(ZERO_ID)
+    zerob_ugen = Zerob(ZEROB_ID)
+    input_ugen = Thru(zero_ugen, arco_input_chans, INPUT_ID)
     // previous output can be read here on the next block:
-    var tmp = arco_ugen_new_id(PREV_OUTPUT_ID)
-    display "made new ugen_id 3 with", arco_ugen_id(tmp)
-    output_ugen = Ugen(tmp, "Thru", 
-                       arco_output_chans, 'a', "U", 'input', zero())
-    display "made prev_output", output_ugen, arco_ugen_id(output_ugen.id)
+    prev_output_ugen = Thru(zero_ugen, arco_output_chans, PREV_OUTPUT_ID)
 
 
 # internal function: wait for arco service, then reset Arco server
@@ -525,7 +517,9 @@ class Ugen:
         this
 
 
-    def mute():  # disconnect this Ugen from audio output
+    def mute(optional status):  # disconnect this Ugen from audio output
+    # since "atend" actions always have a status, we accept a status
+    # but ignore it.
         if this in arco_output_set:
             display "Ugen mute", id
             arco_output_set.remove(this)
@@ -586,8 +580,7 @@ class Ugen:
     def atend(action, optional arg):
     # When this unit generator ends, action will be sent to this or, if
     # provided, to arg, which in either case must handle /arco/<class>/act
-    # which is currently handled by Pwlb and Strplay classes. Currently, 
-    # action must be 'mute' or, equivalently, MUTE.
+    # which is currently handled by Pwlb and Fileplay classes.
         if action == MUTE:
             create_action(this, arg if arg else this, action)
         else:

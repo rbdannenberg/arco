@@ -1,0 +1,52 @@
+# arcoslider.srp -- labeled slider with O2 address and id
+
+# This sends an int32 ID and float value to a given O2 address 
+# (string). Optionally, you can add_target_method(target, method)
+# to also call a serpent function or method. Do not set target or
+# method directly, because this will disable Arco_slider from
+# sending O2 messages.
+#
+# If ID is nil, the message is sent with just a float parameter, and
+# if the address is nil, no O2 message is sent (but then you could
+# just use a Labeled_slider from slider.srp.)
+
+require "slider"
+
+aura_slider_slider_width = 100
+aura_slider_label_width = 50
+aura_slider_value_width = 40
+aura_slider_height = 25
+aura_slider_width = aura_slider_label_width + aura_slider_slider_width +
+                    aura_slider_value_width
+
+class Arco_slider (Labeled_slider):
+    var address
+    var ugen_id
+
+    # send_initial (keyword) means call the handler with the initial
+    #    value when the slider is first created
+    def init(parent, labeltext, x, y, min, max, initial, style, addr, id,
+             optional varname,
+             keyword slider_width = aura_slider_width,
+             keyword slider_height = aura_slider_height,
+             keyword label_width = aura_slider_label_width,
+             keyword value_width = aura_slider_value_width,
+             keyword send_initial = t):
+        slider = Labeled_slider(parent, labeltext, x, y, slider_width,
+                                slider_height, label_width, min, max, 
+                                initial, style, varname)
+        ugen_id = id
+        address = addr
+        add_target_method(this, 'on_slider')
+        if send_initial:
+            on_slider(this, initial)
+
+
+    def on_slider(obj, x):
+        // display "Aura_slider:on_slider", x, message, aura_id.to_string()
+        if address:
+            if ugen_id:
+                o2_send_cmd(address, 0, "Uf", ugen_id, x)
+            else:
+                o2_send_cmd(address, 0, "f", x)
+

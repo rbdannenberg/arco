@@ -1,0 +1,22 @@
+# vu.srp -- record and play audio in memory
+#
+# Roger B. Dannenberg
+# May 2023
+
+def vu(reply_addr, period):
+    Vu(reply_addr, period)
+
+
+class Vu (Ugen):
+    def init(reply_addr, period)
+        super.init(create_ugen_id(), "Vu", 0, '', "sf",
+                   'reply_addr', reply_addr, 'period', period)
+
+    def start(reply_addr, period):
+        o2_send_cmd("/arco/vu/start", 0, "sf", reply_addr, period)
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'inp'
+        inputs['inp'] = value
+        display "Vu set", id, value.id
+        o2_send_cmd("/arco/vu/repl_inp", 0, "UU", id, value.id)

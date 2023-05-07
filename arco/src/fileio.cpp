@@ -32,9 +32,9 @@ static bool fileio_thread_created = false;
 static O2_context fio_o2_ctx;
 static bool fileio_quit_request = false;
 
+
 class Fileio_reader : public Fileio_obj {
 public:
-    const char *filename;
     float start;
     float end;
     bool cycle;
@@ -47,16 +47,10 @@ public:
     int64_t frames_to_end;  // how many more frames to read until end time
     int block_on_deck;  // which block do we send next?
     
-    Audioblock *audioblock_alloc(int chans) {
-        Audioblock *block = (Audioblock *) O2_MALLOC(sizeof(Audioblock) +
-                            AUDIOBLOCK_FRAMES * chans * sizeof(int16_t));
-        return block;
-    }
-    
-    
+
     Fileio_reader(int64_t addr, char *fn, float st, float en, bool cy) :
             Fileio_obj(addr) {
-        filename = o2_heapify(fn);
+        int rslt = -1;  // failure until we open file and seek
         start = st;
         end = en;
         cycle = cy;
@@ -65,10 +59,13 @@ public:
         file_is_open = false;
         block_on_deck = 0;
         snd_in_info.format = 0;
-        snd_in = sf_open(filename, SFM_READ, &snd_in_info);
-        file_is_open = (snd_in != NULL);
+        snd_in = sf_open(fn, SFM_READ, &snd_in_info);
+        if (snd_in) {
+            file_is_open = true;
+            rslt = 0;
+        }
         if (!file_is_open) {
-            arco_print("Fileio_reader: Failed to open %s\n", filename);
+            arco_print("Fileio_reader: Failed to open %s\n", fn);
             snd_in_info.channels = 0;  // make sure we indicate an error
             cycle = false;  // pretend we're at the end of the file and no cycle
             all_frames_count = 0;
@@ -80,7 +77,6 @@ public:
         blocks[0] = audioblock_alloc(chans);
         blocks[1] = audioblock_alloc(chans);
 
-        int rslt = -1;  // result is error until successful seek
         if (start > 0.0 && file_is_open) {
             rslt = (int) sf_seek(snd_in, (sf_count_t)
                                  (start * snd_in_info.samplerate), SEEK_SET);
@@ -91,13 +87,13 @@ public:
         }
         frames_to_end = all_frames_count;
         
-        // o2sm_send_cmd("/arco/strplay/ready", 0, "hiB", addr,
+        // o2sm_send_cmd("/arco/fileplay/ready", 0, "hiB", addr,
         //               (file_is_open ? chans : 0), rslt < 0);
         o2_send_start();
         o2_add_int64(addr);
         o2_add_int32(file_is_open ? chans : 0);
         o2_add_bool(rslt >= 0);
-        O2message_ptr msg = o2_message_finish(0.0, "/arco/strplay/ready", true);
+        O2message_ptr msg = o2_message_finish(0.0, "/arco/fileplay/ready", true);
         audio_bridge->outgoing.push((O2list_elem *) msg);
 
         load_block();  // even if error opening or seeking
@@ -110,7 +106,6 @@ public:
             O2_FREE(blocks[1]);
         }
         makeclosed();
-        O2_FREE((void *) filename);
     }
 
 
@@ -146,12 +141,12 @@ public:
         // if we're out of frames, then tell player we are done:
         ablock->last = frames_to_go > 0;
 
-        // o2sm_send_cmd("/arco/strplay/samps", 0, "hh", addr, (int64_t) ablock);
+        // o2sm_send_cmd("/arco/fileplay/samps", 0, "hh", addr, (int64_t) ablock);
         // instead of sending through O2, deliver straight to Arco:
         o2_send_start();
         o2_add_int64(addr);
         o2_add_int64((int64_t) ablock);
-        O2message_ptr msg = o2_message_finish(0.0, "/arco/strplay/samps", true);
+        O2message_ptr msg = o2_message_finish(0.0, "/arco/fileplay/samps", true);
         audio_bridge->outgoing.push((O2list_elem *) msg);
 
         block_on_deck ^= 1;  // swap 0 <-> 1
@@ -170,6 +165,66 @@ public:
 };
 
 
+class Fileio_writer : public Fileio_obj {
+public:
+    bool file_is_open;
+    
+    SNDFILE *snd_out;  // file descriptor
+    SF_INFO snd_out_info;  // sfinfo structure (sample rate, format, etc.)
+
+    Fileio_writer(int64_t addr, int chans, char *fn) : Fileio_obj(addr) {
+        int rslt = -1;  // failure until we open file and seek
+        file_is_open = false;
+        snd_out_info.frames = 0;
+        snd_out_info.samplerate = AR;
+        snd_out_info.channels = chans;
+        snd_out_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
+        snd_out_info.sections = 0;
+        snd_out_info.seekable = 0;
+        snd_out = sf_open(fn, SFM_WRITE, &snd_out_info);
+        if (snd_out) {
+            file_is_open = true;
+            rslt = 0;
+        }
+        if (!file_is_open) {
+            arco_print("Fileio_writer: Failed to open %s\n", fn);
+        }
+        // o2sm_send_cmd("/arco/filerec/ready", 0, "hB", addr, rslt >= 0)
+        o2_send_start();
+        o2_add_int64(addr);
+        o2_add_bool(rslt >= 0);
+        O2message_ptr msg = o2_message_finish(0.0, "/arco/filerec/ready", true);
+        audio_bridge->outgoing.push((O2list_elem *) msg);
+    }
+
+
+    ~Fileio_writer() {
+        makeclosed();
+    }
+
+
+    bool write_block(int64_t block_addr) {  // return true if last block
+        Audioblock *block = (Audioblock *) block_addr;
+        sf_writef_short(snd_out, block->dat, block->frames);
+        // o2sm_send_cmd("/arco/fileplay/samps", 0, "hh", addr);
+        // instead of sending through O2, deliver straight to Arco:
+        o2_send_start();
+        o2_add_int64(addr);
+        O2message_ptr msg = o2_message_finish(0.0, "/arco/filerec/samps", true);
+        audio_bridge->outgoing.push((O2list_elem *) msg);
+        return block->last;
+    }
+    
+    
+    void makeclosed() {
+        if (file_is_open) {
+            sf_close(snd_out);
+            file_is_open = false;
+        }
+    }
+};
+
+
 static int fileio_find(int64_t addr)
 {
     for (int i = 0; i < fileio_objs.size(); i++) {
@@ -182,14 +237,14 @@ static int fileio_find(int64_t addr)
 }
 
 
-/* O2SM INTERFACE: /fileio/strplay/new
-       int32 id,
+/* O2SM INTERFACE: /fileio/fileplay/new
+       int64 addr,
        string filename,
        float start, float end,
        bool cycle;
    Create a new file reader and open the file.
 */
-static void fileio_strplay_new(O2SM_HANDLER_ARGS)
+static void fileio_fileplay_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int64_t addr = argv[0]->h;
@@ -203,8 +258,8 @@ static void fileio_strplay_new(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /fileio/strplay/read int64 addr; */
-void fileio_strplay_read(O2SM_HANDLER_ARGS)
+/* O2SM INTERFACE: /fileio/fileplay/read int64 addr; */
+void fileio_fileplay_read(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int64_t addr = argv[0]->h;
@@ -217,8 +272,8 @@ void fileio_strplay_read(O2SM_HANDLER_ARGS)
 }           
 
 
-/* O2SM INTERFACE: /fileio/strplay/play int64 addr, bool play_flag; */
-void fileio_strplay_play(O2SM_HANDLER_ARGS)
+/* O2SM INTERFACE: /fileio/fileplay/play int64 addr, bool play_flag; */
+void fileio_fileplay_play(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int64_t addr = argv[0]->h;
@@ -231,6 +286,9 @@ void fileio_strplay_play(O2SM_HANDLER_ARGS)
         if (play_flag) {
             reader->load_block();
         } else {
+            fileio_objs.remove(i);
+            printf("fileio_fileplay_play deleting reader @ %p addr %p\n",
+                   reader, (void *) addr);
             delete reader;
         }
     }
@@ -265,6 +323,53 @@ void *fileio_thread_run(void *data)
 }
 
 
+/* O2SM INTERFACE: /fileio/filerec/new
+       int64 addr,
+       int32 chans,
+       string filename;
+   Create a new file reader and open the file.
+*/
+static void fileio_filerec_new(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int64_t addr = argv[0]->h;
+    int32_t chans = argv[1]->i;
+    char *filename = argv[2]->s;
+    // end unpack message
+
+    fileio_objs.push_back(new Fileio_writer(addr, chans, filename));
+}
+
+
+/* O2SM INTERFACE: /fileio/filerec/write int64 addr, int64 block; */
+void fileio_filerec_write(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int64_t addr = argv[0]->h;
+    int64_t block = argv[1]->h;
+    // end unpack message
+    int i = fileio_find(addr);
+    printf("fileio_filerec_write addr %p block %p index %d last %d\n",
+           (void *) addr, (void *) block, i, ((Audioblock *) block)->last);
+    if (i >= 0) {
+        Fileio_writer *writer = (Fileio_writer *) fileio_objs[i];
+        bool last = writer->write_block(block);
+        printf("wrote audioblock %p, last %d\n", (void *) block, last);
+        o2_send_start();
+        o2_add_int64(addr);
+        O2message_ptr msg = 
+                o2_message_finish(0.0, "/arco/filerec/samps", true);
+        audio_bridge->outgoing.push((O2list_elem *) msg);
+        if (last) {
+            fileio_objs.remove(i);
+            printf("fileio_filerec_write deleting writer @ %p addr %p\n",
+                   writer, (void *) addr);
+            delete writer;
+        }
+    }
+}           
+
+
 // to be called from main thread - creates and starts fileio thread
 // returns non-zero error code if pthread_create fails
 //
@@ -278,10 +383,12 @@ int fileio_initialize()
     o2sm_service_new("fileio", NULL);
 
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/fileio/strplay/new", "hsffB", fileio_strplay_new, NULL, true, true);
-    o2sm_method_new("/fileio/strplay/read", "h", fileio_strplay_read, NULL, true, true);
-    o2sm_method_new("/fileio/strplay/play", "hB", fileio_strplay_play, NULL, true, true);
+    o2sm_method_new("/fileio/fileplay/new", "hsffB", fileio_fileplay_new, NULL, true, true);
+    o2sm_method_new("/fileio/fileplay/read", "h", fileio_fileplay_read, NULL, true, true);
+    o2sm_method_new("/fileio/fileplay/play", "hB", fileio_fileplay_play, NULL, true, true);
     o2sm_method_new("/fileio/quit", "", fileio_quit, NULL, true, true);
+    o2sm_method_new("/fileio/filerec/new", "his", fileio_filerec_new, NULL, true, true);
+    o2sm_method_new("/fileio/filerec/write", "hh", fileio_filerec_write, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     // create a thread to poll for fileio

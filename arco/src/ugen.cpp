@@ -61,9 +61,6 @@ void Initializer::init()
 void Ugen::unref() {
     refcount--;
     if (refcount == 0) {
-        if (id == PREV_OUTPUT_ID) {
-            printf("freeing PREV_OUTPUT_ID Ugen %p\n", this);
-        }
         delete this;
     }
 }

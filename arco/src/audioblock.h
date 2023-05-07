@@ -11,7 +11,7 @@ typedef struct  {
 } Audioblock;
 
 
-Audioblock *asyncio_alloc(int chans);
+Audioblock *audioblock_alloc(int chans);
 
 
 #endif // AUDIOBLOCK_H

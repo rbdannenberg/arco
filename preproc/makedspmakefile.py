@@ -28,8 +28,8 @@ files corresponding to classes in the manifest. allugens.srp is
 written to the same folder as dspmanifest.txt.
 """
 
-NONFAUST = ["pwl", "pwlb", "delay", "mix", "strplay", \
-            "fileio", "recplay"]
+NONFAUST = ["thru", "zero", "vu", "pwl", "pwlb", "delay", "mix", \
+            "fileplay", "filerec", "fileio", "recplay"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -47,6 +47,10 @@ def make_makefile(arco_path, manifest, outf):
     srp_srcs = []
     srp_path = arco_path + "/serpent/srp/"
     ugens_path = arco_path + "/ugens/"
+    if "thru" not in manifest:
+        manifest.append("thru")
+    if "zero*" not in manifest:
+        manifest.append("zero*")
     for ugen in manifest:
         basename = ugen
         if ugen[-1 : ] == "*":
@@ -89,9 +93,10 @@ def make_inclfile(arco_path, manifest, outf):
     "make the CMake include file that lists all the sources"
 
     # we need either fileio or nofileio
-    # use fileio if either fileio or strplay is in manifest
+    # use fileio if either fileio or fileplay or filerec is in manifest
     #
-    if ("strplay" in manifest) or ("fileio" in manifest):
+    if ("fileplay" in manifest) or ("fileio" in manifest) or \
+       ("fileio" in manifest):
         needed = "fileio"
         rejected = "nofileio"
     else:

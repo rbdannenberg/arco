@@ -24,7 +24,7 @@ kind of application. Currently, two applications exist:
   Arco can run in a wxSerpent process using O2's shared memory
   interface.
 
-These applicaitons are in `apps/basic` (the server) and
+These applications are in `apps/basic` (the server) and
 `apps/test` (creates wxSerpent + Arco).
 
 The intent is that you can copy one of these apps subdirectories to
@@ -108,6 +108,13 @@ prefer to run make in a terminal window. The section below on
 
   - `dspsources.cmakeinclude` (tells the project to compile and link the
     unit generator sources)
+
+  - `allugens.srp` (A concatenation of all the Serpent classes and constructor
+    functions to be loaded by client programs that use the set of Ugens
+    listed in dspmanifest.txt. This saves typing in a large set of `require`
+    statements to load each Ugen separately, or alternatively, it having and
+    loading a "master" interface file with *all* interface functions,
+    including ones for unused Ugens.)
 
 - `CMake` invokes `make --makefile=dspmakefile` which invokes `u2f.py` and
   `generate_<ugenname>.sh`

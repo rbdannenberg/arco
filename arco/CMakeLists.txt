@@ -18,7 +18,7 @@ set(ARCO_SRC
     zerob.cpp zerob.h 
     const.cpp const.h 
     upsample.cpp upsample.h 
-    fileio.cpp fileio.h audioblock.h
+    audioblock.cpp audioblock.h
 
 
 #    pwl.cpp pwl.h 

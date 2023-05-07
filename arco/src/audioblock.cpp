@@ -4,12 +4,14 @@
  * April 2023
  */
 
+#include <o2.h>
 #include "audioblock.h"
 
-Audioblock *asynchio_alloc(int chans)
+Audioblock *audioblock_alloc(int chans)
 {
-    Audioblock *ab = O2_MALLOC(sizeof(Audioblock) + 
-                               sizeof(int16) * chans * 8000);
+    Audioblock *ab = (Audioblock *) O2_MALLOC(sizeof(Audioblock) + 
+                        sizeof(int16_t) * chans * AUDIOBLOCK_FRAMES);
+    ab->frames = 0;
     ab->channels = chans;
     ab->last = false;
     return ab;

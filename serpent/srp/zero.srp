@@ -1,0 +1,26 @@
+# zero.srp -- audio zero
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Zero (Ugen):
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zero", -1, 'a', "")
+        o2_send_cmd("/arco/zero/new", 0, "i", arco_ugen_id(id))
+
+
+# DO NOT DEFINE zero() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN zero_ugen
+# def zero(): purposefully not defined here!
+
+
+class Zerob (Ugen)
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zerob", -1, 'b', "")
+        o2_send_cmd("/arco/zerob/new", 0, "i", arco_ugen_id(id))
+
+# DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen
+# def zerob(): purposefully not defined here!

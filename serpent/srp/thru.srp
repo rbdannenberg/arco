@@ -1,0 +1,20 @@
+# thru.srp -- audio pass-through
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Thru (Ugen):
+
+    def init(inp, optional chans, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Thru", chans, 'a', "U", 'inp', inp)
+
+    def set_alternate(alt):
+        o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt)
+
+
+# DO NOT DEFINE thru() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN thru_ugen
+# def thru(): purposefully not defined here!
+
+
+

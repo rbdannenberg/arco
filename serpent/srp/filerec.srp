@@ -1,0 +1,22 @@
+# filerec.srp -- stream audio from file
+#
+# Roger B. Dannenberg
+# May 2023
+
+def filerec(filename, inp, optional chans = 2)
+    Filerec(chans, filename, inp)
+
+
+
+class Filerec (Ugen):
+    var action_id
+
+    def init(chans, filename, inp):
+        super.init(create_ugen_id(), "Filerec", chans, 0, "sU",
+                   'filename', filename, 'inp', inp)
+
+    def go(optional rec_flag = true):
+        o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
+    
+    def stop():
+        go(false)

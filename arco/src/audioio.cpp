@@ -91,7 +91,6 @@ External Control
 See doc/design.md
 
 */
-
 #include <unistd.h>
 #include <stdio.h>
 #include <algorithm>  // min
@@ -115,6 +114,7 @@ See doc/design.md
 #include "prefs.h"
 #include "audioio.h"
 #include "thru.h"
+
 
 static const int ZERO_PAD_COUNT = 4410;  // how many zeros to write when closing
 
@@ -143,6 +143,13 @@ int64_t aud_frames_done = 0;
 int64_t aud_blocks_done = 0;
 bool aud_heartbeat = true;
 O2sm_info *audio_bridge = NULL;
+
+// slew-rate limited master gain control:
+float aud_gain = 1.0;
+float aud_target_gain = 1.0;
+// max slew rate is full-scale 0 to 1 in 20 msec at 48kHz.
+// (It will change with sample rate, but exact value does not matter.)
+const float aud_max_gain_incr = 1.0 / (0.02 * 48000);
 
 static bool arco_thread_exited = false;  // stop processing after o2sm_finish()
 static int actual_in_chans = -1;     // number of channels in callback
@@ -571,7 +578,7 @@ static int callback_entry(float *input, float *output,
         printf("WARNING (Arco audio callback): prev_output is NULL\n");
     } else if (prev_output->chans > 0) {
         // Compute the output to be copied to prev_output, then copy,
-        // then interleave and mix do<wn to actual output.
+        // then interleave and mix down to actual output.
         // Use the actual output as a buffer for the first step if it
         // is big enough; otherwise, allocate a buffer on the stack:
         Sample_ptr buffer = NULL;
@@ -615,9 +622,33 @@ static int callback_entry(float *input, float *output,
             memset(buffer, 0, aud_out_chans * BLOCK_BYTES);
         }
 
-        // copy computed output to prev_output
+        // move computed output to prev_output, multiplying by gain
+        // not sure if it's faster to recompute gain in order to copy
+        // consecutive samples...
         outptr = &prev_output->output[0];
+
+        float aud_gain_incr = (aud_target_gain - aud_gain) * BL_RECIP;
+        // now limit the rate:
+        if (aud_gain_incr > aud_max_gain_incr) {
+            aud_gain_incr = aud_max_gain_incr;
+        } else if (aud_gain_incr < -aud_max_gain_incr) {
+            aud_gain_incr = -aud_max_gain_incr;
+        }
+        Sample_ptr outp = outptr;
+        Sample_ptr bufp = buffer;
+        for (int i = 0; i < BL; i++) {
+            for (int chan = 0; chan < aud_out_chans; chan++) {
+                outp[chan * BL] = bufp[chan * BL] * aud_gain;
+            }
+            aud_gain += aud_gain_incr;
+            outp++;
+            bufp++;
+        }
+
+        /*
+        // previous code, sans gain control
         memcpy(outptr, buffer, aud_out_chans * BLOCK_BYTES);
+         */
 
         // interleave the computed output back to buffer
         transpose(buffer, outptr, aud_out_chans, BL);
@@ -1165,6 +1196,20 @@ void arco_thread_poll()
 }
 
 
+/* O2SM INTERFACE: /arco/gain float gain; -- set the master gain */
+void arco_gain(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    float gain = argv[0]->f;
+    // end unpack message
+
+    if (aud_state == IDLE) {
+        aud_gain = gain;  // so we start audio stream with correct gain
+    }
+    aud_target_gain = gain;
+}
+
+
 // to be called from the main thread - creates audio shared memory thread,
 // except the "thread" is provided by both a polling function called from
 // the main thread and PortAudio callbacks (when PortAudio is actually
@@ -1202,6 +1247,7 @@ void audioio_initialize()
     o2sm_method_new("/arco/logaud", "iis", arco_logaud, NULL, true, true);
     o2sm_method_new("/arco/cpu", "", arco_cpu, NULL, true, true);
     o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
+    o2sm_method_new("/arco/gain", "f", arco_gain, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     Pa_Initialize();

@@ -91,18 +91,66 @@ a hidden unique Const object for the unit generator, so this follows
 the "property of a single ugen" model. But you can also create a
 `Const` object and share it among multiple unit generators.
 
+If a unit generator name ends with a star (`*`), it has two forms:
+output at audio rate and output at block rate. The unit generator is
+described in its audio rate form, but by appending `b`, you get the
+block rate form. E.g. `/arco/mult/new` creates an audio-rate unit
+generator and `/arco/multb/new` creates a block-rate unit generator.
+There are some restrictions on types, but in general, the only
+restriction is that you cannot set an input to a block-rate unit
+generator to an audio-rate signal. Unless otherwise noted, inputs
+to an audio-rate unit generator can be any mix of audio-rate,
+block-rate, and "constant-rate" (class Const) signals.
+
 ## Unit Generators and Messages
 
-### mult
-`/arco/mult/new id chans x1 x2` - Create a new multiplier.
+### delay
+`/arco/delay/new id chans inp dur fb maxdur` - Create a new delay
+generator with audio input and output. `id` is the object id.
+`maxdur` is the maximum duration (this much space is allocated).
 
-`/arco/mult/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`.
+`/arco/delay/set_max id dur` - Reallocates delay memory for a maximum duration of `dur`.
 
-`/arco/mult/set_x1 id chan x1` - Set channel `chan` of input to float value `x1`.
+`/arco/delay/repl_dur id dur_id` - Set duration input to object with id `dur_id`.
 
-`/arco/mult/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
+`/arco/delay/set_dur id dur` - Set duration to a float value `dur`.
 
-`/arco/mult/set_x2 id chan x2` - Set channel `chan` of input to float value `x2`.
+`/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
+
+`/arco/delay/set_fb id fb` - Set feedback to float value `fb`.
+
+
+### playfile
+Used to stream audio files from disk, playfile uses a paired object
+running in another thread to prefetch audio data into buffers. If
+prefetching cannot keep up, output is filled with zeros until the
+next buffer is available. There is currently no notification when
+the first buffer is ready, but the playback does not start until
+a `/arco/playfile/play` message is sent. To detect when playback
+is finished, a message is sent to `/actl/act` with the action id
+provided earlier in `/arco/playfile/act`.
+
+`/arco/playfile/new chans filename start end cycle mix expand` - Create an
+audiofile player with `chans` output channels, reading from `filename`,
+starting at offset `start` (float in seconds), reading until offset
+`end` (float in seconds), repeating an endless loop if `cycle` (Boolean)
+is true, with audiofile channels mixed down to `chans` channels in
+round-robin fashion when the file has more than `chans` files (if
+`mix` (Boolean) is true) and omitting any channels above `chans` if
+`mix` is false, and expanding input channels round-robin fashion to
+`chans` output channels if the number of file channels is less than
+`chans` (if `expand` is true), and padding channels with zero if the
+file has fewer than `chans` channels. If `end` is zero, reading will
+end at the end of the file.
+
+`/arco/playfile/play id play_flag` - Starts or stops playback according
+to `playflag` (Boolean). Play will pause if necessary to wait for a
+block of samples to be read from the file.
+
+`/arco/playfile/act id action_id` - Registers a request to send a
+message to `/actl/act` with `action_id` (an integer greater than 0)
+when file playback completes (or reaches `end`).
+
 
 ### mix
 `/arco/mix/new id chans` - Create a new mixer with `chans` output channels.
@@ -118,18 +166,17 @@ object with id `gain_id`.
 float value `gain`.
 
 
-### sine
-`/arco/sine/new id chans freq amp` - Create a new sine oscillator.
+### mult*
+`/arco/mult/new id chans x1 x2` - Create a new multiplier.
 
-`/arco/sine/repl_freq id freq_id' - Set frequency to object with id `freq_id`.
+`/arco/mult/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`.
 
-`/arco/sine/set_freq id chan freq` - Set frequency of channel `chan` to 
-float value `freq`.
+`/arco/mult/set_x1 id chan x1` - Set channel `chan` of input to float value `x1`.
 
-`/arco/sine/repl_amp id amp_id' - Set amplitude to object with id `freq_id`.
+`/arco/mult/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
 
-`/arco/sine/set_amp id chan amp` - Set amplitude of channel `chan` to 
-float value `amp`.
+`/arco/mult/set_x2 id chan x2` - Set channel `chan` of input to float value `x2`.
+
 
 ### pwl
 `/arco/pwl/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
@@ -139,19 +186,6 @@ float value `amp`.
 `/arco/pwl/start id` - starts object with id.
 
 `/arco/pwl/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
-
-### delay
-`/arco/delay/new id chans inp dur fb maxdur` - Create a new delay generator with audio input and output. `id` is the object id. `maxdur` is the maximum duration (this much space is allocated).
-
-`/arco/delay/set_max id dur` - Reallocates delay memory for a maximum duration of `dur`.
-
-`/arco/delay/repl_dur id dur_id` - Set duration input to object with id `dur_id`.
-
-`/arco/delay/set_dur id dur` - Set duration to a float value `dur`.
-
-`/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
-
-`/arco/delay/set_fb id fb` - Set feedback to float value `fb`.
 
 
 ### reson
@@ -166,3 +200,58 @@ float value `amp`.
 
 `/arco/reson/set_bandwidth id chan bandwidth_id` - Set bandwidth of channel
 `chan` to float value `bandwidth_id`.
+
+
+### sine
+`/arco/sine/new id chans freq amp` - Create a new sine oscillator.
+
+`/arco/sine/repl_freq id freq_id' - Set frequency to object with id `freq_id`.
+
+`/arco/sine/set_freq id chan freq` - Set frequency of channel `chan` to 
+float value `freq`.
+
+`/arco/sine/repl_amp id amp_id' - Set amplitude to object with id `freq_id`.
+
+`/arco/sine/set_amp id chan amp` - Set amplitude of channel `chan` to 
+float value `amp`.
+
+
+### thru
+Thru objects are used for audio input (the audio input is written
+directly into the thru object's outputs and `inp_id` is ignored) and to
+make the audio output available with a one-block delay (after computing the
+output, it is written to the thru object's outputs and `inp_id` is ignored.)
+These special thru objects have index `INPUT_ID` (= 2) and
+`PREV_OUTPUT_ID` (= 3).
+
+`/arco/thru/new id chans inp_id` - Create a pass-through object with input
+`inp_id`. Audio is copied from `inp_id` to the output without modification
+except that 1-channel inputs are expanded to `chans`.
+
+`/arco/thru/alt id alt_id` - When a unit generator requests output from
+this thru object (`id`), it will be redirected to the output of `alt_id`.
+The object there must have a compatible number of channels (either equal,
+or `alt_id` is single channel.)
+To remove the alternate and resume taking input from the thru object's
+input, pass ZERO_ID as `alt_id`. To make the thru's output zero, e.g., to
+mute the output of `INPUT_ID`, create a new `zero` object and pass it as
+`alt_id`.
+
+
+### vu
+`/arco/vu/new id reply_addr period` - Create a vu object, which measures the peak
+values of input channels over every `period` (float, in seconds) and sends the
+values as floats to `reply_addr` (string representing a complete O2 address).
+No messages are sent until input is set with `repl_inp`:
+
+`/arco/vu/repl_inp id inp_id` - Set the input to be analyzed to `inp_id`. If
+`inp_id` names a unit generator of class Zero, analysis is stopped; otherwise,
+processing will start or resume, sending a peak every period.
+
+`/arco/vu/start id reply_addr period` - Change the `reply_addr` and `period`
+of this vu object.
+
+
+### zero*
+`/arco/zero/new id` - Create a signal consisting of all-zeros.
+

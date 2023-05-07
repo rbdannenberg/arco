@@ -1,25 +1,25 @@
-# strplay.srp -- stream audio from file
+# fileplay.srp -- stream audio from file
 #
 # Roger B. Dannenberg
 # May 2023
 
-def strplay(filename, optional chans = 2, start = 0, end = 0, 
+def fileplay(filename, optional chans = 2, start = 0, end = 0, 
             cycle, mix, expand)
-    Strplay(chans, filename, start, end, cycle, mix, expand)
+    Fileplay(chans, filename, start, end, cycle, mix, expand)
 
 
 
-class Strplay (Ugen):
+class Fileplay (Ugen):
     var action_id
 
     def init(chans, filename, start, end, cycle, mix, expand):
         // -chans cuts off standard creation:
-        super.init(create_ugen_id(), "Strplay", chans, 'a', "sffBBB",
+        super.init(create_ugen_id(), "Fileplay", chans, 'a', "sffBBB",
                    'filename', filename, 'start', start,'end', end,
                    'cycle', cycle, 'mix', mix, 'expand', expand)
 
     def go(optional play_flag = true):
-        o2_send_cmd("/arco/strplay/play", 0, "UB", id, play_flag)
+        o2_send_cmd("/arco/fileplay/play", 0, "UB", id, play_flag)
     
     def stop():
         go(false)

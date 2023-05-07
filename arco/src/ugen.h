@@ -4,10 +4,11 @@
  * Dec 2021
  */
 
-// conversion factor: int16 to float:
-#define INT16_TO_FLOAT_SAMPLE 3.05176e-05F
+#define INT16_TO_FLOAT(x) ((x) * 3.0518509476e-5)
+// This maps to range -32767 to 32767:
+#define FLOAT_TO_INT16(x) ((int) ((32767 * (x) + 32768.5)) - 32768)
 
-// flags for Unit generators to cooperate with audioio
+// flags for Unit generators to cooperate with audioio, etc.
 const int IN_OUTPUT_SET = 1;
 const int IN_RUN_SET = 2;
 const int UGEN_MARK = 4;  // used for graph traversal
@@ -76,7 +77,9 @@ class Ugen : public O2obj {
         flags = 0;
         rate = ab;
         chans = nchans;
-        output.init(nchans * (rate == 'a' ? BL : 1));
+        if (rate) {  // if no outut, pass 0 for rate
+            output.init(nchans * (rate == 'a' ? BL : 1));
+        }
         current_block = 0;
     }
 
@@ -111,11 +114,11 @@ class Ugen : public O2obj {
     Sample_ptr outblock(int ch) { return &output[ch * BL]; }
     
     void ref() { refcount++; }
-    void unref();
+    virtual void unref();
     
     virtual void real_run() = 0;
 
-    Sample_ptr run(int64_t block_count) {
+    virtual Sample_ptr run(int64_t block_count) {
         if (block_count > current_block) {
             out_samps = &output[0];
             current_block = block_count;
@@ -126,9 +129,10 @@ class Ugen : public O2obj {
 
     void set_current_block(int64_t n) { current_block = n; }
 
-    void send_action_id(int &action_id) {
+    void send_action_id(int &action_id, int status = 0) {
         o2sm_send_start();
         o2sm_add_int32(action_id);
+        o2sm_add_int32(status);
         strcpy(control_service_addr + control_service_addr_len, "act");
         o2sm_send_finish(0.0, control_service_addr, true);
         action_id = 0;  // one-shot

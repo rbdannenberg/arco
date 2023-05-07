@@ -1,7 +1,9 @@
+vu
 pwl*
 mix
 sine*
 mult*
 reson*
-strplay
+fileplay
+filerec
 recplay
