@@ -1,0 +1,28 @@
+# probe.srp -- stream audio from file
+#
+# Roger B. Dannenberg
+# May 2023
+
+def probe(inp, reply_addr)
+    Probe(inp, reply_addr)
+
+
+
+class Probe (Ugen):
+    var action_id
+
+    def init(inp, reply_addr):
+        super.init(create_ugen_id(), "Probe", 0, '', "Us",
+                   'inp', inp, 'reply_addr', reply_addr)
+
+    def probe(period, frames, chan, nchans, stride, repeats):
+        o2_send_cmd("/arco/probe/probe", 0, "Ufiiiii", id, period,
+                    frames, chan, nchans, stride, repeats)
+    
+    def thresh(threshold, direction, max_wait):
+        o2_send_cmd("/arco/probe/thresh", 0, "Ufif", id,
+                    threshold, direction, max_wait)
+        
+    def stop():
+        o2_send_cmd("/arco/probe/stop", 0, "U", id)
+        

@@ -1,0 +1,108 @@
+require "scope"
+require "iprobe_rpc"
+
+class Aura_scope (Auraobj):
+    var data
+    var running
+    var skip
+    var blocksize
+    var points_per_sweep
+    var probe
+    var sample_rate
+    var threshold
+    var direction
+    var setting_threshold
+    var period // set this to change scope sweep rate (default is 0.25 s)
+    var y_up
+    var y_dn
+    var scope
+    var pending_sweep // pending_sweep tells us we are accumulating data
+                      // and planning to display and recall sweep()
+                      // If pending_sweep and we get start(), do not call
+                      // sweep; let set_vector do it
+
+    def init2(window, label, x, y, w, h, probe_)
+        skip = 1
+        blocksize = 64
+        points_per_sweep = 64
+        period = 0.25
+        threshold = 0.0
+        direction = 0
+        probe = probe_
+        sample_rate = 44100.0
+        scope = Scope(window, label, x, y, w, h, sample_rate)
+        scope.target = this // handle mouse and zoom events here
+        scope.set_channels(1)
+
+    def set_size(w, h):
+        scope.set_size(w, h)
+
+    def set_position(w, h):
+        scope.set_position(w, h)
+
+    def set_sample_rate(r)
+        sample_rate = r
+        scope.set_sample_rate(r / skip)
+
+    def start()
+        running = true
+        if not pending_sweep:
+            sweep()
+
+    def stop()
+        running = nil
+
+    def set_vector(v)
+        if not data:
+            data = v
+        else:
+            data = data + v
+
+        if len(data) >= points_per_sweep:
+            scope.set_values(0, data)
+            pending_sweep = false
+            sweep()
+
+    def sweep()
+        data = nil
+        if running:
+            points_per_sweep = scope.screen.t_max
+            msgs = int((points_per_sweep + blocksize - 1) / blocksize)
+            pending_sweep = true
+            probe <- probe(blocksize, skip, msgs, max(2.0, 2.0 * period),
+                           aura) @ after(period)
+
+    def zoom_in_x():
+        if skip > 1:
+            skip = idiv(skip, 2)
+            scope.set_sample_rate(sample_rate / skip)
+
+
+    def zoom_out_x():
+        skip = skip + skip
+        scope.set_sample_rate(sample_rate / skip)
+
+    def mouse_event(event, x, y):
+        if event == WXS_LEFT_DOWN:
+            threshold = y
+            direction = 0
+            setting_threshold = true
+            // direction is set when you move 3 pixels up or down
+            y_up = scope.screen.unmap_y(scope.screen.map_y(y) - 3)
+            y_dn = scope.screen.unmap_y(scope.screen.map_y(y) + 3)
+
+        // 
+        if setting_threshold and (event == WXS_LEFT_UP or event == WXS_MOVE):
+            // here we wait for the mouse to move to indicate direction
+            // or for a left up, indicating direction == 0
+            if y > y_up:
+                direction = 1
+            if y < y_dn:
+                direction = -1
+               
+            if direction != 0 or event == WXS_LEFT_UP:
+                probe <- set_threshold_dir(threshold, direction)
+                scope.set_threshold(threshold, direction)
+                setting_threshold = false
+
+

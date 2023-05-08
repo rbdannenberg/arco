@@ -1,4 +1,5 @@
 vu
+probe
 pwl*
 mix
 sine*
