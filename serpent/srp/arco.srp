@@ -223,9 +223,15 @@ IS_WXSERPENT = symbol_value('WXS_DEFAULT_WINDOW') == 0  // is this wxserpent?
 audio_devices = []
 
 if IS_WXSERPENT:
+    display "####### arco.srp GETTING File MENU FROM", default_window
     audio_devices_menu = default_window.get_menu("File")
     require "audiodev"
 
+arco_open_msg = ""
+if get_os() == 'linux':
+   arco_open_msg = " If Arco crashes (on Linux) after opening audio, " +
+                   "try increasing latency to 100 msec or opening other " +
+                   "device(s)."
 
 def actl_devinf(timestamp, address, types, info):
     if info == "":
@@ -233,7 +239,16 @@ def actl_devinf(timestamp, address, types, info):
         if arco_state == 'devinf':
             // auto-open in discovery->initializing->devinf->opening->running
             //     sequence:
-            auto_open_audio()
+            if prefs.get('audio_open_success') or
+                wxs_message_box("Automatically open audio using preferences?" +
+                    arco_open_msg, "Start Audio Now",
+                    WXS_STYLE_YES_NO | WXS_STYLE_QUESTION, 0) == WXS_MSG_YES:
+                // Apparently, if you jump right into opening audio, someone
+                // accesses the File menu before it is even created. So delay
+                // auto_open_audio() to allow window creation first:
+                print "************** WRONG!!! FIX ME!! *******************"
+                sched_select(rtsched)
+                sched_cause(0.05, nil, 'auto_open_audio')
             return
         // else user just asked to rescan devices (state is 'devinf2'):
         set_arco_state('stopped')
@@ -283,6 +298,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
             color = [160, 210, 210]
         default_window.set_rgb(color[0], color[1], color[2])
         default_window.method = 'arco_main_win_handler'
+        display "####### arco_init GETTING File MENU FROM", default_window
         var file_menu = default_window.get_menu("File")
         file_menu.item("Quit", "quit the application", nil, nil, 'arco_quit')
         
@@ -322,6 +338,7 @@ def arco_run():
 # are set by passing optional values to arco_init().
 #
 def arco_open(indev, outdev, inchan, outchan, latency, buffersize):
+    prefs.set('audio_open_success', nil, true)  // audio crash detect
     if not zero_ugen:
         create_standard_ugens()
     o2_send_cmd("/arco/open", 0, "iiiiiis", indev, outdev,
@@ -400,6 +417,7 @@ def actl_reset(rest ignore):
     // else arco_state is 'initializing' and we are starting up
     print "**** arco was reset, starting initialization ****"
     arco_ugen_reset()  // new epoch of ugen_id's; all existing are invalidated
+    create_standard_ugens()  // restore basic ugens
     audio_devices.clear()
     o2_send_cmd("/arco/devinf", 0, "s", "/actl/devinf")
 
@@ -434,8 +452,10 @@ def actl_starting(timestamp, address, types, rest args):
     print "Audio stream is starting: in", args[0], "("; args[2], "chan),",
     print "out", args[1], "("; args[3], "chan),", "latency", args[4], 
     print "ms, block size", args[5]
+    display "actl_starting", arco_state
     if not set_arco_state('running'):
         return
+    prefs.set('audio_open_success', true, true)  // audio did not crash
     arco_ready()
     sched_select(rtsched)
     poll_for_status_id = poll_for_status_id + 1

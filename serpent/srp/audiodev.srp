@@ -117,17 +117,19 @@ def create_device_selections():
     // audio devices are listed in audio_devices as strings
     audio_devices_map = {"None": -2, "Default": -1}
     var input_items = find_devices(audio_devices, 'in')
-    var rbheight = 40 + len(input_items) * 20
+    var rbheight = 35 + len(input_items) * 25
     Radiobox(config_win, "Audio Input", input_items, 
              10, device_selections_y, 400, rbheight, 'audio_input_rb')
     var bottom = wxs_y + wxs_h
+    display "after input", bottom
     select_preference(audio_input_rb, input_items, 'audio_in_dev')
 
     var output_items = find_devices(audio_devices, 'out')
-    rbheight = 40 + len(output_items) * 20
+    rbheight = 35 + len(output_items) * 25
     Radiobox(config_win, "Audio Output", output_items, 
              'R', 'S', 'S', rbheight, 'audio_output_rb')
     bottom = max(bottom, wxs_y + wxs_h) + 10
+    display "after output", bottom
     select_preference(audio_output_rb, output_items, 'audio_out_dev')
 
 
@@ -159,7 +161,7 @@ class Configure_audio:
         config_win.set_rgb(200, 230, 200)
         config_win.add_target_method(this, 'win_handler')
 
-        Button(config_win, "Open Audio", 10, 10, 100, 'H', 
+        Button(config_win, "Open Audio", 10, 10, 120, 'H', 
                'open_audio_button')
         open_audio_button.add_target_method(this, 'open_audio_handler')
 
@@ -185,6 +187,7 @@ class Configure_audio:
         wxs_compute_coordinates('S', 'D', 'S', 'S')  // compute Y below maxugens
         device_selections_y = wxs_y  // save coordinate for future layout
         create_device_selections()
+        config_win.fit_to_children()
 
 
     def win_handler(obj, event, x, y):
@@ -300,16 +303,16 @@ class Monitor_audio:
         mon_win.set_rgb(200, 200, 230)
         mon_win.add_target_method(this, 'win_handler')
 
-        var in_out_y = 40
+        var in_out_y = 45
 
         ## Audio Input Controls
         if arco_input_chans > 0:
-            Statictext(mon_win, "In", left, in_out_y, 40, 20)
-            inclip_light = Clip_light(mon_win, left + 15, in_out_y + 3,
+            Statictext(mon_win, "In", left, in_out_y + 1, 40, 20)
+            inclip_light = Clip_light(mon_win, left + 15, in_out_y + 5,
                                       'inclip_light')
             var right_of_light = wxs_x + wxs_w + 15  // some extra space
             input_vu_meter = Vumeter(mon_win, arco_input_chans, 
-                                     left + 5, in_out_y + 23, 'input_vu_meter')
+                                     left + 5, in_out_y + 26, 'input_vu_meter')
             audioin_monitor = Audio_monitor(inclip_light, input_vu_meter)
             input_vu = vu("/actl/inpks", 0.05)
             input_vu.set('inp', input_ugen)
@@ -332,7 +335,7 @@ class Monitor_audio:
             audioin_lb.add_target_method(this, 'audioin_select')
 
             # monitor input button
-            Checkbox(mon_win, "Mon", right_of_light, in_out_y, 50, 15,
+            Checkbox(mon_win, "Mon", right_of_light, in_out_y, 60, 20,
                      'mon_input_bn')
             mon_input_bn.add_target_method(this, 'mon_input')
 
@@ -352,13 +355,13 @@ class Monitor_audio:
                      'mute_audio_bn')
             mute_audio_bn.add_target_method(this, 'mute_audio')
 
-            left = left + 173
-            Statictext(mon_win, "Out", left, 'D', 40, 20)
-            Clip_light(mon_win, left + 27, in_out_y + 3, 'outclip_light')
+            left = left + 185
+            Statictext(mon_win, "Out", left, in_out_y + 1, 40, 20)
+            Clip_light(mon_win, left + 27, in_out_y + 5, 'outclip_light')
             right_of_light = wxs_x + wxs_w + 15  // some extra space
 
             ## test tone button:
-            Checkbox(mon_win, "Tone", right_of_light, in_out_y, 55, 15, 
+            Checkbox(mon_win, "Tone", right_of_light, in_out_y, 60, 20, 
                      'test_tone_cb')
             test_tone_cb.add_target_method(this, 'test_tone')
             test_tone_osc = nil
@@ -368,7 +371,7 @@ class Monitor_audio:
             audio_logout_cb.add_target_method(this, 'audio_logout')
 
             Vumeter(mon_win, arco_output_chans, 
-                    left, in_out_y + 23, 'output_vu_meter')
+                    left, in_out_y + 26, 'output_vu_meter')
             audioout_monitor = Audio_monitor(outclip_light, output_vu_meter)
             output_vu = vu("/actl/outpks", 0.05)
             output_vu.set('inp', prev_output_ugen)
@@ -675,10 +678,10 @@ class Monitor_audio:
 #        // set audio gain to match initial slider value
 #        audioeng_aura <- set_gain(audiomaster_gain)
 #        // aura_send_to(audioeng_aura, "set_gain", ["d", -12.0])
-#        Statictext(w, "Out", x + 95, y + 20, 40, 20)
+#        Statictext(w, "Out", x + 95, y + 23, 40, 20)
 #        //display "creating Clip_light", w, x, y
 #        //print "created Clip_light"
-#        outclip_light = Clip_light(w, x + 122, y + 25)
+#        outclip_light = Clip_light(w, x + 122, y + 28)
 #        output_vu = Vumeter(w, aura_get_audio_output_channels(), x + 125, y + 39)
 #        //print "created vumeter"
 #        audioout_monitor = Audio_monitor(outclip_light, output_vu, "output")
@@ -692,8 +695,8 @@ class Monitor_audio:
 #
 #
 #    if aura_get_audio_input_channels() > 0:
-#        Statictext(w, "In", x, y + 20, 40, 20)
-#        inclip_light = Clip_light(w, x + 15, y + 25)
+#        Statictext(w, "In", x, y + 23, 40, 20)
+#        inclip_light = Clip_light(w, x + 15, y + 28)
 #        input_vu = Vumeter(w, aura_get_audio_input_channels(), x + 5, y + 39)
 #        audioin_monitor = Audio_monitor(inclip_light, input_vu, "input")
 #        ivu_in_aura = ivu_create(audioin_aura, audio_space_zone)
