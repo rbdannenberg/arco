@@ -1,0 +1,10 @@
+vu
+probe
+pwl*
+mix
+sine*
+mult*
+reson*
+fileplay
+filerec
+recplay

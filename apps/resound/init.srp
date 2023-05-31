@@ -1,0 +1,195 @@
+# arco.srp -- Serpent library for controlling Arco
+#
+# Roger B. Dannenberg
+# May 22 2023
+
+# call arco_init(ensemble) to start
+# call arco_run() after setting up UI and or scheduling things
+# arco_ready is set to true when arco is ready for action
+
+require "debug"
+require "wxserpent"
+require "prob"
+require "arco"
+require "allugens"
+
+
+# Definition of Global Variables
+default_window.set_size(350, 300) // set size of default window
+ui_initialized = false # boolean that denotes if ui has been initialized
+
+class Movement1:
+# Instance Variables
+    var recplay1, recplay2, recplay3
+    var win, lag
+
+    def init(window):
+    # Initialization of instance variables
+        // Recplay checkboxes
+        recplay1 = nil
+        recplay2 = nil
+        recplay3 = nil
+
+        win = window // Main UI window
+        lag = nil // latency
+
+    def set_ui():
+    # Setting up Movement1's UI
+        Statictext(win, "I. Four of a Kind", 5, 5, 
+                    150, 'H', 'title') // The title of the movement
+
+        // Setting up rec1's checkbox and target
+        Checkbox(win, "rec1", 5, 25, 'S', 'S', 'r1check') 
+        r1check.add_target_method(this, 'rec1handler')
+
+        // Setting up rec2's checkbox and target
+        Checkbox(win, "rec2", 5, 'D', 'S', 'S', 'r2check')
+        r2check.add_target_method(this, 'rec2handler')
+
+        // Setting up rec3's checkbox and target
+        Checkbox(win, "rec3", 5, 'D', 'S', 'S', 'r3check')
+        r3check.add_target_method(this, 'rec3handler')
+
+        // Setting up the all checkbox and target
+        Checkbox(win, "all", 5, 'D', 'S', 'S', 'allcheck')
+        allcheck.add_target_method(this, 'rec4handler')
+
+        // Setting up the Latency text and slider
+        Statictext(win, "Latency", 150, 170, 150, 'H', 'text_latency')
+        Slider(win.id, 0, 100, 50, 0, 190, 350, 'S', t, 'latency_slider')
+
+        // Set lag value
+        lag = symbol_value(latency_slider).value() // latency value
+        lag = lag/1000 // set lag to milliseconds
+
+    def rec1handler(obj, event, x, y):
+    # Handler for rec1 checkbox
+        display "rec1handler", x
+        if x:
+            if not recplay1: // long fade time to test this feature
+                recplay1 = recplay(input_ugen, 2, 1.0, 3.0, false)
+            recplay1.run() # needs be in run set to make active
+            recplay1.record(true)
+        elif not recplay1:
+            print "WARNING: There is no recplay1 Ugen!"
+        else:
+            recplay1.record(false)
+            recplay1.unrun() # does not need to be active now
+
+
+    def rec2handler(obj, event, x, y):
+    # Handler for rec2 checkbox
+        display "rec2handler", x
+
+        if x and recplay1:
+            if not recplay2: // long fade time to test this feature
+                recplay2 = recplay(input_ugen, 2, 1.0, 3.0, false)
+            recplay2.run() # needs be in run set to make active
+            recplay2.record(true)
+
+            # Play recplay1
+            recplay1.play().atend(MUTE)
+            recplay1.start(lag)
+        elif not recplay1:
+            print "WARNING: There is no recplay1 Ugen!"
+        else:
+            recplay2.record(false)
+            recplay2.unrun() # does not need to be active now
+            recplay1.stop() // atend is already set up to mute when finished
+
+
+    def rec3handler(obj, event, x, y):
+    # Handler for rec3 checkbox
+        display "rec3handler", x
+
+        if x:
+            if not recplay3: // long fade time to test this feature
+                recplay3 = recplay(input_ugen, 2, 1.0, 3.0, false)
+            recplay3.run() # needs be in run set to make active
+            recplay3.record(true)
+
+            # Play recplay1 and recplay2
+            if recplay1 and recplay2:
+                recplay1.play().atend(MUTE)
+                recplay1.start(lag)
+                recplay2.play().atend(MUTE)
+                recplay2.start(lag)
+            else:
+                print "WARNING: There is no recplay1 Ugen!"
+        elif not recplay3:
+            print "WARNING: There is no recplay1 Ugen!"
+        else:
+            recplay3.record(false)
+            recplay3.unrun() # does not need to be active now
+            recplay1.stop() // atend is already set up to mute when finished
+            recplay2.stop()
+
+
+    def rec4handler(obj, event, x, y):
+    # Handler for all checkbox
+        display "rec4handler", x
+
+        if x and recplay1 and recplay2 and recplay3:
+            recplay1.play().atend(MUTE)
+            recplay1.start(lag)
+            recplay2.play().atend(MUTE)
+            recplay2.start(lag)
+            recplay3.play().atend(MUTE)
+            recplay3.start(lag)
+        elif (not x) and recplay1 and recplay2 and recplay3:
+            recplay1.stop()
+            recplay2.stop()
+            recplay3.stop()
+
+
+def arco_ready():
+    # called when arco is initialized and ready to make sound or when
+    # arco audio stream has been reopened
+
+    print "**** arco audio is running! ****"
+    var win = default_window
+    if ui_initialized:
+        return
+
+    # Create Movement1
+    var movement1 = Movement1(win)
+
+    # Setup UI
+    movement1.set_ui()
+    ui_initialized = true
+  
+
+
+########## Main Initialization ################
+
+def arco_prugens_handler(rest ignore):
+    // this tells Arco to print the Ugen tree -- it can be useful for
+    //     debugging.
+    o2_send_cmd("/arco/prtree", 0, "")
+    // also print the list of Ugens accessible by integer ID:
+    o2_send_cmd("/arco/prugens", 0, "")
+
+
+def arco_ugen_gc_info_handler(rest ignore):
+    arco_ugen_gc_info()
+
+
+def main():
+    o2_debug_flags("") // ("SsBl")
+    arco_init(latency = 60, network = false, title = "Resound Test")
+    // this should be replaced by a preference and menu system to select
+    // and open audio device(s):
+    arco_run()
+    sched_select(rtsched)
+    display "####### main.srp GETTING File MENU FROM", default_window
+    var file_menu = default_window.get_menu("File")
+    file_menu.item("Print Ugen Info", "print Ugen tree and table",
+                   nil, nil, 'arco_prugens_handler')
+    file_menu.item("Arco Ugen GC Info", "print info about Ugen IDs",
+                   nil, nil, 'arco_ugen_gc_info_handler')
+
+
+main()
+
+    
+

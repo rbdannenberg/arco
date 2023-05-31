@@ -21,7 +21,7 @@ class Aura_scope (Auraobj):
                       // If pending_sweep and we get start(), do not call
                       // sweep; let set_vector do it
 
-    def init2(window, label, x, y, w, h, probe_)
+    def init(window, label, x, y, w, h, probe_)
         skip = 1
         blocksize = 64
         points_per_sweep = 64
