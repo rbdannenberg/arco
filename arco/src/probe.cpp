@@ -3,6 +3,7 @@
 // Roger B. Dannenberg
 // May 2023
 
+#include "o2.h"
 #include "arcougen.h"
 #include "o2atomic.h"
 #include "sharedmem.h"
@@ -15,7 +16,7 @@ const char *Probe_name = "Probe";
 
 void Probe::real_run()
 {
-    if (state == PROBE_IDLE) return;
+    if (state == PROBE_IDLE || inp == NULL) return;
     int inp_len = (inp->rate == 'a' ? BL : 1);
 
     inp_samps = inp->run(current_block);  // update input
@@ -68,16 +69,30 @@ void Probe::real_run()
     }
  collect:
     while (next < BL) {
+        // copy the next frame from inp_samps. Since we claimed we have one
+        // channel, inp_stride will be zero and not helpful, so we need to
+        // use inp_len, a local variable computed above.
         for (int c = channel_offset; c < channel_offset + channels; c++) {
-            *sample_ptr++ = inp_samps[next + inp_stride * c];
+            *sample_ptr++ = inp_samps[next + inp_len * c];
         }
-        next += stride;        
-        if (sample_ptr >= sample_fence) {
+        frames_sent++;
+        next += stride;
+        if (sample_ptr >= sample_fence || frames_sent >= frames) {
+            // we added the last frame for this message
+            while (sample_ptr < sample_fence) {
+                *sample_ptr++ = 0; // zero fill if there is room left over
+            }
+            msg->data.length = (int32_t) (((char *) sample_fence) -
+                                          ((char *) &(msg->data.misc)));
             o2sm_message_send(msg);
             msg = NULL;
             // are we done yet, or do we need more messages?
-            if (--repeats > 0 || period == 0) {
-                // keep looping
+            if (frames_sent < frames || period == 0) {
+                // keep accumulating samples, but we need a new msg
+                prepare_msg();
+                if (frames_sent >= frames) {
+                    frames_sent = 0;
+                }
             } else if (period > 0) {
                 state = PROBE_DELAYING;
                 wait_count = (int) ((prev_start_block + delay_in_blocks) -
@@ -94,19 +109,10 @@ void Probe::real_run()
     return;
  start_collect:
     state = PROBE_COLLECTING;
-    ready_new_message();
+    frames_sent = 0;
+    prepare_msg();
     prev_start_block = current_block;
     goto collect;
-}
-
-
-void Probe::ready_new_message()
-{
-    assert(!msg);
-    msg = (O2message_ptr) O2_MALLOC(msg_len);
-    memcpy(msg, msg_header, msg_header_len);
-    sample_ptr = (Sample_ptr) (((char *) msg) + msg_header_len);
-    sample_fence = sample_ptr + frames * channels;
 }
 
 
@@ -115,15 +121,15 @@ void Probe::ready_new_message()
  */
 void arco_probe_new(O2SM_HANDLER_ARGS)
 {
+    o2_msg_data_print(msg); putchar('\n');
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t chans = argv[1]->i;
-    int32_t inp_id = argv[2]->i;
-    char *reply_addr = argv[3]->s;
+    int32_t inp_id = argv[1]->i;
+    char *reply_addr = argv[2]->s;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_filerec_new");
-    new Probe(id, chans, inp, reply_addr);
+    ANY_UGEN_FROM_ID(inp, inp_id, "arco_probe_new");
+    new Probe(id, inp, reply_addr);
 }
 
 
@@ -133,8 +139,7 @@ void arco_probe_new(O2SM_HANDLER_ARGS)
        int32 frames,
        int32 chan,
        int32 nchans,
-       int32 stride,
-       int32 repeats;
+       int32 stride;
  */
 void arco_probe_probe(O2SM_HANDLER_ARGS)
 {
@@ -145,11 +150,10 @@ void arco_probe_probe(O2SM_HANDLER_ARGS)
     int32_t chan = argv[3]->i;
     int32_t nchans = argv[4]->i;
     int32_t stride = argv[5]->i;
-    int32_t repeats = argv[6]->i;
     // end unpack message
 
     UGEN_FROM_ID(Probe, probe, id, "arco_probe_probe");
-    probe->probe(period, frames, chan, nchans, stride, repeats);
+    probe->probe(period, frames, chan, nchans, stride);
 }
 
 
@@ -189,8 +193,8 @@ void arco_probe_stop(O2SM_HANDLER_ARGS)
 static void probe_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/probe/new", "iiis", arco_probe_new, NULL, true, true);
-    o2sm_method_new("/arco/probe/probe", "ifiiiii", arco_probe_probe, NULL, true, true);
+    o2sm_method_new("/arco/probe/new", "iis", arco_probe_new, NULL, true, true);
+    o2sm_method_new("/arco/probe/probe", "ifiiii", arco_probe_probe, NULL, true, true);
     o2sm_method_new("/arco/probe/thresh", "ifif", arco_probe_thresh, NULL, true, true);
     o2sm_method_new("/arco/probe/stop", "i", arco_probe_stop, NULL, true, true);
     // END INTERFACE INITIALIZATION

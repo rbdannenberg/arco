@@ -13,11 +13,13 @@ class Probe (Ugen):
 
     def init(inp, reply_addr):
         super.init(create_ugen_id(), "Probe", 0, '', "Us",
+                   omit_chans = t,
                    'inp', inp, 'reply_addr', reply_addr)
 
-    def probe(period, frames, chan, nchans, stride, repeats):
+    def probe(period, frames, chan, nchans, stride):
         o2_send_cmd("/arco/probe/probe", 0, "Ufiiiii", id, period,
-                    frames, chan, nchans, stride, repeats)
+                    frames, chan, nchans, stride)
+        run(true) // suppress warning if we're already in run setx
     
     def thresh(threshold, direction, max_wait):
         o2_send_cmd("/arco/probe/thresh", 0, "Ufif", id,
@@ -25,4 +27,5 @@ class Probe (Ugen):
         
     def stop():
         o2_send_cmd("/arco/probe/stop", 0, "U", id)
+        unrun(true) // suppress warning if we're not in run set
         

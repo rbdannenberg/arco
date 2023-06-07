@@ -10,6 +10,10 @@ require "arcoslider"
 require "vumeter"
 require "evlight"
 
+MONITOR_COLOR = Wxs_color(0xC6, 0xCF, 0xFF)
+require "arcoscope"
+
+
 fileinput_files = nil
 
 def arco_set_input_files(files):
@@ -27,6 +31,7 @@ def audiodev_init()
     monitor_audio = nil    // same for this window
     o2_method_new("/actl/inpks", nil, 'actl_inpks', false)
     o2_method_new("/actl/outpks", nil, 'actl_outpks', false)
+    o2_method_new("/actl/probe", nil, 'actl_probe', false)
 
 
 def actl_inpks(timestamp, address, types, rest peaks):
@@ -38,6 +43,9 @@ def actl_outpks(timestamp, address, types, rest peaks):
     if audioout_monitor:
         audioout_monitor.set_peaks(peaks)
 
+def actl_probe(timestamp, address, types, rest data):
+    if master_scope:
+        master_scope.probe_handler(data)
 
 
 # this is called when the application starts. If devices are selected, we can
@@ -300,7 +308,7 @@ class Monitor_audio:
     def init():
         var left = 5
         Window("Monitor Audio", 520, 400, 300, 30, 'mon_win')
-        mon_win.set_rgb(200, 200, 230)
+        mon_win.set_color(MONITOR_COLOR) // rgb(200, 200, 230)
         mon_win.add_target_method(this, 'win_handler')
 
         var in_out_y = 45
@@ -378,21 +386,20 @@ class Monitor_audio:
             output_vu.run()  // add to run_set to make it compute peaks
 
         ## probe and scope to monitor input
-        // master_probe = probe()
-        // var probe_what = input_ugen
-        // if arco_input_chans == 0:
-        //     probe_what = prev_output_ugen
-        //     print "** Note: no input, Oscilloscope shows nothing **"
-        // probe.set('inp', probe_what)
+        var probe_what = input_ugen
+        if arco_input_chans == 0:
+            probe_what = prev_output_ugen
+            print "** Note: no input, Oscilloscope shows nothing **"
+        master_probe = probe(probe_what, "/actl/probe")
 
-        var ms_x = 245
+        var ms_x = 425
         var ms_y = 5
         var ms_h = 200 
-        // master_scope = Arco_scope(mon_win, "scope", ms_x, ms_y, 212, ms_h, 
-        //                           master_probe)
-        // master_scope.start()
+        master_scope = Arco_scope(mon_win, "scope", ms_x, ms_y, 212, ms_h, 
+                                  master_probe)
+        master_scope.start()
 
-        Checkbox(mon_win, "Enbl", ms_x + 55, ms_y + ms_h + 5, 48, 15,
+        Checkbox(mon_win, "Enable Scope", ms_x, ms_y + ms_h + 5, 120, 15,
                  'enable_scope_bn')
         enable_scope_bn.set_value(t) // initially enabled
         enable_scope_bn.add_target_method(this, 'enable_scope')
@@ -424,12 +431,22 @@ class Monitor_audio:
         audio_login(nil, nil, false, nil);
         audio_logout(nil, nil, false, nil);
         monitor_audio = nil  // remove global reference to this object
+        master_scope = nil
 
 
     def win_handler(obj, event, x, y):
         if event == WXS_CLOSE_WINDOW:
             monitor_audio.delete()  // destroy this object and window
         wxs_event_not_handled()    // allow window to close
+
+
+    def enable_scope(obj, event, x, y):
+        display "enable_scope - NOT IMPLEMENTED FULLY", x, master_scope
+        if master_scope:
+            if x:
+                master_scope.start()
+            else:
+                master_scope.stop()
 
 
     def mon_input(obj, event, x, y):
@@ -759,7 +776,7 @@ class Monitor_audio:
 #    var ms_y = 5
 #    var ms_h = 200 
 #    master_scope = Aura_scope(w, "scope", ms_x, ms_y, 212, ms_h, master_probe)
-#    master_scope.start()
+#    master_sco.start()
 #
 #    enable_scope_button = Checkbox(w, "Enbl", ms_x + 55, ms_y + ms_h + 5, 
 #                                   48, 15)

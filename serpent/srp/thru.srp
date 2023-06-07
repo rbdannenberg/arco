@@ -5,7 +5,7 @@
 
 class Thru (Ugen):
 
-    def init(inp, optional chans, id_num):
+    def init(inp, optional chans = 1, id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
                    "Thru", chans, 'a', "U", 'inp', inp)
 

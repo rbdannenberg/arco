@@ -1,7 +1,16 @@
 require "scope"
-require "iprobe_rpc"
 
-class Aura_scope (Auraobj):
+// color scheme form colorhunt.co/palettes/pastel
+// 255, 225, 176 - tan
+// 236, 247, 255 - light blue
+// 194, 196, 255 - lavendar (similar to Monitor Audio background)
+// 156, 159, 173 - light gray (but darkest in this scheme)
+
+PANEL_COLOR = Wxs_color(174, 171, 145) // 0xa0, 0xc0, 0xa0) // 0xe8, 0xd3, 0xff)
+SCREEN_COLOR = Wxs_color(234, 243, 255) // 0xde, 0xec, 0xff)
+GRID_COLOR = MONITOR_COLOR
+
+class Arco_scope:
     var data
     var running
     var skip
@@ -26,33 +35,42 @@ class Aura_scope (Auraobj):
         blocksize = 64
         points_per_sweep = 64
         period = 0.25
+        sample_rate = AR
         threshold = 0.0
         direction = 0
         probe = probe_
-        sample_rate = 44100.0
-        scope = Scope(window, label, x, y, w, h, sample_rate)
+        scope = Scope(window, label, x, y, w, h, sample_rate,
+                      panel_color = PANEL_COLOR, screen_color = SCREEN_COLOR,
+                      screen_grid = GRID_COLOR)
         scope.target = this // handle mouse and zoom events here
         scope.set_channels(1)
+
 
     def set_size(w, h):
         scope.set_size(w, h)
 
+
     def set_position(w, h):
         scope.set_position(w, h)
+
 
     def set_sample_rate(r)
         sample_rate = r
         scope.set_sample_rate(r / skip)
+
 
     def start()
         running = true
         if not pending_sweep:
             sweep()
 
+
     def stop()
         running = nil
 
-    def set_vector(v)
+
+    def probe_handler(v)
+        v = subseq(v, 1)  // remove the probe's Ugen ID
         if not data:
             data = v
         else:
@@ -63,24 +81,40 @@ class Aura_scope (Auraobj):
             pending_sweep = false
             sweep()
 
+
     def sweep()
         data = nil
         if running:
             points_per_sweep = scope.screen.t_max
             msgs = int((points_per_sweep + blocksize - 1) / blocksize)
             pending_sweep = true
-            probe <- probe(blocksize, skip, msgs, max(2.0, 2.0 * period),
-                           aura) @ after(period)
+            // how many messages do we need to achieve points_per_sweep?
+            var repeats = idiv(points_per_sweep + 63, 64)  // round up
+            // try to run at 20fps. Sweep time is:
+            var sweep_time = points_per_sweep * skip / sample_rate
+            var delay = 0.05 - sweep_time
+            if delay > 0:
+                sched_select(rtsched)
+                sched_cause(delay, probe, 'probe', -1, points_per_sweep, 0, 1, skip)
+            else:
+                probe.probe(-1, points_per_sweep, 0, 1, skip)
+
 
     def zoom_in_x():
         if skip > 1:
             skip = idiv(skip, 2)
-            scope.set_sample_rate(sample_rate / skip)
+            scope.set_sample_rate(AR / skip)
 
 
     def zoom_out_x():
-        skip = skip + skip
-        scope.set_sample_rate(sample_rate / skip)
+    # increases downsampling by doubling skip to get a longer timescale on the
+    # scope. The upper limit for the sweep time is 160ms to avoid very low
+    # frame rates.
+        display "zoom_out_x", skip * points_per_sweep / sample_rate
+        if skip * points_per_sweep / sample_rate <= 0.080:
+            skip = skip + skip
+            scope.set_sample_rate(sample_rate / skip)
+
 
     def mouse_event(event, x, y):
         if event == WXS_LEFT_DOWN:
@@ -91,7 +125,6 @@ class Aura_scope (Auraobj):
             y_up = scope.screen.unmap_y(scope.screen.map_y(y) - 3)
             y_dn = scope.screen.unmap_y(scope.screen.map_y(y) + 3)
 
-        // 
         if setting_threshold and (event == WXS_LEFT_UP or event == WXS_MOVE):
             // here we wait for the mouse to move to indicate direction
             // or for a left up, indicating direction == 0
@@ -101,7 +134,8 @@ class Aura_scope (Auraobj):
                 direction = -1
                
             if direction != 0 or event == WXS_LEFT_UP:
-                probe <- set_threshold_dir(threshold, direction)
+                probe.thresh(threshold, direction, 0.02)
+                display "thresh", threshold, direction
                 scope.set_threshold(threshold, direction)
                 setting_threshold = false
 

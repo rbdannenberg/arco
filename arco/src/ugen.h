@@ -77,7 +77,7 @@ class Ugen : public O2obj {
         flags = 0;
         rate = ab;
         chans = nchans;
-        if (rate) {  // if no outut, pass 0 for rate
+        if (rate) {  // if no output, pass 0 for rate
             output.init(nchans * (rate == 'a' ? BL : 1));
         }
         current_block = 0;

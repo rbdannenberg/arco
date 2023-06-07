@@ -35,11 +35,13 @@ class Probe (Ugen):
 
     def init(inp, reply_addr):
         super.init(create_ugen_id(), "Probe", 0, '', "Us",
+                   omit_chans = t,
                    'inp', inp, 'reply_addr', reply_addr)
 
-    def probe(period, frames, chan, nchans, stride, repeats):
-        o2_send_cmd("/arco/probe/probe", 0, "Ufiiiii", id, period,
-                    frames, chan, nchans, stride, repeats)
+    def probe(period, frames, chan, nchans, stride):
+        o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
+                    frames, chan, nchans, stride)
+        run(true) // suppress warning if we're already in run setx
     
     def thresh(threshold, direction, max_wait):
         o2_send_cmd("/arco/probe/thresh", 0, "Ufif", id,
@@ -47,6 +49,7 @@ class Probe (Ugen):
         
     def stop():
         o2_send_cmd("/arco/probe/stop", 0, "U", id)
+        unrun(true) // suppress warning if we're not in run set
         
 # pwl.srp -- piece-wise linear envelope
 #
@@ -55,8 +58,7 @@ class Probe (Ugen):
 
 class Pwl (Ugen):
     def init(points):
-        super.init(create_ugen_id(), "Pwl", -1, 'a', "")
-        o2_send_cmd("/arco/pwl/new", 0, "U", id)
+        super.init(create_ugen_id(), "Pwl", 1, 'a', "", omit_chans = true)
         set_point_array(points)
 
     def set_points(rest points):
@@ -90,8 +92,7 @@ class Pwlb (Ugen):
     var action_id
 
     def init(points):
-        super.init(create_ugen_id(), "Pwlb", -1, 'b', "")
-        o2_send_cmd("/arco/pwlb/new", 0, "U", id)
+        super.init(create_ugen_id(), "Pwlb", 1, 'b', "", omit_chans = true)
         set_point_array(points)
 
     def set_points(rest points):
@@ -337,7 +338,7 @@ class Recplay (Ugen):
 
 class Thru (Ugen):
 
-    def init(inp, optional chans, id_num):
+    def init(inp, optional chans = 1, id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
                    "Thru", chans, 'a', "U", 'inp', inp)
 
@@ -359,8 +360,7 @@ class Zero (Ugen):
 
     def init(optional id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Zero", -1, 'a', "")
-        o2_send_cmd("/arco/zero/new", 0, "i", arco_ugen_id(id))
+                   "Zero", 1, 'a', "", omit_chans = true)
 
 
 # DO NOT DEFINE zero() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN zero_ugen
@@ -371,8 +371,7 @@ class Zerob (Ugen)
 
     def init(optional id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Zerob", -1, 'b', "")
-        o2_send_cmd("/arco/zerob/new", 0, "i", arco_ugen_id(id))
+                   "Zerob", 1, 'b', "", omit_chans = true)
 
 # DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen
 # def zerob(): purposefully not defined here!

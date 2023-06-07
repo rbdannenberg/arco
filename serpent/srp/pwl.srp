@@ -5,8 +5,7 @@
 
 class Pwl (Ugen):
     def init(points):
-        super.init(create_ugen_id(), "Pwl", -1, 'a', "")
-        o2_send_cmd("/arco/pwl/new", 0, "U", id)
+        super.init(create_ugen_id(), "Pwl", 1, 'a', "", omit_chans = true)
         set_point_array(points)
 
     def set_points(rest points):
@@ -40,8 +39,7 @@ class Pwlb (Ugen):
     var action_id
 
     def init(points):
-        super.init(create_ugen_id(), "Pwlb", -1, 'b', "")
-        o2_send_cmd("/arco/pwlb/new", 0, "U", id)
+        super.init(create_ugen_id(), "Pwlb", 1, 'b', "", omit_chans = true)
         set_point_array(points)
 
     def set_points(rest points):

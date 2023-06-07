@@ -215,6 +215,66 @@ float value `freq`.
 `/arco/sine/set_amp id chan amp` - Set amplitude of channel `chan` to 
 float value `amp`.
 
+## probe
+A `probe` is used to send samples from the audio server to an O2 service.
+In particular, the oscilloscope display uses `probe` to obtain samples to display.
+
+`/arco/probe/new id input_id reply_address` - create a `probe` with the given
+`id`, initially with input from `input_id` and send samples to `reply_address`.
+Note that `chans` is not specified, but see below about how channels are handled.
+
+`/arco/probe/probe id period frames chan nchans stride repeats` - probes the input
+signal, sending samples to the `reply_address` given in the `new` message.
+When a `probe` message is received, any previous operation is terminated
+and the object is reinitialized to respond immediately to this probe request.
+ - `id` indicates the probe to update.
+ -  `period` is the period in seconds (type float) from one probe to the
+    next, i.e., the hop size. Send -1 for a one-shot probe. For any
+    period >= 0, periods are measured relative to the
+    *first* frame of a message, but actual period is at least
+    frames * stride (no overlapping frames) rounded up to the
+    nearest block, and if thresholding
+    is enabled, the search for a threshold *begins* after the
+    period has elapsed.
+ - `frames` is the number of frames collected (roughly) each `period`.
+   The limit for `frames * nchans` is 64, but see `repeats` below. If
+   `frames * nchan` > 64, `frames` is reset to `64 / nchans` (which is
+   unfortunately 0 if `nchans` > 64!)
+ - `chan` is the first channel to collect. If `chan` is out of range for
+   the input, 0 is used.
+ - `nchans` is the number of contiguous channels to collect.
+   If the given range is outside the available channels, `nchans` is reduced
+   as much as needed. E.g. `chan` = 0 and `nchans` = 999 will probe all channels
+   (or up to 999 of them).
+ - `stride` is normally 1, but you can downsample the signal by collecting
+   every `stride` frames with `stride` > 1. If `stride` < 1, 1 is used. Long
+   strides are possible and generate printed warnings.
+ - `repeats` gives the number of times to collect and send
+   `frames * nchans` samples. E.g., to capture 512 successive samples
+   from one channel, set `frames` = 64, `repeats` = 8. If `repeats` < 1,
+   1 is used.
+
+`/arco/probe/thresh id threshold direction max_wait` - To wait for a
+threshold crossing (e.g. for an oscilloscope), set `threshold` to the
+threshold value, and `direction` to 1 for positive and -1 for negative
+direction, or 0 for no threshold detection (collect immediately).
+Then send /arco/probe/probe as above. Use `max_wait` to control how
+long to wait for a zero crossing:
+
+      DESIRED BEHAVIOR        MAX_WAIT     DIRECTION
+      wait until threshold    zero         non-zero
+      wait up to max_wait     non-zero     non-zero
+      do not wait             *            zero
+
+`/arco/probe/stop id` - Stop collecting samples and send an empty message.
+When an empty (no floats) message arrives, the probe has been reset.
+
+To get periodic snapshots, set period to seconds; period
+will be quantized to blocks, and period may not be uniform if
+threshold detection is enabled
+
+The O2 messages consists of the probe id (int32) followed by float samples
+(up to 64 of them).
 
 ### thru
 Thru objects are used for audio input (the audio input is written

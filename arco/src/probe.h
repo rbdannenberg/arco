@@ -20,13 +20,13 @@
            nearest block, and if thresholding
            is enabled, the search for a threshold *begins* after the
            period has elapsed.
-       frames = number of frames in each message (frames * nchans <= 64)
+       frames = number of frames to send each period. The maximum
+           length of a message is 64, so there will be a sequence
+           of ceiling(frames * chans / 64) messages sent each period.
        chan = first channel to probe
        nchans = how many channels to probe. Channels are interleaved
            in the message.
        stride = capture every Nth frame
-       repeats = how many vectors to capture, e.g. to capture 512
-           successive samples from one channel, set frames = 64, repeats = 8
        max_wait = time in seconds to look at for a threshold
            crossing in the first channel. If zero, wait forever.
 
@@ -67,7 +67,7 @@ class Probe : public Ugen {
     // need 24 bytes overhead + up to 68 bytes for type string with
     // 64 floats; allow 64 bytes for address -> 156, add 4 extra:
     char msg_header[160];  // we prebuild an outgoing message here
-    char *float_types_ptr; // where to put typestring in msg_header
+    char *typestring_ptr; // where to put typestring in msg_header
     int msg_header_len;
     O2message_ptr msg;     // message data is here to accumulate samples
     int msg_len;
@@ -75,9 +75,13 @@ class Probe : public Ugen {
     Sample *sample_fence;  // address beyond last sample in message
 
     float period;     // how often to send samples
-    int frames;        // requested length of samples
+    int frames;       // requested number of samples per period - this
+        // message lengths are all the same in between calls to probe,
+        // and zero padding is used if message lengths (64 / channels)
+        // do not evenly divide frames.
+    int frames_sent;  // how many frames have been sent this period?
     int channel_offset; // what channel we start reading from
-    int channels;    // how many channels to read
+    int channels;     // how many channels to read
     int stride;       // how many inputs samples to skip per output sample
     int repeats;      // how many messages to send
     Sample threshold; // start collecting on theshold crossing
@@ -86,6 +90,7 @@ class Probe : public Ugen {
     int next;  // index of next sample for buffer relative to 
                // beginning of the current block, e.g. if next = 34,
                // wait for one 32-sample block and take the 2nd sample
+    int frames_per_msg;  // how many frames go into each message
     int wait_count;  // counts how many blocks before auto sweep
     int wait_in_blocks; // saves wait_count for subsequent vectors
     int delay_in_blocks; // saves wait_count for subsequent vectors
@@ -95,8 +100,7 @@ class Probe : public Ugen {
     Sample prev_sample; // one-sample history for threshold crossing detection
     
 
-    Probe(int id, int chans, Ugen_ptr inp, char *reply_addr) :
-            Ugen(id, 0, chans) {
+    Probe(int id, Ugen_ptr inp, char *reply_addr) : Ugen(id, 0, 1) {
         O2message_ptr m = (O2message_ptr) msg_header;
         m->next = 0;
         m->data.misc = 0;
@@ -104,24 +108,28 @@ class Probe : public Ugen {
         int len = (int) strlen(reply_addr);
         // msg_header has 96 bytes: next (8), length (4), misc (4),
         //     timestamp (8), address (?), types (4). 96 - 28 = 68
-        if (len > 63) len = 63;
+        if (len > 63) {
+            len = 63;
+        }
         memcpy(m->data.address, reply_addr, len);
         m->data.address[len++] = 0;
         while (len & 3) m->data.address[len++] = 0;  // fill to 32 boundary
-        char *float_types_ptr = m->data.address + len;
-        *((int32_t *) float_types_ptr) = 0;  // fill whole word
-        float_types_ptr += 4;
-        *float_types_ptr++ = 'i';  // first parameter is our index
-        // now, float_types_ptr is where to finish writing type string
+        typestring_ptr = m->data.address + len;
+        *((int32_t *) typestring_ptr) = 0;  // fill whole word
+        *typestring_ptr++ = ',';  // first character of all O2/OSC typestrings
+        *typestring_ptr++ = 'i';  // first parameter is our index
+        // now, typestring_ptr is where to finish writing type string
 
         state = PROBE_IDLE;
-        init_inp(inp);
-
+        frames_sent = 0;
+        msg = NULL;
         // default values:
         threshold = 0.0;
         direction = 1;
         max_wait = 0.02;
         prev_sample = 0.0;
+
+        init_inp(inp);
     }
 
 
@@ -142,11 +150,21 @@ class Probe : public Ugen {
         assert(inp->rate == 'a' || inp->rate == 'b');
         stop();  // after input change we need another probe() to start again
     }
+
+    void prepare_msg() {
+        msg = (O2message_ptr) O2_MALLOC(msg_len);
+        memcpy(msg, msg_header, msg_header_len);
+        sample_ptr = (float *) (((char *) msg) + msg_header_len);
+        sample_fence = (float *) (((char *) msg) + msg_len);
+    }
     
 
     void probe(float period_, int frames_, int chan, 
-               int nchans, int stride_, int repeats_) {
+               int nchans, int stride_) {
         stop();  // make sure we are stopped
+        if (!inp) {
+            return;
+        }
 
         period = period_;
         delay_in_blocks = (int) (period * BR);
@@ -165,6 +183,7 @@ class Probe : public Ugen {
         prev_sample = threshold;
 
         frames = frames_;
+        frames_sent = 0;
         channel_offset = chan;
         if (channel_offset >= inp->chans || channel_offset < 0) {
             channel_offset = 0;
@@ -181,17 +200,18 @@ class Probe : public Ugen {
             arco_warn("Probe spans %d samples!", stride * frames);
         }
 
-        repeats = repeats_;
-        if (repeats < 1) repeats = 1;
-
         next = 0;
 
         // complete msg_header
-        if (frames < 0 || frames * channels > 64) {  // max msg has 64 floats
-            frames = 64 / channels;
+        if (frames < 0) {
+            frames = 0;
         }
-        char *types = float_types_ptr;
-        for (int i = 0; i < frames * channels; i++) {
+        frames_per_msg = frames;
+        if (frames_per_msg * channels > 64) {  // max msg has 64 floats
+            frames_per_msg = 64 / channels;
+        }
+        char *types = typestring_ptr;
+        for (int i = 0; i < frames_per_msg * channels; i++) {
             *types++ = 'f';
         }
         *types++ = 0;  // need at least one zero before word boundary
@@ -200,12 +220,23 @@ class Probe : public Ugen {
         msg_header_len = (int) (types - msg_header);
         assert(msg_header_len <= 160);
 
-        msg_len = (int) (msg_header_len + 4 * (frames * channels + 1));
-        
+        // + 1 because the first parameter is (integer) id
+        msg_len = (int) (msg_header_len + 4 * (frames_per_msg * channels + 1));
+        *((int32_t *) types) = id; // first msg arg is our id
+        msg_header_len += 4;  // because it now contains 1st parameter: id
+
+        if (frames_per_msg == 0) {  // too many channels for even one frame
+            frames = 0;
+            msg = NULL;
+            state = PROBE_WAITING;  // in order to get stop() to send a message
+            stop();
+        }
     }
 
 
     void thresh(float threshold_, int direction_, float max_wait_) {
+        printf("Probe::thresh threshold %g, direction %d, max_wait %g\n",
+               threshold_, direction_, max_wait_);
         threshold = threshold_;
         prev_sample = threshold;
         direction = direction_;
@@ -224,8 +255,6 @@ class Probe : public Ugen {
         state = PROBE_IDLE;
    }
 
-
-    void ready_new_message();
-
+    
     virtual void real_run();
 };

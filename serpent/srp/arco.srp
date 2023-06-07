@@ -470,61 +470,67 @@ class Ugen:
     var inputs  // dictionary of inputs
 
     # init installs Ugen in table if id is not nil.  If id is nil,
-    # chans_ should be negative (to suppress /arco/*/new message -- see below).
+    # no_msg should be true (to suppress /arco/*/new message -- see below).
     # If the Ugen has inputs, they are listed in inputs_ in order
     # as param_symbol, param_value, param_symbol, param_value, ...
     # Even though provided as an array so that we can get the order
     # right when we send the /arco/*/new message, the inputs_ are
     # retained in dictionary form for quick lookup in the set() method.
-    # SPECIAL HACK: if chans_ is negative, we set chans to abs(chans_)
-    #   so you can still initialize the channel count, but we do not 
-    #    send a new message so that caller can issue a special message,
-    #    and we IGNORE inputs_
+    # SPECIAL HACK: if no_msg is true, send a new message so that 
+    # caller can issue a special message, and IGNORE inputs_
+    # SPECIAL HACK #2: if omit_chans is true, omit adding chans as the
+    # usual 2nd parameter in the /arco/*/new message.
     #
     # When initial parameters are numbers, they can represent either
     # int32, int64, double, float, time, or be coerced into a Const
     # unit generator. To handle these different interpretations, we
-    # require a types_ parameter, which is a string similar to an
-    # O2 types string consisting of letters from "sihdft" and also "U"
-    # which means "unit generator" - the number is coerced to a Const.
-    # If the type is "U", the actual parameter may also be an array of
-    # floats with a length equal to chans_. A Const with multiple 
-    # channels is created. inputs_ are in pairs, with the name (a symbol)
-    # followed by value. If the type is not "U", the name must still be
-    # present as a place-holder, and by convention should be a helpful
+    # require a types_ parameter, which is a string similar to an O2
+    # types string consisting of letters from "sihdft" and also "U"
+    # which means "unit generator" in which case a number is coerced
+    # to a Const. The type string does NOT include an initial "i" for
+    # the id or a second "i" for chans, if any. The first type string
+    # character refers to the first input value in inputs_. If the
+    # type is "U", the actual parameter may also be an array of floats
+    # with a length equal to chans_. A Const with multiple channels is
+    # created. inputs_ are in pairs, with the name (a symbol) followed
+    # by value. If the type is not "U", the name must still be present
+    # as a place-holder, and by convention should be a helpful
     # parameter name, but it is ignored. Otherwise, names allow the
     # set method to replace the Ugen input with another Ugen.
     #
-    def init(id_, classname_, chans_, rate_, types_, rest inputs_):
+    def init(id_, classname_, chans_, rate_, types_,
+             keyword no_msg = nil, omit_chans = nil, rest inputs_):
         id = id_
         classname = classname_
-        chans = abs(chans_)
+        chans = chans_
         rate = rate_
         inputs = {}  // mapping from input name (symbol) to a ugen
-        if chans_ >= 0:
-            // calling const() if needed will send a message, so
-            // we coerce all numbers to const() BEFORE constructing
-            // the /arco/*/new message:
-            for i = 1 to len(inputs_) by 2:
-                if types_[idiv(i, 2)] == "U" and (isnumber(inputs_[i]) or
-                                                  isarray(inputs_[i])):
-                    inputs_[i] = const(inputs_[i])
-            o2_send_start()  // build and send new method
-            o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
+        if no_msg:
+            return
+        // calling const() if needed will send a message, so
+        // we coerce all numbers to const() BEFORE constructing
+        // the /arco/*/new message:
+        for i = 1 to len(inputs_) by 2:
+            if types_[idiv(i, 2)] == "U" and (isnumber(inputs_[i]) or
+                                              isarray(inputs_[i])):
+                inputs_[i] = const(inputs_[i])
+        o2_send_start()  // build and send new method
+        o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
+        if not omit_chans: // some Ugens, (Probe), do not have chans parameter
             o2_add_int32(chans)
-            // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
+        // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
 
-            // send the "new" message with parameters to create the Ugen:
-            for i = 0 to len(inputs_) by 2:
-                var inp = inputs_[i + 1]
-                if types_[idiv(i, 2)] == "U":  // it's a Ugen
-                    o2_add_int32(arco_ugen_id(inp.id))
-                    inputs[inputs_[i]] = inp  // build dictionary of inputs
-                else:  // add a normal value, use code from o2util.srp:
-                    funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 2)]], inp)
-                // print inputs_[i], inp.id,
-            o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
-            // print
+        // send the "new" message with parameters to create the Ugen:
+        for i = 0 to len(inputs_) by 2:
+            var inp = inputs_[i + 1]
+            if types_[idiv(i, 2)] == "U":  // it's a Ugen
+                o2_add_int32(arco_ugen_id(inp.id))
+                inputs[inputs_[i]] = inp  // build dictionary of inputs
+            else:  // add a normal value, use code from o2util.srp:
+                funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 2)]], inp)
+            // print inputs_[i], inp.id,
+        o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
+        // print
 
 
     def play():  # connect this Ugen to audio output
@@ -549,22 +555,22 @@ class Ugen:
         this
 
 
-    def run():  # add this Ugen to the run set
+    def run(optional quiet):  # add this Ugen to the run set
         if this not in arco_run_set:
             arco_run_set.append(this)
             display "Ugen run", id
             o2_send_cmd("/arco/run", 0, "U", id)
-        else:
+        elif not quiet:
             print "WARNING: in run(), Ugen already in run set", this
         this
 
 
-    def unrun():  # remove this Ugen from the run set
+    def unrun(optional quiet):  # remove this Ugen from the run set
         if this in arco_run_set:
             display "Ugen unrun", id
             arco_run_set.remove(this)
             o2_send_cmd("/arco/unrun", 0, "U", id)
-        else:
+        elif not quiet:
             print "WARNING: in unrun(), Ugen is not in run set", this 
         this
 
@@ -666,7 +672,8 @@ class Instrument (Ugen):
 
     def init(name, ugen):
         // pass -ugen.chans to suppress /arco/*/new message
-        super.init(nil, name, -ugen.chans, ugen.rate, "")
+        super.init(nil, name, ugen.chans, ugen.rate, "",
+                   skip_msg = true)
         output = ugen
         id = output.id
         parameter_bindings = instr_stack.unappend()
