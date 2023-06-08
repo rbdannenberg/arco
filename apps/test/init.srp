@@ -50,9 +50,9 @@ def arco_ready():
     print "**** arco audio is running! ****"
     var win = default_window
     if ui_initialized:
-        return
+        returnn
 
-    Checkbox(win, "Simple test", 5, 5, 150, 'H', 'stcheckbox')
+    Checkbox(win, "Simple test", 5, 5, 170, 'H', 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
 
     Checkbox(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtcheckbox')

@@ -73,7 +73,7 @@ void arco_const_set(O2SM_HANDLER_ARGS)
 static void const_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/const/new", "iii", arco_const_new, NULL, true, true);
+    o2sm_method_new("/arco/const/new", "ii", arco_const_new, NULL, true, true);
     o2sm_method_new("/arco/const/newf", "if", arco_const_newf, NULL, true, true);
     o2sm_method_new("/arco/const/set", "iif", arco_const_set, NULL, true, true);
     // END INTERFACE INITIALIZATION

@@ -61,23 +61,17 @@ public:
 
     float fConst0;
 
-    Reson(int id, int nchans, Ugen_ptr snd_, Ugen_ptr center_, Ugen_ptr q_) : Ugen(id, 'a', nchans) {
+    Reson(int id, int nchans, Ugen_ptr snd_, Ugen_ptr center_, Ugen_ptr q_) :
+            Ugen(id, 'a', nchans) {
         snd = snd_;
         center = center_;
         q = q_;
         states.init(chans);
         fConst0 = (3.14159274f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
-
-        // initialize channel states
-        for (int i = 0; i < chans; i++) {
-            for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) {
-                states[i].fRec0[l0] = 0.0f;
-            }
-        }
-
         init_snd(snd);
         init_center(center);
         init_q(q);
+        run_channel = (void (Reson::*)(Reson_state *)) 0;
         update_run_channel();
     }
 
@@ -89,18 +83,26 @@ public:
 
     const char *classname() { return Reson_name; }
 
+    void initialize_channel_states() {
+        for (int i = 0; i < chans; i++) {
+            for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) {
+                states[i].fRec0[l0] = 0.0f;
+            }
+        }
+    }
+
     void update_run_channel() {
         // initialize run_channel based on input types
+        void (Reson::*new_run_channel)(Reson_state *state);
         if (snd->rate == 'a' && center->rate != 'a' && q->rate != 'a') {
-            run_channel = &Reson::chan_abb_a;
+            new_run_channel = &Reson::chan_abb_a;
         } else if (snd->rate == 'a' && center->rate != 'a' && q->rate == 'a') {
-            run_channel = &Reson::chan_aba_a;
+            new_run_channel = &Reson::chan_aba_a;
         } else if (snd->rate == 'a' && center->rate == 'a' && q->rate != 'a') {
-            run_channel = &Reson::chan_aab_a;
+            new_run_channel = &Reson::chan_aab_a;
         } else if (snd->rate == 'a' && center->rate == 'a' && q->rate == 'a') {
-            run_channel = &Reson::chan_aaa_a;
-        }
-        else {
+            new_run_channel = &Reson::chan_aaa_a;
+        } else {
             if (snd->rate != 'a') {
                 snd = new Upsample(-1, snd->chans, snd);
             }
@@ -110,7 +112,11 @@ public:
             if (q->rate != 'a') {
                 q = new Upsample(-1, q->chans, q);
             }
-            run_channel = &Reson::chan_aaa_a;
+            new_run_channel = &Reson::chan_aaa_a;
+        }
+        if (new_run_channel != run_channel) {
+            initialize_channel_states();
+            run_channel = new_run_channel;
         }
     }
 
@@ -184,7 +190,7 @@ public:
         for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
             float fTemp0 = (1.0f / std::max<float>(float(input1[i0]), 0.100000001f));
             float fTemp1 = ((fSlow1 * (fSlow1 + fTemp0)) + 1.0f);
-            state->fRec0[0] = (float(input0[i0]) - (((state->fRec0[2] * ((fSlow1 * (fSlow1 - fTemp0)) + 1.0f)) + (fSlow2 * state->fRec0[1])) / fTemp1));
+            state->fRec0[0] = (float(input0[i0]) - (((state->fRec0[2] * (1.0f - (fSlow1 * (fTemp0 - fSlow1)))) + (fSlow2 * state->fRec0[1])) / fTemp1));
             *out_samps++ = FAUSTFLOAT(((state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1]))) / fTemp1));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];

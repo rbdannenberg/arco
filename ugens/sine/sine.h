@@ -95,21 +95,15 @@ public:
 
     float fConst0;
 
-    Sine(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_) : Ugen(id, 'a', nchans) {
+    Sine(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_) :
+            Ugen(id, 'a', nchans) {
         freq = freq_;
         amp = amp_;
         states.init(chans);
         fConst0 = (1.0f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
-
-        // initialize channel states
-        for (int i = 0; i < chans; i++) {
-            for (int l2 = 0; (l2 < 2); l2 = (l2 + 1)) {
-                states[i].fRec1[l2] = 0.0f;
-            }
-        }
-
         init_freq(freq);
         init_amp(amp);
+        run_channel = (void (Sine::*)(Sine_state *)) 0;
         update_run_channel();
     }
 
@@ -120,25 +114,37 @@ public:
 
     const char *classname() { return Sine_name; }
 
+    void initialize_channel_states() {
+        for (int i = 0; i < chans; i++) {
+            for (int l2 = 0; (l2 < 2); l2 = (l2 + 1)) {
+                states[i].fRec1[l2] = 0.0f;
+            }
+        }
+    }
+
     void update_run_channel() {
         // initialize run_channel based on input types
+        void (Sine::*new_run_channel)(Sine_state *state);
         if (freq->rate != 'a' && amp->rate == 'a') {
-            run_channel = &Sine::chan_ba_a;
+            new_run_channel = &Sine::chan_ba_a;
         } else if (freq->rate != 'a' && amp->rate != 'a') {
-            run_channel = &Sine::chan_bb_a;
+            new_run_channel = &Sine::chan_bb_a;
         } else if (freq->rate == 'a' && amp->rate == 'a') {
-            run_channel = &Sine::chan_aa_a;
+            new_run_channel = &Sine::chan_aa_a;
         } else if (freq->rate == 'a' && amp->rate != 'a') {
-            run_channel = &Sine::chan_ab_a;
-        }
-        else {
+            new_run_channel = &Sine::chan_ab_a;
+        } else {
             if (freq->rate != 'a') {
                 freq = new Upsample(-1, freq->chans, freq);
             }
             if (amp->rate != 'a') {
                 amp = new Upsample(-1, amp->chans, amp);
             }
-            run_channel = &Sine::chan_aa_a;
+            new_run_channel = &Sine::chan_aa_a;
+        }
+        if (new_run_channel != run_channel) {
+            initialize_channel_states();
+            run_channel = new_run_channel;
         }
     }
 

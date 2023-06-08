@@ -38,8 +38,7 @@ extern const char *Mult_name;
 class Mult : public Ugen {
 public:
     struct Mult_state {
-        float x1_prev;
-        float x2_prev;
+        Sample fSlow0_prev;
     };
     Vec<Mult_state> states;
     void (Mult::*run_channel)(Mult_state *state);
@@ -58,16 +57,9 @@ public:
         x2 = x2_;
         states.init(chans);
 
-
-        // initialize channel states
-        for (int i = 0; i < chans; i++) {
-
-            states[i].x1_prev = 0.0f;
-            states[i].x2_prev = 0.0f;
-        }
-
         init_x1(x1);
         init_x2(x2);
+        run_channel = (void (Mult::*)(Mult_state *)) 0;
         update_run_channel();
     }
 
@@ -78,25 +70,35 @@ public:
 
     const char *classname() { return Mult_name; }
 
+    void initialize_channel_states() {
+        for (int i = 0; i < chans; i++) {
+            states[i].fSlow0_prev = 0.0f;
+        }
+    }
+
     void update_run_channel() {
         // initialize run_channel based on input types
+        void (Mult::*new_run_channel)(Mult_state *state);
         if (x1->rate == 'a' && x2->rate == 'a') {
-            run_channel = &Mult::chan_aa_a;
+            new_run_channel = &Mult::chan_aa_a;
         } else if (x1->rate == 'a' && x2->rate != 'a') {
-            run_channel = &Mult::chan_ab_a;
+            new_run_channel = &Mult::chan_ab_a;
         } else if (x1->rate != 'a' && x2->rate == 'a') {
-            run_channel = &Mult::chan_ba_a;
+            new_run_channel = &Mult::chan_ba_a;
         } else if (x1->rate != 'a' && x2->rate != 'a') {
-            run_channel = &Mult::chan_bb_a;
-        }
-        else {
+            new_run_channel = &Mult::chan_bb_a;
+        } else {
             if (x1->rate != 'a') {
                 x1 = new Upsample(-1, x1->chans, x1);
             }
             if (x2->rate != 'a') {
                 x2 = new Upsample(-1, x2->chans, x2);
             }
-            run_channel = &Mult::chan_aa_a;
+            new_run_channel = &Mult::chan_aa_a;
+        }
+        if (new_run_channel != run_channel) {
+            initialize_channel_states();
+            run_channel = new_run_channel;
         }
     }
 
@@ -142,39 +144,35 @@ public:
     void chan_ab_a(Mult_state *state) {
         FAUSTFLOAT* input0 = x1_samps;
         float fSlow0 = float(*x2_samps);
-        Sample x2_incr = (fSlow0 - state->x2_prev) * BL_RECIP;
-        Sample x2_prev = state->x2_prev;
-        state->x2_prev = fSlow0;
+        Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
+        Sample fSlow0_fast = state->fSlow0_prev;
+        state->fSlow0_prev = fSlow0;
         for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            x2_prev += x2_incr;
-            *out_samps++ = FAUSTFLOAT((x2_prev * float(input0[i0])));
+            fSlow0_fast += fSlow0_incr;
+            *out_samps++ = FAUSTFLOAT((fSlow0 * float(input0[i0])));
         }
     }
 
     void chan_ba_a(Mult_state *state) {
         FAUSTFLOAT* input0 = x2_samps;
         float fSlow0 = float(*x1_samps);
-        Sample x1_incr = (fSlow0 - state->x1_prev) * BL_RECIP;
-        Sample x1_prev = state->x1_prev;
-        state->x1_prev = fSlow0;
+        Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
+        Sample fSlow0_fast = state->fSlow0_prev;
+        state->fSlow0_prev = fSlow0;
         for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            x1_prev += x1_incr;
-            *out_samps++ = FAUSTFLOAT((x1_prev * float(input0[i0])));
+            fSlow0_fast += fSlow0_incr;
+            *out_samps++ = FAUSTFLOAT((fSlow0 * float(input0[i0])));
         }
     }
 
     void chan_bb_a(Mult_state *state) {
         float fSlow0 = (float(*x1_samps) * float(*x2_samps));
-        Sample x2_incr = (fSlow0 - state->x2_prev) * BL_RECIP;
-        Sample x2_prev = state->x2_prev;
-        state->x2_prev = fSlow0;
-        Sample x1_incr = (fSlow0 - state->x1_prev) * BL_RECIP;
-        Sample x1_prev = state->x1_prev;
-        state->x1_prev = fSlow0;
+        Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
+        Sample fSlow0_fast = state->fSlow0_prev;
+        state->fSlow0_prev = fSlow0;
         for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            x2_prev += x2_incr;
-            x1_prev += x1_incr;
-            *out_samps++ = FAUSTFLOAT(x1_prev);
+            fSlow0_fast += fSlow0_incr;
+            *out_samps++ = FAUSTFLOAT(fSlow0);
         }
     }
 

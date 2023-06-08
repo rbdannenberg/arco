@@ -673,7 +673,7 @@ class Instrument (Ugen):
     def init(name, ugen):
         // pass -ugen.chans to suppress /arco/*/new message
         super.init(nil, name, ugen.chans, ugen.rate, "",
-                   skip_msg = true)
+                   no_msg = true)
         output = ugen
         id = output.id
         parameter_bindings = instr_stack.unappend()

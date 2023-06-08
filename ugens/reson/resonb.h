@@ -73,20 +73,13 @@ public:
 
     float fConst0;
 
-    Resonb(int id, int nchans, Ugen_ptr snd_, Ugen_ptr center_, Ugen_ptr q_) : Ugen(id, 'b', nchans) {
+    Resonb(int id, int nchans, Ugen_ptr snd_, Ugen_ptr center_, Ugen_ptr q_) :
+            Ugen(id, 'b', nchans) {
         snd = snd_;
         center = center_;
         q = q_;
         states.init(chans);
         fConst0 = (3.14159274f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
-
-        // initialize channel states
-        for (int i = 0; i < chans; i++) {
-            for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) {
-                states[i].fRec0[l0] = 0.0f;
-            }
-        }
-
         init_snd(snd);
         init_center(center);
         init_q(q);
@@ -99,6 +92,14 @@ public:
     }
 
     const char *classname() { return Resonb_name; }
+
+    void initialize_channel_states() {
+        for (int i = 0; i < chans; i++) {
+            for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) {
+                states[i].fRec0[l0] = 0.0f;
+            }
+        }
+    }
 
     void print_sources(int indent, bool print) {
         snd->print_tree(indent, print, "snd");
@@ -158,8 +159,7 @@ public:
             state->fRec0[0] = (tmp_4 - (tmp_3 * ((tmp_5 * state->fRec0[2]) + (tmp_6 * state->fRec0[1]))));
             *out_samps++ = FAUSTFLOAT((tmp_3 * (state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1])))));
             state->fRec0[2] = state->fRec0[1];
-            state->fRec0[1] = state->fRec0[0];
-            state++;
+            state->fRec0[1] = state->fRec0[0];            state++;
             snd_samps += snd_stride;
             center_samps += center_stride;
             q_samps += q_stride;

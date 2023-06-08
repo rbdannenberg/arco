@@ -67,12 +67,6 @@ public:
         x2 = x2_;
         states.init(chans);
 
-
-        // initialize channel states
-        for (int i = 0; i < chans; i++) {
-
-        }
-
         init_x1(x1);
         init_x2(x2);
     }
@@ -83,6 +77,11 @@ public:
     }
 
     const char *classname() { return Multb_name; }
+
+    void initialize_channel_states() {
+        for (int i = 0; i < chans; i++) {
+        }
+    }
 
     void print_sources(int indent, bool print) {
         x1->print_tree(indent, print, "x1");
@@ -119,8 +118,7 @@ public:
         Multb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             FAUSTFLOAT tmp_0 = (float(*x1_samps) * float(*x2_samps));
-            *out_samps++ = FAUSTFLOAT(tmp_0);
-            state++;
+            *out_samps++ = FAUSTFLOAT(tmp_0);            state++;
             x1_samps += x1_stride;
             x2_samps += x2_stride;
         }

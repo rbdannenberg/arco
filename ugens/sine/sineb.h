@@ -49,6 +49,8 @@ extern const char *Sineb_name;
 class Sineb : public Ugen {
 public:
     struct Sineb_state {
+        FAUSTFLOAT fEntry0;
+        FAUSTFLOAT fEntry1;
         float fRec1[2];
         int iVec0[2];
         int iRec0[2];
@@ -66,19 +68,12 @@ public:
 
     float fConst0;
 
-    Sineb(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_) : Ugen(id, 'b', nchans) {
+    Sineb(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_) :
+            Ugen(id, 'b', nchans) {
         freq = freq_;
         amp = amp_;
         states.init(chans);
         fConst0 = (1.0f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
-
-        // initialize channel states
-        for (int i = 0; i < chans; i++) {
-            for (int l2 = 0; (l2 < 2); l2 = (l2 + 1)) {
-                states[i].fRec1[l2] = 0.0f;
-            }
-        }
-
         init_freq(freq);
         init_amp(amp);
     }
@@ -89,6 +84,14 @@ public:
     }
 
     const char *classname() { return Sineb_name; }
+
+    void initialize_channel_states() {
+        for (int i = 0; i < chans; i++) {
+            for (int l2 = 0; (l2 < 2); l2 = (l2 + 1)) {
+                states[i].fRec1[l2] = 0.0f;
+            }
+        }
+    }
 
     void print_sources(int indent, bool print) {
         freq->print_tree(indent, print, "freq");
@@ -124,10 +127,11 @@ public:
         amp_samps = amp->run(current_block); // update input
         Sineb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            state->fRec1[0] = (*freq_samps + (state->fRec1[1] - std::floor((*freq_samps + state->fRec1[1]))));
-            *out_samps = FAUSTFLOAT((*amp_samps * ftbl0SinebSIG0[int((65536.0f * state->fRec1[0]))]));
-            state->fRec1[1] = state->fRec1[0];
-            state++;
+            FAUSTFLOAT tmp_0 = float(*amp_samps);
+            FAUSTFLOAT tmp_1 = (fConst0 * float(*freq_samps));
+            state->fRec1[0] = (tmp_1 + (state->fRec1[1] - std::floor((tmp_1 + state->fRec1[1]))));
+            *out_samps++ = FAUSTFLOAT((tmp_0 * ftbl0SinebSIG0[int((65536.0f * state->fRec1[0]))]));
+            state->fRec1[1] = state->fRec1[0];            state++;
             freq_samps += freq_stride;
             amp_samps += amp_stride;
         }
