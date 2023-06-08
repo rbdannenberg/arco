@@ -1,7 +1,7 @@
 # arco.srp -- Serpent library for controlling Arco
 #
-# Roger B. Dannenberg
-# May 22 2023
+# Project Author: Roger B. Dannenberg
+# Date: June 7, 2023
 
 # call arco_init(ensemble) to start
 # call arco_run() after setting up UI and or scheduling things
@@ -12,135 +12,14 @@ require "wxserpent"
 require "prob"
 require "arco"
 require "allugens"
+require "slider"
+require "arcoslider"
+require "four_of_a_kind"
 
 
 # Definition of Global Variables
-default_window.set_size(350, 300) // set size of default window
+default_window.set_size(1000,500) // set size of default window
 ui_initialized = false # boolean that denotes if ui has been initialized
-
-class Movement1:
-# Instance Variables
-    var recplay1, recplay2, recplay3
-    var win, lag
-
-    def init(window):
-    # Initialization of instance variables
-        // Recplay checkboxes
-        recplay1 = nil
-        recplay2 = nil
-        recplay3 = nil
-
-        win = window // Main UI window
-        lag = nil // latency
-
-    def set_ui():
-    # Setting up Movement1's UI
-        Statictext(win, "I. Four of a Kind", 5, 5, 
-                    150, 'H', 'title') // The title of the movement
-
-        // Setting up rec1's checkbox and target
-        Checkbox(win, "rec1", 5, 25, 'S', 'S', 'r1check') 
-        r1check.add_target_method(this, 'rec1handler')
-
-        // Setting up rec2's checkbox and target
-        Checkbox(win, "rec2", 5, 'D', 'S', 'S', 'r2check')
-        r2check.add_target_method(this, 'rec2handler')
-
-        // Setting up rec3's checkbox and target
-        Checkbox(win, "rec3", 5, 'D', 'S', 'S', 'r3check')
-        r3check.add_target_method(this, 'rec3handler')
-
-        // Setting up the all checkbox and target
-        Checkbox(win, "all", 5, 'D', 'S', 'S', 'allcheck')
-        allcheck.add_target_method(this, 'rec4handler')
-
-        // Setting up the Latency text and slider
-        Statictext(win, "Latency", 150, 170, 150, 'H', 'text_latency')
-        Slider(win.id, 0, 100, 50, 0, 190, 350, 'S', t, 'latency_slider')
-
-        // Set lag value
-        lag = symbol_value(latency_slider).value() // latency value
-        lag = lag/1000 // set lag to milliseconds
-
-    def rec1handler(obj, event, x, y):
-    # Handler for rec1 checkbox
-        display "rec1handler", x
-        if x:
-            if not recplay1: // long fade time to test this feature
-                recplay1 = recplay(input_ugen, 2, 1.0, 3.0, false)
-            recplay1.run() # needs be in run set to make active
-            recplay1.record(true)
-        elif not recplay1:
-            print "WARNING: There is no recplay1 Ugen!"
-        else:
-            recplay1.record(false)
-            recplay1.unrun() # does not need to be active now
-
-
-    def rec2handler(obj, event, x, y):
-    # Handler for rec2 checkbox
-        display "rec2handler", x
-
-        if x and recplay1:
-            if not recplay2: // long fade time to test this feature
-                recplay2 = recplay(input_ugen, 2, 1.0, 3.0, false)
-            recplay2.run() # needs be in run set to make active
-            recplay2.record(true)
-
-            # Play recplay1
-            recplay1.play().atend(MUTE)
-            recplay1.start(lag)
-        elif not recplay1:
-            print "WARNING: There is no recplay1 Ugen!"
-        else:
-            recplay2.record(false)
-            recplay2.unrun() # does not need to be active now
-            recplay1.stop() // atend is already set up to mute when finished
-
-
-    def rec3handler(obj, event, x, y):
-    # Handler for rec3 checkbox
-        display "rec3handler", x
-
-        if x:
-            if not recplay3: // long fade time to test this feature
-                recplay3 = recplay(input_ugen, 2, 1.0, 3.0, false)
-            recplay3.run() # needs be in run set to make active
-            recplay3.record(true)
-
-            # Play recplay1 and recplay2
-            if recplay1 and recplay2:
-                recplay1.play().atend(MUTE)
-                recplay1.start(lag)
-                recplay2.play().atend(MUTE)
-                recplay2.start(lag)
-            else:
-                print "WARNING: There is no recplay1 Ugen!"
-        elif not recplay3:
-            print "WARNING: There is no recplay1 Ugen!"
-        else:
-            recplay3.record(false)
-            recplay3.unrun() # does not need to be active now
-            recplay1.stop() // atend is already set up to mute when finished
-            recplay2.stop()
-
-
-    def rec4handler(obj, event, x, y):
-    # Handler for all checkbox
-        display "rec4handler", x
-
-        if x and recplay1 and recplay2 and recplay3:
-            recplay1.play().atend(MUTE)
-            recplay1.start(lag)
-            recplay2.play().atend(MUTE)
-            recplay2.start(lag)
-            recplay3.play().atend(MUTE)
-            recplay3.start(lag)
-        elif (not x) and recplay1 and recplay2 and recplay3:
-            recplay1.stop()
-            recplay2.stop()
-            recplay3.stop()
-
 
 def arco_ready():
     # called when arco is initialized and ready to make sound or when
@@ -151,11 +30,9 @@ def arco_ready():
     if ui_initialized:
         return
 
-    # Create Movement1
-    var movement1 = Movement1(win)
+    # four_of_a_kind.srp initialization
+    Four_of_a_kind(win, 5, 5)
 
-    # Setup UI
-    movement1.set_ui()
     ui_initialized = true
   
 

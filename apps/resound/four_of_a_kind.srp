@@ -1,0 +1,139 @@
+# Project Author: Roger B. Dannenberg
+# Date: June 7, 2023
+
+
+class Four_of_a_kind:
+# Instance variables
+    var recplay1, recplay2, recplay3
+    var win, lag, init_x, init_y, check_lag
+
+    def init(window, x, y):
+    # Initialization of instance variables
+        // Recplay checkboxes
+        recplay1 = nil
+        recplay2 = nil
+        recplay3 = nil
+
+        win = window // Main UI window
+        lag = nil // latency
+        init_x = x // set the starting x coord of the movement
+        init_y = y // set the starting y coord of the movement
+
+        // Setup UI
+        this.set_ui()
+
+    def set_ui():
+    # Setting up Movement1's UI
+        Statictext(win, "I. Four of a Kind",init_x+5, init_y+5, 
+                    150, 'H', 'title') // The title of the movement
+
+        // Setting up rec1's checkbox and target
+        Checkbox(win, "rec1", init_x+5, init_y+25, 'S', 'S', 'r1check') 
+        r1check.add_target_method(this, 'rec1handler')
+
+        // Setting up rec2's checkbox and target
+        Checkbox(win, "rec2", init_x+5, 'D', 'S', 'S', 'r2check')
+        r2check.add_target_method(this, 'rec2handler')
+
+        // Setting up rec3's checkbox and target
+        Checkbox(win, "rec3", init_x+5, 'D', 'S', 'S', 'r3check')
+        r3check.add_target_method(this, 'rec3handler')
+
+        // Setting up the all checkbox and target
+        Checkbox(win, "all", init_x+5, 'D', 'S', 'S', 'allcheck')
+        allcheck.add_target_method(this, 'rec4handler')
+
+        // Setting up the Latency text and slider
+        Statictext(win, "Latency", init_x+80, init_y+170, 150, 'H', 'text_latency')
+        Labeled_slider(win, "", init_x-5, init_y+200, 250,
+                                28, 0, 5, 100, 
+                                50, 'integer', 'latency_slider')
+
+        // Set lag or latency value
+        get_latency()
+
+    def get_latency():
+    # A getter method that returns latency
+        lag = symbol_value(latency_slider).value() // latency value
+        lag = lag/1000 // set lag to milliseconds
+
+    def rec1handler(obj, event, x, y):
+    # Handler for rec1 checkbox
+        display "rec1handler", x
+
+        if x:
+            if not recplay1: // long fade time to test this feature
+                recplay1 = recplay(input_ugen, 2, 1.0, 3.0, false)
+            recplay1.run() # needs be in run set to make active
+            recplay1.record(true)
+        else:
+            recplay1.record(false)
+            recplay1.unrun() # does not need to be active now
+
+
+    def rec2handler(obj, event, x, y):
+    # Handler for rec2 checkbox
+        display "rec2handler", x
+
+        if x and recplay1:
+            if not recplay2: // long fade time to test this feature
+                recplay2 = recplay(input_ugen, 2, 1.0, 3.0, false)
+            recplay2.run() # needs be in run set to make active
+            recplay2.record(true)
+
+            # Play recplay1
+            get_latency() // get current latency value
+            recplay1.play().atend(MUTE)
+            recplay1.start(lag)
+        elif not recplay1:
+            print "WARNING: There is no recplay1 Ugen!"
+        else:
+            recplay2.record(false)
+            recplay2.unrun() # does not need to be active now
+            recplay1.stop() // atend is already set up to mute when finished
+
+
+    def rec3handler(obj, event, x, y):
+    # Handler for rec3 checkbox
+        display "rec3handler", x
+
+        if x and recplay1 and recplay2:
+            if not recplay3: // long fade time to test this feature
+                recplay3 = recplay(input_ugen, 2, 1.0, 3.0, false)
+            recplay3.run() # needs be in run set to make active
+            recplay3.record(true)
+
+            # Play recplay1 and recplay2
+            get_latency() // get current latency value
+            recplay1.play().atend(MUTE)
+            recplay1.start(lag)
+            recplay2.play().atend(MUTE)
+            recplay2.start(lag)
+        elif not recplay1 or not recplay2:
+            print "WARNING: Missing recplay1 or/and recplay2 Ugen!"
+        else:
+            recplay3.record(false)
+            recplay3.unrun() # does not need to be active now
+            recplay1.stop() // atend is already set up to mute when finished
+            recplay2.stop()
+
+
+    def rec4handler(obj, event, x, y):
+    # Handler for all checkbox
+        display "rec4handler", x
+
+        if x and recplay1 and recplay2 and recplay3:
+            get_latency() // get current latency value
+            recplay1.play().atend(MUTE)
+            recplay1.start(lag)
+            recplay2.play().atend(MUTE)
+            recplay2.start(lag)
+            recplay3.play().atend(MUTE)
+            recplay3.start(lag)
+        elif (not x) and recplay1 and recplay2 and recplay3:
+            recplay1.stop()
+            recplay2.stop()
+            recplay3.stop()
+        else:
+            print "WARNING: Missing recplay1 or recplay2 or recplay3 Ugen!"
+
