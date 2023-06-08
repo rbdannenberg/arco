@@ -17,7 +17,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 # Name your project here
-set(ARCO_TARGET_NAME daserpent)
+set(ARCO_TARGET_NAME resound)
 
 # Add custom files -- .cpp and .h -- to be compiled and included
 set(CUSTOM_ARCO )
