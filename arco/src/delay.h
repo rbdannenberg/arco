@@ -3,7 +3,19 @@
  * Roger B. Dannenberg
  * Jan 2022
  */
-
+/* Delay buffer (samps) is basically kept full of samples, a timespan of maxdur.
+ * The delay is always at least 1 sample.
+ * To compute the next sample:
+ *   1. find where the head is based on delay time (dur).
+ *   2. read from the head, multiply by feedback (fb), add input and
+ *      store at tail
+ *   3. increment head and tail
+ * The tail points to where to write next, and head points to where to read
+ * next. In the limit, both can point to the same location because we read
+ * first. Thus a delay of 1 requires only 1 sample, and N requires N.
+ * Initially, in case the delay is set to maxdur, we zero everything.
+ * There is no head pointer, only a duration that tells how far to reach back.
+ */
 #ifndef __Delay_H__
 #define __Delay_H__
 
@@ -13,14 +25,14 @@ extern const char *Delay_name;
 
 class Delay : public Ugen {
 public:
-    public Delay_state {
+    struct Delay_state {
         Vec<float> samps;  // delay line
         int tail;  // tail indexes the *next* location to put input
         // tail also indexes the oldest input, which has a delay of
-        // samps.length samples
+        // samps.size() samples
         Sample fb_prev;
     };
-    Vec(Delay_state) states;
+    Vec<Delay_state> states;
     void (Delay::*run_channel)(Delay_state *state);
 
     Ugen_ptr inp;
@@ -35,26 +47,28 @@ public:
     int fb_stride;
     Sample_ptr fb_samps;
 
-    Delay(int id, int nchans, Ugen_ptr inp_, Ugen_ptr dur_, Ugen_ptr fb_, float maxdur) :
-            Ugen(id, 'a', 1) {
+    Delay(int id, int nchans, Ugen_ptr inp_, Ugen_ptr dur_,
+	  Ugen_ptr fb_, float maxdur) : Ugen(id, 'a', 1) {
         inp = inp_;
         dur = dur_;
         fb = fb_;
         states.init(nchans);
 
         for (int i = 0; i < chans; i++) {
-            states[i].samps = new Vec(round(maxdur * AR), true);
-            states[i].head = 0;
-            states[i].head = 0;
+            Vec<Sample> *delay = &states[i].samps;
+            delay->init((int) (maxdur * AR) + 1);  // round up
+            delay->set_size(delay->get_allocated());
+            delay->zero();
+            states[i].tail = 0;
             states[i].fb_prev = 0;
         }
         init_inp(inp);
         init_dur(dur);
-        init_fb(bf);
+        init_fb(fb);
         update_run_channel();
     }
 
-    ~Pwl() {
+    ~Delay() {
         inp->unref();
         dur->unref();
         fb->unref();
@@ -64,38 +78,43 @@ public:
 
     void set_state_max(Delay_state *state, int len) {
         // tail indexes the oldest sample
-        Vec<Sample> *delay = &state->delay;
-        if (len > delay->length) {
-            int old_length = delay->length;
-            int n = len - old_length;
-            Sample_ptr ptr = delay->append_space(n);
-            if (state->delay.allocated > delay->length) {
-                delay->append_space(delay->allocated - delay->length);
-            }  // use all the space
+        Vec<Sample> *delay = &state->samps;
+        int tail = state->tail;
+        if (len > delay->size()) {
+            int old_length = delay->size();
+            Sample_ptr ptr = delay->append_space(len - old_length);
+            delay->set_size(delay->get_allocated());  // use all the space
             // how much did we grow?
-            n = delay->allocated - old_length;
-            // move from tail to old_length to end of vector
-            memmove(&delay[tail + n], &delay[tail], n * sizeof Sample);
-            memset(&delay[tail], 0, n * sizeof Sample);
+            int n = delay->size() - old_length;
+            // how many samples from tail to the end of the old buffer?
+            int m = (tail == 0 ? 0 : old_length - tail);
+            // we had [tuvwxTpqrs], where x is the most recent sample, T
+            // represents tail pointer and oldest sample, and so Tpqrs are
+            // the oldest. When the buffer is extended, we get:
+            // [tuvwxTpqrs???????????????] and we want to convert it to
+            // [tuvwxT00000000000000opqrs] where o was the value at tail T.
+            // opqrs has length m. ??????????????? has length n.
+            memmove(&delay[tail + n], &delay[tail], n * sizeof(Sample));
+            memset(&delay[tail], 0, n * sizeof(Sample));
         }
     }
     
     void set_max(float dur) {
         int len = round(dur * AR);
-        for (int i = 0; i < states.length; i++) {
-            set_state_max(&state[i], len);
+        for (int i = 0; i < states.size(); i++) {
+            set_state_max(&states[i], len);
         }
     }
                 
     void update_run_channel() {
         if (dur->rate == 'a' && fb->rate == 'a') {
-            run_channel = &Delay_aaa_a;
+            run_channel = &Delay::chan_aaa_a;
         } else if (dur->rate == 'a' && fb->rate != 'a') {
-            run_channel = &Delay_aab_a;
+            run_channel = &Delay::chan_aab_a;
         } else if (dur->rate != 'a' && fb->rate == 'a') {
-            run_channel = &Delay_aba_a;
+            run_channel = &Delay::chan_aba_a;
         } else if (dur->rate != 'a' && fb->rate != 'a') {
-            run_channel = &Delay_abb_a;
+            run_channel = &Delay::chan_abb_a;
         }
     }
 
@@ -142,21 +161,22 @@ public:
         Sample_ptr dur = dur_samps;
         Sample_ptr fb = fb_samps;
         int tail = state->tail;
-        Vec<Sample> *delay = &state->delay;
+        Vec<Sample> &delay = state->samps;
         
         for (int i = 0; i < BL; i++) {
             // get from delay line
             int len = round(dur[i] * AR);
-            if (len > delay->length) {
+            if (len > delay.size()) {
                 set_state_max(state, len);
             }
             int head = tail - len;
-            if (head < 0) head += delay->length;
-            *outsamps++ = delay->samps[head];
+            if (head < 0) head += delay.size();
+            Sample out = delay[head];
+            *out_samps++ = out;
             
             // insert input with feedback
-            state->delay[tail] = inp[i] + out * fb[i];
-            if (++tail >= delay->length) tail = 0;  // wrap
+            delay[tail] = inp[i] + out * fb[i];
+            if (++tail >= delay.size()) tail = 0;  // wrap
         }
         state->tail = tail;
     }
@@ -165,10 +185,10 @@ public:
         Sample_ptr inp = inp_samps;
         Sample_ptr dur = dur_samps;
         Sample fb = *fb_samps;
-        Sample fb_prev = state->fb_pref;
+        Sample fb_prev = state->fb_prev;
         Sample fb_incr = (fb - fb_prev) * BL_RECIP;
         int tail = state->tail;
-        Vec<Sample> *delay = &state->delay;
+        Vec<Sample> &delay = state->samps;
         
         state->fb_prev = fb;
 
@@ -176,52 +196,54 @@ public:
             fb_prev += fb_incr;
             // get from delay line
             int len = round(dur[i] * AR);
-            if (len > delay->length) {
+            if (len > delay.size()) {
                 set_state_max(state, len);
             }
             int head = tail - len;
-            if (head < 0) head += delay->length;
-            *outsamps++ = delay->samps[head];
+            if (head < 0) head += delay.size();
+            Sample out = delay[head];
+            *out_samps++ = out;
 
             // insert input with feedback
-            state->delay[tail] = inp[i] + out * fb_prev;
-            if (++tail >= delay->length) tail = 0;  // wrap
+            delay[tail] = inp[i] + out * fb_prev;
+            if (++tail >= delay.size()) tail = 0;  // wrap
         }
         state->tail = tail;
     }
 
     void chan_aba_a(Delay_state *state) {
         Sample_ptr inp = inp_samps;
-        int len = round(*dur_samps);
+        int len = round(*dur_samps * AR);
         Sample_ptr fb = fb_samps;
         int tail = state->tail;
-        Vec<Sample> *delay = &state->delay;
-        if (len > delay->length) {
+        Vec<Sample> &delay = state->samps;
+        if (len > delay.size()) {
             set_state_max(state, len);
         }
 
         for (int i = 0; i < BL; i++) {
             // get from delay line
             int head = tail - len;
-            if (head < 0) head += delay->length;
-            *outsamps++ = delay->samps[head];
+            if (head < 0) head += delay.size();
+            Sample out = delay[head];
+            *out_samps++ = out;
 
             // insert input with feedback
-            state->delay[tail] = inp[i] + out * fb[i];
-            if (++tail >= delay->length) tail = 0;  // wrap
+            delay[tail] = inp[i] + out * fb[i];
+            if (++tail >= delay.size()) tail = 0;  // wrap
         }
         state->tail = tail;
     }
 
     void chan_abb_a(Delay_state *state) {
         Sample_ptr inp = inp_samps;
-        int len = round(*dur_samps);
+        int len = round(*dur_samps * AR);
         Sample fb = *fb_samps;
-        Sample fb_prev = state->fb_pref;
+        Sample fb_prev = state->fb_prev;
         Sample fb_incr = (fb - fb_prev) * BL_RECIP;
         int tail = state->tail;
-        Vec<Sample> *delay = &state->delay;
-        if (len > delay->length) {
+        Vec<Sample> &delay = state->samps;
+        if (len > delay.size()) {
             set_state_max(state, len);
         }
         state->fb_prev = fb;
@@ -230,12 +252,13 @@ public:
             fb_prev += fb_incr;
             // get from delay line
             int head = tail - len;
-            if (head < 0) head += delay->length;
-            *outsamps++ = delay->samps[head];
+            if (head < 0) head += delay.size();
+            Sample out = delay[head];
+            *out_samps++ = out;
 
             // insert input with feedback
-            state->delay[tail] = inp[i] + out * fb_prev;
-            if (++tail >= delay->length) tail = 0;  // wrap
+            delay[tail] = inp[i] + out * fb_prev;
+            if (++tail >= delay.size()) tail = 0;  // wrap
         }
         state->tail = tail;
     }
@@ -245,7 +268,7 @@ public:
         dur_samps = dur->run(current_block);
         fb_samps = fb->run(current_block);
         Delay_state *state = &states[0];
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
             state++;
             inp_samps += inp_stride;

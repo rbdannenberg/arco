@@ -45,6 +45,8 @@ include("${SERPENT_BASE_DIR}/64bit/libraries.txt")
 include("${SERPENT_BASE_DIR}/src/srp_cmake_macros.txt")
 globals_initialize()  # clear global lists for includes and definitions
 
+append_to_global(ALL_COMPILE_DEFINITIONS "O2_NO_O2DISCOVERY=1")
+
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 
@@ -52,9 +54,11 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING
               "Semicolon-separated list of supported configuration types"
               FORCE)
 
-set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "only build forx86_64" FORCE)
+set(CMAKE_OSX_ARCHITECTURES ${CMAKE_SYSTEM_PROCESSOR} CACHE STRING
+			    "only build for local architecture" FORCE)
 
 option(USE_STATIC_LIBS "Build with static libs?" TRUE)
+set(USE_O2 TRUE CACHE STRING "Link Serpent with O2 support" FORCE)
 
 # add arco -- builds audio and arco libraries
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)

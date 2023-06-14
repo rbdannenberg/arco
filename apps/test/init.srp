@@ -52,7 +52,9 @@ def arco_ready():
     if ui_initialized:
         returnn
 
-    Checkbox(win, "Simple test", 5, 5, 170, 'H', 'stcheckbox')
+    display "arco_ready", wxs_default_h, wxs_space
+
+    Checkbox(win, "Simple test", 5, 5, 170, 20, 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
 
     Checkbox(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtcheckbox')
@@ -70,8 +72,10 @@ def arco_ready():
     Checkbox(win, "Play Recorded Output", 'S', 'D', 'S', 'S', 'procheckbox')
     procheckbox.add_target_method(nil, 'play_recorded_output')
 
-    ui_initialized = true
+    Checkbox(win, "Delay Test", 'S', 'D', 'S', 'S', 'dlycheckbox')
+    dlycheckbox.add_target_method(nil, 'delay_test')
 
+    ui_initialized = true
 
 
 def atone_sequence():
@@ -198,7 +202,16 @@ def play_sound_file(rest ignore):
     // a reference because we gave it to m1, but this is non-preemptive
     // and our local m1 shadow holds the reference.
 
+########## DELAY TEST ################
 
+def delay_test(obj, event, x, y):
+    display "delay_test",
+    if x:
+       dly1 = delay(input_ugen, 1.0, 0.1, 2.0)
+       dly1.play()
+    else:
+        dly1.mute()  // immediate stop
+        dly1 = nil   // eventual cleanup when GC frees it
 
 ########## Main Initialization ################
 

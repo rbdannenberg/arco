@@ -94,7 +94,9 @@ See doc/design.md
 #include <unistd.h>
 #include <stdio.h>
 #include <algorithm>  // min
+#ifdef __x86_64__
 #include <xmmintrin.h>
+#endif
 #include <string.h>
 #include <inttypes.h>
 #include "sndfile.h"
@@ -514,7 +516,7 @@ static int callback_entry(float *input, float *output,
         return paContinue;
     }
     // we are RUNNING on the callback
-
+#ifdef  __x86_64__
     _mm_setcsr(_mm_getcsr() | 0x8040); // SSE Denormals handling: At least
     // some Intel processors are *extremely* slow handling denormals
     // which can occur with exponential decay of audio to
@@ -522,6 +524,7 @@ static int callback_entry(float *input, float *output,
     // avoids spikes in computation that cause processing to be slower
     // than real time. This enables denormals-are-zero (DAZ) and
     // flush-to-zero (FTZ) flags for SSE.
+#endif
 
     // Impose artificial load, but stop for a second if underflows happen.
     // I don't think the optimizer will remove a function call.

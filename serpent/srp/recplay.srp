@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # May 2023
 
-def recplay(input, optional chans = 1, optional gain = 1, 
+def recplay(input, optional chans = 1, gain = 1, 
             fade_time = 0.1, loop = false):
     Recplay(chans, input, gain, fade_time, loop)
 

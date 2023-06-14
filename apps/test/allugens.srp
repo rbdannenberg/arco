@@ -39,7 +39,7 @@ class Probe (Ugen):
                    'inp', inp, 'reply_addr', reply_addr)
 
     def probe(period, frames, chan, nchans, stride):
-        o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
+        o2_send_cmd("/arco/probe/probe", 0, "Ufiiiii", id, period,
                     frames, chan, nchans, stride)
         run(true) // suppress warning if we're already in run setx
     
@@ -65,12 +65,15 @@ class Pwl (Ugen):
         set_point_array(points)
 
     def set_point_array(points):
+    # define the shape of the envelope with an array of floats, 
+    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
+    # If the length is odd, a final yn = 0.0 is appended.
         o2_send_start()
         o2_add_int32(id)
         # track cummulative time and samples to avoid accumulated time error
         var time = 0
         var count = 0
-        for i = 0 to len(points) by 2:
+        for i = 0 to len(points) by 2:  // process points pair-wise
             time = time + points[i]
             var samps = round(time * AR - count)
             count = count + samps
@@ -99,21 +102,31 @@ class Pwlb (Ugen):
         set_point_array(points)
 
     def set_point_array(points):
+    # define the shape of the envelope with an array of floats, 
+    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
+    # If the length is odd, a final yn = 0.0 is appended. Times are
+    # converted to block periods (seconds * block_rate).
         // display "Pwlb", points
         o2_send_start()
         o2_add_int32(arco_ugen_id(id))
         # track cummulative time and samples to avoid accumulated time error
-        var time = 0
-        var count = 0
+        var time = 0   // accumulate the total duration (d0 + d1 + ...) here
+        var count = 0  // accumulate the integer block counts here
         // print "               ";
-        for i = 0 to len(points) by 2:
+        for i = 0 to len(points) by 2:  // process points pair-wise
             time = time + points[i]
+	    // Avoid accumulated rounding error from converting durations to
+	    // block counts as follows:
+	    //   count is the block count where this segment begins
+	    //   time * BR is the exact fractional block count where it ends
+	    //   samps is therefore the duration we want with compensation
+	    //   for any accumulated rounding error.
             var samps = round(time * BR - count)
             count = count + samps
             // print samps,
             o2_add_float(samps)  // the number of samples to ramp
             if i + 1 < len(points):  // allowed to omit final zero amplitude
-                print points[i + 1],
+                // print points[i + 1],
                 o2_add_float(points[i + 1])  // the destination amplitude
         // print
         o2_send_finish(0, "/arco/pwlb/env", true)
@@ -307,7 +320,7 @@ class Filerec (Ugen):
 # Roger B. Dannenberg
 # May 2023
 
-def recplay(input, optional chans = 1, optional gain = 1, 
+def recplay(input, optional chans = 1, gain = 1, 
             fade_time = 0.1, loop = false):
     Recplay(chans, input, gain, fade_time, loop)
 
@@ -330,6 +343,21 @@ class Recplay (Ugen):
     def stop():
         o2_send_cmd("/arco/recplay/stop", 0, "U", id)
         
+
+# delay.srp -- feedback delay unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Delay (Ugen):
+    def init(chans, input, dur, fb, maxdur):
+        super.init(create_ugen_id(), "Delay", chans, 'a', "UUUf",
+	           'input', input, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+
+
+def delay(input, dur, fb, maxdur, optional chans = 1):
+    Delay(chans, input, dur, fb, maxdur)  # delay as a function
+
 
 # thru.srp -- audio pass-through
 #

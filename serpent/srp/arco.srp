@@ -517,6 +517,7 @@ class Ugen:
         o2_send_start()  // build and send new method
         o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
         if not omit_chans: // some Ugens, (Probe), do not have chans parameter
+            display "arco.srp:520", chans, type(chans)
             o2_add_int32(chans)
         // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
 
