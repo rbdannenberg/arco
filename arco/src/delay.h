@@ -72,6 +72,9 @@ public:
         inp->unref();
         dur->unref();
         fb->unref();
+        for (int i = 0; i < chans; i++) {
+            states[i].samps.finish();
+        }
     }
 
     const char *classname() { return Delay_name; }

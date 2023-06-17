@@ -29,7 +29,8 @@ written to the same folder as dspmanifest.txt.
 """
 
 NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
-            "mix", "fileplay", "filerec", "fileio", "recplay"]
+            "mix", "fileplay", "filerec", "fileio", "recplay", \
+            "olapitchshift"]
 
 
 def make_makefile(arco_path, manifest, outf):

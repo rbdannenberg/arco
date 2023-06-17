@@ -75,6 +75,9 @@ def arco_ready():
     Checkbox(win, "Delay Test", 'S', 'D', 'S', 'S', 'dlycheckbox')
     dlycheckbox.add_target_method(nil, 'delay_test')
 
+    Checkbox(win, "Pitch Shift Test", 'S', 'D', 'S', 'S', 'pscheckbox')
+    pscheckbox.add_target_method(nil, 'pstest')
+
     ui_initialized = true
 
 
@@ -205,13 +208,24 @@ def play_sound_file(rest ignore):
 ########## DELAY TEST ################
 
 def delay_test(obj, event, x, y):
-    display "delay_test",
+    display "delay_test", x
     if x:
        dly1 = delay(input_ugen, 1.0, 0.1, 2.0, 2)
        dly1.play()
     else:
         dly1.mute()  // immediate stop
         dly1 = nil   // eventual cleanup when GC frees it
+
+########## PITCH SHIFT TEST #############
+
+def pstest(obj, event, x, y):
+    display "pstest - pitch shift", x
+    if x:
+       ps1 = ola_pitch_shift(input_ugen, 1.25, 0.01, 0.05)
+       ps1.play()
+    else:
+       ps1.mute()  // immediate stop
+       ps1 = nil   // eventual cleanup when GC frees it
 
 ########## Main Initialization ################
 
