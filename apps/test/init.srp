@@ -207,7 +207,7 @@ def play_sound_file(rest ignore):
 def delay_test(obj, event, x, y):
     display "delay_test",
     if x:
-       dly1 = delay(input_ugen, 1.0, 0.1, 2.0)
+       dly1 = delay(input_ugen, 1.0, 0.1, 2.0, 2)
        dly1.play()
     else:
         dly1.mute()  // immediate stop

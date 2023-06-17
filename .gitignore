@@ -46,3 +46,7 @@ CMakeCache.txt
 /doc/ugens.md.old
 
 /serpent/srp/pwl.srp.old
+
+/arco/src/olapitchshift.cpp
+
+/arco/src/olapitchshift.h

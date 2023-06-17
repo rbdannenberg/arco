@@ -48,7 +48,7 @@ public:
     Sample_ptr fb_samps;
 
     Delay(int id, int nchans, Ugen_ptr inp_, Ugen_ptr dur_,
-	  Ugen_ptr fb_, float maxdur) : Ugen(id, 'a', 1) {
+	  Ugen_ptr fb_, float maxdur) : Ugen(id, 'a', nchans) {
         inp = inp_;
         dur = dur_;
         fb = fb_;

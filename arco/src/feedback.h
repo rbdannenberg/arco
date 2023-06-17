@@ -1,0 +1,135 @@
+/* feedback.h -- unit generator that passes audio through
+ *
+ * Roger B. Dannenberg
+ * Jan 2022
+ */
+
+extern const char *Feedback_name;
+
+class Feedback : public Ugen {
+  public:
+    struct Feedback_state {
+        Sample gain_prev;  // used for interpolation
+    };
+    Vec<Feedback_state> states;
+    void (Feedback::*run_channel)(Feedback_state *state);
+    
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
+
+    Ugen_ptr gain;
+    int gain_stride;
+    Sample_ptr gain_samps;
+    
+    Ugen_ptr from;  // feedback is comes from here
+    int from_stride;
+    Sample_ptr from_samps;
+
+    Feedback(int id, int nchans, Ugen_ptr inp, Ugen_ptr from, Ugen_ptr gain) :
+            Ugen(id, 'a', nchans) {
+        states.init(chans);
+        init_input(inp);
+        init_from(from);
+        init_gain(gain);
+        run_channel = (void (Feedback::*)(Feedback_state *)) 0;
+        update_run_channel();
+    }
+
+    ~Feedback() {
+        input->unref();
+        gain->unref();
+        from->unref();  // actually, if from is referenced, then it probably
+        // forms a cycle, so we cannot be deconstructed. Normally, you have
+        // to break the cycle by setting the feedback to the zero Ugen, which
+        // never gets freed, so we don't really have to unref it; however, it
+        // is possible that from is not downstream and there's no cycle, so
+        // we really want to unref it here to maintain reference counting.
+    }
+
+    const char *classname() { return Feedback_name; }
+
+    void initialize_channel_state()
+        for (int i = 0; i < chans; i++) {
+            states[i].gain_prev = 0.0f;
+        }
+    }
+
+
+    void update_run_channel() {
+        // initialize run_channel based on input types
+        void (Feedback::*new_run_channel)(Feedback_state *state);
+        if (gain->rate == 'a') {
+            new_run_channel = &Feedback::chan_aa_a;
+        } else {
+            new_run_channel = &Feedback::chan_ab_a;
+        }
+        if (new_run_channel != run_channel) {
+            initialize_channel_states();
+            run_channel = new_run_channel;
+        }
+    }
+
+    void print_sources(int indent, bool print) {
+        input->print_tree(indent, print, "input");
+        from->print_tree(indent, print, "from");
+        gain->print_tree(indent, print, "gain");
+    }
+
+    void repl_input(Ugen_ptr inp) {
+        input->unref();
+        init_input(inp);
+    }
+
+    void repl_from(Ugen_ptr from) {
+        from->unref();
+        init_from(from);
+    }
+
+    void repl_gain(Ugen_ptr gain) {
+        gain->unref();
+        init_gain(gain);
+        update_run_channel();
+    }
+
+    void set_gain(int chan, float g) {
+        assert(gain->rate == 'c');
+        gain->output[chan] = g;
+    }
+
+    void init_input(Ugen_ptr inp) { init_param(inp, input, input_stride); }
+
+    void init_from(Ugen_ptr frm) { init_param(frm, from, from_stride); }
+
+    void init_gain(Ugen_ptr gn) { init_param(gn, gain, gain_stride); }
+
+    void chan_aa_a(Feedback_state *state) {
+        for (int i = 0; i < BL; i++) {
+            *out_samps++ = input_samps[i] + from_samps[i] * gain_samps[i];
+        }
+    }
+
+    void chan_ab_a(Feedback_state *state) {
+        Sample gain_inc = (*gain_samps - state->gain_prev) * BL_RECIP;
+        Sample gain_fast = state->gain_prev;
+        state->gain_prev = *gain_samps;
+        for (int i = 0; i < BL; i++) {
+            gain_fast += gain_incr;
+            *out_samps++ = input_samps[i] + from_samps[i] * gain_fast;
+        }
+    }
+
+    void real_run() {
+        Sample_ptr input_samps = input->run(current_block);  // update input
+        Sample_ptr from_samps = &from->output[0];  // use previous block
+        Sample_ptr gain_samps = gain->run(current_block);  // update gain
+        Feedback_state *state = &states[0];
+        for (int i = 0; i < chans; i++) {
+            (this->*run_channel)(state);
+            state++;
+            input_samps += input_stride;
+            from_samps += from_stride;
+            gain_samps += gain_stride;
+        }
+    }
+};
