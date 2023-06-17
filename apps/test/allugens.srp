@@ -359,6 +359,19 @@ def delay(input, dur, fb, maxdur, optional chans = 1):
     Delay(chans, input, dur, fb, maxdur)  # delay as a function
 
 
+# olapitchshift.srp -- overlap add pitch shift unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Ola_pitch_shift (Ugen):
+    def init(chans, input, ratio, xfade, windur):
+        super.init(create_ugen_id(), "olaps", chans, 'a', "Ufff",
+	           'input', input, 'ratio', ratio, 'xfade', xfade,
+                   'windur', windur)
+
+def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
+    Ola_pitch_shift(chans, input, ratio, xfade, windur)
 # thru.srp -- audio pass-through
 #
 # Roger B. Dannenberg

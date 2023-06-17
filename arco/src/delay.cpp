@@ -10,7 +10,7 @@
 const char *Delay_name = "Delay";
 
 /* O2SM INTERFACE: /arco/delay/new int32 id, int32 chans, 
-                                   int32 inp, int32 dur, int32 fb, float maxdur;
+            int32 inp, int32 dur, int32 fb, float maxdur;
  */
 void arco_delay_new(O2SM_HANDLER_ARGS)
 {
@@ -22,7 +22,7 @@ void arco_delay_new(O2SM_HANDLER_ARGS)
     int32_t fb = argv[4]->i;
     float maxdur = argv[5]->f;
     // end unpack message
-    
+
     ANY_UGEN_FROM_ID(inp_ugen, inp, "arco_delay_new");
     ANY_UGEN_FROM_ID(dur_ugen, dur, "arco_delay_new");
     ANY_UGEN_FROM_ID(fb_ugen, fb, "arco_delay_new");
@@ -31,7 +31,22 @@ void arco_delay_new(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/delay/set_max int32 id, float dur;
+/* O2SM INTERFACE: /arco/delay/repl_inp int32 id, int32 inp_id;
+ */
+static void arco_delay_repl_inp(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t inp_id = argv[1]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Delay, delay, id, "arco_delay_repl_inp");
+    ANY_UGEN_FROM_ID(inp, inp_id, "arco_delay_repl_inp");
+    delay->repl_inp(inp);
+}
+
+
+/* O2SM INTERFACE: /arco/delay/max int32 id, float dur;
  */
 void arco_delay_set_max(O2SM_HANDLER_ARGS)
 {
@@ -108,12 +123,20 @@ static void arco_delay_set_fb(O2SM_HANDLER_ARGS)
 static void delay_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/delay/new", "iiiiif", arco_delay_new, NULL, true, true);
-    o2sm_method_new("/arco/delay/set_max", "if", arco_delay_set_max, NULL, true, true);
-    o2sm_method_new("/arco/delay/repl_dur", "ii", arco_delay_repl_dur, NULL, true, true);
-    o2sm_method_new("/arco/delay/set_dur", "iif", arco_delay_set_dur, NULL, true, true);
-    o2sm_method_new("/arco/delay/repl_fb", "ii", arco_delay_repl_fb, NULL, true, true);
-    o2sm_method_new("/arco/delay/set_fb", "iif", arco_delay_set_fb, NULL, true, true);
+    o2sm_method_new("/arco/delay/new", "iiiiif", arco_delay_new, NULL, true,
+                     true);
+    o2sm_method_new("/arco/delay/repl_inp", "ii", arco_delay_repl_inp, NULL,
+                     true, true);
+    o2sm_method_new("/arco/delay/max", "if", arco_delay_set_max, NULL, true,
+                     true);
+    o2sm_method_new("/arco/delay/repl_dur", "ii", arco_delay_repl_dur, NULL,
+                     true, true);
+    o2sm_method_new("/arco/delay/set_dur", "iif", arco_delay_set_dur, NULL,
+                     true, true);
+    o2sm_method_new("/arco/delay/repl_fb", "ii", arco_delay_repl_fb, NULL,
+                     true, true);
+    o2sm_method_new("/arco/delay/set_fb", "iif", arco_delay_set_fb, NULL,
+                     true, true);
     // END INTERFACE INITIALIZATION
 }
 
