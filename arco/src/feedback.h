@@ -12,6 +12,7 @@ class Feedback : public Ugen {
         Sample gain_prev;  // used for interpolation
     };
     Vec<Feedback_state> states;
+    Vec<Sample> feedback;
     void (Feedback::*run_channel)(Feedback_state *state);
     
     Ugen_ptr input;
@@ -49,7 +50,7 @@ class Feedback : public Ugen {
 
     const char *classname() { return Feedback_name; }
 
-    void initialize_channel_state()
+    void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
             states[i].gain_prev = 0.0f;
         }
@@ -81,14 +82,15 @@ class Feedback : public Ugen {
         init_input(inp);
     }
 
-    void repl_from(Ugen_ptr from) {
+    void repl_from(Ugen_ptr f) {
         from->unref();
-        init_from(from);
+        init_from(f);
+        feedback.init(from->chans * BL, true);
     }
 
-    void repl_gain(Ugen_ptr gain) {
+    void repl_gain(Ugen_ptr g) {
         gain->unref();
-        init_gain(gain);
+        init_gain(g);
         update_run_channel();
     }
 
@@ -114,15 +116,15 @@ class Feedback : public Ugen {
         Sample gain_fast = state->gain_prev;
         state->gain_prev = *gain_samps;
         for (int i = 0; i < BL; i++) {
-            gain_fast += gain_incr;
+            gain_fast += gain_inc;
             *out_samps++ = input_samps[i] + from_samps[i] * gain_fast;
         }
     }
 
     void real_run() {
-        Sample_ptr input_samps = input->run(current_block);  // update input
-        Sample_ptr from_samps = &from->output[0];  // use previous block
-        Sample_ptr gain_samps = gain->run(current_block);  // update gain
+        input_samps = input->run(current_block);  // update input
+        from_samps = &feedback[0];  // use previous block
+        gain_samps = gain->run(current_block);  // update gain
         Feedback_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
@@ -131,5 +133,11 @@ class Feedback : public Ugen {
             from_samps += from_stride;
             gain_samps += gain_stride;
         }
+        // tricky: we could not update "from" earlier because that would
+        // create a cycle of dependencies and infinite recursion, but now
+        // we get samples from "from" to be used as feedback to the next
+        // call to real_run():
+        from_samps = from->run(current_block);
+        memcpy(&feedback[0], from_samps, from->chans * BL);
     }
 };

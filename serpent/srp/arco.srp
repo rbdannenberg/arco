@@ -592,15 +592,15 @@ class Ugen:
                     print previous.chans, "channels but attempt to set channel",
                     print chan
                     return
-                o2_send_cmd("/arco/" + tolower(classname) + "/set_" + input,
-                            0, "Uif", id, chan, value)
+                o2_send_cmd("/arco/" + tolower(classname) +
+                            "/set_" + str(input), 0, "Uif", id, chan, value)
                 return
             // otherwise, make a Const object to hold the value
             value = const(value)  // replacing 'a' or 'b' with 'c'
         // value is a Ugen which is the new input value
         inputs[input] = value
-        o2_send_cmd("/arco/" + tolower(classname) + "/repl_" + input,
-                    0, "UU", id, value.id)
+        o2_send_cmd("/arco/" + tolower(classname) +
+                    "/repl_" + str(input), 0, "UU", id, value.id)
         this
 
 

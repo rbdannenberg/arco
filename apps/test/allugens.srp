@@ -372,6 +372,23 @@ class Ola_pitch_shift (Ugen):
 
 def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
     Ola_pitch_shift(chans, input, ratio, xfade, windur)
+# feedback.srp -- mix input with most recent output of some Ugen
+#
+# Roger B. Dannenberg
+# June 2023
+#
+# By NOT calling the "from" ugen to update, feedback avoids creating a cyclical
+# dependency in an audio graph, at the cost of using "stale" samples from
+# the "from" source, which will normally be the previous 32 samples, creating
+# feedback with a 32-sample delay.
+
+class Feedback (Ugen):
+    def init(chans, input, from, gain):
+        super.init(create_ugen_id(), "feedback", chans, 'a', "UUU",
+	           'input', input, 'from', from, 'gain', gain)
+
+def feedback(input, from, gain, optional chans = 1):
+    Feedback(chans, input, from, gain)
 # thru.srp -- audio pass-through
 #
 # Roger B. Dannenberg
