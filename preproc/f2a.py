@@ -432,7 +432,7 @@ def insert_interpolation(body, varlist):
     body_end = body[loc : ]
     for var in slow_vars:
         body_end = body_end.replace(var, var + "_fast")
-    return (body, slow_vars)
+    return (body_begin + body_end, slow_vars)
 
 
 def find_b_rate_parameter_faust_names(classname, param_info, src):
