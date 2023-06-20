@@ -81,14 +81,14 @@ public:
 
     void set_state_max(Delay_state *state, int len) {
         // tail indexes the oldest sample
-        Vec<Sample> *delay = &state->samps;
+        Vec<Sample> &delay = state->samps;
         int tail = state->tail;
-        if (len > delay->size()) {
-            int old_length = delay->size();
-            Sample_ptr ptr = delay->append_space(len - old_length);
-            delay->set_size(delay->get_allocated());  // use all the space
+        if (len > delay.size()) {
+            int old_length = delay.size();
+            Sample_ptr ptr = delay.append_space(len - old_length);
+            delay.set_size(delay.get_allocated());  // use all the space
             // how much did we grow?
-            int n = delay->size() - old_length;
+            int n = delay.size() - old_length;
             // how many samples from tail to the end of the old buffer?
             int m = (tail == 0 ? 0 : old_length - tail);
             // we had [tuvwxTpqrs], where x is the most recent sample, T
