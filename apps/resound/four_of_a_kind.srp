@@ -46,15 +46,17 @@ class Four_of_a_kind:
         allcheck.add_target_method(this, 'rec4handler')
 
         // Setting up the Latency text and slider
-        Statictext(win, "Latency", init_x+80, init_y+170, 150, 'H', 'text_latency')
+        Statictext(win, "Latency", init_x+80, init_y+170, 150, 'H',
+                    'text_latency')
         Labeled_slider(win, "", init_x-5, init_y+200, 250,
                                 28, 0, 5, 100, 
                                 50, 'integer', 'latency_slider')
+        latency_slider.add_target_method(this, 'lshandler')
 
-
-    def get_latency():
-    # A getter method that returns latency
-        latency = latency_slider.value()/1000 
+    def lshandler(obj, x):
+    # latency slider handler, note that Latency_slider is not a wxserpent
+    # built-in control and it has a different signature for the handler
+        latency = x / 1000
 
     def rec1handler(obj, event, x, y):
     # Handler for rec1 checkbox
@@ -72,7 +74,7 @@ class Four_of_a_kind:
 
     def rec2handler(obj, event, x, y):
     # Handler for rec2 checkbox
-        display "rec2handler", x
+        display "rec2handler", x, latency
 
         if x and recplay1:
             if not recplay2: // long fade time to test this feature
@@ -81,7 +83,6 @@ class Four_of_a_kind:
             recplay2.record(true)
 
             # Play recplay1
-            get_latency() // get current latency value
             recplay1.play().atend(MUTE)
             recplay1.start(latency)
         elif not recplay1:
@@ -94,7 +95,7 @@ class Four_of_a_kind:
 
     def rec3handler(obj, event, x, y):
     # Handler for rec3 checkbox
-        display "rec3handler", x
+        display "rec3handler", x, latency
 
         if x and recplay1 and recplay2:
             if not recplay3: // long fade time to test this feature
@@ -103,7 +104,6 @@ class Four_of_a_kind:
             recplay3.record(true)
 
             # Play recplay1 and recplay2
-            get_latency() // get current latency value
             recplay1.play().atend(MUTE)
             recplay1.start(latency)
             recplay2.play().atend(MUTE)
@@ -119,10 +119,9 @@ class Four_of_a_kind:
 
     def rec4handler(obj, event, x, y):
     # Handler for all checkbox
-        display "rec4handler", x
+        display "rec4handler", x, latency
 
         if x and recplay1 and recplay2 and recplay3:
-            get_latency() // get current latency value
             recplay1.play().atend(MUTE)
             recplay1.start(latency)
             recplay2.play().atend(MUTE)
