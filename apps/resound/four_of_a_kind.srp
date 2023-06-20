@@ -5,7 +5,7 @@
 class Four_of_a_kind:
 # Instance variables
     var recplay1, recplay2, recplay3 // recplay objects
-    var win, lag, init_x, init_y, latency // GUI params
+    var win, init_x, init_y, latency // GUI params
 
     def init(window, x, y):
     # Initialization of instance variables
