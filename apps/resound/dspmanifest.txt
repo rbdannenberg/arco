@@ -9,3 +9,4 @@ fileplay
 filerec
 recplay
 delay
+olapitchshift
