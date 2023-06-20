@@ -5,7 +5,7 @@
 class Four_of_a_kind:
 # Instance variables
     var recplay1, recplay2, recplay3 // recplay objects
-    var win, lag, init_x, init_y, check_lag // GUI params
+    var win, init_x, init_y, latency // GUI params
 
     def init(window, x, y):
     # Initialization of instance variables
@@ -15,12 +15,14 @@ class Four_of_a_kind:
         recplay3 = nil
 
         win = window // Main UI window
-        lag = nil // latency
         init_x = x // set the starting x coord of the movement
         init_y = y // set the starting y coord of the movement
 
         // Setup UI
         this.set_ui()
+
+        // Initialize latency value in milliseconds
+        latency = latency_slider.value()/1000 
 
     def set_ui():
     # Setting up Movement1's UI
@@ -49,13 +51,10 @@ class Four_of_a_kind:
                                 28, 0, 5, 100, 
                                 50, 'integer', 'latency_slider')
 
-        // Set lag or latency value
-        get_latency()
 
     def get_latency():
     # A getter method that returns latency
-        lag = symbol_value(latency_slider).value() // latency value
-        lag = lag/1000 // set lag to milliseconds
+        latency = latency_slider.value()/1000 
 
     def rec1handler(obj, event, x, y):
     # Handler for rec1 checkbox
@@ -84,7 +83,7 @@ class Four_of_a_kind:
             # Play recplay1
             get_latency() // get current latency value
             recplay1.play().atend(MUTE)
-            recplay1.start(lag)
+            recplay1.start(latency)
         elif not recplay1:
             print "WARNING: There is no recplay1 Ugen!"
         else:
@@ -106,9 +105,9 @@ class Four_of_a_kind:
             # Play recplay1 and recplay2
             get_latency() // get current latency value
             recplay1.play().atend(MUTE)
-            recplay1.start(lag)
+            recplay1.start(latency)
             recplay2.play().atend(MUTE)
-            recplay2.start(lag)
+            recplay2.start(latency)
         elif not recplay1 or not recplay2:
             print "WARNING: Missing recplay1 or/and recplay2 Ugen!"
         else:
@@ -125,11 +124,11 @@ class Four_of_a_kind:
         if x and recplay1 and recplay2 and recplay3:
             get_latency() // get current latency value
             recplay1.play().atend(MUTE)
-            recplay1.start(lag)
+            recplay1.start(latency)
             recplay2.play().atend(MUTE)
-            recplay2.start(lag)
+            recplay2.start(latency)
             recplay3.play().atend(MUTE)
-            recplay3.start(lag)
+            recplay3.start(latency)
         elif (not x) and recplay1 and recplay2 and recplay3:
             recplay1.stop()
             recplay2.stop()
