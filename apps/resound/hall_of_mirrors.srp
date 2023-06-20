@@ -15,7 +15,7 @@ class Shift_delay_bank:
 
     def set_delay(i, delay_value):
     # Sets the delay of the ith delay objects
-        delay_objs[i].set('dur', delay_value, -1)
+        delay_objs[i].set('dur', delay_value)
 
 
     

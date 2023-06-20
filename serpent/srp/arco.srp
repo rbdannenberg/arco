@@ -584,6 +584,7 @@ class Ugen:
         var previous = inputs.get(input)
         if not previous:
             print "ERROR:", input, "not found in", classname
+            breakpoint()
             return
         if isnumber(value):
             if previous.rate == 'c':  // set the output of existing Const object
@@ -591,6 +592,7 @@ class Ugen:
                     print "ERROR: const", input, "of", classname, "has",
                     print previous.chans, "channels but attempt to set channel",
                     print chan
+                    breakpoint()
                     return
                 o2_send_cmd("/arco/" + tolower(classname) +
                             "/set_" + str(input), 0, "Uif", id, chan, value)
@@ -713,7 +715,8 @@ def const(x):
     var chans = 1
     if isarray(x):
         chans = len(x)
-    var ugen = Ugen(create_ugen_id(), "Const", -chans, 'c', "")
+    var ugen = Ugen(create_ugen_id(), "Const", chans, 'c', "",
+                    omit_chans = true)
     if isarray(x):
         o2_send_cmd("/arco/const/new", 0, "Ui", ugen.id, chans)
         for f at i in x:  // send "set" message for each channel
