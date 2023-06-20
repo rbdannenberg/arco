@@ -476,7 +476,7 @@ class Ugen:
     # Even though provided as an array so that we can get the order
     # right when we send the /arco/*/new message, the inputs_ are
     # retained in dictionary form for quick lookup in the set() method.
-    # SPECIAL HACK: if no_msg is true, send a new message so that 
+    # SPECIAL HACK: if no_msg is true, do not send a new message so
     # caller can issue a special message, and IGNORE inputs_
     # SPECIAL HACK #2: if omit_chans is true, omit adding chans as the
     # usual 2nd parameter in the /arco/*/new message.
@@ -710,22 +710,26 @@ def zerob(): zerob_ugen
 //        return Ugen(create_ugen_id(), "Sineb", chans, 'b', "UU", 
 //                    'freq', freq, 'amp', amp)
 
+class Const (Ugen):
+    def init(x, optional chans = 1):
+        if isarray(x):
+            chans = max(len(x), 1)
+        super.init(create_ugen_id(), "Const", chans, 'c', "", no_msg = true)
+        if chans > 1:
+            o2_send_cmd("/arco/const/new", 0, "Ui", id, chans)
+            for i = 0 to chans:  // send "set" message for each channel
+                var f = x    if isnumber(x) else
+                        (x[i] if len(x) > i else
+                         (x[0] if len(x) == 1 else
+                          x.last()))
+                o2_send_start()
+                o2_add_int32(arco_ugen_id(id))
+                o2_add_int32(i)
+                o2_add_float(real(f))
+                o2_send_finish(0, "/arco/const/set", true)
+        else: // simple case - 1 channel Const and initial value in one message
+            o2_send_cmd("/arco/const/newf", 0, "Uf", id, x)
 
-def const(x):
-    var chans = 1
-    if isarray(x):
-        chans = len(x)
-    var ugen = Ugen(create_ugen_id(), "Const", chans, 'c', "",
-                    omit_chans = true)
-    if isarray(x):
-        o2_send_cmd("/arco/const/new", 0, "Ui", ugen.id, chans)
-        for f at i in x:  // send "set" message for each channel
-            o2_send_start()
-            o2_add_int32(arco_ugen_id(ugen.id))
-            o2_add_int32(i)
-            o2_add_float(real(f))
-            o2_send_finish(0, "/arco/const/set", true)
-    else: // simple case - 1 channel Const and initial value in one message
-        o2_send_cmd("/arco/const/newf", 0, "Uf", ugen.id, x)
-    // print "sent /arco/const/newf, id", ugen.id, "value", x
-    return ugen
+
+def const(x, optional chans = 1):
+    return Const(x, chans)
