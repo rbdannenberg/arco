@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "mult"
-Code generated with Faust 2.37.3 (https://faust.grame.fr)
-Compilation options: -lang cpp -light -es 1 -single -ftz 0
+Code generated with Faust 2.59.6 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Mult -es 1 -mcd 16 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Mult_H__
@@ -22,7 +22,6 @@ Compilation options: -lang cpp -light -es 1 -single -ftz 0
 #include <cmath>
 #include <cstdint>
 
-
 #ifndef FAUSTCLASS 
 #define FAUSTCLASS Mult
 #endif
@@ -30,6 +29,12 @@ Compilation options: -lang cpp -light -es 1 -single -ftz 0
 #ifdef __APPLE__ 
 #define exp10f __exp10f
 #define exp10 __exp10
+#endif
+
+#if defined(_WIN32)
+#define RESTRICT __restrict
+#else
+#define RESTRICT __restrict__
 #endif
 /*-------------- END FAUST PREAMBLE --------------*/
 
@@ -52,7 +57,8 @@ public:
     Sample_ptr x2_samps;
 
 
-    Mult(int id, int nchans, Ugen_ptr x1_, Ugen_ptr x2_) : Ugen(id, 'a', nchans) {
+    Mult(int id, int nchans, Ugen_ptr x1_, Ugen_ptr x2_) :
+            Ugen(id, 'a', nchans) {
         x1 = x1_;
         x2 = x2_;
         states.init(chans);
@@ -72,6 +78,7 @@ public:
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
+
             states[i].fSlow0_prev = 0.0f;
         }
     }
@@ -136,8 +143,8 @@ public:
     void chan_aa_a(Mult_state *state) {
         FAUSTFLOAT* input0 = x1_samps;
         FAUSTFLOAT* input1 = x2_samps;
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            *out_samps++ = FAUSTFLOAT((float(input0[i0]) * float(input1[i0])));
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            *out_samps++ = FAUSTFLOAT(float(input0[i0]) * float(input1[i0]));
         }
     }
 
@@ -147,9 +154,9 @@ public:
         Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
         Sample fSlow0_fast = state->fSlow0_prev;
         state->fSlow0_prev = fSlow0;
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             fSlow0_fast += fSlow0_incr;
-            *out_samps++ = FAUSTFLOAT((fSlow0 * float(input0[i0])));
+            *out_samps++ = FAUSTFLOAT(fSlow0_fast * float(input0[i0]));
         }
     }
 
@@ -159,20 +166,20 @@ public:
         Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
         Sample fSlow0_fast = state->fSlow0_prev;
         state->fSlow0_prev = fSlow0;
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             fSlow0_fast += fSlow0_incr;
-            *out_samps++ = FAUSTFLOAT((fSlow0 * float(input0[i0])));
+            *out_samps++ = FAUSTFLOAT(fSlow0_fast * float(input0[i0]));
         }
     }
 
     void chan_bb_a(Mult_state *state) {
-        float fSlow0 = (float(*x1_samps) * float(*x2_samps));
+        float fSlow0 = float(*x1_samps) * float(*x2_samps);
         Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
         Sample fSlow0_fast = state->fSlow0_prev;
         state->fSlow0_prev = fSlow0;
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             fSlow0_fast += fSlow0_incr;
-            *out_samps++ = FAUSTFLOAT(fSlow0);
+            *out_samps++ = FAUSTFLOAT(fSlow0_fast);
         }
     }
 

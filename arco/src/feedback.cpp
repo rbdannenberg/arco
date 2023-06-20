@@ -62,7 +62,7 @@ void arco_feedback_repl_from(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/feedback/repl_gain int32 id, int32 gain;
  */
-void arco_feedback_repl_inp(O2SM_HANDLER_ARGS)
+void arco_feedback_repl_gain(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -71,7 +71,7 @@ void arco_feedback_repl_inp(O2SM_HANDLER_ARGS)
 
     UGEN_FROM_ID(Feedback, feedback, id, "arco_feedback_repl_gain")
     ANY_UGEN_FROM_ID(ugen, gain, "arco_feedback_repl_gain");
-    feedback->repl_inp(ugen);
+    feedback->repl_gain(ugen);
 }
 
 

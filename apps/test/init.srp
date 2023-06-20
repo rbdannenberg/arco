@@ -50,7 +50,7 @@ def arco_ready():
     print "**** arco audio is running! ****"
     var win = default_window
     if ui_initialized:
-        returnn
+        return
 
     display "arco_ready", wxs_default_h, wxs_space
 
@@ -77,6 +77,10 @@ def arco_ready():
 
     Checkbox(win, "Pitch Shift Test", 'S', 'D', 'S', 'S', 'pscheckbox')
     pscheckbox.add_target_method(nil, 'pstest')
+
+    Checkbox(win, "Feedback Test", 'S', 'D', 'S', 'S', 'fbcheckbox')
+    fbcheckbox.add_target_method(nil, 'fbtest')
+
 
     ui_initialized = true
 
@@ -210,8 +214,8 @@ def play_sound_file(rest ignore):
 def delay_test(obj, event, x, y):
     display "delay_test", x
     if x:
-       dly1 = delay(input_ugen, 1.0, 0.1, 2.0, 2)
-       dly1.play()
+        dly1 = delay(input_ugen, 1.0, 0.1, 2.0, 2)
+        dly1.play()
     else:
         dly1.mute()  // immediate stop
         dly1 = nil   // eventual cleanup when GC frees it
@@ -221,11 +225,30 @@ def delay_test(obj, event, x, y):
 def pstest(obj, event, x, y):
     display "pstest - pitch shift", x
     if x:
-       ps1 = ola_pitch_shift(input_ugen, 1.25, 0.01, 0.05)
-       ps1.play()
+        ps1 = ola_pitch_shift(input_ugen, 1.25, 0.01, 0.05)
+        ps1.play()
     else:
-       ps1.mute()  // immediate stop
-       ps1 = nil   // eventual cleanup when GC frees it
+        ps1.mute()  // immediate stop
+        ps1 = nil   // eventual cleanup when GC frees it
+
+########## FEEDBACK TEST #############
+
+def fbtest(obj, event, x, y):
+# create a delay with no internal feedback and use a feedback ugen to
+# produce feedback. The delay test used 0.1 gain on feedback so we do
+# the same here, and set delay to 1 second as with delay test.
+    display "fbtest - feedback", x
+    if x:
+        // initially "from" is zero; then we'll replace it with delay
+        fb1 = feedback(input_ugen, zero_ugen, 0.5)
+        fb2 = delay(fb1, 1.0, 0.0, 2.0)
+        fb1.set('from', fb2)  // feedback from delay output
+        fb2.play()
+    else:
+        fb2.mute()  // immediate stop
+        fb1.set("from", zero_ugen)  // break the cycle to allow GC
+        fb1 = nil   // eventual cleanup when GC frees it
+        fb2 = nil
 
 ########## Main Initialization ################
 
