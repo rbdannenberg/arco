@@ -15,6 +15,7 @@ require "allugens"
 require "slider"
 require "arcoslider"
 require "four_of_a_kind"
+require "hall_of_mirrors"
 
 
 # Definition of Global Variables
@@ -26,12 +27,15 @@ def arco_ready():
     # arco audio stream has been reopened
 
     print "**** arco audio is running! ****"
-    var win = default_window
+    var default_win = default_window
     if ui_initialized:
         return
 
     # four_of_a_kind.srp initialization
-    Four_of_a_kind(win, 5, 5)
+    Four_of_a_kind(default_win, 5, 5)
+
+    # hall_of_mirrors.srp initialization
+    Hall_of_mirrors(default_win, 5, 5)
 
     ui_initialized = true
   
