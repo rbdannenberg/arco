@@ -81,6 +81,8 @@ def arco_ready():
     Checkbox(win, "Feedback Test", 'S', 'D', 'S', 'S', 'fbcheckbox')
     fbcheckbox.add_target_method(nil, 'fbtest')
 
+    Checkbox(win, "Granstream Test", 'S', 'D', 'S', 'S', 'gscheckbox')
+    gscheckbox.add_target_method(nil, 'gstest')
 
     ui_initialized = true
 
@@ -246,9 +248,23 @@ def fbtest(obj, event, x, y):
         fb2.play()
     else:
         fb2.mute()  // immediate stop
-        fb1.set("from", zero_ugen)  // break the cycle to allow GC
+        fb1.set('from', zero_ugen)  // break the cycle to allow GC
         fb1 = nil   // eventual cleanup when GC frees it
         fb2 = nil
+
+
+########## GRANSTREAM TEST #############
+
+def gstest(obj, event, x, y):
+# create a granstream to granulate microphone input
+    display "gstest - granstream applied microphone input ", x
+    if x:
+//        gs1 = granstream(input_ugen, 20, 3.0, true, 2)  // 2 channel
+        gs1 = granstream(input_ugen, 20, 1.0, true, 1)  // 2 channel
+        gs1.play()
+    else:
+        gs1.mute()  // immediate stop
+        gs1 = nil   // eventual cleanup
 
 ########## Main Initialization ################
 

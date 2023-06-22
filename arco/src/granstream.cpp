@@ -1,4 +1,4 @@
-/* Igranstr instrument, granular synthesis on streaming input. */
+/* granstream.cpp - granular synthesis on streaming input. */
 
 // AVOIDING OVER/UNDERFLOW: We'll pull samples from buffer,
 // so picture a graph with time horizontal and buffer
@@ -35,252 +35,101 @@
 // end within the buffer, all intermediate reads will be within
 // the buffer.
 
-#include "audioincl.h"
-#include "uenv.h"
-#include "umul.h"
-#include "uadd.h"
-#include "igranstr.h"
+#include "arcougen.h"
+#include "fastrand.h"
+#include "granstream.h"
 
-Igranstr::Igranstr()
-{
-    high = 1.0;
-    low = 1.0;
-    highdur = 0.05;
-    lowdur = 0.05;
-    delay = 0.0;
-    density = 0.5;
-    gate = 0.0;
-    attack = 0.01;
-    release = 0.01;
-    polyphony = 0;  // see set_polyphony() below for real initial value
-    stopped = true;
-    warningblock = 0;
+const char *Granstream_name = "Granstream";
 
-    buffer = NULL;
-    bufferlen = 0;
-    next_input = 0;
-    stopped = true;
-    // request_stop remains true until gate goes positive; request_stop
-    // determines when we compute grains (not stopped)
-    request_stop = true;
-}
-
-
-void Igranstr::showit()
-{
-    cout << "Igranstr " << aura << endl;
-    cout << "    high " << high;
-    cout << "    low " << low;
-    cout << "    highdur " << highdur;
-    cout << "    lowdur " << lowdur;
-    cout << "    delay " << delay;
-    cout << "    density " << density;
-    cout << "    attack " << attack;
-    cout << "    release " << release;
-    cout << "    polyphony " << polyphony;
-    cout << "    debuglevel " << debuglevel;
-}
-
-
-void Igranstr::init_io()
-{
-    /* (inputs, audio outputs, block outputs) */
-    Instr::init_io(1, inarray, CHANNELS, aoutbuf, 0, NULL);
-    gran_out = aoutbuf;
-}
-
-
-void Igranstr::set_in(Aura a, long chan)
-{
-    Instr *source_instr = (Instr *) ptr(a);
-    if (!source_instr) aura_warn("Igranstr set_in(NULL) -- ignored.");
-    link(0, source_instr, a_rate, (int) chan, 1);
-    // note that link does bounds checking on source_instr and chan
-    in_ptr = source_instr->outblock(a_rate, (int) chan);
-}
-
-
-void Igranstr::set_length(double length)
-{
-    if (buffer) {
-        // set_length should not be called while processing audio
-        // since it will destroy samples being read by grains.
-        // To avoid reading random data, kill all the grains here
-        reset_gens();
-        UG_FREE_VEC(buffer, sample, bufferlen);
-    }
-    // this expression rounds to nearest sample
-    bufferlen = (int) (0.5 + length * AR);
-    // this expression rounds up to nearest multiple of block length
-    // since VL is a power of 2, I use a fast masking operation:
-    bufferlen = ((VL - 1) + bufferlen) & ~(VL - 1);
-    cout << "Igranstr::set_length " << bufferlen << endl;
-    buffer = UG_ALLOC_VEC(sample, bufferlen);
-    UG_ZERO_VEC(buffer, sample, bufferlen);
-}
-
-
-void Igranstr::reset()
-{
-    if (buffer)
-        UG_ZERO_VEC(buffer, sample, bufferlen);
-}
-
-
-void Igranstr::reset_gens()
-{
-    // set delay = 1 so that other parameters will be computed
-    // on the next call to real_run():
-    for (int i = 0; i < polyphony; i++) {
-        gens[i].env.set_mode(env_lin);
-        gens[i].state = GS_STOPPING;
-        gens[i].delay = 1;
-        // can't print to cout inside Igranstr::Igranstr(!)
-        // show_grain("set_polyphony", i);
-    }
-}
-
-
-void Igranstr::set_polyphony(int newpolyphony)
-{
-    if (newpolyphony <= 0 || newpolyphony == polyphony) return;
-    if (gens) {
-        UG_FREE_VEC(gens, Gran_gen, polyphony);
-    }
-    gens = UG_ALLOC_VEC(Gran_gen, newpolyphony);
-    assert(gens);
-    polyphony = newpolyphony;
-    reset_gens();
-}
-
-
-void Igranstr::set_gate(double newgate)
-{
-    cout << "set_gate " << newgate << " gate " << gate << 
-            " request_stop " << request_stop << endl;
-    if ((gate <= 0.0) && (newgate > 0.0)) { // start the note:
-        request_stop = false;
-        stopped = false;
-        if (gens) {
-            for (int i = 0; i < polyphony; i++) {
-                gens[i].state = GS_STOPPING;
-                gens[i].delay = 1;
-            }
-        }
-    } else if ((gate > 0.0) && (newgate <= 0.0)) { // stop it
-        request_stop = true;
-    }
-    gate = newgate;
-}
-
-
-void Igranstr::show_grain(const char *label, int i)
-{
-    cout << "grain[" << i << "] (" << label << ") state ";
-    cout << gens[i].state << " delay " << gens[i].delay;
-    cout << " tostop " << gens[i].tostop << " release_blocks ";
-    cout << gens[i].release_blocks << " dur_blocks " << gens[i].dur_blocks;
-    cout << " ratio " << gens[i].ratio << " phase ";
-    cout << gens[i].phase << endl;
-}
-
-void Igranstr::real_run(long newblock)
-{
-    int i;
+// declared here to break circular references among classes
+//
+bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps) {
     // first, read input audio into input buffer
-    freshen_inputs(newblock);
-    assert(next_input >= 0);
-    assert(next_input + VL <= bufferlen);
-    memcpy(buffer + next_input, in_ptr, sizeof(sample) * VL);
-    // print_sample("inp", *in_ptr);
-
-    next_input += VL;
-    // wrap around inside buffer:
-    if (next_input >= bufferlen) next_input = 0;
-
-    memset(gran_out, 0, sizeof(gran_out[0]) * VL * CHANNELS);
-    if (stopped) return;
-    if (request_stop) stopped = true;  // detect if any grains are computing
-    // stopped is reset to false if any grains are being computed
-    // don't simply set stopped to true because we might have activity 
-    // scheduled for the future and we don't want to stop just because
-    // nothing is being computed now
-
-    // print_sample("p", (float) polyphony);
-    for (i = 0; i < polyphony; i++) {
-        // schedule grains
-        gens[i].run(*this, i);
+    memcpy(&samps[tail], gs->inp_samps, BL * sizeof(Sample));
+    tail += BL;
+    if (tail >= samps.size()) {
+        tail = 0;
     }
+    memset(out_samps, 0, BL * sizeof(Sample));
+    bool active = false;
+    if (gs->enable) {
+        for (int i = 0; i < gs->polyphony; i++) {
+            active |= gens[i].run(gs, this, out_samps, i);
+        }
+    }
+    return active;
 }
 
 
-void Gran_gen::run(Igranstr &igranstr, int i)
-{
+bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
+             Sample_ptr out_samps, int i) {
+    int bufferlen = perchannel->samps.size();  //
     if (--delay == 0) {
         switch (state) {
-        case GS_STOPPING: {
-            if (igranstr.request_stop) return;
-            // compute new parameters
-            dur_blocks = (int)
-                ((igranstr.lowdur + 
-                  (igranstr.highdur - igranstr.lowdur) * 
-                  lincongr()) * VR + 0.5);
-
-            int attack_blocks = (int)(igranstr.attack * VR + 1);
-            if (attack_blocks <= 0) attack_blocks = 1;
-            attack = attack_blocks * VP;
-
-            release_blocks = (int)(igranstr.release * VR + 1);
-            if (release_blocks <= 0) release_blocks = 1;
-            release = release_blocks * VP;
-
-            if (attack_blocks + release_blocks > dur_blocks)
+          case GS_FALL: {  // fall has finished, now at end of envelope
+            printf("end grain\n");
+            env_val = 0;
+            env_inc = 0;
+            if (!gs->enable) {
+                return;  // do not start another grain; we're done
+            }
+            dur_blocks = (int) (unifrand_range(gs->lowdur, gs->highdur) *
+                                BR + 0.5);
+            attack_blocks = (int) (gs->attack * BR) + 1;
+            if (attack_blocks < 0) {
+                attack_blocks = 1;
+            }
+            release_blocks = (int) (gs->release * BR) + 1;
+            if (release_blocks < 0) {
+                release_blocks = 1;
+            }
+            if (attack_blocks + release_blocks > dur_blocks) {
                 dur_blocks = attack_blocks + release_blocks;
-
-            ratio = igranstr.low + (igranstr.high - igranstr.low) * lincongr();
+            }
+            ratio = unifrand_range(gs->low, gs->high);
             // avgdur tries to factor out the attack/release
             // to get "effective avgdur"; assume effective duration
             // includes only half of attack and duration
-            double avgdur = (igranstr.lowdur + igranstr.highdur - 
-                             (igranstr.attack + igranstr.release)) * 0.5;
-            double avgioi = avgdur * igranstr.polyphony / igranstr.density;
+            float avgdur = gs->lowdur + gs->highdur -
+                           (gs->attack + gs->release) * 0.5;
+            float avgioi = avgdur * gs->polyphony / gs->density;
             // If all grains were the same duration (avgdur), we
-            // could pick a delay from the end of one grain to the beginning
-            // of the next grain to be between 0 and 2 * (ioi - avgdur)
-            // (uniformly distributed) to obtain an average ioi of avgioi.
-            // Things are more complicated when duration is not always 
-            // avgdur, but we'll use the actual dur of the present grain:
-            double ts = 2 * (avgioi - avgdur) * lincongr();
-            if (ts < 0) ts = 0; // can't overlap grains
-            int tostart = float_to_int(ts * VR);
-            if (tostart < 0) tostart = 0;
-            tostop = dur_blocks - release_blocks;
-            delay = tostart;
+            // could pick a delay from the end of one grain to the
+            // beginning of the next grain to be between 0 and 2 *
+            // (ioi - avgdur) (uniformly distributed) to obtain an
+            // average ioi of avgioi.  Things are more complicated
+            // when duration is not always avgdur, but we'll use
+            // the actual dur of the present grain:
+            float ts = 2 * (avgioi - avgdur) * unifrand();
+            if (ts < 0) {
+                ts = 0;
+            }
+            delay = (int) (ts * BR);
+            if (delay < 0) delay = 0;
             state = GS_PREDELAY;
-            igranstr.stopped = false;
-            if (tostart > 0) break;
-        }
-        case GS_PREDELAY: {
-            // start grain computation 
-            // print_sample("gens[i].tostart", gens[i].tostart);
-            // print_sample("request_stop", (float) request_stop);
-            if (igranstr.request_stop) return;
+            if (delay > 0) {
+                break;
+            }
+          }
+          case GS_PREDELAY: {  // predelay is finished, start grain computation
+            if (!gs->enable) {
+                return;
+            }
             // phase (here) is where we start in buffer relative to now
-            phase = -igranstr.delay * AR * lincongr();
+            phase = -gs->dur * AR * unifrand();
             // number of samples from input buffer is increment per
             // output sample * number of output samples
-            double dur_in_samples = dur_blocks * VL;
+            float dur_in_samples = dur_blocks * BL;
             // To avoid underflow, check the following 
             // (see notes at top)
             // (another note: add 2 to allow interpolation 
             // and rounding):
-            double final_phase = phase + 
-                (dur_in_samples + 2) * (ratio - 1);
-            if (final_phase < VL - igranstr.bufferlen) {
+            float final_phase = phase + (dur_in_samples + 2) * ratio;
+            if (final_phase < BL - bufferlen) {
                 // 1 sample fudge factor:
-                double advance = (VL - igranstr.bufferlen) - final_phase - 1;
-                    final_phase += advance;
-                    phase += advance;
+                float advance = (BL - bufferlen) - final_phase - 1;
+                final_phase += advance;
+                phase += advance;
             } else if (final_phase > -1) {
                 phase -= (final_phase + 1); // 1 sample fudge factor
                 final_phase = -1;
@@ -288,83 +137,249 @@ void Gran_gen::run(Igranstr &igranstr, int i)
             // it may be that we can't satisfy both constraints, 
             // so check again. Also, make sure phase is initially 
             // in buffer. Only play grain if it is possible:
-            if (phase > VL - igranstr.bufferlen && 
-                final_phase > VL - igranstr.bufferlen && 
+            if (phase > BL - bufferlen &&
+                final_phase > BL - bufferlen &&
                 phase < 0 && final_phase < 0) {
                 // start the note
-                env.set_dur(attack);
-                env.set_goal(igranstr.gate);
-                // print_sample("y1", gate);
+                env_val = 0;
+                env_inc = 1.0 / (attack_blocks * BL);
                 // note: phase is negative; map phase to buffer offset
-                //igranstr.aura_printf("phase %g\n", phase);
-                phase = igranstr.next_input - VL + phase;
                 // in case ratio is 1, avoid interpolation
-                phase = (long) phase; 
-                if (phase < 0) phase += igranstr.bufferlen;
-                //int relphase = (((long) phase) - igranstr.next_input + igranstr.bufferlen) % igranstr.bufferlen - igranstr.bufferlen;
-                //igranstr.aura_printf("   relphase init %d\n", relphase);
-                state = GS_STARTED;
-                delay = tostop;
-                assert(phase >= 0 && phase < igranstr.bufferlen);
+                printf("start grain at phase %gs to %gs (%d blocks)\n",
+                       phase * AP, final_phase * AP, dur_blocks);
+                phase = (int) (perchannel->tail - BL + phase);
+                if (phase < 0) phase += bufferlen;
+                state = GS_RISE;
+                delay = attack_blocks;
+                printf("state GS_RISE delay %d\n", delay);
+                assert(phase >= 0 && phase < bufferlen &&
+                       bufferlen == perchannel->samps.size());
             } else {
                 delay = 1; // try again next block
                 state = GS_PREDELAY;
                 // only one message per 1000 blocks to avoid flood of errors
-                if (igranstr.warningblock > igranstr.blocksdone) {
-                    igranstr.aura_warn("igranstr grain too long\n");
-                    igranstr.warningblock = igranstr.blocksdone + 1000;
+                if (gs->warning_block > gs->current_block) {
+                    printf("granstream grain too long\n");
+                    gs->warning_block = gs->current_block + 1000;
                 }
             }
-            // otherwise note is too long, so skip it
             break;
-        }
-        case GS_STARTED: {
-            state = GS_STOPPING;
+          }
+          case GS_RISE:  // attack has finished, start hold until fall
+            delay = dur_blocks - attack_blocks - release_blocks;
+            state = GS_HOLD;
+            env_val = 1;
+            env_inc = 0;
+            printf("state GS_HOLD delay %d\n", delay);
+            if (delay > 0) {
+                break;
+            } // otherwise begin fall immediately
+          case GS_HOLD:  // hold has finished, start fall
             delay = release_blocks;
-            // stop the note
-            env.set_dur(release);
-            env.set_goal(0.0);
-            //int relphase = (((long) phase) - igranstr.next_input + igranstr.bufferlen) % igranstr.bufferlen - igranstr.bufferlen;
-            //igranstr.aura_printf("   relphase offset %d\n", relphase);
+            env_val = 0;
+            env_inc = -1.0 / (release_blocks * BL);
+            state = GS_FALL;
+            printf("state GS_FALL delay %d\n", delay);
             break;
         }
-        }
-        //cout << "# state[" << i << "] " << gens[i].state << " delay " <<
-        //    gens[i].delay << " secs " << gens[i].delay / VR << endl;
     }
-    if (state != GS_PREDELAY) { // GS_STARTED or GS_STOPPING
-        assert(phase >= 0 && phase < igranstr.bufferlen);
-        igranstr.stopped = false;
-        sample ampl;
-        sample block[VL]; // compute block of each grain here
-        for (int j = 0; j < VL; j++) {
+    if (state != GS_PREDELAY) {  // envelope is non-zero
+        assert(perchannel->samps.bounds_check((int) phase));
+        Sample ampl;
+        // non-standard output: Instead of each channel (perchannel)
+        // generating one channel of output, in this Ugen, grains
+        // are spread across all output channels equally. Note
+        // that out_samps is a parameter, so we are *not* updating
+        // an instance variable, and neither does real_run().
+        //
+        // first, we select the output channel in round-robin fashion:
+        out_samps += (i % gs->chans) * BL;
+        for (int i = 0; i < BL; i++) {
             int index = (int) phase;
-            int index2 = index + 1;
-            if (index2 >= igranstr.bufferlen) {
-                index2 = 0;
+            Sample x = perchannel->samps[index];
+            if (ratio != 1.0) {  // for tranposition, phase is fractional
+                int index2 = index + 1;  // so do linear interpolation
+                if (index2 >= bufferlen) {
+                    index2 = 0;
+                }
+                Sample x2 = perchannel->samps[index2];
+                x += (phase - index) * (x2 - x);
             }
-            assert(index >= 0 && index < igranstr.bufferlen);
-            sample x1 = igranstr.buffer[index];
-            assert(index2 >= 0 && index2 < igranstr.bufferlen);
-            block[j] = x1 + (phase - index) * (igranstr.buffer[index2] - x1);
-            phase = phase + ratio;
-            // Do not merge this with the index2 >= igranstr.bufferlen test
-            // above -- if ratio < 1, it may not be time to wrap
-            // phase even if index2 has to wrap.
-            if (phase >= igranstr.bufferlen) {
-                phase -= igranstr.bufferlen;
+            env_val += env_inc;
+            *out_samps++ += x * env_val;
+            phase += ratio;
+            if (phase >= bufferlen) {
+                phase -= bufferlen;
             }
         }
-        // int relphase = (((long) phase) - igranstr.next_input + igranstr.bufferlen) % igranstr.bufferlen - igranstr.bufferlen;
-        //igranstr.aura_printf("   relphase run %ld\n", relphase);
-        // print_sample("b", block[0]);
-        env.run(ampl);
-        // print_sample("a", ampl);
-        mul.run(block, ampl, block);
-        // distribute output among available channels
-        sample *out_ptr = igranstr.gran_out + (VL * (i % CHANNELS));
-        igranstr.add.run(block, out_ptr, out_ptr);
+        return true;  // this grain is active
     }
+    return false;  // this grain is not active
 }
 
-#include "igranstr.aur"
+
+/* O2SM INTERFACE: /arco/granstream/new int32 id, int32 chans,
+            int32 inp, int32 polyphony, float dur, bool enable;
+ */
+void arco_granstream_new(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t chans = argv[1]->i;
+    int32_t inp = argv[2]->i;
+    int32_t polyphony = argv[3]->i;
+    float dur = argv[4]->f;
+    bool enable = argv[5]->B;
+    // end unpack message
+
+    ANY_UGEN_FROM_ID(inp_ugen, inp, "arco_granstream_new");
+
+    new Granstream(id, chans, inp_ugen, polyphony, dur, enable);
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/repl_inp int32 id, int32 inp_id;
+ */
+static void arco_granstream_repl_inp(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t inp_id = argv[1]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_repl_inp");
+    ANY_UGEN_FROM_ID(inp, inp_id, "arco_granstream_repl_inp");
+    granstream->repl_inp(inp);
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/dur int32 id, float dur;
+ */
+void arco_granstream_dur(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float dur = argv[1]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_dur");
+    granstream->set_dur(dur);
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/polyphony int32 id, int32 polyphony;
+ */
+static void arco_granstream_polyphony(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t polyphony = argv[1]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_polyphony");
+    granstream->set_polyphony(polyphony);
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/ratio int32 id, float high, float low;
+ */
+static void arco_granstream_ratio(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float high = argv[1]->f;
+    float low = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_ratio");
+    granstream->high = high;
+    granstream->low = low;
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/graindur int32 id,
+                   float highdur, float lowdur;
+ */
+static void arco_granstream_graindur(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float highdur = argv[1]->f;
+    float lowdur = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_graindur");
+    granstream->highdur = highdur;
+    granstream->lowdur = lowdur;
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/density int32 id, float density;
+ */
+static void arco_granstream_density(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float density = argv[1]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_density");
+    granstream->density = density;
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/env int32 id, float attack, float release;
+ */
+static void arco_granstream_env(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float attack = argv[1]->f;
+    float release = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_env");
+    granstream->attack = attack;
+    granstream->release = release;
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/enable int32 id, bool enable;
+ */
+static void arco_granstream_enable(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    bool enable = argv[1]->B;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_enable");
+    granstream->set_enable(enable);
+}
+
+
+static void granstream_init()
+{
+    // O2SM INTERFACE INITIALIZATION: (machine generated)
+    o2sm_method_new("/arco/granstream/new", "iiiifB", arco_granstream_new,
+                     NULL, true, true);
+    o2sm_method_new("/arco/granstream/repl_inp", "ii",
+                     arco_granstream_repl_inp, NULL, true, true);
+    o2sm_method_new("/arco/granstream/dur", "if", arco_granstream_dur, NULL,
+                     true, true);
+    o2sm_method_new("/arco/granstream/polyphony", "ii",
+                     arco_granstream_polyphony, NULL, true, true);
+    o2sm_method_new("/arco/granstream/ratio", "iff", arco_granstream_ratio,
+                     NULL, true, true);
+    o2sm_method_new("/arco/granstream/graindur", "iff",
+                     arco_granstream_graindur, NULL, true, true);
+    o2sm_method_new("/arco/granstream/density", "if", arco_granstream_density,
+                     NULL, true, true);
+    o2sm_method_new("/arco/granstream/env", "iff", arco_granstream_env, NULL,
+                     true, true);
+    o2sm_method_new("/arco/granstream/enable", "iB", arco_granstream_enable,
+                     NULL, true, true);
+    // END INTERFACE INITIALIZATION
+}
+
+Initializer granstream_init_obj(granstream_init);

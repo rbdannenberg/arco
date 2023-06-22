@@ -229,7 +229,6 @@ class Ola_pitch_shift: public Ugen {
                 // another interpolation, this time interpolating to compute xfade
                 float beta = -fouttap_delta * xfade_recip;
                 *out_samps++ = xb + beta * (xa - xb);
-                assert(*(out_samps - 1) > -1 && *(out_samps - 1) < 1);
             }
             fouttap_delta += (ratio - 1.0F);
         }
