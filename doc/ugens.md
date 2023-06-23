@@ -109,7 +109,7 @@ block-rate, and "constant-rate" (class Const) signals.
 generator with audio input and output. `id` is the object id.
 `maxdur` is the maximum duration (this much space is allocated).
 
-`/arco/delay/set_max id dur` - Reallocates delay memory for a maximum duration of `dur`.
+`/arco/delay/max id dur` - Reallocates delay memory for a maximum duration of `dur`.
 
 `/arco/delay/repl_dur id dur_id` - Set duration input to object with id `dur_id`.
 
@@ -118,6 +118,149 @@ generator with audio input and output. `id` is the object id.
 `/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
 `/arco/delay/set_fb id fb` - Set feedback to float value `fb`.
+
+### feedback
+`/arco/feedback/new id chans inp from gain` - Create a cycle in the
+graph of unit generators. Output from the unit generator specified
+by `from` (an id for another ugen) will be scaled by `gain` and mixed
+with `inp` to form the output. The signal from `from` will be delayed
+by one block (default size is 32 samples) because up-to-date output
+from `from` may depend on our output, creating a circular dependency.
+
+The detailed operation is this: A buffer is initialized to zero. To
+compute output from this feedback ugen, both `inp` and `gain`, but
+not `from`, are updated so they hold current values. The buffer is
+scaled by `gain` and added to the input (`inp`) to form the output.
+Then, `from` is updated to hold current values (it may in fact
+depend directly or indirectly on our output, which is now up-to-date).
+The output of `from` is copied to our buffer to prepare for the next
+block computation.
+
+IMPORTANT:  If `from` depends directly or indirectly on the output of
+this `feedback` object, a cycle is created, and Arco will be unable to
+free any unit generators participating in the cycle. You can break the
+cycle by replacing `from`. For example, before deleting this `feedback`
+unit generator, you should probably replace `from` (see the `repl_from`
+description below) with the built-in zero unit generator, which does
+not depend on anything. Not that "freeing" or "deleting" a unit generator
+simply removes any reference to it from a table that translates ids to
+unit generators. This reduces the reference count on the unit generator,
+but the memory is not freed unless the reference count goes to zero,
+which cannot happen if there is a cycle.
+
+`/arco/feedback/repl_inp id inp` - Set input to the object with id `inp`.
+
+`/arco/feedback/repl_from id from` - Set the source of the feedback
+(called "from") to the object with id `from`. This is especially useful
+for setting `from` to the zero ugen, thus breaking any cycles, before
+freeing the `feedback` ugen. (See "IMPORTANT" paragraph above.)
+
+`/arco/feedback/repl_gain id gain` - Set gain signal to the object with id `gain`.
+
+`/arco/feedback/set_gain id chan gain` - Set the gain for the given channel
+(`chan`) to a the float value `gain`.
+
+
+### granstream
+
+`/arco/granstream/new id chans inp polyphony dur enable` - Create a new
+granular synthesis from input audio unit generator with the given `id`
+number and `chans` channels. The input is initially given by `inp` and
+each output channel will be the sum of `polyphony` independently generated
+grain sequences. Grains are taken from recent input with a buffer length
+of `dur` seconds, and grains are produced when `enable` (Boolean) is true.
+
+The algorithm is as follows: A set of `polyphony` grain generators is allocated
+for each channel. Grain generators follow a sequence of states: Pick a random
+delay based on `density`. Also pick a resampling ratio and a duration.
+After the delay, pick a starting point in the buffer of previous input samples.
+Read the grain starting at this point. Linearly ramp the grain envelope
+from 0.0 up to 1.0 over the `attack` time. Hold the envelope at 1 for a
+duration based on the grain duration. Then linearly ramp from 1.0 back to 0.0
+over the `release` time. This complete one cycle of states. The cycle repeats
+indefinitely. Note that each grain is produced with different random numbers,
+so there is no synchronization among them or between channels.
+
+`/arco/granstream/repl_inp id inp` - Set the input to the ugen with id `inp`.
+
+`/arco/granstream/dur id dur` - Set the length of the buffer from which
+grains are taken to `dur` (float) in seconds. Current buffer samples are
+retained, and if `dur` increases, then the unknown samples (older than the
+original value of `dur`) are set to zero.
+
+`/arco/granstream/polyphony id polyphony` - Set the number of grain generators
+per channel to `polyphony` (integer).
+
+`/arco/granstream/ratio id low high` - Set the range of pitch shift applied
+to grains to (`low`, `high`). Grains are pitch shifted by resampling with
+linear interpolation. The `low` and `high` values are ratios where 1.0 means
+no resampling, less than one implies downward pitch shifting, and greater than
+one implies upward pitch shifting. For each grain, a ratio is randomly selected
+from a uniform distribution over the given range. Ratio cannot be negative.
+
+`/arco/grainstream/graindur id lowdur highdur` - Set the range of grain
+durations to (`lowdur`, `highdur`). For each grain, a duration is randomly selected
+from a uniform distribution over the given range.
+
+`/arco/granstream/density id density` - Set the expected grain density to the
+float value `density`. Density is the number of grains expected to be playing
+at any given moment on any given channel. (Note that the apparent density may
+be proportional to the number of channels, since 2 channels should have twice
+as many grains as 1 channel.)
+
+`/arco/granstream/env id attack release` - Set the attack and release times for
+grains (times are in seconds).
+
+`/arco/granstream/enable id enable` - Enable or disable the generation of grains
+using the boolean value `enable`. When grains are not enabled, any currently
+running grains (not in the delay state) are allowed to complete and ramp smoothly
+to zero, so output can continue for up to the maximum grain duration after enable
+is set to false.
+
+
+### mix
+`/arco/mix/new id chans` - Create a new mixer with `chans` output channels.
+
+`/arco/mix/ins id input gain` - Insert an input to the mixer.
+
+`/arco/mix/rem id input` - Remove an input from the mixer.
+
+`/arco/repl_gain id inp gain_id` - Set the gain for input `inp` to
+object with id `gain_id`.
+
+`/arco/set_gain id inp gain` - Set the gain for input `inp` to the
+float value `gain`.
+
+
+### mult*
+`/arco/mult/new id chans x1 x2` - Create a new multiplier.
+
+`/arco/mult/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`.
+
+`/arco/mult/set_x1 id chan x1` - Set channel `chan` of input to float value `x1`.
+
+`/arco/mult/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
+
+`/arco/mult/set_x2 id chan x2` - Set channel `chan` of input to float value `x2`.
+
+
+### olapitchshift
+`/arco/olaps/new id chans inp ratio xfade windur` - Create a new
+overlap-add pitch shifter with id given by `id`, `chans` channels,
+an input with id `inp`, a pitch shift ratio of `ratio`, a cross-fade
+time of `xfade`, and a window size of `windur`. The algorithm constructs
+grains from the input of duration `windur` and resampled by `ratio` using
+linear interpolation, and which overlap by `xfade`, with linear
+interpolation of signals during the cross-fade time. When ratio is greater
+than 1, pitch is scaled upward by `ratio`, and pitch is shifted downward
+when `ratio` is less than one. All channels are processed synchronously
+with the same window timing and pitch shift amount.
+
+`/arco/olaps/ratio id ratio` - Set the pitch shift ratio to `ratio` (float).
+
+`/arco/olaps/xfade id xfade` - Set the cross-fade time to `xfade` (float).
+
+`/arco/olaps/windur id windur` - Set the window duration to `windur` (float).
 
 
 ### playfile
@@ -151,69 +294,6 @@ block of samples to be read from the file.
 message to `/actl/act` with `action_id` (an integer greater than 0)
 when file playback completes (or reaches `end`).
 
-
-### mix
-`/arco/mix/new id chans` - Create a new mixer with `chans` output channels.
-
-`/arco/mix/ins id input gain` - Insert an input to the mixer.
-
-`/arco/mix/rem id input` - Remove an input from the mixer.
-
-`/arco/repl_gain id inp gain_id` - Set the gain for input `inp` to
-object with id `gain_id`.
-
-`/arco/set_gain id inp gain` - Set the gain for input `inp` to the
-float value `gain`.
-
-
-### mult*
-`/arco/mult/new id chans x1 x2` - Create a new multiplier.
-
-`/arco/mult/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`.
-
-`/arco/mult/set_x1 id chan x1` - Set channel `chan` of input to float value `x1`.
-
-`/arco/mult/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
-
-`/arco/mult/set_x2 id chan x2` - Set channel `chan` of input to float value `x2`.
-
-
-### pwl
-`/arco/pwl/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
-
-`/arco/pwl/env id d0 y0 d1 y1 ... dn-1 [yn-1]` - set the envelope or function shape for object with id. All remaining parameters are floats, alternating segment durations (in samples) and segment final values. The envelope starts at the current output value and ends at yn-1 (defaults to 0).
-
-`/arco/pwl/start id` - starts object with id.
-
-`/arco/pwl/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
-
-
-### reson
-`/arco/reson/new id chans center bandwidth` - Create a new reson filte with `center` frequency and `bandwidth` control inputs, audio input and audio output.
-
-`/arco/reson/repl_center id center_id` - Set center frequency to object with id `center_id`.
-
-`/arco/reson/set_center id chan center_id` - Set center frequency of channel
-`chan` to float value `center_id`.
-
-`/arco/reson/repl_bandwidth id bandwidth_id` - Set bandwidth to object with id `bandwidth_id`.
-
-`/arco/reson/set_bandwidth id chan bandwidth_id` - Set bandwidth of channel
-`chan` to float value `bandwidth_id`.
-
-
-### sine
-`/arco/sine/new id chans freq amp` - Create a new sine oscillator.
-
-`/arco/sine/repl_freq id freq_id' - Set frequency to object with id `freq_id`.
-
-`/arco/sine/set_freq id chan freq` - Set frequency of channel `chan` to 
-float value `freq`.
-
-`/arco/sine/repl_amp id amp_id' - Set amplitude to object with id `freq_id`.
-
-`/arco/sine/set_amp id chan amp` - Set amplitude of channel `chan` to 
-float value `amp`.
 
 ## probe
 A `probe` is used to send samples from the audio server to an O2 service.
@@ -275,6 +355,43 @@ threshold detection is enabled
 
 The O2 messages consists of the probe id (int32) followed by float samples
 (up to 64 of them).
+
+### pwl
+`/arco/pwl/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
+
+`/arco/pwl/env id d0 y0 d1 y1 ... dn-1 [yn-1]` - set the envelope or function shape for object with id. All remaining parameters are floats, alternating segment durations (in samples) and segment final values. The envelope starts at the current output value and ends at yn-1 (defaults to 0).
+
+`/arco/pwl/start id` - starts object with id.
+
+`/arco/pwl/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
+
+
+### reson
+`/arco/reson/new id chans center bandwidth` - Create a new reson filte with `center` frequency and `bandwidth` control inputs, audio input and audio output.
+
+`/arco/reson/repl_center id center_id` - Set center frequency to object with id `center_id`.
+
+`/arco/reson/set_center id chan center_id` - Set center frequency of channel
+`chan` to float value `center_id`.
+
+`/arco/reson/repl_bandwidth id bandwidth_id` - Set bandwidth to object with id `bandwidth_id`.
+
+`/arco/reson/set_bandwidth id chan bandwidth_id` - Set bandwidth of channel
+`chan` to float value `bandwidth_id`.
+
+
+### sine
+`/arco/sine/new id chans freq amp` - Create a new sine oscillator.
+
+`/arco/sine/repl_freq id freq_id' - Set frequency to object with id `freq_id`.
+
+`/arco/sine/set_freq id chan freq` - Set frequency of channel `chan` to 
+float value `freq`.
+
+`/arco/sine/repl_amp id amp_id' - Set amplitude to object with id `freq_id`.
+
+`/arco/sine/set_amp id chan amp` - Set amplitude of channel `chan` to 
+float value `amp`.
 
 ### thru
 Thru objects are used for audio input (the audio input is written

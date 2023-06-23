@@ -281,36 +281,36 @@ static void arco_granstream_polyphony(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/granstream/ratio int32 id, float high, float low;
+/* O2SM INTERFACE: /arco/granstream/ratio int32 id, float low, float high;
  */
 static void arco_granstream_ratio(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    float high = argv[1]->f;
-    float low = argv[2]->f;
+    float low = argv[1]->f;
+    float high = argv[2]->f;
     // end unpack message
 
     UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_ratio");
-    granstream->high = high;
     granstream->low = low;
+    granstream->high = high;
 }
 
 
 /* O2SM INTERFACE: /arco/granstream/graindur int32 id,
-                   float highdur, float lowdur;
+                   float lowdur, float highdur;
  */
 static void arco_granstream_graindur(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    float highdur = argv[1]->f;
-    float lowdur = argv[2]->f;
+    float lowdur = argv[1]->f;
+    float highdur = argv[2]->f;
     // end unpack message
 
     UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_graindur");
-    granstream->highdur = highdur;
     granstream->lowdur = lowdur;
+    granstream->highdur = highdur;
 }
 
 
