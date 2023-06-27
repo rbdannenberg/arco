@@ -5,25 +5,37 @@
 class Shift_delay_bank:
 # Creates a shift delay bank
     var shift_objs, delay_objs // pitch-shift and delay objects
+    var len_objs // length of delay and pitch-shift objects
 
     def init(length):
-        shift_objs = array(5)
-        delay_objs = array(5)
-        for i = 0 to length-1:
+        len_objs = length
+        shift_objs = array(length)
+        delay_objs = array(length)
+        for i = 0 to length:
+            delay_objs[i] = delay(input_ugen, 1.0, 0.1, 2.0)
             shift_objs[i] = ola_pitch_shift(input_ugen, 1, 0.01, 0.05)
-            delay_objs[i] = delay(input_ugen, 1.0, 0.1, 2.0, 2)
+            
 
     def set_delay(i, delay_value):
     # Sets the delay of the ith delay objects
         delay_objs[i].set('dur', delay_value)
 
-
+    def set_ratio(i, ratio_value):
+    # Sets the ratio of the ith pitch shift object
+        shift_objs[i].set_ratio(ratio_value)
     
+    def get_shiftobjs():
+        return shift_objs
+    
+    def get_delayobjs():
+        return delay_objs
+
+
 class Hall_of_mirrors:
 # Instance variables
     var win, init_x, init_y // GUI params
-    var mixer // audio mixer
-    var shift_delay_bank
+    var shift_delay_bank // bank containing shift and delay units
+    var active // Checks if the mixer is currently playing
     
 
     def init(window, x, y):
@@ -34,8 +46,8 @@ class Hall_of_mirrors:
         
 
         // Create shift delay bank
-        shift_delay_bank = Shift_delay_bank(6)
-        
+        shift_delay_bank = Shift_delay_bank(5)
+
         // Setup UI
         this.set_ui()
 
@@ -52,21 +64,59 @@ class Hall_of_mirrors:
     # in the Radiobox
         return symbol_value(hallmirror).value()
 
+    def play(flag):
+    # Play shift-delays depending on radiobox selection
+        if active != flag and active == nil:
+            for i = 0 to shift_delay_bank.len_objs:
+                shift_delay_bank.get_shiftobjs()[i].play()
+                shift_delay_bank.get_delayobjs()[i].play()
+            active = flag
+        else:
+            // if off is clicked after
+            // playing movement, turn off everything
+            if active:
+                //mixer.mute()
+                for i = 0 to shift_delay_bank.len_objs:
+                    shift_delay_bank.get_shiftobjs()[i].mute()
+                    shift_delay_bank.get_delayobjs()[i].mute()
+                active = nil
+
     def sd_hit(obj, event, x, y):
     # Shift delay hit events
         display "Current control", get_control()
+
+         // play mixer based on Radiobox selection
+        this.play(get_control() != 0)
+
         if get_control() == 1:
-            set_shift_delay(0.5, [2])
+            set_shift_delay(0.6, [1.12])
+        elif get_control() == 2:
+            set_shift_delay(0.4,[1.12, 1.498])
+        elif get_control() == 3:
+            set_shift_delay(0.3,[1, 1.2599, 1.888]) # (1,4,11) diff from aura, why?
+        elif get_control() == 4:
+            set_shift_delay(0.24,[1.12, 1.2599, 1.888, 1.587])
+        elif get_control() == 5:
+            set_shift_delay(0.2,[0.445, 1.682, 1.12, 1.335, 2])
 
     def set_shift_delay(delay, shift_arr):
-    # Sets up the delay and shift values of 
+    # Sets up the delay and shift values 
     # in the shift-delay bank
 
+        # turn off delay and pitch-shift units that are to be inactive
+        for i = len(shift_arr) to shift_delay_bank.len_objs:
+            shift_delay_bank.get_shiftobjs()[i].mute()
+            shift_delay_bank.get_delayobjs()[i].mute()
+
         for i = 0 to len(shift_arr):
-            if delay == nil:
-                continue
-            else:
-                shift_delay_bank.set_delay(i, (i+1)*delay) // Do I include latency? Confirm!!
+            shift_delay_bank.set_delay(i, (i+1)*delay) // Do I include latency? Confirm!!
+            shift_delay_bank.set_ratio(i, shift_arr[i])
+            shift_delay_bank.get_delayobjs()[i].play()
+            shift_delay_bank.get_shiftobjs()[i].play()
+
+
+
+
 
                 
 
