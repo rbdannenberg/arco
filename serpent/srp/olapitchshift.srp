@@ -8,6 +8,10 @@ class Ola_pitch_shift (Ugen):
         super.init(create_ugen_id(), "olaps", chans, 'a', "Ufff",
 	           'input', input, 'ratio', ratio, 'xfade', xfade,
                    'windur', windur)
+    
+    def set_ratio(value):
+        o2_send_cmd("/arco/olaps/ratio", 0, "Uf", id, value)
+        
 
 def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
     Ola_pitch_shift(chans, input, ratio, xfade, windur)
