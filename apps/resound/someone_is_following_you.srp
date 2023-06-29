@@ -1,0 +1,89 @@
+# Project Author: Roger B. Dannenberg
+# Date: June 7, 2023
+
+
+class Someone_is_following_you:
+# Instance variables
+    var dly1, dly2
+    var dly1_value, dly2_value
+    var fade_value
+    var mix1
+    var mult1
+    var win, init_x, init_y
+
+    def init(window, x, y):
+    # Initialization of instance variables
+        dly1 = nil
+        dly2 = nil
+        dly1_value = nil
+        dly2_value = nil
+        fade_value = nil
+        m1 = nil
+        pwl1 = nil
+        
+        win = window // Main UI window
+        init_x = x // set the starting x coord of the movement
+        init_y = y // set the starting y coord of the movement
+
+        // Setup UI
+        this.set_ui()
+
+        dly1_value = d1_slide.value()
+        dly2_value = d2_slide.value()
+        fade_value = fl_slide.value()
+
+    def set_ui():
+    # Setting up Movement1's UI
+        Checkbox(win, "VII. Someone is Following You", init_x+5, init_y+5, 
+                 300, 'H', 'd_check') // checkbox doubling as title
+        d_check.add_target_method(this, 'delay_handler')
+
+        // Sliders
+        Labeled_slider(win, "del1", init_x+5, 'D', 250,
+                                28, 65, 1, 10, 
+                                5, 'integer', 'd1_slide')
+        d1_slide.add_target_method(this, 'delay1_handler')
+
+        Labeled_slider(win, "del2", init_x+5, 'D', 250,
+                                28, 65, 1, 10, 
+                                5, 'integer', 'd2_slide')
+        d2_slide.add_target_method(this, 'delay2_handler')
+
+        Labeled_slider(win, "fadelen", init_x+5, 'D', 250,
+                                28, 65, 5, 100, 
+                                50, 'integer', 'fl_slide')
+        fl_slide.add_target_method(this, 'fadelen_handler')
+        
+
+    def delay_handler(obj, event, x, y)
+        display "delay_handler", x, dly1_value, dly2_value
+        if x:
+            mix1 = mix(2)
+            dly1 = delay(input_ugen, dly1_value, 0.1, 2.0, 2)
+            dly2 = delay(input_ugen, dly2_value, 0.1, 2.0, 2)
+            mix1.ins(dly1, 1.0)
+            mix1.ins(dly2, 1.0)
+            mult1 = mult(mix1, 1, 2)
+            mult1.play()
+        else:
+            pwl1 = pwlb(0, 1, fade_value, 0)
+            mul1.repl_x2(pwl1)
+            sched_select(rtsched)
+            sched_cause(fade_value + 0.1, this, 'finish_delays')
+            pwl1 = nil
+            mix1 = nil
+            dly1 = nil
+            dly2 = nil
+
+    def finish_delays()
+        mult1.mute()
+        mult1 = nil
+
+    def delay1_handler(obj, x)
+        dly1_value = x
+
+    def delay2_handler(obj, x)
+        dly2_value = x
+
+    def fadelen_handler(obj, x)
+        fade_value = x
