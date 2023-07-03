@@ -61,12 +61,15 @@ class Mix (Ugen):
         var gain_ugen = inputs[i][1]
         if isinstance(gain_ugen, Ugen) and gain_ugen.rate == "c":
             // a Const exists, so we just write to it using set_gain
-            o2_send_cmd("/arco/mix/set_gain", 0, "UUf", id, ugen, gain)
+            display "mix set_gain, calling /set_gain", id, ugen.id, gain
+            o2_send_cmd("/arco/mix/set_gain", 0, "UUf", id, ugen.id, gain)
         else:  // have to replace with either gain as Ugen or make a const
             if isnumber(gain):
                 gain = const(gain)
+                display "mix set_gain is number, convert", gain.id
             inputs[i][1] = gain
-            o2_send_cmd("/arco/mix/repl_gain", 0, "UUU", id, ugen, gain)
+            display "mix set_gain, calling /repl_gain", id, ugen.id, gain.id
+            o2_send_cmd("/arco/mix/repl_gain", 0, "UUU", id, ugen.id, gain.id)
     
 
 def mix(optional chans = 1):

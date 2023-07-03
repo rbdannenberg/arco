@@ -219,6 +219,7 @@ public:
 
     bool chan_a(Granstream_state *state) {
         return state->chan_a(this, out_samps);
+        
     }
 
     void real_run() {

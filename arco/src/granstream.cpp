@@ -71,7 +71,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             env_val = 0;
             env_inc = 0;
             if (!gs->enable) {
-                return;  // do not start another grain; we're done
+                return false;  // do not start another grain; we're done
             }
             dur_blocks = (int) (unifrand_range(gs->lowdur, gs->highdur) *
                                 BR + 0.5);
@@ -113,7 +113,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
           }
           case GS_PREDELAY: {  // predelay is finished, start grain computation
             if (!gs->enable) {
-                return;
+                return true;
             }
             // phase (here) is where we start in buffer relative to now
             phase = -gs->dur * AR * unifrand();

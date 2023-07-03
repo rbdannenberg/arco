@@ -52,7 +52,8 @@ def arco_ready():
     if ui_initialized:
         return
 
-    display "arco_ready", wxs_default_h, wxs_space
+    display "arco_ready", wxs_h, wxs_space,
+    display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
 
     Checkbox(win, "Simple test", 5, 5, 170, 20, 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
@@ -143,14 +144,25 @@ def play_simple_test(obj, event, x, y):
 def play_mixer_test(obj, event, x, y):
     if x:
         m1 = mix(1)
-        m1.ins(sine(440.0, 0.01), 1)
-        m1.ins(sine(880.0, 0.01), 1)
+        ms1 = sine(440.0, 0.01)
+        m1.ins(ms1, 1)
+        ms2 = sine(880.0, 0.01)
+        m1.ins(ms2, 1)
         m1.ins(sine(1320.0, 0.007), 1)
         m1.ins(sine(1760.0, 0.005), 1)
         m1.play()
+        sched_select(rtsched)
+        sched_cause(1.0, nil, 'mixer_gain_change')
     else
         m1.mute()
-        m1 = nil  // delete reference
+        m1 = nil  // delete references
+        ms1 = nil
+        ms2 = nil
+
+def mixer_gain_change():
+    m1.set_gain(ms1, 10)
+    m1.set_gain(ms2, 10)
+
 
 ########## PLAYREC TESTS ##################
 

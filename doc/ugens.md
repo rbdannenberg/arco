@@ -247,7 +247,7 @@ float value `gain`.
 ### olapitchshift
 `/arco/olaps/new id chans inp ratio xfade windur` - Create a new
 overlap-add pitch shifter with id given by `id`, `chans` channels,
-an input with id `inp`, a pitch shift ratio of `ratio`, a cross-fade
+and input with id `inp`, a pitch shift ratio of `ratio`, a cross-fade
 time of `xfade`, and a window size of `windur`. The algorithm constructs
 grains from the input of duration `windur` and resampled by `ratio` using
 linear interpolation, and which overlap by `xfade`, with linear
