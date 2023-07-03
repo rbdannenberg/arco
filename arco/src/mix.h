@@ -50,8 +50,9 @@ public:
 
     // find the index of Ugen inp -- linear search
     int find(Ugen_ptr inp) {
-        Input *input = &inputs[0];
+        //Input *input = &inputs[0]; This line looks like a bug!
         for (int i = 0; i < inputs.size(); i++) {
+            Input *input = &inputs[i];
             if (input->input == inp) {
                 return i;
             }
