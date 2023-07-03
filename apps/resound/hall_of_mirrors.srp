@@ -1,7 +1,6 @@
 # Project Author: Roger B. Dannenberg
 # Date: June 7, 2023
 
-
 class Shift_delay_bank:
 # Creates a shift delay bank
     var shift_objs, delay_objs // pitch-shift and delay objects
@@ -12,8 +11,8 @@ class Shift_delay_bank:
         shift_objs = array(length)
         delay_objs = array(length)
         for i = 0 to length:
-            delay_objs[i] = delay(input_ugen, 1.0, 0.1, 2.0)
-            shift_objs[i] = ola_pitch_shift(input_ugen, 1, 0.01, 0.05)
+            delay_objs[i] = delay(input_ugen, 1.0, 0.0, 2.0)
+            shift_objs[i] = ola_pitch_shift(delay_objs[i], 1, 0.01, 0.05)
             
 
     def set_delay(i, delay_value):
@@ -25,10 +24,16 @@ class Shift_delay_bank:
         shift_objs[i].set_ratio(ratio_value)
     
     def get_shiftobjs():
+    # Getter method to access pitch-shift objects
         return shift_objs
     
     def get_delayobjs():
+    # Getter method to access delay objects
         return delay_objs
+    
+    def get_len():
+    # Getter method to access length of objects
+        return len_objs
 
 
 class Hall_of_mirrors:
@@ -36,6 +41,7 @@ class Hall_of_mirrors:
     var win, init_x, init_y // GUI params
     var shift_delay_bank // bank containing shift and delay units
     var active // Checks if the mixer is currently playing
+    var mixer // Mixer containing delay and pitch-shifted ugens
     
 
     def init(window, x, y):
@@ -48,6 +54,13 @@ class Hall_of_mirrors:
         // Create shift delay bank
         shift_delay_bank = Shift_delay_bank(5)
 
+        // Initialize mixer
+        mixer = mix(1)
+
+        // insert shift objects into the mixer
+        for i = 0 to 5:
+            mixer.ins(shift_delay_bank.get_shiftobjs()[i], 0.0)
+        
         // Setup UI
         this.set_ui()
 
@@ -62,24 +75,37 @@ class Hall_of_mirrors:
     def get_control():
     # Returns the currently selected control
     # in the Radiobox
-        return symbol_value(hallmirror).value()
+        return hallmirror.value()
 
     def play(flag):
     # Play shift-delays depending on radiobox selection
         if active != flag and active == nil:
-            for i = 0 to shift_delay_bank.len_objs:
-                shift_delay_bank.get_shiftobjs()[i].play()
-                shift_delay_bank.get_delayobjs()[i].play()
+            mixer.play() // Play mixer if it was inactive
             active = flag
+        elif active == flag: // Do nothing
+            display "Current state", active
         else:
             // if off is clicked after
             // playing movement, turn off everything
             if active:
-                //mixer.mute()
-                for i = 0 to shift_delay_bank.len_objs:
-                    shift_delay_bank.get_shiftobjs()[i].mute()
-                    shift_delay_bank.get_delayobjs()[i].mute()
                 active = nil
+                sched_select(rtsched) // select scheduler
+                sched_cause(1.0, this, 'mute_mixer') // mute mixer after 1s
+
+    def mute_mixer():
+    # Mutes mixer
+        // Do I delete mixer?
+        // What if the movement is played more than once?
+        mixer.mute()  
+    
+    def freq_ratio(semi_arr):
+    # returns an array of freq_ratios from 
+    # semi_arr (semitone array)
+        result = []
+        for i=0 to len(semi_arr):
+            ratio = 2**(semi_arr[i]/12)
+            result.append(ratio)
+        return result
 
     def sd_hit(obj, event, x, y):
     # Shift delay hit events
@@ -87,41 +113,36 @@ class Hall_of_mirrors:
 
          // play mixer based on Radiobox selection
         this.play(get_control() != 0)
-
+        
+        // Setup shift-delays by passing delay and semitone
+        // array
         if get_control() == 1:
-            set_shift_delay(0.6, [1.12])
+            semitone_arr = [2]
+            set_shift_delay(0.6, freq_ratio(semitone_arr))
         elif get_control() == 2:
-            set_shift_delay(0.4,[1.12, 1.498])
+            semitone_arr = [2, 7]
+            set_shift_delay(0.3, freq_ratio(semitone_arr))
         elif get_control() == 3:
-            set_shift_delay(0.3,[1, 1.2599, 1.888]) # (1,4,11) diff from aura, why?
+            semitone_arr = [0, 4, 11]
+            set_shift_delay(0.2, freq_ratio(semitone_arr)) # (0,4,11) diff from aura, why?
         elif get_control() == 4:
-            set_shift_delay(0.24,[1.12, 1.2599, 1.888, 1.587])
+            semitone_arr = [2, 4, 11, 8]
+            set_shift_delay(0.15, freq_ratio(semitone_arr))
         elif get_control() == 5:
-            set_shift_delay(0.2,[0.445, 1.682, 1.12, 1.335, 2])
+            semitone_arr = [-14, 9, 2, 5, 12]
+            set_shift_delay(0.12, freq_ratio(semitone_arr))
 
     def set_shift_delay(delay, shift_arr):
     # Sets up the delay and shift values 
     # in the shift-delay bank
 
-        # turn off delay and pitch-shift units that are to be inactive
-        for i = len(shift_arr) to shift_delay_bank.len_objs:
-            shift_delay_bank.get_shiftobjs()[i].mute()
-            shift_delay_bank.get_delayobjs()[i].mute()
+        # turn off shift units that are to be inactive
+        for i = len(shift_arr) to shift_delay_bank.get_len():
+            mixer.set_gain(shift_delay_bank.get_shiftobjs()[i],0.0)
 
         for i = 0 to len(shift_arr):
             shift_delay_bank.set_delay(i, (i+1)*delay) // Do I include latency? Confirm!!
-            shift_delay_bank.set_ratio(i, shift_arr[i])
-            shift_delay_bank.get_delayobjs()[i].play()
-            shift_delay_bank.get_shiftobjs()[i].play()
-
-
-
-
-
-                
-
-
-
-
-
-
+            shift_delay_bank.set_ratio(i, shift_arr[i]) // Set freq ratio
+            
+            // Adjust gains of active delay and pitch-shift objects
+            mixer.set_gain(shift_delay_bank.get_shiftobjs()[i], 1) 
