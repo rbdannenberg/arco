@@ -9,6 +9,7 @@ class Someone_is_following_you:
     var fade_value
     var mix1
     var mult1
+    var pwl1
     var win, init_x, init_y
 
     def init(window, x, y):
@@ -18,7 +19,8 @@ class Someone_is_following_you:
         dly1_value = nil
         dly2_value = nil
         fade_value = nil
-        m1 = nil
+        mix1 = nil
+        mult1 = nil
         pwl1 = nil
         
         win = window // Main UI window
@@ -67,7 +69,7 @@ class Someone_is_following_you:
             mult1.play()
         else:
             pwl1 = pwlb(0, 1, fade_value, 0)
-            mul1.repl_x2(pwl1)
+            mult1.repl_x2(pwl1)
             sched_select(rtsched)
             sched_cause(fade_value + 0.1, this, 'finish_delays')
             pwl1 = nil
