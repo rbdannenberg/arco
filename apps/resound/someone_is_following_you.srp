@@ -42,18 +42,18 @@ class Someone_is_following_you:
 
         // Sliders
         Labeled_slider(win, "del1", init_x+5, 'D', 250,
-                                28, 65, 1, 10, 
-                                5, 'integer', 'd1_slide')
+                                28, 65, 0, 5, 
+                                1, 'linear', 'd1_slide')
         d1_slide.add_target_method(this, 'delay1_handler')
 
         Labeled_slider(win, "del2", init_x+5, 'D', 250,
-                                28, 65, 1, 10, 
-                                5, 'integer', 'd2_slide')
+                                28, 65, 0, 5, 
+                                2, 'linear', 'd2_slide')
         d2_slide.add_target_method(this, 'delay2_handler')
 
         Labeled_slider(win, "fadelen", init_x+5, 'D', 250,
-                                28, 65, 5, 100, 
-                                50, 'integer', 'fl_slide')
+                                28, 65, 0, 5, 
+                                2.5, 'linear', 'fl_slide')
         fl_slide.add_target_method(this, 'fadelen_handler')
         
 
@@ -69,7 +69,7 @@ class Someone_is_following_you:
             mult1.play()
         else:
             pwl1 = pwlb(0, 1, fade_value, 0)
-            mult1.repl_x2(pwl1)
+            mult1.set('x2', pwl1)
             sched_select(rtsched)
             sched_cause(fade_value + 0.1, this, 'finish_delays')
             pwl1 = nil
