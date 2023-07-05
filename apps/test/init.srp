@@ -143,25 +143,36 @@ def play_simple_test(obj, event, x, y):
 // handler for mtcheckbox: play/stop some sine tones
 def play_mixer_test(obj, event, x, y):
     if x:
-        m1 = mix(1)
+        m1 = mix(2)
+
         ms1 = sine(440.0, 0.01)
-        m1.ins(ms1, 1)
+        m1.ins('inp1', ms1, [1, 0])
+
         ms2 = sine(880.0, 0.01)
-        m1.ins(ms2, 1)
-        m1.ins(sine(1320.0, 0.007), 1)
-        m1.ins(sine(1760.0, 0.005), 1)
+        m1.ins('inp2', ms2, [0, 1])
+
+        m1.ins('inp3', sine(1320.0, 0.007), 1)
+
+        m1.ins('inp4', sine(1760.0, 0.005), 1)
+
         m1.play()
+
         sched_select(rtsched)
-        sched_cause(1.0, nil, 'mixer_gain_change')
+        sched_cause(1.0, nil, 'mixer_gain_change_1')
+        sched_cause(2.0, nil, 'mixer_gain_change_2')
     else
         m1.mute()
         m1 = nil  // delete references
         ms1 = nil
         ms2 = nil
 
-def mixer_gain_change():
-    m1.set_gain(ms1, 10)
-    m1.set_gain(ms2, 10)
+def mixer_gain_change_1():
+    if m1:  // user has not stopped test yet
+        m1.set_gain('inp1', 10, 0)  // left channel
+
+def mixer_gain_change_2():
+    if m1:  // user has not stopped test yet
+        m1.set_gain('inp2', 10, 1)  // right channel
 
 
 ########## PLAYREC TESTS ##################

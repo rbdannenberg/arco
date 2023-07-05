@@ -12,12 +12,12 @@
 
 require "slider"
 
-aura_slider_slider_width = 100
-aura_slider_label_width = 50
-aura_slider_value_width = 40
-aura_slider_height = 25
-aura_slider_width = aura_slider_label_width + aura_slider_slider_width +
-                    aura_slider_value_width
+arco_slider_slider_width = 100
+arco_slider_label_width = 50
+arco_slider_value_width = 40
+arco_slider_height = 25
+arco_slider_width = arco_slider_label_width + arco_slider_slider_width +
+                    arco_slider_value_width
 
 class Arco_slider (Labeled_slider):
     var address
@@ -27,10 +27,10 @@ class Arco_slider (Labeled_slider):
     #    value when the slider is first created
     def init(parent, labeltext, x, y, min, max, initial, style, addr, id,
              optional varname,
-             keyword slider_width = aura_slider_width,
-             keyword slider_height = aura_slider_height,
-             keyword label_width = aura_slider_label_width,
-             keyword value_width = aura_slider_value_width,
+             keyword slider_width = arco_slider_width,
+             keyword slider_height = arco_slider_height,
+             keyword label_width = arco_slider_label_width,
+             keyword value_width = arco_slider_value_width,
              keyword send_initial = t):
         slider = Labeled_slider(parent, labeltext, x, y, slider_width,
                                 slider_height, label_width, min, max, 
@@ -43,7 +43,7 @@ class Arco_slider (Labeled_slider):
 
 
     def on_slider(obj, x):
-        // display "Aura_slider:on_slider", x, message, aura_id.to_string()
+        // display "Arco_slider:on_slider", x, message, arco_id.to_string()
         if address:
             if ugen_id:
                 o2_send_cmd(address, 0, "Uf", ugen_id, x)

@@ -3,7 +3,8 @@
 
 
 class Someone_is_following_you:
-# Instance variables
+# basically a 1s and 2s delay panned left and right
+    // Instance variables:
     var dly1, dly2
     var dly1_value, dly2_value
     var fade_value
@@ -41,17 +42,17 @@ class Someone_is_following_you:
         d_check.add_target_method(this, 'delay_handler')
 
         // Sliders
-        Labeled_slider(win, "del1", init_x+5, 'D', 250,
+        Labeled_slider(win, "del1", 'S', 'D', 250,
                                 28, 65, 0, 5, 
                                 1, 'linear', 'd1_slide')
         d1_slide.add_target_method(this, 'delay1_handler')
 
-        Labeled_slider(win, "del2", init_x+5, 'D', 250,
+        Labeled_slider(win, "del2", 'S', 'D', 250,
                                 28, 65, 0, 5, 
                                 2, 'linear', 'd2_slide')
         d2_slide.add_target_method(this, 'delay2_handler')
 
-        Labeled_slider(win, "fadelen", init_x+5, 'D', 250,
+        Labeled_slider(win, "fadelen", 'S', 'D', 250,
                                 28, 65, 0, 5, 
                                 2.5, 'linear', 'fl_slide')
         fl_slide.add_target_method(this, 'fadelen_handler')

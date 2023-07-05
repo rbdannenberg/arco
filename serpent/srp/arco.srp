@@ -23,6 +23,10 @@ BL_RECIP = 1 / BL
 BR = AR / BL
 BP = 1 / BR
 
+A_RATE = 'a'
+B_RATE = 'b'
+C_RATE = 'c'
+
 // BPS is set to zero when audio stops to avoid activity that
 // cannot be processed by the audio server. BPS is restored
 // using this variable:
@@ -466,7 +470,7 @@ class Ugen:
     var id  // ugen_id object: our encapsulated Arco id
     var classname  // name of Arco Unit Generator Class
     var chans // output channels
-    var rate // output rate: 'a' or 'b'
+    var rate // output rate: A_RATE or B_RATE
     var inputs  // dictionary of inputs
 
     # init installs Ugen in table if id is not nil.  If id is nil,
@@ -587,7 +591,7 @@ class Ugen:
             breakpoint()
             return
         if isnumber(value):
-            if previous.rate == 'c':  // set the output of existing Const object
+            if previous.rate == C_RATE:  // set the output of existing Const object
                 if chan >= previous.chans:
                     print "ERROR: const", input, "of", classname, "has",
                     print previous.chans, "channels but attempt to set channel",
@@ -598,7 +602,7 @@ class Ugen:
                             "/set_" + str(input), 0, "Uif", id, chan, value)
                 return
             // otherwise, make a Const object to hold the value
-            value = const(value)  // replacing 'a' or 'b' with 'c'
+            value = const(value)  // replacing A_RATE or B_RATE with C_RATE
         // value is a Ugen which is the new input value
         inputs[input] = value
         o2_send_cmd("/arco/" + tolower(classname) +
@@ -700,28 +704,28 @@ def zero(): zero_ugen
 def zerob(): zerob_ugen
 
 //def sine(freq, amp, optional chans = 1):
-//    Ugen(create_ugen_id(), "Sine", chans, 'a', "UU", 'freq', freq, 'amp', amp)
+//    Ugen(create_ugen_id(), "Sine", chans, A_RATE, "UU", 'freq', freq, 'amp', amp)
 //
 //def sineb(freq, amp, optional chans = 1):
-//    if freq.rate == 'a' or amp.rate == 'a':
+//    if freq.rate == A_RATE or amp.rate == A_RATE:
 //        print "ERROR: passing audio rate Ugen to block rate sineb"
 //        return nil
 //    else:
-//        return Ugen(create_ugen_id(), "Sineb", chans, 'b', "UU", 
+//        return Ugen(create_ugen_id(), "Sineb", chans, B_RATE, "UU", 
 //                    'freq', freq, 'amp', amp)
 
 class Const (Ugen):
     def init(x, optional chans = 1):
         if isarray(x):
             chans = max(len(x), 1)
-        super.init(create_ugen_id(), "Const", chans, 'c', "", no_msg = true)
+        super.init(create_ugen_id(), "Const", chans, C_RATE, "", no_msg = true)
         if chans > 1:
             o2_send_cmd("/arco/const/new", 0, "Ui", id, chans)
             for i = 0 to chans:  // send "set" message for each channel
                 var f = x    if isnumber(x) else
-                        (x[i] if len(x) > i else
-                         (x[0] if len(x) == 1 else
-                          x.last()))
+                       (x[i] if len(x) > i  else
+                       (x[0] if len(x) == 1 else
+                        x.last()))
                 o2_send_start()
                 o2_add_int32(arco_ugen_id(id))
                 o2_add_int32(i)

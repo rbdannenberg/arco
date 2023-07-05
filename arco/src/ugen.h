@@ -4,6 +4,10 @@
  * Dec 2021
  */
 
+#ifndef MAX
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+#endif
+
 #define INT16_TO_FLOAT(x) ((x) * 3.0518509476e-5)
 // This maps to range -32767 to 32767:
 #define FLOAT_TO_INT16(x) ((int) ((32767 * (x) + 32768.5)) - 32768)

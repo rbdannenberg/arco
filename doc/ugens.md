@@ -56,7 +56,29 @@ commands to follow the reference to the Const object and set a value:
 ````
 This message only works if the current input is a Const and is recommended because the client can free its direct reference to the Const object. Also, it seems more direct to set an *input* parameter of the ugen as opposed to an *output* parameter of a Const.
 
-However, if the Const is shared by other ugens, setting the *input* of one of those ugens changes the input of other ugens. In that case, it is better to treat the Const object as a shared variable and set the Const object directly.
+As a further convenience and matter of style, the client can allocate fixed
+Arco ID numbers for Const construction. When you want a "c-rate" (i.e. Const) input,
+send `/arco/const/new` using the fixed ID, use `/arco/const/set` to set the value(s),
+and then use this Const as a parameter for a new Ugen. Immediately send `/arco/free`
+to free the Const. Since the const is still referenced by the new Ugen, you can
+use messages like `/arco/fmosc/set_freq` to change the Const value, so you really
+do not need to retain a direct reference to the Const, and now you can reuse the
+fixed ID number for the next Const parameter you need. Since Ugens can have multiple
+parameters, you should reserve a handful of Const IDs. We use 5, 6, 7, 8, and 9.
+
+In summary, the pattern for starting Ugens with one or more Const inputs is:
+1. Create Const objects for each Const parameter using fixed Arco ID numbers.
+2. Set the initial values of the Const objects.
+3. Pass the objects as parameters to the newly created Ugen.
+4. Free all the Const objects (from their IDs).
+5. If you need to change an input value, do it through one of the Ugen's 
+      `set_` methods.
+
+This procedure also insures a separate Const for each parameter. If a
+Const is shared by other ugens, setting the *input* of one of those ugens
+changes the input of other ugens. In that case, it is better to treat the
+Const object as a shared variable with its own ID and set the Const object directly
+using that ID.
 
 If the current input is A-rate (audio) or B-rate (block rate), you can *replace*
 the input (and also unref the current one) by using a replace command:
@@ -105,19 +127,19 @@ block-rate, and "constant-rate" (class Const) signals.
 ## Unit Generators and Messages
 
 ### delay
-`/arco/delay/new id chans inp dur fb maxdur` - Create a new delay
-generator with audio input and output. `id` is the object id.
-`maxdur` is the maximum duration (this much space is allocated).
+`/arco/delay/new id chans inp dur fb maxdur` - Create a new feedback delay
+generator with audio input and output. All channels have the same maximum duration (`maxdur`), but each channel can have a different delay (`dur`) and feedback
+(`fb`). `id` is the object id.
 
 `/arco/delay/max id dur` - Reallocates delay memory for a maximum duration of `dur`.
 
 `/arco/delay/repl_dur id dur_id` - Set duration input to object with id `dur_id`.
 
-`/arco/delay/set_dur id dur` - Set duration to a float value `dur`.
+`/arco/delay/set_dur id chan dur` - Set duration to a float value `dur`.
 
 `/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
-`/arco/delay/set_fb id fb` - Set feedback to float value `fb`.
+`/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
 
 ### feedback
 `/arco/feedback/new id chans inp from gain` - Create a cycle in the
@@ -219,17 +241,43 @@ is set to false.
 
 
 ### mix
+Mix accepts any number of inputs. Each input has a name and an associated gain,
+which must be b-rate or c-rate. You can change the gain at any time. To change
+the input signal, insert a new input and gain using the same name.
+
+Multiple channels are handled as follows: First, each mixer input consists of
+both an input signal and a gain. If both are single channel, we say the input
+is single channel. If one is n-channel and the other (either input signal
+or gain) is single *or* n-channel, we say the input is n-channel. The input
+signal and gain are not permitted to have multiple channels that do not match,
+e.g. n-channel and m-channel where n > 1, m > 1, and n != m. Attempts to insert
+mismatched Ugens will have no effect other than printing a warning.
+
+A single channel input signal will be duplicated n times if the gain has n
+channels, and a single gain channel will be duplicated n times if the input
+signal has n channels, forming n audio channels as the input signal. These
+n channels are added to mixer output channels starting at channel 0 and
+wrapping around if n is greater than the number of output channels.
+
+Note that the number of channels in any given input does not need to match
+the number of mixer output channels. Also note that a single input channel
+is *never* expanded to the number of mixer channels. E.g., mono input is
+routed to stereo left (only). To place a mono channel in the middle of a
+stereo field, use a 2-channel gain, which could be as simple as a Const
+Ugen with values [0.7, 0.7].
+
 `/arco/mix/new id chans` - Create a new mixer with `chans` output channels.
 
-`/arco/mix/ins id input gain` - Insert an input to the mixer.
+`/arco/mix/ins id name input gain` - Insert an input to the mixer. The `name`
+must not match the name of another input, or the existing input will be replaced.
 
-`/arco/mix/rem id input` - Remove an input from the mixer.
+`/arco/mix/rem id name` - Remove an input matching `name` from the mixer.
 
-`/arco/repl_gain id inp gain_id` - Set the gain for input `inp` to
+`/arco/repl_gain id name gain_id` - Set the gain for input `name` to
 object with id `gain_id`.
 
-`/arco/set_gain id inp gain` - Set the gain for input `inp` to the
-float value `gain`.
+`/arco/set_gain id name chan gain` - Set the gain for input `name` on
+channel `chan` to the float value `gain`.
 
 
 ### mult*

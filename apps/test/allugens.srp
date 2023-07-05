@@ -146,24 +146,20 @@ def pwlb(rest points): Pwlb(points)
 # May 2023
 
 class Mix (Ugen):
-    var input_name  // for dictionary of inputs, we need to generate names
-
     
     def init(chans_):
-        input_name = 0
-        super.init(create_ugen_id(), "Mix", chans_, 'a', "")
+        super.init(create_ugen_id(), "Mix", chans_, A_RATE, "")
 
-
+        
     def set(input, value, optional chan = 0):
         print "ERROR: set method not available for Mix class"
 
 
-    def ins(ugen, gain, optional atend):
-        if isnumber(gain):
+    def ins(name, ugen, gain, optional atend):
+        if isnumber(gain) or isarray(gain):
             gain = const(gain)
-        inputs[input_name] = [ugen, gain]
-        input_name = input_name + 1
-        o2_send_cmd("/arco/mix/ins", 0, "UUU", id, ugen.id, gain.id)
+        inputs[name] = [name, ugen, gain]
+        o2_send_cmd("/arco/mix/ins", 0, "UsUU", id, str(name), ugen.id, gain.id)
         if atend:
             if atend == SIGNAL and issubclass(ugen, Instrument) and 
                ugen.get['envelope']:
@@ -175,43 +171,43 @@ class Mix (Ugen):
         return this
     
 
-    def rem(ugen):
-        for key in inputs.keys():
-            if inputs[key][0] == ugen:
-                inputs.remove(key)
-                o2_send_cmd("/arco/mix/rem", 0, "UU", id, ugen.id)
-                return this
+    def rem(name):
+        if inputs.has_key(name):
+            inputs.remove(key)
+            o2_send_cmd("/arco/mix/rem", 0, "Us", id, str(name))
         return this
 
 
     def find_name_of(ugen):
         for key in inputs.keys():
-            if inputs[key][0] == ugen:
+            if inputs[key][1] == ugen:
                 return key
         return nil
 
 
-    def set_gain(ugen, gain):
+    def set_gain(name, gain, optional chan = 0):
     # general set gain to either a Ugen or float (constant value)
-        // inputs are "named" by numbers that start at 0 and increment for
-        // each ins() operation. We do not reuse numbers.
-        // Start by finding the input name:
-        var i = find_name_of(ugen)
-        if not i:
-            print "ERROR: Mix set_gain cannot find ugen", ugen
+        if not inputs.has_key(name):
+            print "ERROR: Mix set_gain cannot find input", name
             return
-        var gain_ugen = inputs[i][1]
-        if isinstance(gain_ugen, Ugen) and gain_ugen.rate == "c":
+        var gain_ugen = inputs[name][2]
+        display "in set_gain", inputs[name], gain_ugen, repr(gain_ugen.rate)
+        if isinstance(gain_ugen, Ugen) and gain_ugen.rate == C_RATE:
+            if chan >= gain_ugen.chans:
+                print "WARNING: Mix gain for", name, "is a", gain_ugen.chans,
+                print "channel Const, but set_gain requests channel", chan
             // a Const exists, so we just write to it using set_gain
-            display "mix set_gain, calling /set_gain", id, ugen.id, gain
-            o2_send_cmd("/arco/mix/set_gain", 0, "UUf", id, ugen.id, gain)
+            display "mix set_gain, calling /set_gain", id, name, chan, gain
+            o2_send_cmd("/arco/mix/set_gain", 0, "Usif", id, str(name), chan, gain)
         else:  // have to replace with either gain as Ugen or make a const
-            if isnumber(gain):
+            if isnumber(gain) or isarray(gain):
+                if chan != 0:
+                    print "WARNING: set_gain is creating Const, but chan != 0"
                 gain = const(gain)
-                display "mix set_gain is number, convert", gain.id
-            inputs[i][1] = gain
-            display "mix set_gain, calling /repl_gain", id, ugen.id, gain.id
-            o2_send_cmd("/arco/mix/repl_gain", 0, "UUU", id, ugen.id, gain.id)
+                display "mix set_gain is number(s), convert", gain.id
+            inputs[name][2] = gain
+            display "mix set_gain, calling /repl_gain", id, name, gain.id
+            o2_send_cmd("/arco/mix/repl_gain", 0, "UsU", id, str(name), gain.id)
     
 
 def mix(optional chans = 1):
@@ -372,6 +368,10 @@ class Ola_pitch_shift (Ugen):
         super.init(create_ugen_id(), "olaps", chans, 'a', "Ufff",
 	           'input', input, 'ratio', ratio, 'xfade', xfade,
                    'windur', windur)
+    
+    def set_ratio(value):
+        o2_send_cmd("/arco/olaps/ratio", 0, "Uf", id, value)
+        
 
 def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
     Ola_pitch_shift(chans, input, ratio, xfade, windur)
