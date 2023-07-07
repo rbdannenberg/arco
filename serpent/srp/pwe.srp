@@ -1,11 +1,11 @@
-# pwl.srp -- piece-wise linear envelope
+# pwe.srp -- piece-wise linear envelope
 #
 # Roger B. Dannenberg
 # May 2023
 
-class Pwl (Ugen):
+class Pwe (Ugen):
     def init(points):
-        super.init(create_ugen_id(), "Pwl", 1, 'a', "", omit_chans = true)
+        super.init(create_ugen_id(), "Pwe", 1, 'a', "", omit_chans = true)
         set_point_array(points)
 
     def set_points(rest points):
@@ -27,26 +27,26 @@ class Pwl (Ugen):
             o2_add_float(samps)  // the number of samples to ramp
             if i + 1 < len(points):  // allowed to omit final zero amplitude
                 o2_add_float(points[i + 1])  // the destination amplitude
-        o2_send_finish(0, "/arco/pwl/env", true)
+        o2_send_finish(0, "/arco/pwe/env", true)
         this
 
     def start():
-        o2_send_cmd("/arco/pwl/start", 0, "U", id)
+        o2_send_cmd("/arco/pwe/start", 0, "U", id)
         this
 
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
-        o2_snd_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
+        o2_snd_cmd("/arco/pwe/decay", 0, "Uf", id, dur * AR)
 
 
-def pwl(rest points): Pwl(points)  # pwl as a function
+def pwe(rest points): Pwe(points)  # pwe as a function
 
 
-class Pwlb (Ugen):
+class Pweb (Ugen):
     var action_id
 
     def init(points):
-        super.init(create_ugen_id(), "Pwlb", 1, 'b', "", omit_chans = true)
+        super.init(create_ugen_id(), "Pweb", 1, 'b', "", omit_chans = true)
         set_point_array(points)
 
     def set_points(rest points):
@@ -57,7 +57,7 @@ class Pwlb (Ugen):
     # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
     # If the length is odd, a final yn = 0.0 is appended. Times are
     # converted to block periods (seconds * block_rate).
-        // display "Pwlb", points
+        // display "Pweb", points
         o2_send_start()
         o2_add_int32(arco_ugen_id(id))
         # track cummulative time and samples to avoid accumulated time error
@@ -80,18 +80,18 @@ class Pwlb (Ugen):
                 // print points[i + 1],
                 o2_add_float(points[i + 1])  // the destination amplitude
         // print
-        o2_send_finish(0, "/arco/pwlb/env", true)
+        o2_send_finish(0, "/arco/pweb/env", true)
         this
 
 
     def start():
-        o2_send_cmd("/arco/pwlb/start", 0, "U", id)
+        o2_send_cmd("/arco/pweb/start", 0, "U", id)
         this
 
 
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
-        o2_snd_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
+        o2_snd_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
 
 
-def pwlb(rest points): Pwlb(points)
+def pweb(rest points): Pweb(points)

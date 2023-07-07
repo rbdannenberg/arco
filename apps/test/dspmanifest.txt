@@ -1,6 +1,7 @@
 vu
 probe
 pwl*
+pwe*
 mix
 sine*
 mult*

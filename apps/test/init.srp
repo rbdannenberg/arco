@@ -24,7 +24,11 @@ class Atone (Instrument):
         env.atend(MUTE, this)  # target to mute is this, not env!
         var mix = mix(1)
         for i = 0 to nharm:
-            mix.ins(sine(freq * i, 0.8 ** i), env)
+            // we need a symbol for each mixer input but since the
+            // number of inputs is controlled by nharm, we have to
+            // manufacture symbols:
+            var name = intern("i" + str(i))
+            mix.ins(name, sine(freq * i, 0.8 ** i), env)
         if not SIMPLE and pr_coin(0.5):
             // reson filter center frequency envelope:
             var renv = member(pwlb(random(), pr_unif(4, 10) * freq, 
@@ -84,6 +88,9 @@ def arco_ready():
 
     Checkbox(win, "Granstream Test", 'S', 'D', 'S', 'S', 'gscheckbox')
     gscheckbox.add_target_method(nil, 'gstest')
+
+    Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
+    pwecheckbox.add_target_method(nil, 'pwetest')                
 
     ui_initialized = true
 
@@ -225,7 +232,7 @@ def play_sound_file(rest ignore):
 # finishes.
     var m1 = mix(2)
     var sp = fileplay(sound_file_path, 2)
-    m1.ins(sp, 1)  // sp reference handed off to m1
+    m1.ins('sndfile', sp, 1)  // sp reference handed off to m1
     m1.play()  // connect mixer to output
     sp.atend(MUTE, m1)  // "when the sound file finishes, mute m1"
     // The mute method will delete m1. If it were not a local var,
@@ -264,7 +271,7 @@ def fbtest(obj, event, x, y):
 # the same here, and set delay to 1 second as with delay test.
     display "fbtest - feedback", x
     if x:
-        // initially "from" is zero; then we'll replace it with delay
+        // initially "from" is zero; then we replace it with delay
         fb1 = feedback(input_ugen, zero_ugen, 0.5)
         fb2 = delay(fb1, 1.0, 0.0, 2.0)
         fb1.set('from', fb2)  // feedback from delay output
@@ -282,12 +289,37 @@ def gstest(obj, event, x, y):
 # create a granstream to granulate microphone input
     display "gstest - granstream applied microphone input ", x
     if x:
-//        gs1 = granstream(input_ugen, 20, 3.0, true, 2)  // 2 channel
-        gs1 = granstream(input_ugen, 20, 1.0, true, 1)  // 2 channel
+        gs1 = granstream(input_ugen, 20, 3.0, true, 2)  // 2 channel
+        // gs1 = granstream(input_ugen, 20, 1.0, true, 1)  // 1 channel
         gs1.play()
     else:
         gs1.mute()  // immediate stop
         gs1 = nil   // eventual cleanup
+
+
+########## PWE TEST #############
+
+def pwetest(obj, event, x, y):
+# create a tone with pwe envelope
+    display "pwetest - tones with pwl and pwe envelopes"
+    pwlnote()
+    sched_select(rtsched)
+    sched_cause(1.3, nil, 'pwenote')
+    
+def pwlnote()
+    print "pwlnote starting to play"
+    var env = pwlb(0.2, 0.5, 1.0)
+    var note = mult(sine(880.0, 1.0), env)
+    env.atend(MUTE, note)
+    note.play()
+
+def pwenote()
+    print "pwenote starting to play"
+    var env = pweb(0.2, 0.5, 1.0)
+    var note = mult(sine(880.0, 1.0), env)
+    env.atend(MUTE, note)
+    note.play()
+
 
 ########## Main Initialization ################
 

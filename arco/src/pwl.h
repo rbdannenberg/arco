@@ -15,6 +15,7 @@ public:
     float seg_incr;  // increment from one sample to the next in current segment
     float final_value; // target value that will be first sample of next segment
     int next_point_index;  // index into point of the next segment
+    int action_id;
     Vec<float> points;  // envelope breakpoints (seg_len, final_value)
 
     Pwl(int id) : Ugen(id, 'a', 1) {
@@ -22,9 +23,10 @@ public:
         seg_togo = 0;     //     segment as soon as it is called because 
                           //     seg_togo == 0
         final_value = 0.0f;      // if no envelope is loaded, output will
-        next_point_index = 0; }  //     become constant zero.
-
-    ~Pwl() { ; }
+        next_point_index = 0;    //     become constant zero.
+        action_id = 0; }
+    
+    ~Pwl() { if (action_id) send_action_id(action_id); }
 
     const char *classname() { return Pwl_name; }
 
@@ -41,6 +43,9 @@ public:
                 if (next_point_index >= points.size()) {
                     seg_togo = INT_MAX;
                     seg_incr = 0.0f;
+                    if (current == 0 && action_id) {
+                        send_action_id(action_id);
+                    }
                 } else {
                     seg_togo = (int) points[next_point_index++];
                     final_value = points[next_point_index++];

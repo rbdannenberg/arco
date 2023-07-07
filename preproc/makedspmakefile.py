@@ -1,4 +1,5 @@
-# makedspmakefile.py -- dspmanifest.txt -> dspmakefile and dspsources.cmakeinclude
+# makedspmakefile.py -- dspmanifest.txt -> dspmakefile and
+#                       dspsources.cmakeinclude
 #
 # Roger B. Dannenberg
 # April 2023
@@ -30,7 +31,7 @@ written to the same folder as dspmanifest.txt.
 
 NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
             "mix", "fileplay", "filerec", "fileio", "recplay", \
-            "olapitchshift", "feedback", "granstream"]
+            "olapitchshift", "feedback", "granstream", "pwe", "pweb"]
 
 
 def make_makefile(arco_path, manifest, outf):
