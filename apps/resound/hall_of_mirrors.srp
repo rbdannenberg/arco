@@ -55,11 +55,11 @@ class Hall_of_mirrors:
         shift_delay_bank = Shift_delay_bank(5)
 
         // Initialize mixer
-        mixer = mix(1)
+        mixer = mix(2)
 
         // insert shift objects into the mixer
         for i = 0 to 5:
-            mixer.ins(shift_delay_bank.get_shiftobjs()[i], 0.0)
+            mixer.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0, 0])
         
         // Setup UI
         this.set_ui()
@@ -116,21 +116,22 @@ class Hall_of_mirrors:
         
         // Setup shift-delays by passing delay and semitone
         // array
+        tempo = 1 // seconds per beat
         if get_control() == 1:
             semitone_arr = [2]
-            set_shift_delay(0.6, freq_ratio(semitone_arr))
+            set_shift_delay(tempo, freq_ratio(semitone_arr))
         elif get_control() == 2:
             semitone_arr = [2, 7]
-            set_shift_delay(0.3, freq_ratio(semitone_arr))
+            set_shift_delay(tempo/2, freq_ratio(semitone_arr))
         elif get_control() == 3:
             semitone_arr = [0, 4, 11]
-            set_shift_delay(0.2, freq_ratio(semitone_arr)) # (0,4,11) diff from aura, why?
+            set_shift_delay(tempo/3, freq_ratio(semitone_arr)) # (0,4,11) diff from aura, why?
         elif get_control() == 4:
             semitone_arr = [2, 4, 11, 8]
-            set_shift_delay(0.15, freq_ratio(semitone_arr))
+            set_shift_delay(tempo/4, freq_ratio(semitone_arr))
         elif get_control() == 5:
             semitone_arr = [-14, 9, 2, 5, 12]
-            set_shift_delay(0.12, freq_ratio(semitone_arr))
+            set_shift_delay(tempo/5, freq_ratio(semitone_arr))
 
     def set_shift_delay(delay, shift_arr):
     # Sets up the delay and shift values 
@@ -138,11 +139,14 @@ class Hall_of_mirrors:
 
         # turn off shift units that are to be inactive
         for i = len(shift_arr) to shift_delay_bank.get_len():
-            mixer.set_gain(shift_delay_bank.get_shiftobjs()[i],0.0)
+            mixer.set_gain(str(i), 0, 0) // set gain for left channel
+            mixer.set_gain(str(i), 0, 1) // set gain for right channel 
+
 
         for i = 0 to len(shift_arr):
             shift_delay_bank.set_delay(i, (i+1)*delay) // Do I include latency? Confirm!!
             shift_delay_bank.set_ratio(i, shift_arr[i]) // Set freq ratio
             
             // Adjust gains of active delay and pitch-shift objects
-            mixer.set_gain(shift_delay_bank.get_shiftobjs()[i], 1) 
+            mixer.set_gain(str(i), 3, 0) // set gain for left channel
+            mixer.set_gain(str(i), 3, 1) // set gain for right channel
