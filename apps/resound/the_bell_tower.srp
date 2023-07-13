@@ -1,4 +1,4 @@
-# Project Author: ROger B. Dannenberg
+# Project Author: Roger B. Dannenberg
 # Date: July 13, 2023
 
 class The_bell_tower:
@@ -35,6 +35,7 @@ class The_bell_tower:
     // setting up reverb's checkbox 
     Checkbox(win, "IV. The Bell Tower", init_x, init_y-4,
               150, 'H', 'reverb') // init_y - 5 to allign top of checkbox with other text
+    reverb.add_target_method(this, 'reverb')
 
     // Bell 1
     Radiobox(win, "Bell 1", ["reset", "record", "play"], 
@@ -50,16 +51,39 @@ class The_bell_tower:
     Radiobox(win, "Bell 3", ["reset", "record", "play"], 
              'S', 'D', 100, 100, 'bell3')
     bell3.add_target_method(this, 'bell_three')
+
+    // Micwet
+    Labeled_slider(win, "micwet", 'S', init_y+330, 250, 30, 50, 0, 1,
+                    0.5, 'linear', 'micwet_slider')
+
+    // Bellwet
+    Labeled_slider(win, "bellwet", 'S', init_y+370, 250, 30, 50, 0, 1,
+                    0.5, 'linear', 'bellwet_slider')
+
+    // RT60
+    Labeled_slider(win, "rt60", 'S', init_y+410, 250, 30, 50, 0, 100,
+                    50, 'linear', 'rt60_slider')
+
+    // Filter
+    Labeled_slider(win, "filter", 'S', init_y+450, 250, 30, 50, 0, 20000,
+                    0, 'integer', 'filter_slider')
+
+    // Fadeout
+    Checkbox(win, "fadeout", 'S', 'D', 150, 'H', 'fadeout')
+
+    // Fadelength
+    Labeled_slider(win, "fadelen", 'S', 'D', 250, 30, 50, 0, 30,
+                    30, 'integer', 'fadelen_slider')
+
   
-
-  def reverb(obj, x, y):
+  def reverb(obj, event, x, y):
     print "Emeka"
 
-  def bell_one(obj, x, y):
+  def bell_one(obj, event, x, y):
     print "Emeka"
 
-  def bell_two(obj, x, y):
+  def bell_two(obj, event, x, y):
     print "Emeka"
 
-  def bell_three(obj, x, y):
+  def bell_three(obj, event, x, y):
     print "Emeka"

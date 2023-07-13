@@ -20,7 +20,7 @@ require "the_bell_tower"
 
 
 # Definition of Global Variables
-default_window.set_size(1000,500) // set size of default window
+default_window.set_size(1000,600) // set size of default window
 ui_initialized = false # boolean that denotes if ui has been initialized
 
 def arco_ready():
