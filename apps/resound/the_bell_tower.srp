@@ -1,0 +1,65 @@
+# Project Author: ROger B. Dannenberg
+# Date: July 13, 2023
+
+class The_bell_tower:
+# Instance variables
+  var recplay1, recplay2, recplay3 // recplay objects
+  var reset1, reset2, reset3 // reset checkboxes
+  var reverb_flag // Turn on/off reverb
+  var win, init_x, init_y // GUI params
+ 
+  def init(window, x, y):
+  # Initialization of instance variables
+    // Recplay checkboxes
+    recplay1 = nil
+    recplay2 = nil
+    recplay3 = nil
+
+    // Reset checkboxes
+    reset1 = nil
+    reset2 = nil
+    reset3 = nil
+
+    // Init Reverb to off
+    reverb_flag = nil
+
+    win = window // Main UI window
+    init_x = x // set the starting x coord of the movement
+    init_y = y // set the starting y coord of the movement 
+
+    // Setup UI
+    this.set_ui()
+
+  def set_ui():
+  # Setting up The_bell_tower's UI
+    // setting up reverb's checkbox 
+    Checkbox(win, "IV. The Bell Tower", init_x, init_y-4,
+              150, 'H', 'reverb') // init_y - 5 to allign top of checkbox with other text
+
+    // Bell 1
+    Radiobox(win, "Bell 1", ["reset", "record", "play"], 
+             'S', 'D', 100, 100, 'bell1')
+    bell1.add_target_method(this, 'bell_one')
+
+    // Bell 2
+    Radiobox(win, "Bell 2", ["reset", "record", "play"], 
+             'S', 'D', 100, 100, 'bell2')
+    bell2.add_target_method(this, 'bell_two')
+
+    // Bell 3
+    Radiobox(win, "Bell 3", ["reset", "record", "play"], 
+             'S', 'D', 100, 100, 'bell3')
+    bell3.add_target_method(this, 'bell_three')
+  
+
+  def reverb(obj, x, y):
+    print "Emeka"
+
+  def bell_one(obj, x, y):
+    print "Emeka"
+
+  def bell_two(obj, x, y):
+    print "Emeka"
+
+  def bell_three(obj, x, y):
+    print "Emeka"
