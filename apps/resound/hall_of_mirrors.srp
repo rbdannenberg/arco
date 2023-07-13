@@ -68,7 +68,7 @@ class Hall_of_mirrors:
     # Setting up Movement's UI
         // Create Radiobox
         Radiobox(win, "II. Hall of Mirrors",
-                ["off", "1", "2", "3", "4", "5"], init_x+300, init_y+5,
+                ["off", "1", "2", "3", "4", "5"], init_x, init_y,
                 125, 225, 'hallmirror')
         hallmirror.add_target_method(this, 'sd_hit')
     
