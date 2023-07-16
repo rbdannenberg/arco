@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "resonb"
-Code generated with Faust 2.37.3 (https://faust.grame.fr)
-Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
+Code generated with Faust 2.59.6 (https://faust.grame.fr)
+Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Resonb -es 1 -mcd 16 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Resonb_H__
@@ -24,7 +24,7 @@ Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
 #include <math.h>
 
 static float Resonb_faustpower2_f(float value) {
-    return (value * value);
+    return value * value;
 }
 
 #ifndef FAUSTCLASS 
@@ -79,7 +79,7 @@ public:
         center = center_;
         q = q_;
         states.init(chans);
-        fConst0 = (3.14159274f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
+        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_snd(snd);
         init_center(center);
         init_q(q);
@@ -95,7 +95,7 @@ public:
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
-            for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) {
+            for (int l0 = 0; l0 < 3; l0 = l0 + 1) {
                 states[i].fRec0[l0] = 0.0f;
             }
         }
@@ -149,15 +149,15 @@ public:
         q_samps = q->run(current_block); // update input
         Resonb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            FAUSTFLOAT tmp_0 = (1.0f / std::max<float>(float(*q_samps), 0.100000001f));
-            FAUSTFLOAT tmp_1 = std::tan((fConst0 * std::max<float>(float(*center_samps), 0.100000001f)));
-            FAUSTFLOAT tmp_2 = (1.0f / tmp_1);
-            FAUSTFLOAT tmp_3 = (1.0f / (((tmp_0 + tmp_2) / tmp_1) + 1.0f));
+            FAUSTFLOAT tmp_0 = 1.0f / std::max<float>(float(*q_samps), 0.1f);
+            FAUSTFLOAT tmp_1 = std::tan(fConst0 * std::max<float>(float(*center_samps), 0.1f));
+            FAUSTFLOAT tmp_2 = 1.0f / tmp_1;
+            FAUSTFLOAT tmp_3 = 1.0f / ((tmp_0 + tmp_2) / tmp_1 + 1.0f);
             FAUSTFLOAT tmp_4 = float(*snd_samps);
-            FAUSTFLOAT tmp_5 = (((tmp_2 - tmp_0) / tmp_1) + 1.0f);
-            FAUSTFLOAT tmp_6 = (2.0f * (1.0f - (1.0f / Resonb_faustpower2_f(tmp_1))));
-            state->fRec0[0] = (tmp_4 - (tmp_3 * ((tmp_5 * state->fRec0[2]) + (tmp_6 * state->fRec0[1]))));
-            *out_samps++ = FAUSTFLOAT((tmp_3 * (state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1])))));
+            FAUSTFLOAT tmp_5 = (tmp_2 - tmp_0) / tmp_1 + 1.0f;
+            FAUSTFLOAT tmp_6 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(tmp_1));
+            state->fRec0[0] = tmp_4 - tmp_3 * (tmp_5 * state->fRec0[2] + tmp_6 * state->fRec0[1]);
+            *out_samps++ = FAUSTFLOAT(tmp_3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];            state++;
             snd_samps += snd_stride;

@@ -1,0 +1,17 @@
+# lowpass.ugen -- lowpass unit generator
+#
+# Roger B. Dannenberg
+# Nov 2022
+# lowpass(sound, cutoff)
+
+lowpass(a, ab): a
+lowpassb(b, b): b
+
+FAUST
+
+declare description "Lowpass Unit Generator for Arco";
+
+import("stdfaust.lib");
+import("filters.lib");
+
+process(snd, cutoff) = snd : lowpass(1, cutoff);

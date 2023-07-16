@@ -30,7 +30,7 @@ def main():
         source += ".ugen"
     elif source.find(".ugen") < 0 or has_upper(source):
         print("Error: command line argument " + source + \
-              "must be class name (lower case) with or without " + \
+              " must be class name (lower case) with or without " + \
               ".ugen extension")
         return
     # now strip off .ugen because we need the directory name too

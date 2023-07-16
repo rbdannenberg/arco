@@ -126,6 +126,24 @@ block-rate, and "constant-rate" (class Const) signals.
 
 ## Unit Generators and Messages
 
+### alpass
+`/arco/alpass/new id chans inp dur fb maxdur` - Create a new alpass unit
+generator with audio input and output. All channels have the same maximum duration (`maxdur`), but each channel can have a different delay (`dur`) and feedback
+(`fb`). `id` is the object id. This is based on `delay`, but uses an allpass filter
+design where every frequency has the same gain. If the desired control parameters
+are frequency (in Hz) and decay time (T60, in seconds), set `dur` to 1 / *hz* and set
+`fb` (feedback) to `exp(-6.9087 * dur / decay_time)`
+
+`/arco/delay/max id dur` - Reallocates delay memory for a maximum duration of `dur`.
+
+`/arco/delay/repl_dur id dur_id` - Set duration input to object with id `dur_id`.
+
+`/arco/delay/set_dur id chan dur` - Set duration to a float value `dur`.
+
+`/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
+
+`/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
+
 ### delay
 `/arco/delay/new id chans inp dur fb maxdur` - Create a new feedback delay
 generator with audio input and output. All channels have the same maximum duration (`maxdur`), but each channel can have a different delay (`dur`) and feedback

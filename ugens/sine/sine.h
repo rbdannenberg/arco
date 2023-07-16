@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "sine"
-Code generated with Faust 2.37.3 (https://faust.grame.fr)
-Compilation options: -lang cpp -light -es 1 -single -ftz 0
+Code generated with Faust 2.59.6 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Sine -es 1 -mcd 16 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Sine_H__
@@ -22,6 +22,21 @@ Compilation options: -lang cpp -light -es 1 -single -ftz 0
 #include <cmath>
 #include <cstdint>
 #include <math.h>
+
+#ifndef FAUSTCLASS 
+#define FAUSTCLASS Sine
+#endif
+
+#ifdef __APPLE__ 
+#define exp10f __exp10f
+#define exp10 __exp10
+#endif
+
+#if defined(_WIN32)
+#define RESTRICT __restrict
+#else
+#define RESTRICT __restrict__
+#endif
 
 class SineSIG0 {
     
@@ -40,19 +55,19 @@ class SineSIG0 {
     }
     
     void instanceInitSineSIG0(int sample_rate) {
-        for (int l0 = 0; (l0 < 2); l0 = (l0 + 1)) {
+        for (int l0 = 0; l0 < 2; l0 = l0 + 1) {
             iVec0[l0] = 0;
         }
-        for (int l1 = 0; (l1 < 2); l1 = (l1 + 1)) {
+        for (int l1 = 0; l1 < 2; l1 = l1 + 1) {
             iRec0[l1] = 0;
         }
     }
     
     void fillSineSIG0(int count, float* table) {
-        for (int i1 = 0; (i1 < count); i1 = (i1 + 1)) {
+        for (int i1 = 0; i1 < count; i1 = i1 + 1) {
             iVec0[0] = 1;
-            iRec0[0] = ((iVec0[1] + iRec0[1]) % 65536);
-            table[i1] = std::sin((9.58738019e-05f * float(iRec0[0])));
+            iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
+            table[i1] = std::sin(9.58738e-05f * float(iRec0[0]));
             iVec0[1] = iVec0[0];
             iRec0[1] = iRec0[0];
         }
@@ -64,15 +79,6 @@ static SineSIG0* newSineSIG0() { return (SineSIG0*)new SineSIG0(); }
 static void deleteSineSIG0(SineSIG0* dsp) { delete dsp; }
 
 static float ftbl0SineSIG0[65536];
-
-#ifndef FAUSTCLASS 
-#define FAUSTCLASS Sine
-#endif
-
-#ifdef __APPLE__ 
-#define exp10f __exp10f
-#define exp10 __exp10
-#endif
 /*-------------- END FAUST PREAMBLE --------------*/
 
 extern const char *Sine_name;
@@ -80,6 +86,7 @@ extern const char *Sine_name;
 class Sine : public Ugen {
 public:
     struct Sine_state {
+        int iVec1[2];
         float fRec1[2];
     };
     Vec<Sine_state> states;
@@ -100,7 +107,7 @@ public:
         freq = freq_;
         amp = amp_;
         states.init(chans);
-        fConst0 = (1.0f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
+        fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_freq(freq);
         init_amp(amp);
         run_channel = (void (Sine::*)(Sine_state *)) 0;
@@ -116,8 +123,11 @@ public:
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
-            for (int l2 = 0; (l2 < 2); l2 = (l2 + 1)) {
-                states[i].fRec1[l2] = 0.0f;
+            for (int l2 = 0; l2 < 2; l2 = l2 + 1) {
+                states[i].iVec1[l2] = 0;
+            }
+            for (int l3 = 0; l3 < 2; l3 = l3 + 1) {
+                states[i].fRec1[l3] = 0.0f;
             }
         }
     }
@@ -181,20 +191,26 @@ public:
 
     void chan_ba_a(Sine_state *state) {
         FAUSTFLOAT* input0 = amp_samps;
-        float fSlow0 = (fConst0 * float(*freq_samps));
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            state->fRec1[0] = (fSlow0 + (state->fRec1[1] - std::floor((fSlow0 + state->fRec1[1]))));
-            *out_samps++ = FAUSTFLOAT((float(input0[i0]) * ftbl0SineSIG0[int((65536.0f * state->fRec1[0]))]));
+        float fSlow0 = fConst0 * float(*freq_samps);
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            state->iVec1[0] = 1;
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow0 + state->fRec1[1]);
+            state->fRec1[0] = fTemp0 - std::floor(fTemp0);
+            *out_samps++ = FAUSTFLOAT(float(input0[i0]) * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }
 
     void chan_bb_a(Sine_state *state) {
         float fSlow0 = float(*amp_samps);
-        float fSlow1 = (fConst0 * float(*freq_samps));
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            state->fRec1[0] = (fSlow1 + (state->fRec1[1] - std::floor((fSlow1 + state->fRec1[1]))));
-            *out_samps++ = FAUSTFLOAT((fSlow0 * ftbl0SineSIG0[int((65536.0f * state->fRec1[0]))]));
+        float fSlow1 = fConst0 * float(*freq_samps);
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            state->iVec1[0] = 1;
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1 + state->fRec1[1]);
+            state->fRec1[0] = fTemp0 - std::floor(fTemp0);
+            *out_samps++ = FAUSTFLOAT(fSlow0 * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }
@@ -202,10 +218,12 @@ public:
     void chan_aa_a(Sine_state *state) {
         FAUSTFLOAT* input0 = freq_samps;
         FAUSTFLOAT* input1 = amp_samps;
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            float fTemp0 = (state->fRec1[1] + (fConst0 * float(input0[i0])));
-            state->fRec1[0] = (fTemp0 - std::floor(fTemp0));
-            *out_samps++ = FAUSTFLOAT((float(input1[i0]) * ftbl0SineSIG0[int((65536.0f * state->fRec1[0]))]));
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            state->iVec1[0] = 1;
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : state->fRec1[1] + fConst0 * float(input0[i0]));
+            state->fRec1[0] = fTemp0 - std::floor(fTemp0);
+            *out_samps++ = FAUSTFLOAT(float(input1[i0]) * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }
@@ -213,10 +231,12 @@ public:
     void chan_ab_a(Sine_state *state) {
         FAUSTFLOAT* input0 = freq_samps;
         float fSlow0 = float(*amp_samps);
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            float fTemp0 = (state->fRec1[1] + (fConst0 * float(input0[i0])));
-            state->fRec1[0] = (fTemp0 - std::floor(fTemp0));
-            *out_samps++ = FAUSTFLOAT((fSlow0 * ftbl0SineSIG0[int((65536.0f * state->fRec1[0]))]));
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            state->iVec1[0] = 1;
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : state->fRec1[1] + fConst0 * float(input0[i0]));
+            state->fRec1[0] = fTemp0 - std::floor(fTemp0);
+            *out_samps++ = FAUSTFLOAT(fSlow0 * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }

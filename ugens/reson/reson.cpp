@@ -121,13 +121,20 @@ static void arco_reson_set_q(O2SM_HANDLER_ARGS)
 static void reson_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/reson/new", "iiiii", arco_reson_new, NULL, true, true);
-    o2sm_method_new("/arco/reson/repl_snd", "ii", arco_reson_repl_snd, NULL, true, true);
-    o2sm_method_new("/arco/reson/set_snd", "iif", arco_reson_set_snd, NULL, true, true);
-    o2sm_method_new("/arco/reson/repl_center", "ii", arco_reson_repl_center, NULL, true, true);
-    o2sm_method_new("/arco/reson/set_center", "iif", arco_reson_set_center, NULL, true, true);
-    o2sm_method_new("/arco/reson/repl_q", "ii", arco_reson_repl_q, NULL, true, true);
-    o2sm_method_new("/arco/reson/set_q", "iif", arco_reson_set_q, NULL, true, true);
+    o2sm_method_new("/arco/reson/new", "iiiii", arco_reson_new, NULL, true,
+                     true);
+    o2sm_method_new("/arco/reson/repl_snd", "ii", arco_reson_repl_snd, NULL,
+                     true, true);
+    o2sm_method_new("/arco/reson/set_snd", "iif", arco_reson_set_snd, NULL,
+                     true, true);
+    o2sm_method_new("/arco/reson/repl_center", "ii", arco_reson_repl_center,
+                     NULL, true, true);
+    o2sm_method_new("/arco/reson/set_center", "iif", arco_reson_set_center,
+                     NULL, true, true);
+    o2sm_method_new("/arco/reson/repl_q", "ii", arco_reson_repl_q, NULL, true,
+                     true);
+    o2sm_method_new("/arco/reson/set_q", "iif", arco_reson_set_q, NULL, true,
+                     true);
     // END INTERFACE INITIALIZATION
 
     // class initialization code from faust:

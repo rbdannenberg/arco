@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "sineb"
-Code generated with Faust 2.37.3 (https://faust.grame.fr)
-Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
+Code generated with Faust 2.59.6 (https://faust.grame.fr)
+Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Sineb -es 1 -mcd 16 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Sineb_H__
@@ -50,6 +50,7 @@ class Sineb : public Ugen {
 public:
     struct Sineb_state {
         FAUSTFLOAT fEntry0;
+        int iVec1[2];
         FAUSTFLOAT fEntry1;
         float fRec1[2];
         int iVec0[2];
@@ -73,7 +74,7 @@ public:
         freq = freq_;
         amp = amp_;
         states.init(chans);
-        fConst0 = (1.0f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
+        fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_freq(freq);
         init_amp(amp);
     }
@@ -87,8 +88,11 @@ public:
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
-            for (int l2 = 0; (l2 < 2); l2 = (l2 + 1)) {
-                states[i].fRec1[l2] = 0.0f;
+            for (int l2 = 0; l2 < 2; l2 = l2 + 1) {
+                states[i].iVec1[l2] = 0;
+            }
+            for (int l3 = 0; l3 < 2; l3 = l3 + 1) {
+                states[i].fRec1[l3] = 0.0f;
             }
         }
     }
@@ -128,9 +132,12 @@ public:
         Sineb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             FAUSTFLOAT tmp_0 = float(*amp_samps);
-            FAUSTFLOAT tmp_1 = (fConst0 * float(*freq_samps));
-            state->fRec1[0] = (tmp_1 + (state->fRec1[1] - std::floor((tmp_1 + state->fRec1[1]))));
-            *out_samps++ = FAUSTFLOAT((tmp_0 * ftbl0SinebSIG0[int((65536.0f * state->fRec1[0]))]));
+            FAUSTFLOAT tmp_1 = fConst0 * float(*freq_samps);
+            state->iVec1[0] = 1;
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : tmp_1 + state->fRec1[1]);
+            state->fRec1[0] = fTemp0 - std::floor(fTemp0);
+            *out_samps++ = FAUSTFLOAT(tmp_0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];            state++;
             freq_samps += freq_stride;
             amp_samps += amp_stride;

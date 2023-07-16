@@ -90,10 +90,14 @@ static void sine_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/sine/new", "iiii", arco_sine_new, NULL, true, true);
-    o2sm_method_new("/arco/sine/repl_freq", "ii", arco_sine_repl_freq, NULL, true, true);
-    o2sm_method_new("/arco/sine/set_freq", "iif", arco_sine_set_freq, NULL, true, true);
-    o2sm_method_new("/arco/sine/repl_amp", "ii", arco_sine_repl_amp, NULL, true, true);
-    o2sm_method_new("/arco/sine/set_amp", "iif", arco_sine_set_amp, NULL, true, true);
+    o2sm_method_new("/arco/sine/repl_freq", "ii", arco_sine_repl_freq, NULL,
+                     true, true);
+    o2sm_method_new("/arco/sine/set_freq", "iif", arco_sine_set_freq, NULL,
+                     true, true);
+    o2sm_method_new("/arco/sine/repl_amp", "ii", arco_sine_repl_amp, NULL,
+                     true, true);
+    o2sm_method_new("/arco/sine/set_amp", "iif", arco_sine_set_amp, NULL,
+                     true, true);
     // END INTERFACE INITIALIZATION
 
     // class initialization code from faust:

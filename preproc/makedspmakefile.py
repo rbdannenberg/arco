@@ -30,7 +30,7 @@ written to the same folder as dspmanifest.txt.
 """
 
 NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
-            "mix", "fileplay", "filerec", "fileio", "recplay", \
+            "alpass", "mix", "fileplay", "filerec", "fileio", "recplay", \
             "olapitchshift", "feedback", "granstream", "pwe", "pweb"]
 
 
@@ -71,14 +71,14 @@ def make_makefile(arco_path, manifest, outf):
     # for each source, write the command to generate it
     # this generates all variants (a-rate, b-rate) and both .cpp and .h
     for source in sources:
-        sans_extension = source[ : -3]
+        sans_extension = source[ : -4]
         src_path, basename = sans_extension.rsplit("/", 1)
-        print(source + ": " + sans_extension + "ugen " + \
+        print(source + ": " + sans_extension + ".ugen " + \
               arco_path + "/preproc/u2f.py", file=outf)
         print("\tcd " + src_path + "; python3 " + arco_path + \
-              "/preproc/u2f.py " + source, file=outf)
+              "/preproc/u2f.py " + basename, file=outf)
         print("\tcd " + src_path + "; sh " + src_path + \
-              "/generate_" + basename + "sh", file=outf)
+              "/generate_" + basename + ".sh", file=outf)
         print("\n", file=outf)
 
     # write the code to make allugens.srp
@@ -165,6 +165,8 @@ def main():
     manifest = list(filter(is_a_unit_generator, manifest))
     # remove newlines
     manifest = [ugen[:-1] for ugen in manifest]
+    # remove trailing blanks
+    manifest = [ugen.strip() for ugen in manifest]
 
     with open(makefile_name, "w") as outf:
         make_makefile(arco_path, manifest, outf)

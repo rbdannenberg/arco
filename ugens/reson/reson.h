@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "reson"
-Code generated with Faust 2.37.3 (https://faust.grame.fr)
-Compilation options: -lang cpp -light -es 1 -single -ftz 0
+Code generated with Faust 2.59.6 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Reson -es 1 -mcd 16 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Reson_H__
@@ -23,10 +23,6 @@ Compilation options: -lang cpp -light -es 1 -single -ftz 0
 #include <cstdint>
 #include <math.h>
 
-static float Reson_faustpower2_f(float value) {
-    return (value * value);
-}
-
 #ifndef FAUSTCLASS 
 #define FAUSTCLASS Reson
 #endif
@@ -35,6 +31,16 @@ static float Reson_faustpower2_f(float value) {
 #define exp10f __exp10f
 #define exp10 __exp10
 #endif
+
+#if defined(_WIN32)
+#define RESTRICT __restrict
+#else
+#define RESTRICT __restrict__
+#endif
+
+static float Reson_faustpower2_f(float value) {
+    return value * value;
+}
 /*-------------- END FAUST PREAMBLE --------------*/
 
 extern const char *Reson_name;
@@ -67,7 +73,7 @@ public:
         center = center_;
         q = q_;
         states.init(chans);
-        fConst0 = (3.14159274f / std::min<float>(192000.0f, std::max<float>(1.0f, float(AR))));
+        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_snd(snd);
         init_center(center);
         init_q(q);
@@ -85,7 +91,7 @@ public:
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
-            for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) {
+            for (int l0 = 0; l0 < 3; l0 = l0 + 1) {
                 states[i].fRec0[l0] = 0.0f;
             }
         }
@@ -167,15 +173,15 @@ public:
 
     void chan_abb_a(Reson_state *state) {
         FAUSTFLOAT* input0 = snd_samps;
-        float fSlow0 = (1.0f / std::max<float>(float(*q_samps), 0.100000001f));
-        float fSlow1 = std::tan((fConst0 * std::max<float>(float(*center_samps), 0.100000001f)));
-        float fSlow2 = (1.0f / fSlow1);
-        float fSlow3 = (1.0f / (((fSlow0 + fSlow2) / fSlow1) + 1.0f));
-        float fSlow4 = (((fSlow2 - fSlow0) / fSlow1) + 1.0f);
-        float fSlow5 = (2.0f * (1.0f - (1.0f / Reson_faustpower2_f(fSlow1))));
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            state->fRec0[0] = (float(input0[i0]) - (fSlow3 * ((fSlow4 * state->fRec0[2]) + (fSlow5 * state->fRec0[1]))));
-            *out_samps++ = FAUSTFLOAT((fSlow3 * (state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1])))));
+        float fSlow0 = 1.0f / std::max<float>(float(*q_samps), 0.1f);
+        float fSlow1 = std::tan(fConst0 * std::max<float>(float(*center_samps), 0.1f));
+        float fSlow2 = 1.0f / fSlow1;
+        float fSlow3 = 1.0f / ((fSlow0 + fSlow2) / fSlow1 + 1.0f);
+        float fSlow4 = (fSlow2 - fSlow0) / fSlow1 + 1.0f;
+        float fSlow5 = 2.0f * (1.0f - 1.0f / Reson_faustpower2_f(fSlow1));
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            state->fRec0[0] = float(input0[i0]) - fSlow3 * (fSlow4 * state->fRec0[2] + fSlow5 * state->fRec0[1]);
+            *out_samps++ = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }
@@ -184,14 +190,14 @@ public:
     void chan_aba_a(Reson_state *state) {
         FAUSTFLOAT* input0 = snd_samps;
         FAUSTFLOAT* input1 = q_samps;
-        float fSlow0 = std::tan((fConst0 * std::max<float>(float(*center_samps), 0.100000001f)));
-        float fSlow1 = (1.0f / fSlow0);
-        float fSlow2 = (2.0f * (1.0f - (1.0f / Reson_faustpower2_f(fSlow0))));
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            float fTemp0 = (1.0f / std::max<float>(float(input1[i0]), 0.100000001f));
-            float fTemp1 = ((fSlow1 * (fSlow1 + fTemp0)) + 1.0f);
-            state->fRec0[0] = (float(input0[i0]) - (((state->fRec0[2] * (1.0f - (fSlow1 * (fTemp0 - fSlow1)))) + (fSlow2 * state->fRec0[1])) / fTemp1));
-            *out_samps++ = FAUSTFLOAT(((state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1]))) / fTemp1));
+        float fSlow0 = std::tan(fConst0 * std::max<float>(float(*center_samps), 0.1f));
+        float fSlow1 = 1.0f / fSlow0;
+        float fSlow2 = 2.0f * (1.0f - 1.0f / Reson_faustpower2_f(fSlow0));
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            float fTemp0 = 1.0f / std::max<float>(float(input1[i0]), 0.1f);
+            float fTemp1 = fSlow1 * (fSlow1 + fTemp0) + 1.0f;
+            state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * (fSlow1 * (fSlow1 - fTemp0) + 1.0f) + fSlow2 * state->fRec0[1]) / fTemp1;
+            *out_samps++ = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp1);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }
@@ -200,13 +206,13 @@ public:
     void chan_aab_a(Reson_state *state) {
         FAUSTFLOAT* input0 = snd_samps;
         FAUSTFLOAT* input1 = center_samps;
-        float fSlow0 = (1.0f / std::max<float>(float(*q_samps), 0.100000001f));
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            float fTemp0 = std::tan((fConst0 * std::max<float>(float(input1[i0]), 0.100000001f)));
-            float fTemp1 = (1.0f / fTemp0);
-            float fTemp2 = (((fSlow0 + fTemp1) / fTemp0) + 1.0f);
-            state->fRec0[0] = (float(input0[i0]) - (((state->fRec0[2] * (((fTemp1 - fSlow0) / fTemp0) + 1.0f)) + (2.0f * (state->fRec0[1] * (1.0f - (1.0f / Reson_faustpower2_f(fTemp0)))))) / fTemp2));
-            *out_samps++ = FAUSTFLOAT(((state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1]))) / fTemp2));
+        float fSlow0 = 1.0f / std::max<float>(float(*q_samps), 0.1f);
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            float fTemp0 = std::tan(fConst0 * std::max<float>(float(input1[i0]), 0.1f));
+            float fTemp1 = 1.0f / fTemp0;
+            float fTemp2 = (fSlow0 + fTemp1) / fTemp0 + 1.0f;
+            state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * ((fTemp1 - fSlow0) / fTemp0 + 1.0f) + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp2;
+            *out_samps++ = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp2);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }
@@ -216,13 +222,13 @@ public:
         FAUSTFLOAT* input0 = snd_samps;
         FAUSTFLOAT* input1 = center_samps;
         FAUSTFLOAT* input2 = q_samps;
-        for (int i0 = 0; (i0 < BL); i0 = (i0 + 1)) {
-            float fTemp0 = std::tan((fConst0 * std::max<float>(float(input1[i0]), 0.100000001f)));
-            float fTemp1 = (1.0f / fTemp0);
-            float fTemp2 = (1.0f / std::max<float>(float(input2[i0]), 0.100000001f));
-            float fTemp3 = (((fTemp2 + fTemp1) / fTemp0) + 1.0f);
-            state->fRec0[0] = (float(input0[i0]) - (((state->fRec0[2] * (((fTemp1 - fTemp2) / fTemp0) + 1.0f)) + (2.0f * (state->fRec0[1] * (1.0f - (1.0f / Reson_faustpower2_f(fTemp0)))))) / fTemp3));
-            *out_samps++ = FAUSTFLOAT(((state->fRec0[2] + (state->fRec0[0] + (2.0f * state->fRec0[1]))) / fTemp3));
+        for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            float fTemp0 = std::tan(fConst0 * std::max<float>(float(input1[i0]), 0.1f));
+            float fTemp1 = 1.0f / fTemp0;
+            float fTemp2 = 1.0f / std::max<float>(float(input2[i0]), 0.1f);
+            float fTemp3 = (fTemp2 + fTemp1) / fTemp0 + 1.0f;
+            state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * ((fTemp1 - fTemp2) / fTemp0 + 1.0f) + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp3;
+            *out_samps++ = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp3);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }

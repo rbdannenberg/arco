@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "multb", "mult"
-Code generated with Faust 2.37.3 (https://faust.grame.fr)
-Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
+Code generated with Faust 2.59.6 (https://faust.grame.fr)
+Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Multb -es 1 -mcd 16 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Multb_H__
@@ -62,7 +62,8 @@ public:
     Sample_ptr x2_samps;
 
 
-    Multb(int id, int nchans, Ugen_ptr x1_, Ugen_ptr x2_) : Ugen(id, 'b', nchans) {
+    Multb(int id, int nchans, Ugen_ptr x1_, Ugen_ptr x2_) :
+            Ugen(id, 'b', nchans) {
         x1 = x1_;
         x2 = x2_;
         states.init(chans);
@@ -80,6 +81,7 @@ public:
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
+
         }
     }
 
@@ -117,7 +119,7 @@ public:
         x2_samps = x2->run(current_block); // update input
         Multb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            FAUSTFLOAT tmp_0 = (float(*x1_samps) * float(*x2_samps));
+            FAUSTFLOAT tmp_0 = float(*x1_samps) * float(*x2_samps);
             *out_samps++ = FAUSTFLOAT(tmp_0);            state++;
             x1_samps += x1_stride;
             x2_samps += x2_stride;

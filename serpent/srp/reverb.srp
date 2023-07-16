@@ -1,0 +1,35 @@
+# reverb.srp -- simple reverb ported from Nyquist REVERB-MONO
+#
+# Roger B. Dannenberg
+
+
+REVERB_COMBDELAY = [0.028049887, 0.031315193, 0.036439909,
+                    0.040294785, 0.044195011, 0.046780045]
+
+REVERB_ALPASSDELAY = [143.6482085, 454.6391753, 621.1267606,
+                      832.0754717, 1422.580645]  // in Hz
+for hz at i in REVERB_ALPASSDELAY:
+    REVERB_ALPASSDELAY[i] = 1 / hz
+    
+REVERB_DECAY = [0.822, 0.802, 0.773, 0.753, 0.753, 0.753]
+
+
+class Reverb (Instrument):
+
+    def init(inp, rt60):
+        instr_begin()
+        var acomball = mix(1)
+        for delay at i in REVERB_COMBDELAY:
+            acomball.ins(intern("comb" + str(i)),
+                         delay(inp, delay,
+                               exp(-6.9087 * delay / rt60 * REVERB_DECAY[i]),
+                               delay + 0.001), 1.0)
+        var out = acomball
+        for delay at i in REVERB_ALPASSDELAY:
+            out = alpass(out, delay, exp(-6.9087 * delay / rt60 * 0.7),
+                         delay + 0.001)
+        out = lowpass(out, 9000.0)
+        super.init("Reverb", out)
+
+
+def reverb(inp, rt60): return Reverb(inp, rt60)

@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------
 name: "multb", "mult"
-Code generated with Faust 2.37.3 (https://faust.grame.fr)
-Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
+Code generated with Faust 2.59.6 (https://faust.grame.fr)
+Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Multb -es 1 -mcd 16 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Multb_H__
@@ -34,7 +34,7 @@ Compilation options: -lang cpp -os0 -light -es 1 -single -ftz 0
 #define FAUST_INT_CONTROLS 0
 #define FAUST_REAL_CONTROLS 1
 
-class Multb : public one_sample_dsp {
+class Multb : public one_sample_dsp<float> {
 	
  private:
 	
@@ -43,18 +43,18 @@ class Multb : public one_sample_dsp {
 	int fSampleRate;
 	
  public:
-	
+	Multb() {}
+
+	Multb(int* icontrol, float* fcontrol):one_sample_dsp(icontrol, fcontrol) {}
+
 	void metadata(Meta* m) { 
-		m->declare("compile_options", "-lang cpp -os0 -light -es 1 -single -ftz 0");
+		m->declare("compile_options", "-lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Multb -es 1 -mcd 16 -single -ftz 0");
 		m->declare("description", "Mult(iply) Unit Generator for Arco");
 		m->declare("filename", "multb_bb_b.dsp");
 		m->declare("interpolated", "x1 x2");
 		m->declare("name", "multb");
 	}
 
-	Multb() {}
-	Multb(int* icontrol, FAUSTFLOAT* fcontrol):one_sample_dsp(icontrol, fcontrol) {}
-	
 	virtual int getNumInputs() {
 		return 0;
 	}
@@ -63,7 +63,7 @@ class Multb : public one_sample_dsp {
 	}
 	
 	static void classInit(int sample_rate) {}
-
+	
 	void staticInit(int sample_rate) {
 	}
 	
@@ -100,19 +100,19 @@ class Multb : public one_sample_dsp {
 	
 	virtual void buildUserInterface(UI* ui_interface) {
 		ui_interface->openVerticalBox("multb");
-		ui_interface->addNumEntry("x1", &fEntry0, FAUSTFLOAT(0.0f), FAUSTFLOAT(0.0f), FAUSTFLOAT(1.0f), FAUSTFLOAT(0.100000001f));
-		ui_interface->addNumEntry("x2", &fEntry1, FAUSTFLOAT(0.0f), FAUSTFLOAT(0.0f), FAUSTFLOAT(1.0f), FAUSTFLOAT(0.100000001f));
+		ui_interface->addNumEntry("x1", &fEntry0, FAUSTFLOAT(0.0f), FAUSTFLOAT(0.0f), FAUSTFLOAT(1.0f), FAUSTFLOAT(0.1f));
+		ui_interface->addNumEntry("x2", &fEntry1, FAUSTFLOAT(0.0f), FAUSTFLOAT(0.0f), FAUSTFLOAT(1.0f), FAUSTFLOAT(0.1f));
 		ui_interface->closeBox();
 	}
 	
-	virtual void control(int* RESTRICT iControl, FAUSTFLOAT* RESTRICT fControl) {
-		fControl[0] = (float(fEntry0) * float(fEntry1));
+	virtual void control(int* RESTRICT iControl, float* RESTRICT fControl) {
+		fControl[0] = float(fEntry0) * float(fEntry1);
 	}
 
 	virtual int getNumIntControls() { return 0; }
 	virtual int getNumRealControls() { return 1; }
 	
-	virtual void compute(FAUSTFLOAT* RESTRICT inputs, FAUSTFLOAT* RESTRICT outputs, int* RESTRICT iControl, FAUSTFLOAT* RESTRICT fControl) {
+	virtual void compute(FAUSTFLOAT* RESTRICT inputs, FAUSTFLOAT* RESTRICT outputs, int* RESTRICT iControl, float* RESTRICT fControl) {
 		outputs[0] = FAUSTFLOAT(fControl[0]);
 	}
 

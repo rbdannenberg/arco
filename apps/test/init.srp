@@ -12,6 +12,7 @@ require "wxserpent"
 require "prob"
 require "arco"
 require "allugens"
+require "reverb"
 
 SIMPLE = false
 
@@ -91,6 +92,9 @@ def arco_ready():
 
     Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
     pwecheckbox.add_target_method(nil, 'pwetest')                
+
+    Button(win, "Alpass Test", 'S', 'D', 'S', 'S', 'alpcheckbox')
+    alpcheckbox.add_target_method(nil, 'alptest')                
 
     ui_initialized = true
 
@@ -320,6 +324,50 @@ def pwenote()
     env.atend(MUTE, note)
     note.play()
 
+
+########## ALPASS TEST #############
+
+def alptest(obj, event, x, y):
+# create an alpass filter for beep
+    display "alptest - tones with and without alpass filter"
+    sweep()
+    sched_select(rtsched)
+    sched_cause(2.0, nil, 'alpsweep')
+    sched_cause(4.0, nil, 'cmbsweep')
+    sched_cause(6.0, nil, 'rvbsweep')
+    
+
+def sweeper():
+# make a sine tone sweep with amp that goes to zero at 0.4s
+    var swpwl = pwlb(0.0, 440.0, 0.4, 1760.0, 10.0)
+    var swsine = sine(swpwl, 1.0)
+    sched_select(rtsched)
+    sched_cause(0.4, swsine, 'set', 'amp', 0.0)
+    return swsine
+
+def sweep()
+    var swsine = sweeper()
+    swsine.play()
+    sched_cause(0.5, swsine, 'mute')
+
+def alpsweep()
+    var swsine = sweeper()
+    var alp = alpass(swsine, 0.04, 0.9, 0.041)
+    alp.play()
+    sched_cause(2, alp, 'mute')
+
+def cmbsweep()
+    var swsine = sweeper()
+    var cmb = delay(swsine, 0.04, 0.9, 0.041)
+    cmb.play()
+    sched_cause(2, cmb, 'mute')
+
+def rvbsweep()
+    var swsine = sweeper()
+    var rvb = reverb(swsine, 5.0)
+    rvb.play()
+    sched_cause(7.0, rvb, 'mute')
+    
 
 ########## Main Initialization ################
 
