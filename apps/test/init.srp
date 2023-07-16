@@ -328,14 +328,20 @@ def pwenote()
 ########## ALPASS TEST #############
 
 def alptest(obj, event, x, y):
-# create an alpass filter for beep
+# This test performs a sequence of sounds:
+# 1. create and apply an alpass filter to a frequency sweep
+# 2. same test, but use a comb filter instead
+# 3. apply reverb with 1s reverb time to frequency sweep
+# 4. change the reverb time on the same reverb object to 5s and
+#       switch input to a new frequency sweep generator
+# 5. remove the reverb object and clean up
     display "alptest - tones with and without alpass filter"
     sweep()
     sched_select(rtsched)
     sched_cause(2.0, nil, 'alpsweep')
     sched_cause(4.0, nil, 'cmbsweep')
     sched_cause(6.0, nil, 'rvbsweep')
-    
+    sched_cause(8.0, nil, 'rvbsweep2')
 
 def sweeper():
 # make a sine tone sweep with amp that goes to zero at 0.4s
@@ -363,11 +369,22 @@ def cmbsweep()
     sched_cause(2, cmb, 'mute')
 
 def rvbsweep()
+# create reverb and send in a sine sweep
     var swsine = sweeper()
-    var rvb = reverb(swsine, 5.0)
+    rvb = reverb(swsine, 1.0)  // GLOBAL
     rvb.play()
-    sched_cause(7.0, rvb, 'mute')
-    
+
+def rvbsweep2()
+# set reverb time to 5s and send in another sine sweep
+    var swsine = sweeper()
+    rvb.set_rt60(5.0)
+    rvb.set_inp(swsine)
+    sched_cause(6, nil, 'rvbfinish')
+
+def rvbfinish():
+    rvb.mute()
+    rvb = nil  // allow GC
+
 
 ########## Main Initialization ################
 

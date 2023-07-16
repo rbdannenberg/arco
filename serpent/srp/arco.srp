@@ -587,7 +587,11 @@ class Ugen:
     def set(input, value, optional chan = 0):
         var previous = inputs.get(input)
         if not previous:
-            print "ERROR:", input, "not found in", classname
+            if type(input) != 'Symbol':
+                print "ERROR: set called with input", input,
+                print     "of type", type(input)
+            else:
+                print "ERROR:", input, "not found in", classname
             breakpoint()
             return
         if isnumber(value):

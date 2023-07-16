@@ -11,6 +11,7 @@
 // to 0.01 (about -40dB), exponential decays are computed, and then the
 // bias is removed from the result. If yi is 0 the output will be zero, but
 // the shape of the exponential decay will be what you would see in a decay
+
 // to bias (0.01).
 //    In addition, because it often sounds better, the first segment can be
 // linear from 0 to y0 in time d0. This option is enabled by linatk (Boolean,

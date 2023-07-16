@@ -15,21 +15,41 @@ REVERB_DECAY = [0.822, 0.802, 0.773, 0.753, 0.753, 0.753]
 
 
 class Reverb (Instrument):
+    var combs
+    var alpasses
 
     def init(inp, rt60):
+        combs = array(len(REVERB_COMBDELAY))
+        alpasses = array(len(REVERB_ALPASSDELAY))
         instr_begin()
         var acomball = mix(1)
         for delay at i in REVERB_COMBDELAY:
-            acomball.ins(intern("comb" + str(i)),
-                         delay(inp, delay,
-                               exp(-6.9087 * delay / rt60 * REVERB_DECAY[i]),
-                               delay + 0.001), 1.0)
+            combs[i] = delay(inp, delay,
+                             exp(-6.9087 * delay / (rt60 * REVERB_DECAY[i])),
+                             delay + 0.001)
+            acomball.ins(intern("comb" + str(i)), combs[i], 1.0)
+                         
         var out = acomball
         for delay at i in REVERB_ALPASSDELAY:
-            out = alpass(out, delay, exp(-6.9087 * delay / rt60 * 0.7),
+            out = alpass(out, delay, exp(-6.9087 * delay / (rt60 * 0.7)),
                          delay + 0.001)
+            alpasses[i] = out
         out = lowpass(out, 9000.0)
         super.init("Reverb", out)
+
+
+    def set_inp(inp):
+        for cb in combs:
+            cb.set('inp', inp)
+        
+
+    def set_rt60(rt60):
+        for cb at i in combs:
+            cb.set('fb', exp(-6.9087 * REVERB_COMBDELAY[i] /
+                             (rt60 * REVERB_DECAY[i])))
+        for ap at i in alpasses:
+            ap.set('fb', exp(-6.9087 * REVERB_ALPASSDELAY[i] / (rt60 * 0.7)))
+
 
 
 def reverb(inp, rt60): return Reverb(inp, rt60)
