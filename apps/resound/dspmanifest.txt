@@ -6,9 +6,12 @@ mix
 sine*
 mult*
 reson*
+lowpass*
 fileplay
 filerec
 recplay
 delay
+alpass
 olapitchshift
 feedback
+granstream
