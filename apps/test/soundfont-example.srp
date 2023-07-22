@@ -1,0 +1,7 @@
+# soundfont.srp -- define where to find a soundfont file for test
+#
+# Roger B. Dannenberg
+# July 2023
+
+# Change this according to your local directory structure:
+SOUNDFONT = "/Users/rbd/fluidsynth-2.3.3/sf2/VintageDreamsWaves-v2.sf2"

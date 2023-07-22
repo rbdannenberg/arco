@@ -566,6 +566,46 @@ def granstream(input, polyphony, dur, enable, optional chans = 1):
     Granstream(chans, input, polyphony, dur, enable)  # granstream as a function
 
 
+# flsyn.srp - fluid synth interface
+#
+# Roger B. Dannenberg
+# Jul, 2023
+
+class Flsyn (Ugen):
+    def init(path):
+        super.init(create_ugen_id(), "Flsyn", nil, 'a', "s", 'path', path,
+                   omit_chans = t) // always created with 2 channel output
+
+    def alloff(chan):
+        o2_send_cmd("/arco/flsyn/off", 0, "Ui", id, chan)
+
+    def control_change(chan, num, val):
+        o2_send_cmd("/arco/flsyn/cc", 0, "Uiii", id, chan, num, val)
+
+    def channel_pressure(chan, val):
+        o2_send_cmd("/arco/flsyn/cp", 0, "Uii", id, chan, val)
+
+    def key_pressure(chan, key, val):
+        o2_send_cmd("/arco/flsyn/kp", 0, "Uiii", id, chan, key, val)
+
+    def noteoff(chan, key):
+        o2_send_cmd("/arco/flsyn/noteoff", 0, "Uii" , id, chan, key)
+
+    def noteon(chan, key, vel):
+        o2_send_cmd("/arco/flsyn/noteon", 0, "Uiii", id, chan, key, vel)
+
+    def pitch_bend(chan, bend):
+        o2_send_cmd("/arco/flsyn/pbend", 0, "Uif", id, chan, bend)
+
+    def pitch_sens(chan, val):
+        o2_send_cmd("/arco/flsyn/psens", 0, "Uii", id, chan, val)
+
+    def program_change(chan, program):
+        o2_send_cmd("/arco/flsyn/prog", 0, "Uii", id, chan, program)
+
+
+
+def flsyn(path): Flsyn(path)
 # thru.srp -- audio pass-through
 #
 # Roger B. Dannenberg

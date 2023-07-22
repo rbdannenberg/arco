@@ -201,6 +201,58 @@ freeing the `feedback` ugen. (See "IMPORTANT" paragraph above.)
 (`chan`) to a the float value `gain`.
 
 
+##flsyn
+Fluidsynth is a popular open-source sample-based synthesizer. `flsyn` is a
+unit generator that uses the Fluidsynth engine to produce samples. This is
+a MIDI synthesizer, so you control it by sending Arco messages that correspond
+to MIDI messages.
+
+*Note:* On macOS, Fluidsynth requires a dynamic library, `glib-2.0`, so the
+resulting Arco application using `flsyn` is not complete or executable
+without also providing the library. On the developer's machine, this is
+```
+/opt/homebrew/Cellar/glib/2.76.4/lib/libglib-2.0.dylib
+```
+Linking with the static version of this library results in some undefined
+functions, so using the `.dylib` version is currently the only option.
+
+`/arco/flsyn/new id path` - Create a unit generator based on Fluidsynth.
+`path` (a string) is a file path to a sample library.
+
+`/arco/flsyn/off id chan` - Performs a MIDI all-off operation on the given
+channel. (`chan` is int32).
+
+`/arco/flsyn/cc id chan num val` - Performs a MIDI control change operation
+using channel `chan`, controller number `num`, and value `val`, all int32.
+
+`/arco/flsyn/cp id chan val` - Performs a MIDI channel pressure (aftertouch)
+operation using channel `chan` and value `val`, both int32.
+
+`/arco/flsyn/kp id chan key val` - Performs a MIDI key pressure (polyphonic
+aftertouch) operation using channel `chan`, key number `key`, and value
+`val`, all int32.
+
+`/arco/flsyn/noteoff id chan key` - Performs a MIDI note off operation
+on channel `chan` and key number `key`, both int32. Note that there is no
+velocity parameter.
+
+`/arco/flsyn/noteon id chan key vel` - Performs a MIDI note on operation
+on channel `chan` with key number `key` and velocity `vel`.
+
+`/arco/flsyn/pbend id chan val` - Performs a MIDI pitch bend operation
+on channel `chan`, an int32. The pitch bend is specified by a float from
+-1 to +1. To get to the 14-bit pitch bend value, multiply `val` by
+2^13, round to the nearest integer, add 2^13, and clip the value to the
+range -(2^13) through (2^13)-1.
+
+`/arco/flsyn/psens id chan val` - Set MIDI pitch bend sensitivity for
+channel `chan` (int32). The `val` (int32) is the number of semitones of
+the full-scale pitch bend. (The total pitch bend range is from `-val` to
+`+val`.)
+
+`/arco/flsyn/prog id chan program` - Performs a MIDI program change operation
+using channel `chan` and program number `program` (both int32).
+
 ### granstream
 
 `/arco/granstream/new id chans inp polyphony dur enable` - Create a new
@@ -430,6 +482,56 @@ The O2 messages consists of the probe id (int32) followed by float samples
 `/arco/pwl/start id` - starts object with id.
 
 `/arco/pwl/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
+
+### recplay
+
+`recplay` is a unit generator that can record sound and play it back. It applies a smooth envelope when the playback starts and stops, and it can automatically loop the recorded sound.
+
+`/arco/recplay/new id chans inp_id gain_id fade loop` - Create a `recplay` ugen.
+`chans` is the number of channels recorded and played (the channels are all
+synchronous). `gain_id` is normally a c-rate ugen. Each channel has independent
+gain, but gain must be c-rate or b-rate (not audio), and b-rate gain is not
+interpolated. The intention is to implement efficient adjustable gains that
+remain fixed. Use a mixer or multiplier for amplitude modulation. `fade` is
+the fade time (a float, applies to all channels). The fade is a raised
+cosine curve and is applied to both the beginning and ending of the recorded
+signal during playback. `loop` is a boolean.
+When `loop` is true, playback restarts immediately when the end of the recording
+is reached while playing.
+
+`/arco/recplay/repl_inp id inp_id` - Set the input to the object with
+id `inp_id`.
+
+`/arco/recplay/repl_gain id gain_id` - Set the gain to the object with
+id `gain_id`.
+
+`/arco/recplay/set_gain id chan gain` - Set the gain of channel `chan` to
+`gain` (a float). The gain input must be a `const` ugen.
+
+`/arco/recplay/speed id speed` - Set the playback speed to (float) `speed`.
+The same speed applies to all channels. Samples are linearly interpolated,
+and `speed` is a relative value, nominally 1.0.
+
+`/arco/recplay/rec id record` - Start or stop recording. `record` is a
+boolean value (true to start). When you start to record, any previous
+samples recorded are deleted.
+
+`/arco/recplay/start id start_time` - Start playback from time offset
+`start_time` (a float), which is relative to the start of recording.
+
+`/arco/recplay/act id action_id` - Set the action id to `action_id`.
+This id is sent when playback reaches the end of the recording.
+
+`/arco/recplay/stop id` - Stop playback. Playback continues until the
+fade-out completes. (Note that the fade-out may have already started
+if the end of recording is near.)
+
+` /arco/recplay/borrow id lender_id` - A single recording can be played
+by multiple `recplay` ugens at the same time. To do this, use one `recplay`
+to make the recording. Then, "borrow" the recording by sending this message
+to another `recplay` object. The borrower should not record anything, but it
+can play the recording. Reference counting is used so that recordings are
+only freed when no `recplay` has a reference.
 
 
 ### reson

@@ -13,6 +13,7 @@ require "prob"
 require "arco"
 require "allugens"
 require "reverb"
+require "soundfont"
 
 SIMPLE = false
 
@@ -94,8 +95,11 @@ def arco_ready():
     pwecheckbox.add_target_method(nil, 'pwetest')                
 
     Button(win, "Alpass Test", 'S', 'D', 'S', 'S', 'alpcheckbox')
-    alpcheckbox.add_target_method(nil, 'alptest')                
+    alpcheckbox.add_target_method(nil, 'alptest')
 
+    Button(win, "Flsyn Test", 'S', 'D', 'S', 'S', 'flscheckbox')
+    flscheckbox.add_target_method(nil, 'flstest')
+    
     ui_initialized = true
 
 
@@ -384,6 +388,23 @@ def rvbsweep2()
 def rvbfinish():
     rvb.mute()
     rvb = nil  // allow GC
+
+
+########## FLSYN TEST #############
+
+flsyn_ugen = nil
+
+def flstest(obj, event, x, y):
+    if not flsyn_ugen:
+        flsyn_ugen = Flsyn(SOUNDFONT)
+        print "Created Flsyn unit generator with sound font"
+        print "    ", SOUNDFONT
+        flsyn_ugen.play()
+        return
+    # play a note if flsyn_ugen exists
+    flsyn_ugen.noteon(0, 60, 100)
+    sched_select(rtsched)
+    sched_cause(1.0, flsyn_ugen, 'noteoff', 0, 60)
 
 
 ########## Main Initialization ################

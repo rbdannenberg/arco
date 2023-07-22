@@ -20,7 +20,6 @@ set(ARCO_SRC
     upsample.cpp upsample.h 
     audioblock.cpp audioblock.h
 
-
 #    pwl.cpp pwl.h 
 #    pwlb.cpp pwlb.h
 #    delay.cpp delay.h
@@ -47,7 +46,13 @@ set(ARCO_SRC
 )
 
 if(APPLE) 
-  list(APPEND ARCO_SRC recperm.mm recperm.h) 
+  list(APPEND ARCO_SRC recperm.mm recperm.h)
+  # curses library is required by fluidsynth library, which *may* be
+  # linked - it depends on dspsources.cmakeinclude, which is generated
+  # from the application's dspmanifest.txt file:
+  set(CURSES_LIB curses)
+else()
+  set(CURSES_LIB ncurses)
 endif() 
 
 list(TRANSFORM ARCO_SRC PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/") 
@@ -93,37 +98,38 @@ add_custom_target(make_faust_ugens ALL
 # now that sources are made, add them here using the cmakeinclude file
 # made by makedspmakefile.py called by make_faust_ugens.sh
 #
-include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude")
-message(STATUS "ARCO_SRC: ${ARCO_SRC}")
 
 append_to_global(ALL_INCLUDE_DIRECTORIES
                  "${CMAKE_CURRENT_LIST_DIR}/src")
-append_to_global(ALL_INCLUDE_DIRECTORIES
-                 "${FRIENDS_PATH}/o2/src")
-append_to_global(ALL_INCLUDE_DIRECTORIES
-                 "${FRIENDS_PATH}/portaudio/include")
-append_to_global(ALL_INCLUDE_DIRECTORIES
-                 "${FRIENDS_PATH}/nyquist/nylsf")
+append_to_global(ALL_INCLUDE_DIRECTORIES "${O2_INCL}")
+append_to_global(ALL_INCLUDE_DIRECTORIES "${PA_INCL}")
+append_to_global(ALL_INCLUDE_DIRECTORIES "${SNDFILE_INCL}")
+append_to_global(ALL_INCLUDE_DIRECTORIES "${FLSYN_INCL}")
 
-if(APPLE)
-  find_library(COREAUDIO CoreAudio)
-  find_library(FOUNDATION Foundation)
-  find_library(COREFOUNDATION CoreFoundation)
-  find_library(CORESERVICES CoreServices)
-  find_library(AUDIOTOOLBOX AudioToolbox)
-  find_library(AUDIOUNIT AudioUnit)
-  find_library(AVFOUNDATION AVFoundation)
-  find_library(COREMIDI CoreMIDI)
-endif()
+#if(APPLE)
+#  find_library(COREAUDIO CoreAudio)
+#  find_library(FOUNDATION Foundation)
+#  find_library(COREFOUNDATION CoreFoundation)
+#  find_library(CORESERVICES CoreServices)
+#  find_library(AUDIOTOOLBOX AudioToolbox)
+#  find_library(AUDIOUNIT AudioUnit)
+#  find_library(AVFOUNDATION AVFoundation)
+#  find_library(COREMIDI CoreMIDI)
+#  find_library(APPKIT AppKit)
+#  find_library(CARBON Carbon)
+#endif()
 
 append_to_global(ALL_LINK_DIRECTORIES
                  "${CMAKE_CURRENT_LIST_DIR}/../../o2")
 append_to_global(ALL_LINK_DIRECTORIES
                  "${CMAKE_CURRENT_LIST_DIR}/../../portaudio")
-append_to_global(ALL_LINK_DIRECTORIES
-                 "${CMAKE_CURRENT_LIST_DIR}/../../nyquist")
+#append_to_global(ALL_LINK_DIRECTORIES
+#                 "${CMAKE_CURRENT_LIST_DIR}/../../nyquist")
 
-add_library(arco4lib STATIC ${ARCO_SRC} ${ARCO4_APP_SRC})  
+add_library(arco4lib STATIC ${ARCO4_APP_SRC})  
+include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude") 
+message(STATUS "ARCO_SRC: ${ARCO_SRC}") 
+
 register_target(arco4lib)
 add_dependencies(arco4lib make_faust_ugens) 
 
@@ -160,7 +166,7 @@ find_library(PA_DBG_LIB NAMES ${PREFERRED_PORTAUDIO_LIB} portaudio_static.a
 message(STATUS "PA_OPT_LIB ${PA_OPT_LIB}, PA_DBG_LIB ${PA_DBG_LIB}")
 
 
-target_link_libraries(arco4lib PRIVATE
+target_link_libraries(arco4lib PRIVATE 
     debug ${PA_DBG_LIB} optimized ${PA_OPT_LIB}
     debug ${SNDFILE_DBG_LIB} optimized ${SNDFILE_OPT_LIB}) 
 
@@ -239,15 +245,18 @@ endif()
 
 message(STATUS "EXTRA_PA_LIBS ${EXTRA_PA_LIBS}")
 
-target_link_libraries(arco4lib PRIVATE
-    ${EXTRA_PA_LIBS}  # for linux
-    ${COREAUDIO}
-    ${FOUNDATION}
-    ${COREMIDI}
-    ${COREFOUNDATION}
-    ${CORESERVICES}
-    ${AUDIOTOOLBOX}
-    ${AUDIOUNIT}
-    ${AVFOUNDATION})
+#target_link_libraries(arco4lib PUBLIC
+#    ${EXTRA_PA_LIBS}  # for linux
+#    ${COREAUDIO}
+#    ${FOUNDATION}
+#    ${COREMIDI}
+#    ${COREFOUNDATION}
+#    ${CORESERVICES}
+#    ${AUDIOTOOLBOX}
+#    ${AUDIOUNIT}
+#    ${AVFOUNDATION}
+#    ${APPKIT}
+#    ${CARBON}
+#    )
 
 

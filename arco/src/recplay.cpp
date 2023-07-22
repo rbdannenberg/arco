@@ -479,7 +479,7 @@ static void arco_recplay_rec(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/recplay/start int32 id, double start_time;
+/* O2SM INTERFACE: /arco/recplay/start int32 id, float start_time;
  */
 static void arco_recplay_start(O2SM_HANDLER_ARGS)
 {

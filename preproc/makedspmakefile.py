@@ -31,7 +31,8 @@ written to the same folder as dspmanifest.txt.
 
 NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
             "alpass", "mix", "fileplay", "filerec", "fileio", "recplay", \
-            "olapitchshift", "feedback", "granstream", "pwe", "pweb"]
+            "olapitchshift", "feedback", "granstream", "pwe", "pweb", \
+            "flsyn"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -94,6 +95,8 @@ def make_makefile(arco_path, manifest, outf):
 def make_inclfile(arco_path, manifest, outf):
     "make the CMake include file that lists all the sources"
 
+    need_flsyn_lib = False  # special: ugen needs a library
+    
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
     #
@@ -133,9 +136,30 @@ def make_inclfile(arco_path, manifest, outf):
         else:
             src = arco_path + "/ugens/" + basename + "/" + ugen
             print("    " + src + ".cpp " + src + ".h", file=outf)
+        if basename == "flsyn":
+            need_flsyn_lib = True
 
     print(")", file=outf)
-
+    print("\ntarget_sources(arco4lib PRIVATE ${ARCO_SRC})", file=outf)
+    if need_flsyn_lib:
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug ${FLSYN_DBG_LIB} optimized ${FLSYN_OPT_LIB})",
+              file=outf)
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug ${GLIB_DBG_LIB} optimized ${GLIB_OPT_LIB})",
+              file=outf)
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
+              file=outf)
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug readline optimized readline)", file=outf)
+        # make this one public - I don't want to ever link curses in twice,
+        # and I'm not sure how this interacts with Arco Server's use of
+        # curses. Not even sure why Fluidsynth needs curses if I'm just
+        # trying to synthesize sound and not running it as an application.
+#        print("target_link_libraries(arco4lib PUBLIC", file=outf)
+#        print("    debug ${CURSES_LIB} optimized ${CURSES_LIB})", file=outf)
+#        print("set(ARCO_TARGET_LINK_OBJC true PARENT_SCOPE)", file=outf)
 
 def is_a_unit_generator(line):
     "determine if line describes a unit generator (not empty, not a comment)"

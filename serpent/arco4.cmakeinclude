@@ -72,6 +72,11 @@ add_subdirectory(${SERPENT_BASE_DIR}/64bit/src
 # set parameters to customize daserpent
 set(WXSERPENT_TARGET ${ARCO_TARGET_NAME})
 add_executable(${ARCO_TARGET_NAME})
+# target_link_options(${ARCO_TARGET_NAME} PUBLIC "-ObjC")
+if(${ARCO_TARGET_LINK_OBJC})
+message(STATUS "adding ObjC flag to linker for ${ARCO_TARGET_NAME}")
+target_link_options(${ARCO_TARGET_NAME} PUBLIC "-ObjC")
+endif()
 
 message(STATUS "target name is ${WXSERPENT_TARGET}")
 
@@ -87,6 +92,7 @@ message(STATUS "CUSTOM_WXS_SRC ${CUSTOM_WXS_SRC}
     CUSTOM_WXS_INCLUDE_DIRECTORIES ${CUSTOM_WXS_INCLUDE_DIRECTORIES}")
 
 set(EXTERNAL_LIBRARIES arco4lib)  # externals for wxserpent
+add_dependencies(${ARCO_TARGET_NAME} arco4lib)
 
 # create the executable
 add_subdirectory(${SERPENT_BASE_DIR}/wxs "${CMAKE_CURRENT_BINARY_DIR}/wxsbuild")
