@@ -2,24 +2,31 @@
 # Date: July 13, 2023
 
 class BellObjs:
+# This class contains three bell objects which
+# record trumpets and allow for playback
+
 # Instance variables
-  var bell_obj1, bell_obj2, bell_obj3
-  var checkboxes
+  var bell_obj1, bell_obj2, bell_obj3 // recplay bell objs
+  var radioboxes // To track clicks on UI radioboxes
 
   def init():
     bell_obj1 = recplay(input_ugen, 2, 1, 3, true)
     bell_obj2 = recplay(input_ugen, 2, 1, 3, true)
     bell_obj3 = recplay(input_ugen, 2, 1, 3, true)
-    checkboxes = array(3)
+    radioboxes = array(3)
   
-  def trackers(mixer, rest check_bxs):
+  def trackers(mixer, rest radio_bxs):
+  # Each radiobox is connected to a symbol that
+  # helps track if "reset", "record" or "play" is clicked
     for i=1 to 4:
-      checkboxes[i-1] = check_bxs[i-1]
+      radioboxes[i-1] = radio_bxs[i-1]
 
   def bell1_event(obj, event, x, y):
-    if checkboxes[0].value() == 0:
+  # Handles what happens when "reset". "record" or "play"
+  # is clicked for bell1
+    if radioboxes[0].value() == 0:
       bell_obj1 = nil
-    elif checkboxes[0].value() == 1:
+    elif radioboxes[0].value() == 1:
       // Record into bell_obj1's buffer
       bell_obj1.run()
       bell_obj1.record(true)
@@ -30,9 +37,11 @@ class BellObjs:
       
 
   def bell2_event(obj, event, x, y):
-    if checkboxes[1].value() == 0:
+  # Handles what happens when "reset". "record" or "play"
+  # is clicked for bell2
+    if radioboxes[1].value() == 0:
       bell_obj2 = nil
-    elif checkboxes[1].value() == 1:
+    elif radioboxes[1].value() == 1:
       // Record into bell_obj2's buffer
       bell_obj2.run()
       bell_obj2.record(true)
@@ -42,9 +51,11 @@ class BellObjs:
       bell_obj2.start(0)
 
   def bell3_event(obj, event, x, y):
-    if checkboxes[2].value() == 0:
+  # Handles what happens when "reset". "record" or "play"
+  # is clicked for bell3
+    if radioboxes[2].value() == 0:
       bell_obj3 = nil
-    elif checkboxes[2].value() == 1:
+    elif radioboxes[2].value() == 1:
       // Record into bell_obj3's buffer
       bell_obj3.run()
       bell_obj3.record(true)
@@ -57,8 +68,9 @@ class The_bell_tower:
 # Instance variables
   var bell_objs
   var win, init_x, init_y // GUI params
+  var played
   var bell_wet, mic_wet 
-  var rvb_mic, rvb_bell
+  var rvb
   var bell_mixer, rvb_mixer
   var finalmix, output
  
@@ -67,6 +79,9 @@ class The_bell_tower:
     win = window // Main UI window
     init_x = x // set the starting x coord of the movement
     init_y = y // set the starting y coord of the movement 
+
+    // Set played to nil as movement has not been played yet
+    played = nil
 
     // Init bell mixer
     bell_mixer = Mix(2)
@@ -82,7 +97,7 @@ class The_bell_tower:
     // Setup UI
     this.set_ui()
 
-    // Track the checkboxes
+    // Track the radioboxes
     bell_objs.trackers(bell_mixer, bell1, bell2, bell3)
 
     // Init bell wetness
@@ -92,16 +107,50 @@ class The_bell_tower:
     mic_wet = mult(input_ugen, micwet_slider.value() , 2)
 
     // Init reverb
-    rvb_mic = reverb(mic_wet, 1)
-    rvb_bell = reverb(bell_wet, 1)
     rvb_mixer = Mix(2)
-    rvb_mixer.ins("rvb_bell", rvb_mic, [1,1])
-    rvb_mixer.ins("rvb_mic", rvb_bell, [1,1])
+    rvb_mixer.ins("rvb_bell", mic_wet, [1,1])
+    rvb_mixer.ins("rvb_mic", bell_wet, [1,1])
+    rvb = reverb(rvb_mixer, 1)
 
     // Init finalmix
     finalmix = Mix(2)
-    //finalmix.ins("mic", input_ugen, [1,1])
-    finalmix.ins("rvb", rvb_mixer, [1,1])
+    finalmix.ins("mic", input_ugen, [1,1])
+    finalmix.ins("rvb", rvb, [1,1])
+    finalmix.ins("bell_mixer", bell_mixer, [1,1])
+
+    // Init output
+    output = mult(finalmix, 1, 2)
+
+  def reinit():
+  # This method reinitializes the entire movement
+  # in case it is to be played again.
+    // Init bell mixer
+    bell_mixer = Mix(2)
+
+    // Add the bells to the mixer
+    bell_mixer.ins("1", bell_objs.bell_obj1, [1,1])
+    bell_mixer.ins("2", bell_objs.bell_obj2, [1,1])
+    bell_mixer.ins("3", bell_objs.bell_obj3, [1,1])
+
+    // Track the radioboxes
+    bell_objs.trackers(bell_mixer, bell1, bell2, bell3)
+
+    // Init bell wetness
+    bell_wet = mult(bell_mixer, bellwet_slider.value(), 2)
+
+    // Init mic wetness
+    mic_wet = mult(input_ugen, micwet_slider.value() , 2)
+
+    // Init reverb
+    rvb_mixer = Mix(2)
+    rvb_mixer.ins("rvb_bell", mic_wet, [1,1])
+    rvb_mixer.ins("rvb_mic", bell_wet, [1,1])
+    rvb = reverb(rvb_mixer, 1)
+
+    // Init finalmix
+    finalmix = Mix(2)
+    finalmix.ins("mic", input_ugen, [1,1])
+    finalmix.ins("rvb", rvb, [1,1])
     finalmix.ins("bell_mixer", bell_mixer, [1,1])
 
     // Init output
@@ -146,8 +195,9 @@ class The_bell_tower:
     rt60_slider.add_target_method(this, 'rt60_handler')
 
     // Filter
-    Labeled_slider(win, "filter", 'S', init_y+450, 250, 30, 50, 0, 20000,
-                    0, 'integer', 'filter_slider')
+    Labeled_slider(win, "filter", 'S', init_y+450, 250, 30, 50, 1, 20000,
+                    9000, 'integer', 'filter_slider') // lowest cutoff set to 1 due to dist.
+    filter_slider.add_target_method(this, 'filter_handler')
 
     // Fadeout
     Checkbox(win, "fadeout", 'S', 'D', 150, 'H', 'fadeout')
@@ -166,15 +216,23 @@ class The_bell_tower:
 
   def reverb_handler(obj, event, x, y):
     if x:
-      // Play reverb
+      // Play reverb and output once reverb is clicked
+      if played:
+        // reinitialize if movement has been played at 
+        // least once
+        reinit()
       output.play()
+      played = t
     else:
+      // Note that the bell objects are not deleted
+      // from memory and still exist. This is a design 
+      // choice and can be changed later. If this is changed,
+      // they have to bre reinitialized in reinit()
       output.mute()
       output = nil
       finalmix = nil
       rvb_mixer = nil
-      rvb_bell = nil
-      rvb_mic = nil
+      rvb = nil
       mic_wet = nil
       bell_wet = nil
       bell_mixer = nil
@@ -184,8 +242,7 @@ class The_bell_tower:
     rt60_val = rt60_slider.value()
     if rt60_val == 0:
       rt60_val = 0.1
-    rvb_mic.set_rt60(rt60_val)
-    rvb_bell.set_rt60(rt60_val)
+    rvb.set_rt60(rt60_val)
 
   def bellwet_handler(obj, x):
   # Determines the wetness of the currently active bell
@@ -194,3 +251,7 @@ class The_bell_tower:
   def micwet_handler(obj, x):
   # Determines the wetness of the mic
     mic_wet.set('x2', micwet_slider.value())
+
+  def filter_handler(obj, x):
+  # Change the frequency of the lowpass filter
+    rvb.set_cutoff(filter_slider.value())
