@@ -84,7 +84,10 @@ class Four_of_a_kind:
 
             # Play recplay1
             recplay1.play().atend(MUTE)
-            recplay1.start(0) // Bug Alert: Latency causes distortion on audio chans (set to 0 instead)
+
+            // Bug Alert: Latency causes distortion on audio chans (set to 0 instead)
+            // Tested this in apps/test as well. Highly suspect its due to interpolation
+            recplay1.start(0) 
         elif not recplay1:
             print "WARNING: There is no recplay1 Ugen!"
         else:
