@@ -14,6 +14,7 @@ require "someone_is_following_you"
 require "hall_of_mirrors"
 require "the_bell_tower"
 require "o_for_a_thousand"
+require "ripples_in_time"
 
 
 # Definition of Global Variables
@@ -38,11 +39,14 @@ def arco_ready():
     # o_for_a_thousand.srp initialization
     O_for_a_thousand(default_win, 480, 10)
 
-    # someone_is_following_you.srp initialization
-    Someone_is_following_you(default_win, 10, 300)
-
     # the_bell_tower.srp initialization
     The_bell_tower(default_win, 680, 10)
+
+    # ripples_in_time initialization
+    Ripples_in_time(default_win, 10, 260)
+
+    # someone_is_following_you.srp initialization
+    Someone_is_following_you(default_win, 250, 300)
 
     ui_initialized = true
   
