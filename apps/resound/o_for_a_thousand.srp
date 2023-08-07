@@ -1,0 +1,22 @@
+# Project Author: Chukwuemeka L. Nkama
+# Date: Aug 7, 2023
+
+class O_for_a_thousand:
+# Instance variables
+  var win, init_x, init_y // GUI params
+
+  def init(window, x, y):
+  # Initialization of instance variables
+    win = window // Main UI window
+    init_x = x // Starting x coord of movement
+    init_y = y // Starting y coord of movement
+
+    // Setup UI
+    this.set_ui()
+
+  def set_ui():
+  # Setting up Movement's UI
+    // Create Radiobox
+    Radiobox(win, "III. O For a Thousand \nSongs to Sing",
+             ["1", "2", "3", "4", "5", "6", "7"], init_x, init_y,
+             150, 255, 'o_for_a_thousand')
