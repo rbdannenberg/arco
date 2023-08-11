@@ -46,9 +46,9 @@ class Four_of_a_kind:
         allcheck.add_target_method(this, 'rec4handler')
 
         // Setting up the Latency text and slider
-        Statictext(win, "Latency", init_x+80, init_y+170, 150, 'H',
+        Statictext(win, "Latency", init_x+80, 'D', 150, 'H',
                     'text_latency')
-        Labeled_slider(win, "", init_x-5, init_y+200, 250,
+        Labeled_slider(win, "", init_x-5, 'D', 250,
                                 28, 0, 5, 100, 
                                 50, 'integer', 'latency_slider')
         latency_slider.add_target_method(this, 'lshandler')

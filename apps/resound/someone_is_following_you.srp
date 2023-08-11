@@ -44,7 +44,7 @@ class Someone_is_following_you:
         d_check.add_target_method(this, 'delay_handler')
 
         // Sliders
-        Labeled_slider(win, "del1", init_x+5, 'D', 250,
+        Labeled_slider(win, "del1", init_x+5, init_y + 50, 250,
                                 28, 65, 0.8, 1.2, 
                                 1, 'linear', 'd1_slide')
         d1_slide.add_target_method(this, 'delay1_handler')

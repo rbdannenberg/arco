@@ -71,7 +71,7 @@ class Hall_of_mirrors:
         // Create Radiobox
         Radiobox(win, "II. Hall of Mirrors",
                 ["off", "1", "2", "3", "4", "5"], init_x, init_y,
-                125, 225, 'hallmirror')
+                150, 200, 'hallmirror')
         hallmirror.add_target_method(this, 'sd_hit')
     
     def get_control():

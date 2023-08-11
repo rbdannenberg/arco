@@ -19,14 +19,14 @@ class O_for_a_thousand:
   def set_ui():
   # Setting up Movement's UI
     // Create Checkbox
-    Checkbox(win, "III. O For a Thousand \nSongs to Sing", init_x,
-             init_y - 8, 170, 50, 'power_btn')
+    Checkbox(win, "III. O For a Thousand \nTongues to Sing", init_x,
+             init_y - 8, 200, 50, 'power_btn')
     power_btn.add_target_method(this, 'pbtn_handler')
 
     // Create Radiobox
     Radiobox(win, "Section",
              ["1", "2", "3", "4", "5", "6", "7"], 'S', 'D',
-             150, 220, 'o_for_a_thousand')
+             200, 225, 'o_for_a_thousand')
     o_for_a_thousand.add_target_method(this, 'th_hit') 
 
   def get_control():

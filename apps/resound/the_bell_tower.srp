@@ -161,41 +161,41 @@ class The_bell_tower:
   # Setting up The_bell_tower's UI
     // setting up reverb's checkbox 
     Checkbox(win, "IV. The Bell Tower", init_x, init_y-4,
-              150, 'H', 'rverb') // init_y - 5 to allign top of checkbox with other text
+              175, 'H', 'rverb') // init_y - 5 to allign top of checkbox with other text
     rverb.add_target_method(this, 'reverb_handler')
 
     // Bell 1
     Radiobox(win, "Bell 1", ["reset", "record", "play"], 
-             'S', 'D', 100, 100, 'bell1')
+             'S', 'D', 175, 125, 'bell1')
     bell1.add_target_method(bell_objs, 'bell1_event')
 
     // Bell 2
     Radiobox(win, "Bell 2", ["reset", "record", "play"], 
-             'S', 'D', 100, 100, 'bell2')
+             'S', 'D', 175, 125, 'bell2')
     bell2.add_target_method(bell_objs, 'bell2_event')
 
     // Bell 3
     Radiobox(win, "Bell 3", ["reset", "record", "play"], 
-             'S', 'D', 100, 100, 'bell3')
+             'S', 'D', 175, 125, 'bell3')
     bell3.add_target_method(bell_objs, 'bell3_event')
 
     // Micwet
-    Labeled_slider(win, "micwet", 'S', init_y+330, 250, 30, 50, 0, 1,
+    Labeled_slider(win, "micwet", 'S', init_y + 425, 275, 30, 75, 0, 1,
                     0.5, 'linear', 'micwet_slider')
     micwet_slider.add_target_method(this, 'micwet_handler')
 
     // Bellwet
-    Labeled_slider(win, "bellwet", 'S', init_y+370, 250, 30, 50, 0, 1,
+    Labeled_slider(win, "bellwet", 'S', 'D', 275, 30, 75, 0, 1,
                     0.5, 'linear', 'bellwet_slider')
     bellwet_slider.add_target_method(this, 'bellwet_handler')
 
     // RT60
-    Labeled_slider(win, "rt60", 'S', init_y+410, 250, 30, 50, 0, 10,
+    Labeled_slider(win, "rt60", 'S', 'D', 275, 30, 75, 0, 10,
                     5, 'linear', 'rt60_slider')
     rt60_slider.add_target_method(this, 'rt60_handler')
 
     // Filter
-    Labeled_slider(win, "filter", 'S', init_y+450, 250, 30, 50, 1, 20000,
+    Labeled_slider(win, "filter", 'S', 'D', 275, 30, 75, 1, 20000,
                     9000, 'integer', 'filter_slider') // lowest cutoff set to 1 due to dist.
     filter_slider.add_target_method(this, 'filter_handler')
 
@@ -204,7 +204,7 @@ class The_bell_tower:
     fadeout.add_target_method(this, 'fadeout_handler')
 
     // Fadelength
-    Labeled_slider(win, "fadelen", 'S', 'D', 250, 30, 50, 0, 30,
+    Labeled_slider(win, "fadelen", 'S', 'D', 275, 30, 75, 0, 30,
                     30, 'integer', 'fadelen_slider')
 
 

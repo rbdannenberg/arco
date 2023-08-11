@@ -10,15 +10,16 @@ require "slider"
 require "arcoslider"
 require "reverb"
 require "four_of_a_kind"
-require "someone_is_following_you"
 require "hall_of_mirrors"
-require "the_bell_tower"
 require "o_for_a_thousand"
+require "the_bell_tower"
+require "side_band"
 require "ripples_in_time"
+require "someone_is_following_you"
 
 
 # Definition of Global Variables
-default_window.set_size(1000,600) // set size of default window
+default_window.set_size(1000,1000) // set size of default window
 ui_initialized = false # boolean that denotes if ui has been initialized
 
 def arco_ready():
@@ -34,19 +35,22 @@ def arco_ready():
     Four_of_a_kind(default_win, 10, 10)
 
     # hall_of_mirrors.srp initialization
-    Hall_of_mirrors(default_win, 300, 10)
+    Hall_of_mirrors(default_win, 10, 225)
 
     # o_for_a_thousand.srp initialization
-    O_for_a_thousand(default_win, 480, 10)
+    O_for_a_thousand(default_win, 10, 450)
 
     # the_bell_tower.srp initialization
-    The_bell_tower(default_win, 680, 10)
+    The_bell_tower(default_win, 275, 10)
+
+    # side_band.srp initialization 
+    The_side_band(default_win, 575, 10)
 
     # ripples_in_time initialization
-    Ripples_in_time(default_win, 10, 260)
+    Ripples_in_time(default_win, 575, 100)
 
     # someone_is_following_you.srp initialization
-    Someone_is_following_you(default_win, 250, 300)
+    Someone_is_following_you(default_win, 575, 425)
 
     ui_initialized = true
   
