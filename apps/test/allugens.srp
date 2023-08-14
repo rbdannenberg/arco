@@ -606,6 +606,26 @@ class Flsyn (Ugen):
 
 
 def flsyn(path): Flsyn(path)
+# pv.srp -- overlap add pitch shift unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Pv(Ugen):
+    def init(chans, input, ratio, fftsize, hopsize, points, mode):
+        super.init(create_ugen_id(), "pv", chans, 'a', "Ufiiii",
+	           'input', input, 'ratio', ratio, 'fftsize', fftsize,
+                   'hopsize', hopsize, 'points', points, 'mode', mode)
+    
+    def set_ratio(value):
+        o2_send_cmd("/arco/pv/ratio", 0, "Uf", id, value)
+
+    def set_stretch(value):
+        o2_send_cmd("/arco/pv/stretch", 0, "Uf", id, value)
+
+
+def pv(input, ratio, fftsize, hopsize, points, mode, optional chans = 1):
+    Pv(chans, input, ratio, fftsize, hopsize, points, mode)
 # thru.srp -- audio pass-through
 #
 # Roger B. Dannenberg

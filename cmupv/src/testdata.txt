@@ -1,0 +1,70 @@
+1. distortion
+
+Span  Oversamp  Baseline   1.1K         0.911K  
+----  --------  ---------  ---------    ---------- 
+WITH 64-BIT rsfloat:
+64    256       2.70008         2.91656     11.9631
+32    256       2.70008        28.5949      21.7175
+16    256       2.70008       127.114      177.405
+8     256       2.70008      1370.54       734.934
+8     128       2.70008      1370.19       741.334
+8      64       2.70008      1368.87       790.405
+8      32       2.70008      1364.38       867.938   **** 
+8      16       2.70008      1347.47      5395.73
+--- 1024 table ---
+4     256       2.70008    117109.0      22980.1  
+8     128       2.70008      1370.19       741.334
+16     64       2.70008       127.169      352.197
+32     32       2.70008        28.2886     454.315
+64     16       2.70008        21.1246    7007.55
+--- 2048 table ---
+8     256       2.70008      1370.54       734.934 
+16    128       2.70008       127.043      200.743
+32     64       2.70008        28.2868     310.545
+64     32       2.70008         6.00941    461.855
+
+
+2. lowpass
+
+Span  Oversamp  20K         24K         28K         32K         36K
+----  --------  ---------   ----------  ---------   ----------  ---------
+8     64        4.62295     2.49887     0.855082    0.141627    0.00517925   
+16    64        5.56059     1.59297     0.0388744   0.000463592 0.00083496 
+32    64        6.71305     0.426908    0.000682698 0.000254777 0.000119608
+64    64        7.07021     0.00105121  6.30336e-05 8.97827e-06 1.19132e-05
+128   64        7.07156     0.000211898 1.6831e-05  5.18011e-06 1.42356e-07
+
+Cutoff at 18K
+
+Span  Oversamp  20K         24K         28K         32K         36K
+----  --------  ---------   ----------  ---------   ----------  ---------
+8     64        2.25315     0.511859    0.0296484   0.000981455 0.0010541
+16    64        1.67887     2.88352     2.8861      2.88638     2.88622
+32    64        2.72537     2.88547     2.88562     2.88609     2.88607
+64    64        2.88503     2.88552     2.8856      2.88586     2.88597
+128   64        0.00047006  0.000264889 0.000458556 6.79867e-05 0.00010219
+
+Notes: Large windows work best, so results with a small window of, say,
+8 may not be great. With a window size of 8, transposing down seems to
+work better, and transposing down really sums 8 points (4 on each side),
+whereas when you tranpose up, you need to lowpass to reduce aliasing,
+and for that the window size is greater than 8; e.g., if you transpose
+up an octave, the windowed sinc function has to be twice as wide, so it
+spans 16 samples of input.
+
+For 8 (which we should at least try because it is much faster than
+a really accurate interpolation), an oversampling factor of 32 seems
+reasonable. The windowed sinc function takes 8 * 32 * 4 * 2 = 2048 bytes,
+so not a problem. Unfortunately, substantial gains in performance
+require larger windows, not better interpolation.
+
+It seems like 8-sample windows do not do much for anti-aliasing, i.e.,
+just not a sharp cutoff at the Nyquist frequency. Getting a faster
+cutoff requires a long filter, so maybe it is not suitable for real-time,
+and the best approach is simply to transpose down, not up.
+
+Execution time with a window of 8 is about 2000 times real time.
+
+
+
+

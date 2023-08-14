@@ -1,0 +1,102 @@
+;; resamptest.ny -- Nyquist code to help evaluate resampling
+;;
+;; Roger B. Dannenberg
+;; July 2023
+
+;; First, we use resampler to convert from 1kHz sine to 1.1 and 0.9kHz.
+;;
+;; The files are simply text, with one sample per line, so we need to
+;; read that into a Nyquist signal.
+;;
+;; Once we have the file, we apply a notch filter to remove the expected
+;; frequency.
+;;
+;; Then we compute the the total RMS residual from the middle 1s
+;; (of 2s input), ignoring the beginning and ending 0.5s because there
+;; might be some signal coming from the edges.
+
+set RATIO = 1.0 / 0.9111
+
+;; read signal from text:
+;;
+function read-signal(filename)
+  begin
+    with inf = open(filename), samps, samps-array, s
+    loop
+      for sample = read(inf)
+      while sample
+      set samps @= sample
+    end
+    set samps = reverse(samps)
+    set samps-array = make-array(length(samps))
+    loop
+      for samp in samps
+      for i from 0
+      set samps-array[i] = samp
+    end
+    print "read", length(samps-array), "samples from", filename
+    set s = snd-from-array(0, 44100.0, samps-array)
+    ; exec s-plot(s, 0.01, 1000)
+    return s
+  end
+
+
+;; compute the residual after notch filter
+;;
+function residual(s, hz)  ; signal s, frequency hz
+  begin
+    if hz then
+      set s = notch2(s, hz, 10.0)
+    set rms = rms(s, 10.0)
+    set rms-array = snd-samples(rms, 1000)
+    ; display "residual", length(rms-array), rms-array
+    loop
+      with sum = 0
+      for i from 5 below 15
+      set sum += rms-array[i]
+      finally return sum
+    end
+  end
+
+function ny-900()
+  begin
+    with sin = sine(1000.0 * RATIO, 2)
+    return sin 
+  end
+
+function notch-residuals()
+  begin
+    display "1a", residual(read-signal("d1a.dat"), 1000.0)
+    display "1b", residual(read-signal("d1b.dat"), 1000 / RATIO)
+    display "1c", residual(read-signal("d1c.dat"), 1000 * RATIO)
+    display "1d", residual(read-signal("d1d.dat"), 1000 * RATIO)
+    display "1e", residual(read-signal("d1e.dat"), 1000 / RATIO)
+    ;display "nc", residual(ny-900(), 10000 / 9.0)
+  end
+
+
+function f2a(x)
+  begin
+    with a = format(nil, "~A             ", x)
+    return subseq(a, 0, 12)
+  end
+
+
+function antialias-residuals()
+  begin
+    set d2a = residual(read-signal("d2a.dat"), nil)
+    set d2b = residual(read-signal("d2b.dat"), nil)
+    set d2c = residual(read-signal("d2c.dat"), nil)
+    set d2d = residual(read-signal("d2d.dat"), nil)
+    set d2e = residual(read-signal("d2e.dat"), nil)
+    display "2a", d2a
+    display "2b", d2b
+    display "2c", d2c
+    display "2d", d2d
+    display "2e", d2e
+    print strcat(f2a(d2a), f2a(d2b), f2a(d2c), f2a(d2d), f2a(d2e))
+  end
+
+; exec notch-residuals()
+; exec antialias-residuals()
+exec s-save(read-signal("d3a.dat"), ny:all, "./d3a.wav")

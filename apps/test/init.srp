@@ -99,7 +99,17 @@ def arco_ready():
 
     Button(win, "Flsyn Test", 'S', 'D', 'S', 'S', 'flscheckbox')
     flscheckbox.add_target_method(nil, 'flstest')
+
+    # start a 2nd column
+    wxs_x = 200
+    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
+
+    Checkbox(win, "Phase vocoder", 'S', 'D', 'S', 'S', 'pvcheckbox')
+    pvcheckbox.add_target_method(nil, 'pvtest')
     
+    Button(win, "File Play/Record", 'S', 'D', 'S', 'S', 'fprbutton')
+    fprbutton.add_target_method(nil, 'file_play_record')
+
     ui_initialized = true
 
 
@@ -190,7 +200,7 @@ def mixer_gain_change_2():
         m1.set_gain('inp2', 10, 1)  // right channel
 
 
-########## PLAYREC TESTS ##################
+########## RECPLAY TESTS ##################
 
 recplay1 = nil
 
@@ -214,7 +224,7 @@ def play_recorded_output(obj, event, x, y):
         // note that Recplay might end playback immediately upon starting,
         // so we need to set up the atend action before sending 'start':
         recplay1.play().atend(MUTE)
-        recplay1.start(0.0)
+        recplay1.start(0.056)
     elif (not x) and recplay1:
         recplay1.stop()  // atend is already set up to mute when finished
 
@@ -401,10 +411,70 @@ def flstest(obj, event, x, y):
         print "    ", SOUNDFONT
         flsyn_ugen.play()
         return
-    # play a note if flsyn_ugen exists
-    flsyn_ugen.noteon(0, 60, 100)
     sched_select(rtsched)
-    sched_cause(1.0, flsyn_ugen, 'noteoff', 0, 60)
+    flsyn_ugen.program_change(0, 0)
+    fls_sequence(0, 50)
+
+def fls_sequence(program, pitch):
+    var delay = 0.2
+    flsyn_ugen.noteon(0, pitch, 100)
+    sched_cause(1.0, flsyn_ugen, 'noteoff', 0, pitch)
+    pitch = pitch + 5
+    if pitch > 70:
+        pitch = 50
+        program = program + 1
+        if program > 20:
+            return
+        flsyn_ugen.program_change(0, program)
+        delay = 1.0
+    sched_cause(delay, nil, 'fls_sequence', program, pitch)
+
+
+########## PHASE VOCODER TEST #############
+
+// handler for pvcheckbox: play/stop phase vocoder test
+def pvtest(obj, event, x, y):
+    display "pvtest", x
+    if x:
+        pv = pv(input_ugen, 0.5, 2048, 512, 8, 1)
+        display "pvtest made pv", pv
+        pv.play()
+        pvfr = filerec("./pvoutput.wav", pv, 1)
+        pvfr.run()
+        pvfr.go()
+    else:
+        pv.mute()
+        pvfr.stop()
+        pvfr.unrun()
+        pvfr = nil
+        pv = nil
+
+
+########## File Play/Record TEST #############
+
+class File_play_record:
+    var fply, frec
+
+    def init():
+        fply = fileplay("./testinput.wav", 1)
+        frec = filerec("./testoutput.wav", fply, 1)
+        fply.atend(FINISH, this)
+        fply.go()
+        frec.run()
+        frec.go()
+
+    def finish(optional status):  // stop recording and clean up
+        frec.stop()
+        frec.unrun()
+        frec = nil
+        fply = nil
+
+
+// handler for fprbutton: play file and record it
+def file_play_record(obj, event, x, y):
+    display "file_play_record", x
+    File_play_record()
+
 
 
 ########## Main Initialization ################

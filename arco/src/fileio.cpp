@@ -205,7 +205,32 @@ public:
 
     bool write_block(int64_t block_addr) {  // return true if last block
         Audioblock *block = (Audioblock *) block_addr;
+        printf("fileio::write_block dat address %p\n", block->dat);
         sf_writef_short(snd_out, block->dat, block->frames);
+        printf("fileio::write_block wrote %d frames\n", block->frames);
+        static FILE *outf = NULL;
+        if (!outf) outf = fopen("testout.txt", "w");
+        for (int i = 0; i < block->frames; i++) {
+            fprintf(outf, "%d\n", block->dat[i]);
+        }
+        if (block->frames < 8000) {
+            fclose(outf);
+        }
+        for (int i = 0; i < block->frames - 4; i++) {
+            int j;
+            for (j = 0; j < 4; j++) {
+                if (block->dat[i + j] != 0) break;
+            }
+            // if j==4, we found 4 zeros;
+            // must also be preceded and/or followed by non-zero
+            if (j == 4) {
+                if ((i == 0 || block->dat[i - 1] != 0) &&
+                    (i + j < block->frames && block->dat[i + j] != 0)) {
+                    printf("WE FOUND BAD DATA!!!!! at %d\n", i);
+                }
+            }
+        }
+
         // o2sm_send_cmd("/arco/fileplay/samps", 0, "hh", addr);
         // instead of sending through O2, deliver straight to Arco:
         o2_send_start();

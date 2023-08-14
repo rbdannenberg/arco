@@ -99,8 +99,12 @@ add_custom_target(make_faust_ugens ALL
 # made by makedspmakefile.py called by make_faust_ugens.sh
 #
 
-append_to_global(ALL_INCLUDE_DIRECTORIES
+append_to_global(ALL_INCLUDE_DIRECTORIES  
                  "${CMAKE_CURRENT_LIST_DIR}/src")
+append_to_global(ALL_INCLUDE_DIRECTORIES  
+                 "${CMAKE_CURRENT_LIST_DIR}/../ffts/src")  
+append_to_global(ALL_INCLUDE_DIRECTORIES  
+                 "${CMAKE_CURRENT_LIST_DIR}/../cmupv/src")  
 append_to_global(ALL_INCLUDE_DIRECTORIES "${O2_INCL}")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${PA_INCL}")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${SNDFILE_INCL}")
@@ -118,13 +122,6 @@ append_to_global(ALL_INCLUDE_DIRECTORIES "${FLSYN_INCL}")
 #  find_library(APPKIT AppKit)
 #  find_library(CARBON Carbon)
 #endif()
-
-append_to_global(ALL_LINK_DIRECTORIES
-                 "${CMAKE_CURRENT_LIST_DIR}/../../o2")
-append_to_global(ALL_LINK_DIRECTORIES
-                 "${CMAKE_CURRENT_LIST_DIR}/../../portaudio")
-#append_to_global(ALL_LINK_DIRECTORIES
-#                 "${CMAKE_CURRENT_LIST_DIR}/../../nyquist")
 
 add_library(arco4lib STATIC ${ARCO4_APP_SRC})  
 include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude") 

@@ -125,9 +125,11 @@ def set_arco_state(newstate):
 SIGNAL = 'signal'
 GAIN = 'gain'
 BOTH = 'both'
-// atend types for Pwlb.atend():
-MUTE = 'mute'
-
+// atend types for ugen.atend(). Various Ugens can send notification of end events:
+//    Pwlb, Fileplay, ...
+MUTE = 'mute'  // standard thing to do at end: call mute() to delete a sound instance
+FINISH = 'finish'  // custom behavior - the target should implement finish() to
+                   // handle the event
 
 ZERO_ID = 0
 ZEROB_ID = 1
@@ -595,7 +597,8 @@ class Ugen:
             breakpoint()
             return
         if isnumber(value):
-            if previous.rate == C_RATE:  // set the output of existing Const object
+            if previous.rate == C_RATE:
+                // set the output of existing Const object:
                 if chan >= previous.chans:
                     print "ERROR: const", input, "of", classname, "has",
                     print previous.chans, "channels but attempt to set channel",
@@ -618,7 +621,7 @@ class Ugen:
     # When this unit generator ends, action will be sent to this or, if
     # provided, to arg, which in either case must handle /arco/<class>/act
     # which is currently handled by Pwlb and Fileplay classes.
-        if action == MUTE:
+        if action == MUTE or action == FINISH:
             create_action(this, arg if arg else this, action)
         else:
             print "ERROR: Ugen atend - unknown action", repr(action)

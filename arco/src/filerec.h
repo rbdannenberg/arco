@@ -132,6 +132,8 @@ public:
         o2_send_start();
         o2_add_int64((int64_t) this);
         o2_add_int64((int64_t) blocks[block_to_send]);
+        printf("filerec send_a_block: block %p block dat %p\n",
+               blocks[block_to_send], blocks[block_to_send]->dat);
         O2message_ptr msg =
                 o2_message_finish(0.0, "/fileio/filerec/write", true);
         fileio_bridge->outgoing.push((O2list_elem *) msg);
@@ -186,8 +188,11 @@ public:
             return;
         }
         // read one frame at a time and write to block
-        int16_t *out = &block[block_on_deck].dat[
-                frame_in_block * block->channels];
+        int16_t *out = &(block->dat[frame_in_block * block->channels]);
+        if (frame_in_block == 0) {
+            printf("real_run, frame_in_block == 0, write to %p (out) dat %p\n",
+                   out, &(block->dat[0]));
+        }
         for (int i = 0; i < BL; i++) {
             Sample_ptr in = inp_samps + i;
             for (int ch = 0; ch < chans; ch++) {
@@ -197,7 +202,8 @@ public:
         }
         frame_in_block += BL;
         assert(frame_in_block <= AUDIOBLOCK_FRAMES);
-        if (frame_in_block == AUDIOBLOCK_FRAMES) {
+        // see if there's room for another BL frames:
+        if (frame_in_block + BL * block->channels > AUDIOBLOCK_FRAMES) {
             advance_to_next_block(false);
         }
     }

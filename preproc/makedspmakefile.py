@@ -32,7 +32,7 @@ written to the same folder as dspmanifest.txt.
 NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
             "alpass", "mix", "fileplay", "filerec", "fileio", "recplay", \
             "olapitchshift", "feedback", "granstream", "pwe", "pweb", \
-            "flsyn"]
+            "flsyn", "pv"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -95,7 +95,8 @@ def make_makefile(arco_path, manifest, outf):
 def make_inclfile(arco_path, manifest, outf):
     "make the CMake include file that lists all the sources"
 
-    need_flsyn_lib = False  # special: ugen needs a library
+    need_flsyn_lib = False  # special: ugen needs fluidsynth library
+    need_fft = False  # need to compile and link with ffts files
     
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
@@ -113,6 +114,24 @@ def make_inclfile(arco_path, manifest, outf):
         manifest.remove(rejected)
 
     print("set(ARCO_SRC ${ARCO_SRC}", file=outf)
+
+    if "pv" in manifest:  # add cmupv which pv depends on
+        print("    " + arco_path + "/cmupv/src/cmupv.c",
+                       arco_path + "/cmupv/src/cmupv.h\n",
+              "    " + arco_path + "/cmupv/src/internal.c",
+                       arco_path + "/cmupv/src/internal.h\n",
+              "    " + arco_path + "/cmupv/src/resamp.h",
+              file=outf)
+        need_fft = True
+
+    if need_fft:
+        print("    " + arco_path + "/ffts/src/fftext.c",
+                       arco_path + "/ffts/src/fftext.h\n",
+              "    " + arco_path + "/ffts/src/fftlib.c",
+                       arco_path + "/ffts/src/fftlib.h\n",
+              "    " + arco_path + "/ffts/src/matlib.c",
+                       arco_path + "/ffts/src/matlib.h\n",
+              file=outf)
 
     for ugen in manifest:
         both = False

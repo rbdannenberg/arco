@@ -119,7 +119,7 @@ class Ola_pitch_shift: public Ugen {
 
         intap = 0;
         fouttap = 0.0;
-        init_input(inp);
+        init_inp(inp);
     }
 
     ~Ola_pitch_shift() {
@@ -131,7 +131,7 @@ class Ola_pitch_shift: public Ugen {
 
     const char *classname() { return Ola_pitch_shift_name; }
     
-    void init_input(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
+    void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
 
     void set_ratio(float r) {
         ratio = r;
@@ -149,6 +149,13 @@ class Ola_pitch_shift: public Ugen {
         }
     }
         
+    
+    void repl_inp(Ugen_ptr ugen) {
+        inp->unref();
+        init_inp(ugen);
+    }
+
+    
     void set_buflen() {
         if (windur == 0.0) return;
         iwindur = (int) (windur * AR);

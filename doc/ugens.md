@@ -200,6 +200,53 @@ freeing the `feedback` ugen. (See "IMPORTANT" paragraph above.)
 `/arco/feedback/set_gain id chan gain` - Set the gain for the given channel
 (`chan`) to a the float value `gain`.
 
+### fileplay
+Used to stream audio files from disk, fileplay uses a paired object
+running in another thread to prefetch audio data into buffers. If
+prefetching cannot keep up, output is filled with zeros until the
+next buffer is available. There is currently no notification when
+the first buffer is ready, but the playback does not start until
+a `/arco/fileplay/play` message is sent. To detect when playback
+is finished, a message is sent to `/actl/act` with the action id
+provided earlier in `/arco/fileplay/act`.
+
+`/arco/fileplay/new id chans filename start end cycle mix expand` - Create an
+audiofile player with `chans` output channels, reading from `filename`,
+starting at offset `start` (float in seconds), reading until offset
+`end` (float in seconds), repeating an endless loop if `cycle` (Boolean)
+is true, with audiofile channels mixed down to `chans` channels in
+round-robin fashion when the file has more than `chans` files (if
+`mix` (Boolean) is true) and omitting any channels above `chans` if
+`mix` is false, and expanding input channels round-robin fashion to
+`chans` output channels if the number of file channels is less than
+`chans` (if `expand` is true), and padding channels with zero if the
+file has fewer than `chans` channels. If `end` is zero, reading will
+end at the end of the file.
+
+`/arco/fileplay/play id play_flag` - Starts or stops playback according
+to `playflag` (Boolean). Play will pause if necessary to wait for a
+block of samples to be read from the file.
+
+`/arco/fileplay/act id action_id` - Registers a request to send a
+message to `/actl/act` with `action_id` (an integer greater than 0)
+when file playback completes (or reaches `end`).
+
+##filerec
+The filerec unit generator writes its input to a file.
+
+`/arco/filerec/new id chans filename inp` - Create an audiofile writer
+that writes `chans` channels to `filename`. The source of audio is `inp`.
+
+`/arco/filerec/repl_inp id inp` - Set the input to the object with id `inp`.
+
+`/arco/filerec/act id action_id` - Set the action id to `action_id`.
+This id is sent when the file is open and ready for writing.
+
+`/arco/filerec/rec id record` - Start recording (when `record`, a Boolean)
+is true. Stop recording when `record` is false. Recording can only be
+started and then stopped, in that order. To record again, create a new
+unit generator.
+
 
 ##flsyn
 Fluidsynth is a popular open-source sample-based synthesizer. `flsyn` is a
@@ -380,38 +427,7 @@ with the same window timing and pitch shift amount.
 
 `/arco/olaps/windur id windur` - Set the window duration to `windur` (float).
 
-
-### playfile
-Used to stream audio files from disk, playfile uses a paired object
-running in another thread to prefetch audio data into buffers. If
-prefetching cannot keep up, output is filled with zeros until the
-next buffer is available. There is currently no notification when
-the first buffer is ready, but the playback does not start until
-a `/arco/playfile/play` message is sent. To detect when playback
-is finished, a message is sent to `/actl/act` with the action id
-provided earlier in `/arco/playfile/act`.
-
-`/arco/playfile/new chans filename start end cycle mix expand` - Create an
-audiofile player with `chans` output channels, reading from `filename`,
-starting at offset `start` (float in seconds), reading until offset
-`end` (float in seconds), repeating an endless loop if `cycle` (Boolean)
-is true, with audiofile channels mixed down to `chans` channels in
-round-robin fashion when the file has more than `chans` files (if
-`mix` (Boolean) is true) and omitting any channels above `chans` if
-`mix` is false, and expanding input channels round-robin fashion to
-`chans` output channels if the number of file channels is less than
-`chans` (if `expand` is true), and padding channels with zero if the
-file has fewer than `chans` channels. If `end` is zero, reading will
-end at the end of the file.
-
-`/arco/playfile/play id play_flag` - Starts or stops playback according
-to `playflag` (Boolean). Play will pause if necessary to wait for a
-block of samples to be read from the file.
-
-`/arco/playfile/act id action_id` - Registers a request to send a
-message to `/actl/act` with `action_id` (an integer greater than 0)
-when file playback completes (or reaches `end`).
-
+`/arco/granstream/repl_inp id inp` - Set the input to the ugen with id `inp`.
 
 ## probe
 A `probe` is used to send samples from the audio server to an O2 service.
@@ -473,6 +489,47 @@ threshold detection is enabled
 
 The O2 messages consists of the probe id (int32) followed by float samples
 (up to 64 of them).
+
+## pv
+The `pv` unit generator uses a phase vocoder to implement time stretching
+and pitch shifting. Time stretching is a standard function of the phase
+vocoder. Pitch shifting is obtained by stretching the signal (which
+changes the duration but not the pitch) and then resampling to undo the
+time stretch (which *does* change the pitch), resulting in pitch shift
+without stretch.
+
+You cannot stretch sounds that are computed in real time since there is
+no place to store samples that arrive faster than needed, and of course
+you cannot read samples from the future if you want to play a sound
+faster than real time. However, you can obtain samples from `recplay` or
+`playfile` to stretch pre-recorded sounds. For this to work, it is
+imperative that the only consumer of samples is a `pv` unit generator.
+
+`/arco/pv/new id chans inp ratio fftsize hopsize points mode` - Create a
+phase vocoder unit generator with `chans` channels and input `inp`.
+All channels use the same control parameters so processing is
+synchronous across all channels. Pitch is shifted by `ratio`
+(use a ratio greater than 1.0 to shift higher). The `fftsize` should
+be a power of 2. 2048 is a good choice. The `hopsize` refers to the
+overlap (in samples) and should normally be `fftsize / 8`. The
+smallest  `ratio` is `3 * hopsize / fftsize` so smaller hop sizes
+may be needed for extreme downward pitch shifts. Resampling uses
+sinc interpolation over `points` samples. The `mode` is 0
+for normal, 1 for a phase computation that attempts to reduce phase
+artifacts by preserving the phase relationships between peaks and nearby
+bins, and 2 invokes a "robot voice" mode that assigns fixed phases
+and creates a constant pitch (controlled by the hopsize) vocoder-like
+effect. (Thanks to M.C.Sharma for this idea.)
+
+`/arco/pv/stretch id stretch` - Sets the stretch factor, which is 1.0
+by default. Time stretching can only work with non-real-time input
+provided by `fileplay` or `recplay` unit generators. Both pitch shifting
+and time stretching can be applied together.
+
+`arco/pv/ratio` id ratio - Sets the pitch shift in terms of frequency
+ratio. Greater than 1 means raise the pitch.
+
+`arco/pv/repl_inp id inp_id` - Set the input to the object with id `inp_id`.
 
 ### pwl
 `/arco/pwl/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.

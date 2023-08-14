@@ -30,6 +30,12 @@ CMakeCache.txt
 
 /apps/basic/**/arcobasic
 
+/apps/test/daserpent
+/apps/test/soundfont.srp
+/apps/test/testinput.wav
+
+/apps/resound/allugens.srp
+
 /ugens/*/generate_*.sh
 /ugens/*/*.fh
 /ugens/*/*.dsp
@@ -41,13 +47,15 @@ CMakeCache.txt
 
 /ugens/mult-backup/
 
-/apps/test/daserpent
-
 /doc/ugens.md.old
-
 /serpent/srp/pwl.srp.old
 
+/cmupv/cmake_install.cmake
+/cmupv/CMakeCache.txt
+/cmupv/resamptest.xcodeproj
+/cmupv/CMakeFiles
+/cmupv/Release
+/cmupv/CMakeScripts
+/cmupv/build
 
-/apps/resound/allugens.srp
-
-/apps/test/soundfont.srp
+/cmupv/Debug/
