@@ -11,7 +11,7 @@ class Shift_delay_bank:
         shift_objs = array(length)
         delay_objs = array(length)
         for i = 0 to length:
-            delay_objs[i] = delay(input_ugen, 1.0, 0.0, 2.0)
+            delay_objs[i] = delay(input_ugen, 1.0, 0.1, 2.0)
             shift_objs[i] = ola_pitch_shift(delay_objs[i], 1, 0.01, 0.05)
             
 
@@ -42,6 +42,7 @@ class Hall_of_mirrors:
     var shift_delay_bank // bank containing shift and delay units
     var active // Checks if the mixer is currently playing
     var mixer // Mixer containing delay and pitch-shifted ugens
+    var played_once
     
 
     def init(window, x, y):
@@ -49,6 +50,7 @@ class Hall_of_mirrors:
         win = window // Main UI window
         init_x = x // Starting x coord of movement
         init_y = y // Starting y coord of movement
+        played_once = nil
         
 
         // Create shift delay bank
@@ -69,7 +71,7 @@ class Hall_of_mirrors:
         // Create Radiobox
         Radiobox(win, "II. Hall of Mirrors",
                 ["off", "1", "2", "3", "4", "5"], init_x, init_y,
-                125, 225, 'hallmirror')
+                150, 200, 'hallmirror')
         hallmirror.add_target_method(this, 'sd_hit')
     
     def get_control():
@@ -80,6 +82,9 @@ class Hall_of_mirrors:
     def play(flag):
     # Play shift-delays depending on radiobox selection
         if active != flag and active == nil:
+            // If movement has been played once, restart it 
+            if played_once:
+              restart_hall()
             mixer.play() // Play mixer if it was inactive
             active = flag
         elif active == flag: // Do nothing
@@ -90,13 +95,30 @@ class Hall_of_mirrors:
             if active:
                 active = nil
                 sched_select(rtsched) // select scheduler
-                sched_cause(1.0, this, 'mute_mixer') // mute mixer after 1s
+                sched_cause(1.0, this, 'finish_hall') 
+                // Since movement has been played once, note it
+                played_once = t
 
-    def mute_mixer():
-    # Mutes mixer
+    def finish_hall():
+    # Mutes mixer, shift and delay objects and set to nil
         // Do I delete mixer?
         // What if the movement is played more than once?
         mixer.mute()  
+        mixer = nil
+        shift_delay_bank = nil
+
+    def restart_hall():
+    # Restart the hall of mirror movement
+      // Create shift delay bank
+      shift_delay_bank = Shift_delay_bank(5)
+
+      // Initialize mixer
+      mixer = mix(2)
+
+      // insert shift objects into the mixer
+      for i = 0 to 5:
+        mixer.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0, 0])
+        
     
     def freq_ratio(semi_arr):
     # returns an array of freq_ratios from 
@@ -113,7 +135,8 @@ class Hall_of_mirrors:
 
          // play mixer based on Radiobox selection
         this.play(get_control() != 0)
-        
+
+ 
         // Setup shift-delays by passing delay and semitone
         // array
         tempo = 1 // seconds per beat
@@ -148,5 +171,5 @@ class Hall_of_mirrors:
             shift_delay_bank.set_ratio(i, shift_arr[i]) // Set freq ratio
             
             // Adjust gains of active delay and pitch-shift objects
-            mixer.set_gain(str(i), 3, 0) // set gain for left channel
-            mixer.set_gain(str(i), 3, 1) // set gain for right channel
+            mixer.set_gain(str(i), 1, 0) // set gain for left channel
+            mixer.set_gain(str(i), 1, 1) // set gain for right channel

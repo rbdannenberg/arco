@@ -46,9 +46,9 @@ class Four_of_a_kind:
         allcheck.add_target_method(this, 'rec4handler')
 
         // Setting up the Latency text and slider
-        Statictext(win, "Latency", init_x+80, init_y+170, 150, 'H',
+        Statictext(win, "Latency", init_x+80, 'D', 150, 'H',
                     'text_latency')
-        Labeled_slider(win, "", init_x-5, init_y+200, 250,
+        Labeled_slider(win, "", init_x-5, 'D', 250,
                                 28, 0, 5, 100, 
                                 50, 'integer', 'latency_slider')
         latency_slider.add_target_method(this, 'lshandler')
@@ -64,7 +64,7 @@ class Four_of_a_kind:
 
         if x:
             if not recplay1: // long fade time to test this feature
-                recplay1 = recplay(input_ugen, 2, 1.0, 3.0, false)
+                recplay1 = recplay(input_ugen, 2, 1, 3, false)
             recplay1.run() # needs be in run set to make active
             recplay1.record(true)
         else:
@@ -78,13 +78,16 @@ class Four_of_a_kind:
 
         if x and recplay1:
             if not recplay2: // long fade time to test this feature
-                recplay2 = recplay(input_ugen, 2, 1.0, 3.0, false)
+                recplay2 = recplay(input_ugen, 2, 1, 3, false)
             recplay2.run() # needs be in run set to make active
             recplay2.record(true)
 
             # Play recplay1
             recplay1.play().atend(MUTE)
-            recplay1.start(latency)
+
+            // Bug Alert: Latency causes distortion on audio chans (set to 0 instead)
+            // Tested this in apps/test as well. Highly suspect its due to interpolation
+            recplay1.start(0) 
         elif not recplay1:
             print "WARNING: There is no recplay1 Ugen!"
         else:
@@ -99,15 +102,15 @@ class Four_of_a_kind:
 
         if x and recplay1 and recplay2:
             if not recplay3: // long fade time to test this feature
-                recplay3 = recplay(input_ugen, 2, 1.0, 3.0, false)
+                recplay3 = recplay(input_ugen, 2, 1, 3, false)
             recplay3.run() # needs be in run set to make active
             recplay3.record(true)
 
             # Play recplay1 and recplay2
             recplay1.play().atend(MUTE)
-            recplay1.start(latency)
+            recplay1.start(0)
             recplay2.play().atend(MUTE)
-            recplay2.start(latency)
+            recplay2.start(0)
         elif not recplay1 or not recplay2:
             print "WARNING: Missing recplay1 or/and recplay2 Ugen!"
         else:
@@ -123,15 +126,18 @@ class Four_of_a_kind:
 
         if x and recplay1 and recplay2 and recplay3:
             recplay1.play().atend(MUTE)
-            recplay1.start(latency)
+            recplay1.start(0)
             recplay2.play().atend(MUTE)
-            recplay2.start(latency)
+            recplay2.start(0)
             recplay3.play().atend(MUTE)
-            recplay3.start(latency)
+            recplay3.start(0)
         elif (not x) and recplay1 and recplay2 and recplay3:
             recplay1.stop()
             recplay2.stop()
             recplay3.stop()
+            recplay1 = nil
+            recplay2 = nil
+            recplay3 = nil
         else:
             print "WARNING: Missing recplay1 or recplay2 or recplay3 Ugen!"
 

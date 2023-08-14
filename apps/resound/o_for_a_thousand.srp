@@ -1,0 +1,76 @@
+# Project Author: Chukwuemeka L. Nkama
+# Date: Aug 7, 2023
+
+class O_for_a_thousand:
+# Instance variables
+  var win, init_x, init_y // GUI params
+  var gran_obj
+
+  def init(window, x, y):
+  # Initialization of instance variables
+    win = window // Main UI window
+    init_x = x // Starting x coord of movement
+    init_y = y // Starting y coord of Movement
+    gran_obj = nil
+
+    // Setup UI
+    this.set_ui()
+
+  def set_ui():
+  # Setting up Movement's UI
+    // Create Checkbox
+    Checkbox(win, "III. O For a Thousand \nTongues to Sing", init_x,
+             init_y - 8, 200, 50, 'power_btn')
+    power_btn.add_target_method(this, 'pbtn_handler')
+
+    // Create Radiobox
+    Radiobox(win, "Section",
+             ["1", "2", "3", "4", "5", "6", "7"], 'S', 'D',
+             200, 225, 'o_for_a_thousand')
+    o_for_a_thousand.add_target_method(this, 'th_hit') 
+
+  def get_control():
+  # Returns the currently selected control
+  # in the Radiobox
+    return o_for_a_thousand.value()
+
+  def th_hit(obj, event, x, y):
+  # o_for_a_thousand hit events
+    display "Current control", get_control()
+
+    if not gran_obj:
+      print "Turn on the Movmement to initialize granular synth!"
+      return
+
+    // what is a gate? Confirm...
+
+    if get_control() == 0: // (1 button is clicked)
+      gran_obj.set_ratio(0.5, 2.0)
+      gran_obj.set_graindur(0.033, 0.041)
+      gran_obj.set_density(1.0)
+      gran_obj.set_env(0.022, 0.022)
+    elif get_control() == 1:
+      gran_obj.set_ratio(0.98, 1.02)
+    elif get_control() == 2:
+      gran_obj.set_ratio(1.00, 1.00)
+    elif get_control() == 3:
+      gran_obj.set_ratio(0.5, 2.00)
+    elif get_control() == 4:
+      gran_obj.set_ratio(0.5, 2.00)
+    elif get_control() == 5:
+      gran_obj.set_ratio(0.5, 2.00)
+    elif x == 6:
+      gran_obj.set_ratio(0.5, 2.00)
+
+  def pbtn_handler(obj, event, x, y):
+    if x:
+      gran_obj = granstream(input_ugen, 2, 0.714, true, 2)
+      gran_obj.play()
+    else:
+      gran_obj.mute() // Immediate stop
+      gran_obj = nil // Eventual cleanup
+      
+
+      
+
+
