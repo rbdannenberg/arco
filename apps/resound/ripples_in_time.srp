@@ -17,7 +17,7 @@ class Ripples_in_time:
         m1 = mix(2)
 
         for i = 0 to 5:
-            m1.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0,0])
+            m1.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0, 0])
 
         this.set_ui()
     
@@ -74,5 +74,5 @@ class Ripples_in_time:
             shift_delay_bank.set_ratio(i, shift_arr[i]) // Set freq ratio
             
             // Adjust gains of active delay and pitch-shift objects
-            m1.set_gain(str(i), 1, 0) // set gain for left channel
-            m1.set_gain(str(i), 1, 1) // set gain for right channel
+            m1.set_gain(str(i), (i + 1) % 2, 0) // set gain for left channel
+            m1.set_gain(str(i), i % 2, 1) // set gain for right channel
