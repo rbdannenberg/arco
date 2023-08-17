@@ -18,15 +18,15 @@ class BellObjs:
     bell_mix = mixer
     radioboxes = array(3)
     latency = latency_slider.value()/1000 # initialize latency variable
-    latency = 0 // for debugging
 
     // Attach latency slider to lshandler
     latency_slider.add_target_method(this, 'lshandler')
+    latency = 0 // Remove this after interpolation effects have been fixed
 
   def lshandler(obj, x):
   # latency slider handler
     latency = x/1000
-    return 0 // To remove artefacts due to interpolation for the time being
+    latency = 0 // Remove this after interpolation effects have been fixed
   
   def trackers(mixer, rest radio_bxs):
   # Each radiobox is connected to a symbol that

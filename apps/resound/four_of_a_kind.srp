@@ -23,6 +23,7 @@ class Four_of_a_kind:
 
         // Initialize latency value in milliseconds
         latency = latency_slider.value()/1000 
+        latency = 0 // Remove this after interpolation bug has been fixed.
 
     def set_ui():
     # Setting up Movement1's UI
@@ -52,6 +53,7 @@ class Four_of_a_kind:
     # latency slider handler, note that Latency_slider is not a wxserpent
     # built-in control and it has a different signature for the handler
         latency = x / 1000
+        latency = 0 // Remove this after interpolation bug has been fixed.
 
     def rec1handler(obj, event, x, y):
     # Handler for rec1 checkbox
@@ -82,7 +84,7 @@ class Four_of_a_kind:
 
             // Bug Alert: Latency causes distortion on audio chans (set to 0 instead)
             // Tested this in apps/test as well. Highly suspect its due to interpolation
-            recplay1.start(0) 
+            recplay1.start(latency) 
         elif not recplay1:
             print "WARNING: There is no recplay1 Ugen!"
         else:
@@ -103,9 +105,9 @@ class Four_of_a_kind:
 
             # Play recplay1 and recplay2
             recplay1.play().atend(MUTE)
-            recplay1.start(0)
+            recplay1.start(latency)
             recplay2.play().atend(MUTE)
-            recplay2.start(0)
+            recplay2.start(latency)
         elif not recplay1 or not recplay2:
             print "WARNING: Missing recplay1 or/and recplay2 Ugen!"
         else:
@@ -121,11 +123,11 @@ class Four_of_a_kind:
 
         if x and recplay1 and recplay2 and recplay3:
             recplay1.play().atend(MUTE)
-            recplay1.start(0)
+            recplay1.start(latency)
             recplay2.play().atend(MUTE)
-            recplay2.start(0)
+            recplay2.start(latency)
             recplay3.play().atend(MUTE)
-            recplay3.start(0)
+            recplay3.start(latency)
         elif (not x) and recplay1 and recplay2 and recplay3:
             recplay1.stop()
             recplay2.stop()
