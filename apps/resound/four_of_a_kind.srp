@@ -45,13 +45,8 @@ class Four_of_a_kind:
         Checkbox(win, "all", init_x+5, 'D', 'S', 'S', 'allcheck')
         allcheck.add_target_method(this, 'rec4handler')
 
-        // Setting up the Latency text and slider
-        Statictext(win, "Latency", init_x+80, 'D', 150, 'H',
-                    'text_latency')
-        Labeled_slider(win, "", init_x-5, 'D', 250,
-                                28, 0, 5, 100, 
-                                50, 'integer', 'latency_slider')
         latency_slider.add_target_method(this, 'lshandler')
+
 
     def lshandler(obj, x):
     # latency slider handler, note that Latency_slider is not a wxserpent

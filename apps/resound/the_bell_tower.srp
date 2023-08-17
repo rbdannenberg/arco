@@ -8,12 +8,25 @@ class BellObjs:
 # Instance variables
   var bell_obj1, bell_obj2, bell_obj3 // recplay bell objs
   var radioboxes // To track clicks on UI radioboxes
+  var latency
+  var bell_mix
 
-  def init():
+  def init(mixer):
     bell_obj1 = recplay(input_ugen, 2, 1, 3, true)
     bell_obj2 = recplay(input_ugen, 2, 1, 3, true)
     bell_obj3 = recplay(input_ugen, 2, 1, 3, true)
+    bell_mix = mixer
     radioboxes = array(3)
+    latency = latency_slider.value()/1000 # initialize latency variable
+    latency = 0 // for debugging
+
+    // Attach latency slider to lshandler
+    latency_slider.add_target_method(this, 'lshandler')
+
+  def lshandler(obj, x):
+  # latency slider handler
+    latency = x/1000
+    return 0 // To remove artefacts due to interpolation for the time being
   
   def trackers(mixer, rest radio_bxs):
   # Each radiobox is connected to a symbol that
@@ -25,15 +38,23 @@ class BellObjs:
   # Handles what happens when "reset". "record" or "play"
   # is clicked for bell1
     if radioboxes[0].value() == 0:
+      if bell_obj1:
+        bell_mix.rem("1")
       bell_obj1 = nil
     elif radioboxes[0].value() == 1:
       // Record into bell_obj1's buffer
+
+      if not bell_obj1:
+        // Prevents an error if bell_obj1 is reset w/out turning on/off the reverb
+        bell_obj1 = recplay(input_ugen, 2, 1, 3, true)
+        bell_mixer.ins("1", this.bell_obj1, [1,1])
+
       bell_obj1.run()
       bell_obj1.record(true)
     else:
       bell_obj1.record(false)
       bell_obj1.unrun()
-      bell_obj1.start(0)
+      bell_obj1.start(latency)
       
 
   def bell2_event(obj, event, x, y):
@@ -43,12 +64,17 @@ class BellObjs:
       bell_obj2 = nil
     elif radioboxes[1].value() == 1:
       // Record into bell_obj2's buffer
+
+      if not bell_obj2:
+        // Prevents an error if bell_obj2 is reset w/out turning on/off the reverb
+        bell_obj2 = recplay(input_ugen, 2, 1, 3, true)
+
       bell_obj2.run()
       bell_obj2.record(true)
     else:
       bell_obj2.record(false)
       bell_obj2.unrun()
-      bell_obj2.start(0)
+      bell_obj2.start(latency)
 
   def bell3_event(obj, event, x, y):
   # Handles what happens when "reset". "record" or "play"
@@ -57,12 +83,15 @@ class BellObjs:
       bell_obj3 = nil
     elif radioboxes[2].value() == 1:
       // Record into bell_obj3's buffer
+      if not bell_obj3:
+        // Prevents an error if bell_obj3 is reset w/out turning on/off the reverb
+        bell_obj3 = recplay(input_ugen, 2, 1, 3, true)
       bell_obj3.run()
       bell_obj3.record(true)
     else:
       bell_obj3.record(false)
       bell_obj3.unrun()
-      bell_obj3.start(0)
+      bell_obj3.start(latency)
 
 class The_bell_tower:
 # Instance variables
@@ -87,7 +116,7 @@ class The_bell_tower:
     bell_mixer = Mix(2)
 
     // Create the bell objs
-    bell_objs = BellObjs()
+    bell_objs = BellObjs(bell_mixer)
 
     // Add the bells to the mixer
     bell_mixer.ins("1", bell_objs.bell_obj1, [1,1])
@@ -126,6 +155,9 @@ class The_bell_tower:
   # in case it is to be played again.
     // Init bell mixer
     bell_mixer = Mix(2)
+
+    // Create the bell objs
+    bell_objs = BellObjs()
 
     // Add the bells to the mixer
     bell_mixer.ins("1", bell_objs.bell_obj1, [1,1])

@@ -31,14 +31,22 @@ def arco_ready():
     if ui_initialized:
         return
 
+    # Setup latency slider
+    x_slider = 900
+    y_slider = 5
+    Statictext(default_win, "Latency", x_slider+80, y_slider, 150,
+               'H', 'text_latency')
+    Labeled_slider(default_win, "", x_slider, y_slider+25, 250,
+                   28, 0, 5, 100, 50, 'integer', 'latency_slider')
+
     # four_of_a_kind.srp initialization
     Four_of_a_kind(default_win, 10, 10)
 
     # hall_of_mirrors.srp initialization
-    Hall_of_mirrors(default_win, 10, 225)
+    Hall_of_mirrors(default_win, 10, 180)
 
     # o_for_a_thousand.srp initialization
-    O_for_a_thousand(default_win, 10, 450)
+    O_for_a_thousand(default_win, 10, 390)
 
     # the_bell_tower.srp initialization
     The_bell_tower(default_win, 275, 10)
@@ -51,6 +59,7 @@ def arco_ready():
 
     # someone_is_following_you.srp initialization
     Someone_is_following_you(default_win, 575, 425)
+
 
     ui_initialized = true
   
