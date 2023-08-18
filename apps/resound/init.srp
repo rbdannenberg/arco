@@ -19,7 +19,7 @@ require "someone_is_following_you"
 
 
 # Definition of Global Variables
-default_window.set_size(1000,1000) // set size of default window
+default_window.set_size(1000, 1000) // set size of default window
 ui_initialized = false # boolean that denotes if ui has been initialized
 
 def arco_ready():
@@ -53,6 +53,7 @@ def arco_ready():
     Someone_is_following_you(default_win, 575, 425)
 
     ui_initialized = true
+    default_window.fit_to_children()
   
 
 
