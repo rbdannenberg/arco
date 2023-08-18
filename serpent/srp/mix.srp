@@ -31,7 +31,7 @@ class Mix (Ugen):
 
     def rem(name):
         if inputs.has_key(name):
-            inputs.remove(key)
+            inputs.remove(name)
             o2_send_cmd("/arco/mix/rem", 0, "Us", id, str(name))
         return this
 
