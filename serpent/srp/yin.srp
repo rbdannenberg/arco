@@ -1,0 +1,13 @@
+# yin.srp -- yin pitch estimation unit generator
+#
+# Roger B. Dannenberg
+# August 2023
+
+class Yin(Ugen):
+    def init(chans, inp, minstep, maxstep, hopsize, address):
+        super.init(create_ugen_id(), "Yin", chans, 'a', "Uiiis", 'inp', inp,
+                   'minstep', minstep, 'maxstep', maxstep, 'hopsize', hopsize,
+                   'address', address)
+
+def yin(inp, minstep, maxstep, hopsize, address, optional chans = 1):
+    Yin(chans, inp, minstep, maxstep, hopsize, address)  # yin as a function

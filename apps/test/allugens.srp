@@ -278,7 +278,7 @@ class Mix (Ugen):
 
     def rem(name):
         if inputs.has_key(name):
-            inputs.remove(key)
+            inputs.remove(name)
             o2_send_cmd("/arco/mix/rem", 0, "Us", id, str(name))
         return this
 
@@ -472,7 +472,7 @@ class Recplay (Ugen):
 # Roger B. Dannenberg
 # June 2023
 
-class Delay (Ugen):
+class Delay(Ugen):
     def init(chans, inp, dur, fb, maxdur):
         super.init(create_ugen_id(), "Delay", chans, 'a', "UUUf",
 	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
@@ -543,22 +543,22 @@ class Granstream (Ugen):
                    'enable', enable)
 
     def set_polyphony(p):
-        o2_send_cmd("/arco/granstream/polyphony", 0, "if", id, p)
+        o2_send_cmd("/arco/granstream/polyphony", 0, "Uf", id, p)
 
     def set_ratio(low, high)
-        o2_send_cmd("/arco/granstream/ratio", 0, "iff", id, low, high)
+        o2_send_cmd("/arco/granstream/ratio", 0, "Uff", id, low, high)
 
     def set_graindur(lowdur, highdur)
-        o2_send_cmd("/arco/granstream/graindur", 0, "iff", id, lowdur, highdur)
+        o2_send_cmd("/arco/granstream/graindur", 0, "Uff", id, lowdur, highdur)
 
     def set_density(density)
-        o2_send_cmd("/arco/granstream/density", 0, "if", id, density)
+        o2_send_cmd("/arco/granstream/density", 0, "Uf", id, density)
 
     def set_env(attack, release)
-        o2_send_cmd("/arco/granstream/env", 0, "iff", id, attack, release)
+        o2_send_cmd("/arco/granstream/env", 0, "Uff", id, attack, release)
     
     def set_enable(enable)
-        o2_send_cmd("/arco/granstream/enable", 0, "iB", id, enable)
+        o2_send_cmd("/arco/granstream/enable", 0, "UB", id, enable)
         
 
 
@@ -626,6 +626,19 @@ class Pv(Ugen):
 
 def pv(input, ratio, fftsize, hopsize, points, mode, optional chans = 1):
     Pv(chans, input, ratio, fftsize, hopsize, points, mode)
+# yin.srp -- yin pitch estimation unit generator
+#
+# Roger B. Dannenberg
+# August 2023
+
+class Yin(Ugen):
+    def init(chans, inp, minstep, maxstep, hopsize, address):
+        super.init(create_ugen_id(), "Yin", chans, 'a', "Uiiis", 'inp', inp,
+                   'minstep', minstep, 'maxstep', maxstep, 'hopsize', hopsize,
+                   'address', address)
+
+def yin(inp, minstep, maxstep, hopsize, address, optional chans = 1):
+    Yin(chans, inp, minstep, maxstep, hopsize, address)  # yin as a function
 # thru.srp -- audio pass-through
 #
 # Roger B. Dannenberg

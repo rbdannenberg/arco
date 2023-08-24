@@ -531,7 +531,34 @@ ratio. Greater than 1 means raise the pitch.
 
 `arco/pv/repl_inp id inp_id` - Set the input to the object with id `inp_id`.
 
-### pwl
+### pwe, pweb
+
+These envelope generators generate approximately exponential curves between
+positive breakpoints. To avoid the problem of zero (exponential decays never
+actually reach zero), all breakpoint values are increased by 0.01. The
+exponential interpolation occurs between these biased breakpoints. Then,
+0.01 is subtracted to obtain the output, which can truly reach zero. For
+very small breakpoint values, the curves are close to linear.
+
+`/arco/pwe/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
+
+`/arco/pwe/env id d0 y0 d1 y1 ... dn-1 [yn-1]` - set the envelope or function shape for object with id. All remaining parameters are floats, alternating segment durations (in samples) and segment final values. The envelope starts at the current output value and ends at yn-1 (defaults to 0).
+
+`/arco/pwe/start id` - starts object with id.
+
+`/arco/pwe/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
+
+`/arco/pwe/set id y` - sets current output value to `y` (float). If the unit
+generator is in the middle of an envelope, this will create a discontinuity
+and may result in strange output because the output will continue to increase
+or decrease exponentially from `y`.
+
+If the case of **pweb**, output is b-rate, and all messages are the same
+except the address begins with `/arco/pweb/`.
+
+
+### pwl, pwlb
+
 `/arco/pwl/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
 
 `/arco/pwl/env id d0 y0 d1 y1 ... dn-1 [yn-1]` - set the envelope or function shape for object with id. All remaining parameters are floats, alternating segment durations (in samples) and segment final values. The envelope starts at the current output value and ends at yn-1 (defaults to 0).
@@ -539,6 +566,9 @@ ratio. Greater than 1 means raise the pitch.
 `/arco/pwl/start id` - starts object with id.
 
 `/arco/pwl/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
+
+If the case of **pwlb**, output is b-rate, and all messages are the same
+except the address begins with `/arco/pwlb/`.
 
 ### recplay
 

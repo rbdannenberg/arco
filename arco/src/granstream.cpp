@@ -4,11 +4,11 @@
 // so picture a graph with time horizontal and buffer
 // position as vertical. Assume the buffer is infinitely
 // long, so as the buffer fills, we can plot the boundary of
-// valid samples as a stairstep starting at VL at the origin
-// (because we read VL samples before anything else) and increasing
-// by VL every VP seconds. Because the buffer is actually
+// valid samples as a stairstep starting at BL at the origin
+// (because we read BL samples before anything else) and increasing
+// by BL every VP seconds. Because the buffer is actually
 // circular, the buffer is invalidated in a stairstep as well,
-// with VL - bufferlen at the origin, and stepping by VL every
+// with BL - bufferlen at the origin, and stepping by BL every
 // VP seconds.
 //     We want to guarantee that we only access samples from
 // this valid region. Since the ratio is fixed, if we start
@@ -16,8 +16,8 @@
 // valid.  To simplify conservatively, let's ignore
 // the stairstep region and pretend the valid samples are in
 // a diagonal band bounded above by t*AR (where t is time in secs)
-// and below by t*AR + VL - bufferlen. Subtracting t*AR from
-// these bounds we get from 0 to VL - bufferlen.
+// and below by t*AR + BL - bufferlen. Subtracting t*AR from
+// these bounds we get from 0 to BL - bufferlen.
 // The starting point in the buffer is calculated as
 // a random number between 0 and delay * AR, where delay 
 // tells how far back in time we can grab audio data:
@@ -29,7 +29,7 @@
 // The -(dur * AR) term accounts for samples being added to the
 // buffer. We can simplify to:
 //     phase + dur * AR * (ratio - 1)
-// which must lie between 0 and VL - bufferlen
+// which must lie between 0 and BL - bufferlen
 // We interpolate by reading one sample ahead, so take this into
 // account too, but basically, if we start within the buffer and 
 // end within the buffer, all intermediate reads will be within
@@ -50,7 +50,6 @@ bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps) {
     if (tail >= samps.size()) {
         tail = 0;
     }
-    memset(out_samps, 0, BL * sizeof(Sample));
     bool active = false;
     if (gs->enable) {
         for (int i = 0; i < gs->polyphony; i++) {
@@ -67,7 +66,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
     if (--delay == 0) {
         switch (state) {
           case GS_FALL: {  // fall has finished, now at end of envelope
-            printf("end grain\n");
+            printf("end grain, env_val %g env_inc %g\n", env_val, env_inc);
             env_val = 0;
             env_inc = 0;
             if (!gs->enable) {
@@ -89,27 +88,32 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             ratio = unifrand_range(gs->low, gs->high);
             // avgdur tries to factor out the attack/release
             // to get "effective avgdur"; assume effective duration
-            // includes only half of attack and duration
-            float avgdur = gs->lowdur + gs->highdur -
-                           (gs->attack + gs->release) * 0.5;
-            float avgioi = avgdur * gs->polyphony / gs->density;
-            // If all grains were the same duration (avgdur), we
-            // could pick a delay from the end of one grain to the
-            // beginning of the next grain to be between 0 and 2 *
-            // (ioi - avgdur) (uniformly distributed) to obtain an
-            // average ioi of avgioi.  Things are more complicated
-            // when duration is not always avgdur, but we'll use
-            // the actual dur of the present grain:
-            float ts = 2 * (avgioi - avgdur) * unifrand();
-            if (ts < 0) {
-                ts = 0;
-            }
+            // includes only half of attack and duration:
+            float effective_attack_release = (gs->attack + gs->release) * 0.5;
+            float avgdur = (gs->lowdur + gs->highdur) * 0.5 -
+                           effective_attack_release;
+            // pretend that all grains have the same avgdur duration. Since
+            // avgdur does not contain half of attack and decay times, the
+            // minimum ioi is:
+            float minioi = avgdur + effective_attack_release;
+            // the average ioi is based on density, polyphony, and input channels:
+            float avgioi = avgdur * gs->polyphony * gs->chans / gs->density;
+            // we want to add a random time delay to minioi to achieve avgioi:
+            float maxioi = avgioi + (avgioi - minioi);
+            float ts = (maxioi - minioi) * unifrand();
+            // Check the result: By substitution, letting
+            //   ear = effective_attack_release, and
+            //   unifrand() = 0.5 to represent the mean value,
+            //   ts = (avgioi + (avgioi - avgdur - ear) - avgdur - ear) * 0.5
+            //      = avgioi - avgdur - ear
+            // So avgioi = ts + avgdur + ear. Thus using ts gives the right ioi.
             delay = (int) (ts * BR);
+            // Make sure delay is plausible:
             if (delay < 0) delay = 0;
             state = GS_PREDELAY;
             if (delay > 0) {
                 break;
-            }
+            }  // otherwise, we skip the delay and immediately start ramping up:
           }
           case GS_PREDELAY: {  // predelay is finished, start grain computation
             if (!gs->enable) {
@@ -120,10 +124,8 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             // number of samples from input buffer is increment per
             // output sample * number of output samples
             float dur_in_samples = dur_blocks * BL;
-            // To avoid underflow, check the following 
-            // (see notes at top)
-            // (another note: add 2 to allow interpolation 
-            // and rounding):
+            // To avoid underflow, check the following (see notes at top)
+            // (another note: add 2 to allow interpolation and rounding):
             float final_phase = phase + (dur_in_samples + 2) * ratio;
             if (final_phase < BL - bufferlen) {
                 // 1 sample fudge factor:
@@ -166,6 +168,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             break;
           }
           case GS_RISE:  // attack has finished, start hold until fall
+            printf("end rise, env_val %g env_inc %g\n", env_val, env_inc);
             delay = dur_blocks - attack_blocks - release_blocks;
             state = GS_HOLD;
             env_val = 1;
@@ -176,7 +179,6 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             } // otherwise begin fall immediately
           case GS_HOLD:  // hold has finished, start fall
             delay = release_blocks;
-            env_val = 0;
             env_inc = -1.0 / (release_blocks * BL);
             state = GS_FALL;
             printf("state GS_FALL delay %d\n", delay);

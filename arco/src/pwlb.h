@@ -37,6 +37,7 @@ public:
                 seg_togo = INT_MAX;
                 seg_incr = 0.0f;
                 if (current == 0.0f && action_id) {
+                    printf("pwlb.h calling send_action_id\n");
                     send_action_id(action_id);
                 }
             } else {

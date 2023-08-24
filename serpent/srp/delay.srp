@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # June 2023
 
-class Delay (Ugen):
+class Delay(Ugen):
     def init(chans, inp, dur, fb, maxdur):
         super.init(create_ugen_id(), "Delay", chans, 'a', "UUUf",
 	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)

@@ -31,15 +31,13 @@ class Gran_gen {
 public:
     Gran_state state;    // state machine state (not the per-channel state)
     int delay;           // blocks until next state change
+    float attack_blocks; // grain attack time in blocks
     int release_blocks;  // how many blocks in envelope release
-    int tostop_blocks;   // how many blocks to envelope gate down
     
     int dur_blocks; // how long is the grain in blocks?
     float ratio;  // sample rate conversion: higher ratio -> higher pitch
                   // ratio is uniform random between high and low
     float phase;  // buffer offset relative to now (negative)
-    float attack_blocks;   // attack time in seconds
-    float release_blokcs;  // decay time in seconds
     float env_val;  // current envelope value
     float env_inc;  // increment to next envelope value
 
@@ -87,11 +85,15 @@ public:
     }
 
     void set_polyphony(int polyphony) {
-        samps.set_size(polyphony);
+        gens.set_size(polyphony);
         reset_gens(polyphony);
     }
 
-    void set_dur(int len) {
+    void set_dur(int len) {  // called by Granstream::set_dur(float dur)
+        // note that buffer duration never shrinks -- because we could be reading
+        // from a long delay that would become inaccessible if the buffer size
+        // is reduced. dur, however, can be reduced so that future grains come
+        // from more recent history (lower delay).
         if (len > samps.size()) {  // see delay.h for algorithm notes
             int old_length = samps.size();
             int grow = len - old_length;
@@ -226,6 +228,9 @@ public:
         inp_samps = inp->run(current_block);
         Granstream_state *state = &states[0];
         bool active = false;
+        // clear all output here because each channel (state) can sum grains
+        // to each channel
+        memset(out_samps, 0, BL * sizeof(Sample) * chans);
         for (int i = 0; i < states.size(); i++) {
             active |= chan_a(state);
             state++;

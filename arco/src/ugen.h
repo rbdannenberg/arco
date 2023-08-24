@@ -8,6 +8,10 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
+#ifndef MIN
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+#endif
+
 #define INT16_TO_FLOAT(x) ((x) * 3.0518509476e-5)
 // This maps to range -32767 to 32767:
 #define FLOAT_TO_INT16(x) ((int) ((32767 * (x) + 32768.5)) - 32768)
@@ -83,6 +87,7 @@ class Ugen : public O2obj {
         chans = nchans;
         if (rate) {  // if no output, pass 0 for rate
             output.init(nchans * (rate == 'a' ? BL : 1));
+            output.set_size(output.get_allocated(), false);
         }
         current_block = 0;
     }
@@ -138,6 +143,8 @@ class Ugen : public O2obj {
         o2sm_add_int32(action_id);
         o2sm_add_int32(status);
         strcpy(control_service_addr + control_service_addr_len, "act");
+        printf("send_action_id address %s status(actl) %d\n", control_service_addr,
+               o2_status("actl"));
         o2sm_send_finish(0.0, control_service_addr, true);
         action_id = 0;  // one-shot
     }

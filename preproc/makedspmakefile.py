@@ -32,7 +32,7 @@ written to the same folder as dspmanifest.txt.
 NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
             "alpass", "mix", "fileplay", "filerec", "fileio", "recplay", \
             "olapitchshift", "feedback", "granstream", "pwe", "pweb", \
-            "flsyn", "pv"]
+            "flsyn", "pv", "yin"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -97,6 +97,8 @@ def make_inclfile(arco_path, manifest, outf):
 
     need_flsyn_lib = False  # special: ugen needs fluidsynth library
     need_fft = False  # need to compile and link with ffts files
+    need_windowed_input = False  # need to compile and link with windowedinput.h
+        # (this is an abstract superclass; perhaps multiple ugens depend on it)
     
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
@@ -124,6 +126,9 @@ def make_inclfile(arco_path, manifest, outf):
               file=outf)
         need_fft = True
 
+    if "yin" in manifest:
+        need_windowed_input = True
+
     if need_fft:
         print("    " + arco_path + "/ffts/src/fftext.c",
                        arco_path + "/ffts/src/fftext.h\n",
@@ -132,6 +137,9 @@ def make_inclfile(arco_path, manifest, outf):
               "    " + arco_path + "/ffts/src/matlib.c",
                        arco_path + "/ffts/src/matlib.h\n",
               file=outf)
+
+    if need_windowed_input:
+        print("    " + arco_path + "/arco/src/windowedinput.h")
 
     for ugen in manifest:
         both = False

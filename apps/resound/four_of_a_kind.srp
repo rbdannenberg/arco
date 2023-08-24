@@ -52,8 +52,9 @@ class Four_of_a_kind:
     def lshandler(obj, x):
     # latency slider handler, note that Latency_slider is not a wxserpent
     # built-in control and it has a different signature for the handler
+        display "four_of_a_kind lshandler latency (ms)", x
         latency = x / 1000
-        latency = 0 // Remove this after interpolation bug has been fixed.
+
 
     def rec1handler(obj, event, x, y):
     # Handler for rec1 checkbox

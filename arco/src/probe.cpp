@@ -116,12 +116,10 @@ void Probe::real_run()
 }
 
 
-/* O2SM INTERFACE: /arco/probe/new int32 id, int32 chans,
-                         int32 inp_id, string reply_addr;
+/* O2SM INTERFACE: /arco/probe/new int32 id, int32 inp_id, string reply_addr;
  */
 void arco_probe_new(O2SM_HANDLER_ARGS)
 {
-    o2_msg_data_print(msg); putchar('\n');
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t inp_id = argv[1]->i;

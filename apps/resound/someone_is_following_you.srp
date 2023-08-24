@@ -37,6 +37,7 @@ class Someone_is_following_you:
         dly2 = delay(input_ugen, dly2_value, 0.1, 2.0, 2)
         fade_value = fl_slide.value()
 
+
     def set_ui():
     # Setting up Movement1's UI
         Checkbox(win, "VII. Someone is Following You", init_x+5, init_y+5, 
@@ -44,19 +45,16 @@ class Someone_is_following_you:
         d_check.add_target_method(this, 'delay_handler')
 
         // Sliders
-        Labeled_slider(win, "del1", init_x+5, init_y + 50, 250,
-                                28, 65, 0.8, 1.2, 
-                                1, 'linear', 'd1_slide')
+        Labeled_slider(win, "del1", init_x+5, init_y + 50, 250, 28, 65,
+                       0.8, 1.2, 1, 'linear', 'd1_slide')
         d1_slide.add_target_method(this, 'delay1_handler')
 
-        Labeled_slider(win, "del2", init_x+5, 'D', 250,
-                                28, 65, 1.8, 2.2, 
-                                2, 'linear', 'd2_slide')
+        Labeled_slider(win, "del2", init_x+5, 'D', 250, 28, 65,
+                       1.8, 2.2, 2, 'linear', 'd2_slide')
         d2_slide.add_target_method(this, 'delay2_handler')
 
-        Labeled_slider(win, "fadelen", init_x+5, 'D', 250,
-                                28, 65, 0, 3, 
-                                2.5, 'linear', 'fl_slide')
+        Labeled_slider(win, "fadelen", init_x+5, 'D', 250, 28, 65,
+                       0.1, 4, 2.5, 'exponential', 'fl_slide')
         fl_slide.add_target_method(this, 'fadelen_handler')
         
 
@@ -74,16 +72,19 @@ class Someone_is_following_you:
             mult1.set('x2', pwl1)
             sched_select(rtsched)
             sched_cause(fade_value + 0.1, this, 'finish_delays')
+
     
     def start_delays()
         wait = nil
         mix1 = mix(2)
-        dly1 = delay(input_ugen, dly1_value, 0.1, 2.0, 2)
-        dly2 = delay(input_ugen, dly2_value, 0.1, 2.0, 2)
+        # delay gets left channel only if input is multichannel:
+        dly1 = delay(input_ugen, dly1_value, 0.1, 2.0, 1)
+        dly2 = delay(input_ugen, dly2_value, 0.1, 2.0, 1)
         mix1.ins('inp1', dly1, [1, 0])
         mix1.ins('inp2', dly2, [0, 1])
         mult1 = mult(mix1, 1, 2)
         mult1.play() 
+
 
     def finish_delays()
         mult1.mute()
@@ -94,15 +95,18 @@ class Someone_is_following_you:
         dly2 = nil
         wait = nil
 
+
     def delay1_handler(obj, x)
         dly1_value = x
         if dly1:
             dly1.set('dur', x)
 
+
     def delay2_handler(obj, x)
         dly2_value = x
         if dly2:
             dly2.set('dur', x)
+
 
     def fadelen_handler(obj, x)
         fade_value = x

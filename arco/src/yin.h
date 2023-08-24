@@ -1,4 +1,4 @@
-// yin.h -- yin for software oscilloscope
+// yin.h -- yin unit generator for pitch estimation
 //
 // Roger B. Dannenberg
 // Aug 2023
@@ -9,6 +9,40 @@
 
 extern const char *Yin_name;
 
+// Estimate a local minimum (or maximum) using parabolic
+// interpolation. The parabola is defined by the points
+// (x1,y1),(x2,y2), and (x3,y3).
+float parabolic_interp(float x1, float x2, float x3,
+                       float y1, float y2, float y3, float *min)
+{
+  float a, b, c;
+  float pos;
+
+  //  y1=a*x1^2+b*x1+c
+  //  y2=a*x2^2+b*x2+c
+  //  y3=a*x3^2+b*x3+c
+
+  //  y1-y2=a*(x1^2-x2^2)+b*(x1-x2)
+  //  y2-y3=a*(x2^2-x3^2)+b*(x2-x3)
+
+  //  (y1-y2)/(x1-x2)=a*(x1+x2)+b
+  //  (y2-y3)/(x2-x3)=a*(x2+x3)+b
+
+  a= ((y1-y2)/(x1-x2)-(y2-y3)/(x2-x3))/(x1-x3);
+  b= (y1-y2)/(x1-x2) - a*(x1+x2);
+  c= y1-a*x1*x1-b*x1;
+
+  *min= c;
+
+  // dy/dx = 2a*x + b = 0
+  
+  pos= -b/2.0F/a;
+
+  return pos;
+
+}
+
+
 class Yin : public Windowed_input {
   public:
     struct Yin_state {
@@ -17,30 +51,30 @@ class Yin : public Windowed_input {
     };
     Vec<Yin_state> yin_states;
     bool new_estimates; // set to true when yin runs
-    char *address; // where to send messages
+    const char *address; // where to send messages
 
     int m;  // shortest period in samples
     int middle;  // middle index of window
     float *results;  // temporary storage for yin
     
     Yin(int id, int chans, Ugen_ptr inp, int minstep, int maxstep,
-                int hopsize, char *address) : Windowed_input(id, chans, inp) {
+                int hopsize, const char *address_) : Windowed_input(id, chans, inp) {
         yin_states.init(chans);
         middle = std::ceil(AR / step_to_hz(minstep));
         int window_size = middle * 2;
-        windowed_input_init(window_size + BL * 2, window_size, hopsize);
-        m = AR / step_to_hz(high_step);
-        results = O2_MALLOC(sizeof(float) * (middle - m + 1));
+        Windowed_input::init(window_size + BL * 2, window_size, hopsize);
+        m = AR / step_to_hz(maxstep);
+        results = O2_MALLOCNT(middle - m + 1, float);
         init_inp(inp);
         new_estimates = false;
-        address = o2_heapify(address);
+        address = o2_heapify(address_);
     }
 
 
     ~Yin() {
         O2_FREE(results);
         yin_states.finish();
-        O2_FREE(address);
+        O2_FREE((char *) address);
     }
 
     const char *classname() { return Yin_name; }
@@ -58,7 +92,7 @@ class Yin : public Windowed_input {
     }
 
 
-    void process_window(int i, float window) {
+    void process_window(int channel, Sample_ptr window) {
         float left, right;  // samples from left period and right period
         float left_energy = 0;
         float right_energy = 0;
@@ -94,13 +128,13 @@ class Yin : public Windowed_input {
         }
         
         // normalize by the cumulative sum
-        for (i = m; i <= middle; i++) {
+        for (int i = m; i <= middle; i++) {
             cum_sum += results[i - m];
             results[i - m] = results[i - m] / (cum_sum / (i - m + 1));
         }
 
         min_i = m;  // value of initial estimate
-        for (i = m; i <= middle; i++) {
+        for (int i = m; i <= middle; i++) {
             if (results[i - m] < threshold) {
                 min_i = i;
                 // This step is not part of the published
@@ -125,21 +159,14 @@ class Yin : public Windowed_input {
             period = parabolic_interp(
                     (float)(min_i - 1), (float)(min_i), (float)(min_i + 1), 
                     results[min_i - 1 - m], results[min_i - m], 
-                    results[min_i + 1 - m], &(yin_states[i].harmonicity));
+                    results[min_i + 1 - m],
+                    &(yin_states[channel].harmonicity));
         } else {
             period = (float) min_i;
-            yin_states[i].harmonicity = results[min_i - m];
+            yin_states[channel].harmonicity = results[min_i - m];
         }
-        yin_states[i].pitch = (float) hz_to_step((float) (AR / period));
+        yin_states[channel].pitch = (float) hz_to_step((float) (AR / period));
         new_estimates = true;
-    }
-
-
-    void prepare_msg() {
-        msg = (O2message_ptr) O2_MALLOC(msg_len);
-        memcpy(msg, msg_header, msg_header_len);
-        sample_ptr = (float *) (((char *) msg) + msg_header_len);
-        sample_fence = (float *) (((char *) msg) + msg_len);
     }
 
 
@@ -147,12 +174,12 @@ class Yin : public Windowed_input {
         Windowed_input::real_run();
         if (new_estimates) {  // time to send a message
             // message format is pitch0, harmo0, pitch1, harmo1, ...
-            o2_send_start();
-            for (int i = 0; i < chans; i++) {
-                o2_add_float(yin_states[i].pitch);
-                o2_add_float(yin_states[i].harmonicity);
+            o2sm_send_start();
+            for (int channel = 0; channel < chans; channel++) {
+                o2sm_add_float(yin_states[channel].pitch);
+                o2sm_add_float(yin_states[channel].harmonicity);
             }
-            o2_send_finish(0, address, false);
+            o2sm_send_finish(0, address, false);
             new_estimates = false;
         }
     }

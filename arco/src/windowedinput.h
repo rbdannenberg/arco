@@ -15,10 +15,11 @@ class Windowed_input : public Ugen {
     Vec<Windowed_input_state> states;
     int tail;  // index of start of next window
     int window_size;  // size of window
-    int hop_size;
+    int hopsize;
     
     Ugen_ptr inp;
     int inp_stride;
+    Sample_ptr inp_samps;
 
   Windowed_input(int id, int chans, Ugen_ptr inp) : Ugen(id, 'a', chans) {
         states.init(chans);
@@ -26,19 +27,20 @@ class Windowed_input : public Ugen {
         tail = 0;
     }
 
-
-    void Windowed_input_init(int buffer_size, int window_size_, int hopsize_) {
-        int buffer_size = max(buffer_size, window_size + BL);
+    virtual void process_window(int i, Sample_ptr window) = 0;
+    
+    void init(int buffer_size, int window_size_, int hopsize_) {
+        buffer_size = MAX(buffer_size, window_size + BL);
         for (int i = 0; i < chans; i++) {
             states[i].samps.init(buffer_size);
         }
         window_size = window_size_;
-        hop_size = hop_size_;
+        hopsize = hopsize_;
     }
     
 
     ~Windowed_input() {
-        for (int i = 0; i < cjans; i++) {
+        for (int i = 0; i < chans; i++) {
             states[i].samps.finish();
         }
     }
@@ -60,7 +62,7 @@ class Windowed_input : public Ugen {
         inp_samps = inp->run(current_block);
         Windowed_input_state *state = &states[0];
         if (state->samps.size() + BL > state->samps.get_allocated()) {
-            int erase = min(tail, state->samps.size());
+            int erase = MIN(tail, state->samps.size());
             // shift samples so that tail is 0
             for (int i = 0; i < chans; i++) {
                 state->samps.erase(0, erase);
@@ -78,7 +80,7 @@ class Windowed_input : public Ugen {
         }
         
         state = &states[0];
-        while (state->size() >= tail + window_size) {
+        while (state->samps.size() >= tail + window_size) {
             for (int i = 0; i < chans; i++) {
                 process_window(i, &(state->samps[tail]));
                 state++;

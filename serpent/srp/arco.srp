@@ -317,11 +317,13 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     o2_initialize(ensemble, o2trace)
     arco_initialize()  // create audio shared memory interface
     o2_service_new("actl")
+    print "service actl created"
     o2_method_new("/actl/devinf", "s", 'actl_devinf', t)
     o2_method_new("/actl/act", "ii", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
     o2_method_new("/actl/reset", "", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
+    o2_method_new("/actl/yin", "ff", 'actl_yin', t)
     sched_select(rtsched)
     sched_cause(0.1, nil, 'poll_for_arco')
     if IS_WXSERPENT:
