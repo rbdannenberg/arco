@@ -61,7 +61,11 @@ def arco_ready():
     display "arco_ready", wxs_h, wxs_space,
     display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
 
-    Checkbox(win, "Simple test", 5, 5, 170, 20, 'stcheckbox')
+    Checkbox(win, "Show block counts", 5, 5, 170, 20, 'bccheckbox')
+    bccheckbox.set_value(true)
+    bccheckbox.add_target_method(nil, 'show_block_counts')
+
+    Checkbox(win, "Simple test", 'S', 'D', 'S', 'S', 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
 
     Checkbox(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtcheckbox')
@@ -76,8 +80,17 @@ def arco_ready():
     Checkbox(win, "Record Output", 'S', 'D', 'S', 'S', 'rocheckbox')
     rocheckbox.add_target_method(nil, 'record_output')
 
+    Checkbox(win, "Record Output Stereo", 'S', 'D', 'S', 'S', 'ro2checkbox')
+    ro2checkbox.add_target_method(nil, 'record_output_2')
+
     Checkbox(win, "Play Recorded Output", 'S', 'D', 'S', 'S', 'procheckbox')
     procheckbox.add_target_method(nil, 'play_recorded_output')
+
+    Checkbox(win, "Play Recorded Up", 'S', 'D', 'S', 'S', 'proucheckbox')
+    proucheckbox.add_target_method(nil, 'play_recorded_output_up')
+
+    Checkbox(win, "Play Recorded Down", 'S', 'D', 'S', 'S', 'prodncheckbox')
+    prodncheckbox.add_target_method(nil, 'play_recorded_output_down')
 
     Checkbox(win, "Delay Test", 'S', 'D', 'S', 'S', 'dlycheckbox')
     dlycheckbox.add_target_method(nil, 'delay_test')
@@ -91,6 +104,10 @@ def arco_ready():
     Checkbox(win, "Granstream Test", 'S', 'D', 'S', 'S', 'gscheckbox')
     gscheckbox.add_target_method(nil, 'gstest')
 
+    # start a 2nd column
+    wxs_x = 200
+    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
+
     Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
     pwecheckbox.add_target_method(nil, 'pwetest')                
 
@@ -99,10 +116,6 @@ def arco_ready():
 
     Button(win, "Flsyn Test", 'S', 'D', 'S', 'S', 'flscheckbox')
     flscheckbox.add_target_method(nil, 'flstest')
-
-    # start a 2nd column
-    wxs_x = 200
-    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
 
     Checkbox(win, "Phase vocoder", 'S', 'D', 'S', 'S', 'pvcheckbox')
     pvcheckbox.add_target_method(nil, 'pvtest')
@@ -114,6 +127,7 @@ def arco_ready():
     yincheckbox.add_target_method(nil, 'yintest')
 
     ui_initialized = true
+    default_window.fit_to_children()
 
 
 def atone_sequence():
@@ -146,6 +160,14 @@ def host_openaggr(timestamp, address, types, info)
 def host_openaggr_init()
     o2_service_new("host")
     o2_method_new("/host/openaggr", "s", 'host_openaggr', t)
+
+
+######### Show Block Counts ############
+
+// handler for bccheckbox: disable/enable printing of block counts
+def show_block_counts(obj, event, x, y):
+    display "show_block_counts", x
+    arco_heartbeat(1 if x else 0)
 
 
 ######### Synthesis Tests ##############
@@ -207,11 +229,17 @@ def mixer_gain_change_2():
 
 recplay1 = nil
 
-def record_output(obj, event, x, y):
-    display "record_output", x
+def record_output(obj, event, x, y, optional chans = 1):
+    display "record_output", x, chans
     if x:
-        if not recplay1:  // long fade time to test this feature
-            recplay1 = recplay(prev_output_ugen, 2, 0.5, 3.0, false)
+        if not recplay1 or recplay1.chans != chans:
+            if recplay1:
+                print "shutting down recplay1 because it has", recplay1.chans,
+                print     "channels and we want", chans
+                recplay1.record(false)
+                recplay1.unrun()
+            // long fade time to test this feature
+            recplay1 = recplay(prev_output_ugen, chans, 0.5, 3.0, false)
         recplay1.run()  # needs be in run set to make active
         recplay1.record(true)
     elif not recplay1:
@@ -221,15 +249,31 @@ def record_output(obj, event, x, y):
         recplay1.unrun()  # does not need to be active now
 
 
-def play_recorded_output(obj, event, x, y):
-    display "play_recorded_output", x
+def record_output_2(obj, event, x, y):
+    display "record_output_2", x
+    record_output(obj, event, x, y, 2)
+
+
+def play_recorded_output(obj, event, x, y, optional speed = 1):
+    display "play_recorded_output", x, speed
     if x and recplay1:
         // note that Recplay might end playback immediately upon starting,
         // so we need to set up the atend action before sending 'start':
         recplay1.play().atend(MUTE)
-        recplay1.start(0.056)
+        recplay1.set_speed(speed)
+        recplay1.start(0.056)  // tests for non-zero start time
     elif (not x) and recplay1:
         recplay1.stop()  // atend is already set up to mute when finished
+
+
+def play_recorded_output_up(obj, event, x, y):
+    display "play_recorded_output_up", x
+    play_recorded_output(obj, event, x, y, 1.2)
+
+
+def play_recorded_output_down(obj, event, x, y):
+    display "play_recorded_output_up", x
+    play_recorded_output(obj, event, x, y, 0.8)
 
 
 ############ ATONE: INSTRUMENT AND NOTE SEQUENCE ##############

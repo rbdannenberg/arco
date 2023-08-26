@@ -37,12 +37,14 @@ public:
 
     Pwe(int id) : Ugen(id, 'a', 1) {
         bias = 0.01;
-        current = bias;   // real_run() will compute the first envelope
-        seg_togo = 0;     //     segment as soon as it is called because 
-                          //     seg_togo == 0
-        final_value = bias;      // if no envelope is loaded, output will
-        next_point_index = 0;    //     become constant zero.
-        action_id = 0; }
+        current = bias;        // real_run() will compute the first envelope
+        seg_togo = INT_MAX;    //     after start(); initial output is 0
+        seg_factor = 1.0;
+        final_value = bias;    // if no envelope is loaded, output will
+        next_point_index = 0;  //     become constant zero.
+        action_id = 0;
+        points.init(0);        // initially empty, so size = 0
+    }
     
     ~Pwe() { if (action_id) send_action_id(action_id); }
 
@@ -61,7 +63,7 @@ public:
                 if (next_point_index >= points.size()) {
                     seg_togo = INT_MAX;
                     seg_factor = 1.0f;
-                    if (current == bias && action_id) {
+                    if (action_id) {
                         send_action_id(action_id);
                     }
                 } else {
@@ -99,6 +101,12 @@ public:
         seg_factor = exp(log(final_value / current) / seg_togo);
         next_point_index = points.size();  // end of envelope
     }
+
+    void set(float y) {
+        current = y + bias;
+    }
     
+    void point(float f) { points.push_back(f); }
+
 };
 

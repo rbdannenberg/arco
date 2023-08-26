@@ -21,7 +21,7 @@ void arco_pwlb_new(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/pwlb/act int32 id int32 action_id;
+/* O2SM INTERFACE: /arco/pwlb/act int32 id, int32 action_id;
  *    set the action_id
  */
 void arco_pwlb_act(O2SM_HANDLER_ARGS)
@@ -86,6 +86,21 @@ static void arco_pwlb_decay(O2SM_HANDLER_ARGS)
     UGEN_FROM_ID(Pwlb, pwlb, id, "arco_pwlb_decay");
     if (d < 1.0f) d = 1.0f;
     pwlb->decay(d);
+}
+
+
+/* O2SM INTERFACE: /arco/pwlb/set int32 id, float y;
+ */
+static void arco_pwlb_set(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float y = argv[1]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Pwlb, pwlb, id, "arco_pwe_decay");
+    if (y < 0) y = 0;
+    pwlb->set(y);
 }
 
 

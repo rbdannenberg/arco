@@ -6,24 +6,17 @@ class Someone_is_following_you:
 # Instance variables
     var dly1, dly2
     var dly1_value, dly2_value
+    var latency_value
     var fade_value
     var mix1
     var mult1
-    var pwl1
+    var pwe1
     var win, init_x, init_y
+    var state  // nil, 'running' or 'ending'
+
 
     def init(window, x, y):
     # Initialization of instance variables
-        dly1 = nil
-        dly2 = nil
-        dly1_value = nil
-        dly2_value = nil
-        fade_value = nil
-        mix1 = nil
-        mult1 = nil
-        pwl1 = nil
-        wait = nil
-        
         win = window // Main UI window
         init_x = x // set the starting x coord of the movement
         init_y = y // set the starting y coord of the movement
@@ -31,11 +24,14 @@ class Someone_is_following_you:
         // Setup UI
         this.set_ui()
 
-        dly1_value = d1_slide.value()
-        dly2_value = d2_slide.value()
+        latency_value = latency_slider.value() * 0.001
+        dly1_value = max(0, d1_slide.value() - latency_value)
+        dly2_value = max(0, d2_slide.value() - latency_value)
+        display "Someone_is_following_you", dly1_value, dly2_value
         dly1 = delay(input_ugen, dly1_value, 0.1, 2.0, 2)
         dly2 = delay(input_ugen, dly2_value, 0.1, 2.0, 2)
         fade_value = fl_slide.value()
+        latency_slider.add_target_method(this, 'latency_handler')
 
 
     def set_ui():
@@ -58,52 +54,64 @@ class Someone_is_following_you:
         fl_slide.add_target_method(this, 'fadelen_handler')
         
 
+    def latency_handler(obj, x):
+    # handler for global audio latency slider
+        latency_value = x * 0.001
+        dly1_value = max(0, d1_slide.value() - latency_value)
+        dly2_value = max(0, d2_slide.value() - latency_value)
+        if dly1:
+            dly1.set('dur', dly1_value)
+        if dly2:
+            dly2.set('dur', dly2_value)
+                
+
     def delay_handler(obj, event, x, y)
         display "delay_handler", x, dly1_value, dly2_value
-        if x:
-            if wait:
-                sched_select(rtsched)
-                sched_cause(3.1, this, 'start_delays')
-            else:
-                start_delays()
-        else:
-            wait = 1
-            pwl1 = pweb(0, 1, fade_value, 0)
-            mult1.set('x2', pwl1)
+        if x and state == 'ending':  // we're busy, so retry later
+            sched_select(rtsched)
+            sched_cause(0.1, this, 'delay_handler', obj, event, x, y)
+        elif x and state == nil:    // ready to create ugens
+            start_delays()
+        elif not x and state == 'running':
+            state = 'ending'
+            display "sify delay_handler", x, state, fade_value
+            pwe1 = pweb(init = 1, fade_value, 0)
+            mult1.set('x2', pwe1)
             sched_select(rtsched)
             sched_cause(fade_value + 0.1, this, 'finish_delays')
 
     
     def start_delays()
-        wait = nil
+        state = 'running'
         mix1 = mix(2)
         # delay gets left channel only if input is multichannel:
-        dly1 = delay(input_ugen, dly1_value, 0.1, 2.0, 1)
-        dly2 = delay(input_ugen, dly2_value, 0.1, 2.0, 1)
+        dly1 = delay(input_ugen, dly1_value, 0.0, 2.0, 1)
+        dly2 = delay(input_ugen, dly2_value, 0.0, 2.0, 1)
         mix1.ins('inp1', dly1, [1, 0])
         mix1.ins('inp2', dly2, [0, 1])
         mult1 = mult(mix1, 1, 2)
-        mult1.play() 
+        mult1.play()
 
 
     def finish_delays()
+        display "sify finish_delays"
         mult1.mute()
         mult1 = nil
-        pwl1 = nil
+        pwe1 = nil
         mix1 = nil
         dly1 = nil
         dly2 = nil
-        wait = nil
+        state = nil  // all done
 
 
     def delay1_handler(obj, x)
-        dly1_value = x
+        dly1_value = x - latency_value
         if dly1:
             dly1.set('dur', x)
 
 
     def delay2_handler(obj, x)
-        dly2_value = x
+        dly2_value = x - latency_value
         if dly2:
             dly2.set('dur', x)
 

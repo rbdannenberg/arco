@@ -147,7 +147,7 @@ public:
 
     void real_run() {
         // zero the outputs
-        memset(out_samps, 0, BLOCK_BYTES * chans);
+        block_zero_n(out_samps, chans);
         // add inputs with wrap-around
         Input *input = &inputs[0];
         for (int i = 0; i < inputs.size(); i++) {

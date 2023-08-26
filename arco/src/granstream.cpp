@@ -45,7 +45,7 @@ const char *Granstream_name = "Granstream";
 //
 bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps) {
     // first, read input audio into input buffer
-    memcpy(&samps[tail], gs->inp_samps, BL * sizeof(Sample));
+    block_copy(&samps[tail], gs->inp_samps);
     tail += BL;
     if (tail >= samps.size()) {
         tail = 0;

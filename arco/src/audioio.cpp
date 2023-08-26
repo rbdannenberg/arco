@@ -412,7 +412,7 @@ void copy_deinterleave(Sample_ptr dest, int dest_chans,
     }
     if (dest_chans > src_chans) {
         // we need to zero any remaining channels
-        memset(dest, 0, (dest_chans - src_chans) * BLOCK_BYTES);
+        block_zero_n(dest, dest_chans - src_chans);
     }
 }
 
@@ -506,7 +506,7 @@ static int callback_entry(float *input, float *output,
         // will tend to advance in big steps on each callback.
         arco_wall_time += BP; // time is advanced by block period
     } else {
-        memset(output, 0, BL * sizeof(float) * actual_out_chans);
+        block_zero_n(output, actual_out_chans);
         if (aud_close_request) {
             if (aud_zero_fill_count >= ZERO_PAD_COUNT) {
                  return paComplete;
@@ -605,10 +605,9 @@ static int callback_entry(float *input, float *output,
             outptr = &output_ug->output[0];
             int n = min(output_ug->chans, aud_out_chans);
             if (!wrote_buffer) {  // copy and fill
-                memcpy(buffer, outptr, n * BLOCK_BYTES);
+                block_copy_n(buffer, outptr, n);
                 if (n < aud_out_chans) {
-                    memset(buffer + BL * n, 0,
-                           (aud_out_chans - n) * BLOCK_BYTES);
+                    block_zero_n(buffer + BL * n, aud_out_chans - n);
                 }
                 wrote_buffer = true;
             } else {  // 2nd sound: add to buffer, no fill needed
@@ -622,7 +621,7 @@ static int callback_entry(float *input, float *output,
             }
         }
         if (!wrote_buffer) {  // No sound was written to buffer!
-            memset(buffer, 0, aud_out_chans * BLOCK_BYTES);
+            block_zero_n(buffer, aud_out_chans);
         }
 
         // move computed output to prev_output, multiplying by gain
@@ -687,7 +686,7 @@ static int callback_entry(float *input, float *output,
         // synthesize tries to access Ivu's output? It's recursive.
         prev_output->set_current_block(aud_blocks_done + 1);
     } else if (actual_out_chans > 0) {  // no synthesized output, so zero output
-        memset(output, 0, BL * actual_out_chans * sizeof(*output));
+        block_zero_n(output, actual_out_chans);
     }
 
     return paContinue;

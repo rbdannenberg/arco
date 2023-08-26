@@ -38,8 +38,19 @@ class Pwe (Ugen):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwe/decay", 0, "Uf", id, dur * AR)
 
+    def set(y):
+    # set current value to y
+        o2_snd_cmd("/arco/pwe/set", 0, "Uf", id, y)
 
-def pwe(rest points): Pwe(points)  # pwe as a function
+
+def pwe(keyword init, start = true, rest points):
+    var pwe = Pwe(points)
+    if init:
+        pwe.set(init)
+    if start:
+        pwe.start()
+    return pwe
+
 
 
 class Pweb (Ugen):
@@ -91,7 +102,18 @@ class Pweb (Ugen):
 
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
-        o2_snd_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
+        o2_send_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
 
 
-def pweb(rest points): Pweb(points)
+    def set(y):
+    # set current value to y
+        o2_send_cmd("/arco/pweb/set", 0, "Uf", id, y)
+
+
+def pweb(keyword init, start = true, rest points):
+    var pweb = Pweb(points)
+    if init:
+        pweb.set(init)
+    if start:
+        pweb.start()
+    return pweb

@@ -21,12 +21,14 @@ public:
 
     Pweb(int id) : Ugen(id, 'b', 1) {
         bias = 0.01;
-        current = bias;   // real_run() will compute the first envelope
-        seg_togo = 0;     //     segment as soon as it is called because 
-                          //     seg_togo == 0
-        final_value = bias;      // if no envelope is loaded, output will
-        next_point_index = 0;    //     become constant zero.
-        action_id = 0; }
+        current = bias;        // real_run() will compute the first envelope
+        seg_togo = INT_MAX;    //     after start(); initial output is 0
+        seg_factor = 1.0;
+        final_value = bias;    // if no envelope is loaded, output will
+        next_point_index = 0;  //     become constant zero.
+        action_id = 0;
+        points.init(0);   // initially empty, so size = 0
+    }
 
     ~Pweb() { if (action_id) send_action_id(action_id); }
 
@@ -38,17 +40,19 @@ public:
             if (next_point_index >= points.size()) {
                 seg_togo = INT_MAX;
                 seg_factor = 1.0f;
-                if (current == bias && action_id) {
+                if (action_id) {
                     send_action_id(action_id);
                 }
+                printf("Pweb: done\n");
             } else {
                 seg_togo = (int) points[next_point_index++];
                 final_value = points[next_point_index++] + bias;
                 seg_factor = exp(log(final_value / current) / seg_togo);
-                // printf("Pweb: togo %d final %g\n", seg_togo, final_value);
+                printf("Pweb: togo %d final %g\n", seg_togo, final_value);
             }
         }
-        *out_samps++ = current - bias;
+        *out_samps = current - bias;
+        printf("pweb out %g\n", *out_samps);
         current *= seg_factor;
         seg_togo--;
     }
@@ -57,13 +61,18 @@ public:
         next_point_index = 0;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
+        printf("pweb start: final_value %g\n", final_value);
     }
 
-    void decay(float d) {
-        seg_togo = (int) d;
+    void decay(int d) {
+        seg_togo = d;
         final_value = bias;
         seg_factor = exp(log(final_value / current) / seg_togo);
         next_point_index = points.size();  // end of envelope
+    }
+
+    void set(float y) {
+        current = y + bias;
     }
     
     void point(float f) { points.push_back(f); }

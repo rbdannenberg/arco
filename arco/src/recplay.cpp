@@ -6,14 +6,12 @@
  * Apr 2023
  */
 
+#include <cmath>
 #include "arcougen.h"
 #include "recplay.h"
 
-#define LOG2_BLOCKS_PER_BUFFER 10
-#define LOG2_SAMPLES_PER_BUFFER (LOG2_BLOCKS_PER_BUFFER + LOG2_BL)
-#define SAMPLES_PER_BUFFER (1 << LOG2_SAMPLES_PER_BUFFER)
-#define INDEX_TO_BUFFER(i) ((i) >> LOG2_SAMPLES_PER_BUFFER)
-#define INDEX_TO_OFFSET(i) ((i) & (SAMPLES_PER_BUFFER - 1))
+#define INDEX_TO_BUFFER(i) ((i) / samples_per_buffer)
+#define INDEX_TO_OFFSET(i) ((i) % samples_per_buffer)
 
 // the last sample must be obtained from the owner of the samples
 #define END_COUNT (lender_ptr ? lender_ptr->sample_count : sample_count)
@@ -45,21 +43,204 @@ float raised_cosine[COS_TABLE_SIZE + 5] = {
 
 const char *Recplay_name = "Recplay";
 
-void Recplay::run_channel(int chan) {
+/******
+ Computation has 5 cases:
+ 1. during fade at speed == 1: step through buffer and multiply by
+    interpolated fade envelope points.
+ 2. during fade at speed != 1: interpolate buffer samples (tricky because
+    we need previous sample and phase to interpolate, but we also have
+    non-contiguous samples in buffers) and use same code as (1) for envelope.
+ 3. non-fade at speed == 1: simplest case just copies sequential samples
+    with test for go-to-next-buffer.
+ 4. non-fade at speed != 1: no envelope calculation but uses code from (2)
+    to interpolate samples from buffers.
+ 5. not playing: just output zero on all output channels
+*******/
+
+// play one channel during fade at speed == 1
+//
+void Recplay::play_fade_1(int chan, float fade_phase, int buffer, int offset)
+{
+    Vec<Sample_ptr> &buffers = *states[chan].buffers;
+    Sample *src = buffers[buffer] + offset;
+
+    for (int i = 0; i < BL; i++) {
+        long iphase = (long) fade_phase; // truncate to integer
+        float fraction = fade_phase - iphase; // get fraction 
+        // interpolated envelope
+        float env = raised_cosine[iphase] * (1 - fraction) +
+                    raised_cosine[iphase + 1] * fraction;
+        // compute a sample
+        *out_samps++ = *src++ * env * *gain_samps;
+        fade_phase += fade_incr;
+        offset++;
+        if (offset >= samples_per_buffer) {
+            offset = 0;
+            src = (*(states[chan].buffers))[++buffer];
+        }
+    }
+    gain_samps += gain_stride;
+}
+
+
+// play one channel during fade at speed != 1
+//    fade_phase - float position (index) within fade curve
+//    fade_incr - member variable with per-sample fade_phase increment
+//    buffer - index to buffer
+//    offset - offset within buffer, corresponds to src, offset > phase
+//    phase - float position (index) within buffer for next sample
+//    src - pointer to the sample stored at offset in buffers[buffer]
+//
+void Recplay::play_fade_x(int chan, float fade_phase, int buffer, int offset,
+                          double phase)
+{
+    Vec<Sample_ptr> &buffers = *states[chan].buffers;
+    Sample *src = buffers[buffer] + offset;
+
+    Sample next_sample = *src;
+    for (int i = 0; i < BL; i++) {
+        // note that phase can be negative if offset is zero, i.e. *src is
+        // the first sample in the buffer!
+        long iphase = (long) fade_phase; // truncate to integer
+        float fraction = fade_phase - iphase; // get fraction
+        // interpolated envelope
+        float env = raised_cosine[iphase] * (1 - fraction) +
+                    raised_cosine[iphase + 1] * fraction;
+        // compute a sample. frac is the fraction of a sample
+        // between the current position (play_phase) and the 
+        // location of the next sample (play_index)
+        fraction = offset - phase;
+        Sample samp = states[chan].prev_sample * (1 - fraction) +
+                      next_sample * fraction;
+        *out_samps++ = samp * env * *gain_samps;
+        fade_phase += fade_incr;
+        phase += speed;
+
+        // if speed > 1, we can advance past more than one sample
+        if (phase > offset) {
+            int n = phase - offset + 1;  // how far to advance, >= 1
+            offset += n - 1;  // (re)read prev_sample
+            src += n - 1;
+            if (offset >= samples_per_buffer) {
+                offset = 0;
+                phase -= samples_per_buffer;
+                src = (*(states[chan].buffers))[++buffer];
+            }
+            states[chan].prev_sample = *src;
+            // now position at the next sample
+            offset++;
+            src++;
+            if (offset >= samples_per_buffer) {
+                offset = 0;
+                phase -= samples_per_buffer;
+                src = (*(states[chan].buffers))[++buffer];
+            }
+            next_sample = *src;
+        }
+    }
+    gain_samps += gain_stride;
+}
+    
+
+// play one channel without fade at speed == 1
+//    buffer - index to buffer
+//    offset - offset within buffer, corresponds to src, offset > phase
+//    src - pointer to the sample stored at offset in buffers[buffer]
+//
+void Recplay::play_1(int chan, int buffer, int offset)
+{
+    Vec<Sample_ptr> &buffers = *states[chan].buffers;
+    Sample *src = buffers[buffer] + offset;
+
+    for (int i = 0; i < BL; i++) {
+        // compute a sample
+        *out_samps++ = *src++ * *gain_samps;
+        offset++;
+        if (offset >= samples_per_buffer) {
+            offset = 0;
+            src = (*(states[chan].buffers))[++buffer];
+        }
+    }
+}
+
+
+// play one channel without fade at speed != 1
+//    buffer - index to buffer
+//    offset - offset within buffer, corresponds to src, offset > phase
+//    src - pointer to the sample stored at offset in buffers[buffer]
+//
+void Recplay::play_x(int chan, int buffer, int offset, double phase)
+{
+    Vec<Sample_ptr> &buffers = *states[chan].buffers;
+    Sample *src = buffers[buffer] + offset;
+
+    Sample next_sample = *src;
+    for (int i = 0; i < BL; i++) {
+        // compute a sample. frac is the fraction of a sample
+        // between the current position (play_phase) and the 
+        // location of the next sample (play_index)
+        float fraction = offset - phase;
+        Sample samp = states[chan].prev_sample * (1 - fraction) +
+                      next_sample * fraction;
+        *out_samps++ = samp * *gain_samps;
+        phase += speed;
+
+        // if speed > 1, we can advance past more than one sample
+        if (phase > offset) {
+            int n = phase - offset + 1;  // how far to advance, >= 1
+            offset += n - 1;  // (re)read prev_sample
+            src += n - 1;
+            if (offset >= samples_per_buffer) {
+                offset = 0;
+                phase -= samples_per_buffer;
+                src = (*(states[chan].buffers))[++buffer];
+            }
+            states[chan].prev_sample = *src;
+            // now position at the next sample
+            offset++;
+            src++;
+            if (offset >= samples_per_buffer) {
+                offset = 0;
+                phase -= samples_per_buffer;
+                src = (*(states[chan].buffers))[++buffer];
+            }
+            next_sample = *src;
+        }
+    }
+}
+
+
+void Recplay::real_run()
+{
+    int buffer = 0;
+    long offset = 0;
+    double phase = 0;
+
+    inp_samps = inp->run(current_block);
+    gain_samps = gain->run(current_block);
+
     if (recording) {
         int buffer = (int) INDEX_TO_BUFFER(rec_index);
         int offset = (int) INDEX_TO_OFFSET(rec_index);
 
-        // make sure we have space
-        if (buffer >= my_buffers.size()) {
-            assert(buffer == my_buffers.size());
-            Sample_ptr b = O2_MALLOCNT(SAMPLES_PER_BUFFER * chans, Sample);
-            assert(b);
-            my_buffers.push_back(b);
+        // expand all channel storage if we need more space to record
+        if (buffer >= states[0].my_buffers.size()) {
+            assert(buffer == states[0].my_buffers.size());
+            for (int i = 0; i < chans; i++) {
+                Sample_ptr b = O2_MALLOCNT(SAMPLES_PER_BUFFER, Sample);
+                assert(b);
+                states[i].my_buffers.push_back(b);
+            }
         }
-        memcpy(my_buffers[buffer] + offset, inp_samps, sizeof(Sample) * BL);
+        
+        // record the input
+        for (int i = 0; i < chans; i++) {
+            block_copy(states[i].my_buffers[buffer] + offset, inp_samps);
+            inp_samps += inp_stride;
+        }
         rec_index += BL;
         if (rec_index > sample_count) sample_count = rec_index;
+        
     }
 
     if (playing) {
@@ -88,7 +269,7 @@ void Recplay::run_channel(int chan) {
         // 
         // To continue, we need BL samples, so the final sample phase
         // will be:
-        double final_phase = play_phase + (BL - 1) * speed;
+        double final_phase = play_phase + (BL - 1) * speed;        
         // With interpolation, we need one sample beyond final_phase
         // (and to keep this simple, we'll always arrange for fades to
         // end one sample early so that if we round up, we'll still be
@@ -103,81 +284,39 @@ void Recplay::run_channel(int chan) {
             // If the recording time is reasonable and if the speed is not
             // changing, this code will never be reached because the fadeout
             // will finish before we run out of samples.
-            memset(out_samps, 0, sizeof(Sample) * BL);
-            out_samps += BL;
+            block_zero_n(out_samps, chans);
             playing = false;
             arco_warn("Recplay: sudden stop, out of samples");
             send_action_id(action_id);
             return;
         }
-
         int buffer = (int) INDEX_TO_BUFFER(play_index);
         long offset = INDEX_TO_OFFSET(play_index);
         // phase is exact offset within buffer. Computed by subtracting
         // off the length of the previous buffers, which is play_index
         // minus offset, which is where we are in the current buffer.
+        // If offset == 0, phase can be < 0.
         double phase = play_phase - (play_index - offset);
 
-        int i;
-        Sample *src = (*buffers)[buffer] + offset;
         if (fading) {
             if (speed == 1.0) {
-                for (i = 0; i < BL; i++) {
-                    long iphase = (long) fade_phase; // truncate to integer
-                    float fraction = fade_phase - iphase; // get fraction 
-                    // interpolated envelope
-                    float env = raised_cosine[iphase] * (1 - fraction) +
-                                raised_cosine[iphase + 1] * fraction;
-                    // compute a sample
-                    *out_samps++ = *src++ * env * *gain_samps;
-                    fade_phase += fade_incr;
-                    offset++;
-                    if (offset >= SAMPLES_PER_BUFFER) {
-                        offset = 0;
-                        src = (*buffers)[++buffer];
-                    }
+                for (int i = 0; i < chans; i++) {
+                    play_fade_1(i, fade_phase, buffer, offset);
                 }
                 play_index += BL;
-                play_phase = play_index; // keep play_phase up-to-date in case
-                                         // speed changes
-            } else { // speed is not 1, so do linear interpolation
-                for (i = 0; i < BL; i++) {
-                    long iphase = (long) fade_phase; // truncate to integer
-                    float fraction = fade_phase - iphase; // get fraction 
-                    // interpolated envelope
-                    float env = raised_cosine[iphase] * (1 - fraction) +
-                                raised_cosine[iphase + 1] * fraction;
-                    // compute a sample. frac is the fraction of a sample
-                    // between the current position (play_phase) and the 
-                    // location of the next sample (play_index)
-                    fraction = play_index - play_phase;
-                    Sample next_sample = *src;
-                    Sample samp = prev_sample * fraction +
-                                  next_sample * (1 - fraction);
-                    *out_samps++ = samp * env * *gain_samps;
-                    fade_phase += fade_incr;
-                    phase += speed;
-                    play_phase += speed;
-                    // if speed > 1, we can advance past more than one sample
-                    // We'll do this the slow way -- one sample at a time.
-                    while (phase > offset) { // advance to the next sample
-                        prev_sample = next_sample;
-                        offset++;
-                        play_index++;
-                        src++;
-                        if (offset >= SAMPLES_PER_BUFFER) {
-                            offset = 0;
-                            phase -= SAMPLES_PER_BUFFER;
-                            src = (*buffers)[++buffer];
-                        }
-                    }
+                play_phase = play_index;
+            } else {
+                for (int i = 0; i < chans; i++) {
+                    play_fade_x(i, fade_phase, buffer, offset, phase);
                 }
+                play_phase += BL * speed;
+                play_index = std::ceil(play_phase);  // round up
             }
+            fade_phase += fade_incr * BL;
             fade_count--;
             if (fade_count <= 0) {
                 fading = false;
-                //LINEAR if (incr < 0.0) {
-                if (stopping) { // stopping means fading out, not fading in
+                if (stopping) { // stopping means fading out, not in
                     stopping = false;
                     playing = false;
                     if (loop) {
@@ -185,62 +324,25 @@ void Recplay::run_channel(int chan) {
                     } else {
                         send_action_id(action_id);
                     }
-                } // else we finished fading in
-            }
-        // before starting, see if we're at the end of the samples
-        } else {
-            if (speed == 1.0) { // fast copy if no interpolation
-                for (i = 0; i < BL; i++) {
-                    // compute a sample
-                    *out_samps++ = *src++ * *gain_samps;
-                    offset++;
-                    if (offset >= SAMPLES_PER_BUFFER) {
-                        offset = 0;
-                        src = (*buffers)[++buffer];
-                    }
+                }
+            } // else we finished fading in
+        } else {  // not fading
+            if (speed == 1.0) {
+                for (int i = 0; i < chans; i++) {
+                    play_1(i, buffer, offset);
                 }
                 play_index += BL;
-                play_phase = play_index; // keep play_phase up-to-date in case
-                                         // speed changes
-            } else { // slow: interpolation because speed != 1.0
-                for (i = 0; i < BL; i++) {
-                    // compute a sample
-                    Sample frac = play_index - play_phase;
-                    Sample next_sample = *src;
-                    Sample samp = prev_sample * frac + next_sample * (1 - frac);
-                    *out_samps++ = samp * *gain_samps;
-                    phase += speed;
-                    play_phase += speed;
-                    // if speed > 1, we can advance past more than one sample.
-                    // We'll do this the slow way -- one sample at a time.
-                    while (phase > offset) { // advance to the next sample
-                        prev_sample = next_sample;
-                        offset++;
-                        play_index++;
-                        src++;
-                        if (offset >= SAMPLES_PER_BUFFER) {
-                            offset = 0;
-                            phase -= SAMPLES_PER_BUFFER;
-                            src = (*buffers)[++buffer];
-                        }
-                    }
+                play_phase = play_index;
+            } else {
+                for (int i = 0; i < chans; i++) {
+                    play_x(i, buffer, offset, phase);
                 }
-            }
+                play_phase += BL * speed;
+                play_index = std::ceil(play_phase);  // round up
+            }                
         }
     } else { // !playing, so just output zeros
-        memset(out_samps, 0, sizeof(Sample) * BL);
-        out_samps += BL;
-    }
-}
-
-
-void Recplay::real_run() {
-    inp_samps = inp->run(current_block);
-    gain_samps = gain->run(current_block);
-    for (int i = 0; i < chans; i++) {
-        run_channel(i);
-        inp_samps += inp_stride;
-        gain_samps += gain_stride;
+        block_zero_n(out_samps, chans);
     }
 }
 
@@ -250,9 +352,11 @@ void Recplay::record(bool record) {
         arco_warn("Recplay: can't record into lender's buffer\n");
         return;
     }
-    if (!buffers) {
-        my_buffers.init(10);  // allocate space for some buffer pointers
-        buffers = &my_buffers;
+    if (!states[0].buffers) {
+        for (int i = 0; i < chans; i++) {
+            states[i].my_buffers.init(10);  // allocate space for some buffer pointers
+            states[i].buffers = &states[i].my_buffers;
+        }
     }
     if (recording == record) {
         return;  // already recording/not recording
@@ -272,7 +376,7 @@ void Recplay::record(bool record) {
 void Recplay::start(double start_time_)
 {
     start_time = start_time_;
-    if (!buffers) {
+    if (!states[0].buffers) {
         arco_warn("Recplay: Nothing recorded to play");
         goto no_play;
     }
@@ -283,8 +387,9 @@ void Recplay::start(double start_time_)
         play_index = END_COUNT;
     }
     play_phase = play_index;
-    prev_sample = 0; // just to be safe, initialize for interpolation
-
+    for (int i = 0; i < chans; i++) {  // just to be safe, initialize
+        states[i].prev_sample = 0;     // for interpolation
+    }
     fade_count = long(fade * AR * BL_RECIP);
     fade_len = fade_count * BL;
     if (fade_len <= 0) {
@@ -364,8 +469,7 @@ void Recplay::stop()
 
 void Recplay::borrow(int lender_id)
 {
-    // make sure we are borrowing buffers from a lender of
-    if (buffers) {
+    if (states[0].buffers) {
         arco_warn("Irecplay::borrow called after buffer allocation");
         return;
     }
@@ -373,13 +477,27 @@ void Recplay::borrow(int lender_id)
     UGEN_FROM_ID(Recplay, lender, lender_id, "arco_recplay_borrow lender");
 
     if (borrowing) { // return buffers to lender
-        lender_ptr->return_buffers();
+        lender_ptr->unref();
         borrowing = false;
-        buffers = NULL;
+        for (int i = 0; i < chans; i++) {
+            states[i].buffers = NULL;
+        }
     }
 
     if (!lender) return;
-    buffers = &(lender->my_buffers);
+    // make sure we are borrowing buffers from a lender of class Recplay
+    if (lender->classname() != Recplay_name) {
+        arco_error("Recplay::borrow - lender %d has class %s\n",
+                   lender_id, lender->classname());
+        return;
+    }
+    
+    // map buffers from lender to borrower round-robin
+    int j = 0;
+    for (int i = 0; i < chans; i++) {
+        states[i].buffers = &(lender->states[j].my_buffers);
+        j = (j + 1) % lender->chans;
+    }
     lender->ref();
     lender_ptr = lender;
     borrowing = true;

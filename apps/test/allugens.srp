@@ -91,8 +91,20 @@ class Pwl (Ugen):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
 
+    def set(y):
+    # set current value to y
+        o2_snd_cmd("/arco/pwl/set", 0, "Uf", id, y)
 
-def pwl(rest points): Pwl(points)  # pwl as a function
+
+
+def pwl(keyword init, start = true, rest points):
+    var pwl = Pwl(points)
+    if init:
+       pwe.set(init)
+    if start:
+       pwe.start()
+    return pwl
+
 
 
 class Pwlb (Ugen):
@@ -147,7 +159,19 @@ class Pwlb (Ugen):
         o2_snd_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
 
 
-def pwlb(rest points): Pwlb(points)
+    def set(y):
+    # set current value to y
+        o2_send_cmd("/arco/pwlb/set", 0, "Uf", id, y)
+
+
+
+def pwlb(keyword init, start = true, rest points):
+    var pwlb = Pwlb(points)
+    if init:
+        pwlb.set(init)
+    if start:
+        pwlb.start()
+    return pwlb
 # pwe.srp -- piece-wise linear envelope
 #
 # Roger B. Dannenberg
@@ -188,8 +212,19 @@ class Pwe (Ugen):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwe/decay", 0, "Uf", id, dur * AR)
 
+    def set(y):
+    # set current value to y
+        o2_snd_cmd("/arco/pwe/set", 0, "Uf", id, y)
 
-def pwe(rest points): Pwe(points)  # pwe as a function
+
+def pwe(keyword init, start = true, rest points):
+    var pwe = Pwe(points)
+    if init:
+        pwe.set(init)
+    if start:
+        pwe.start()
+    return pwe
+
 
 
 class Pweb (Ugen):
@@ -241,10 +276,21 @@ class Pweb (Ugen):
 
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
-        o2_snd_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
+        o2_send_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
 
 
-def pweb(rest points): Pweb(points)
+    def set(y):
+    # set current value to y
+        o2_send_cmd("/arco/pweb/set", 0, "Uf", id, y)
+
+
+def pweb(keyword init, start = true, rest points):
+    var pweb = Pweb(points)
+    if init:
+        pweb.set(init)
+    if start:
+        pweb.start()
+    return pweb
 # mix.srp -- audio mixer
 #
 # Roger B. Dannenberg
@@ -465,7 +511,9 @@ class Recplay (Ugen):
 
     def stop():
         o2_send_cmd("/arco/recplay/stop", 0, "U", id)
-        
+
+    def set_speed(x):
+        o2_send_cmd("/arco/recplay/speed", 0, "Uf", id, x)
 
 # delay.srp -- feedback delay unit generator
 #
@@ -653,11 +701,8 @@ class Thru (Ugen):
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt)
 
-
-# DO NOT DEFINE thru() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN thru_ugen
-# def thru(): purposefully not defined here!
-
-
+def thru(inp, optional chans = 1):
+    Thru(inp, chans)
 
 # zero.srp -- audio zero
 #

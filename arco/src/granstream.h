@@ -230,7 +230,7 @@ public:
         bool active = false;
         // clear all output here because each channel (state) can sum grains
         // to each channel
-        memset(out_samps, 0, BL * sizeof(Sample) * chans);
+        block_zero_n(out_samps, chans);
         for (int i = 0; i < states.size(); i++) {
             active |= chan_a(state);
             state++;

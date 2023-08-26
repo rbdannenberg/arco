@@ -21,7 +21,7 @@ void arco_pwl_new(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/pwl/act int32 id int32 action_id;
+/* O2SM INTERFACE: /arco/pwl/act int32 id, int32 action_id;
  *    set the action_id
  */
 void arco_pwl_act(O2SM_HANDLER_ARGS)
@@ -90,6 +90,21 @@ static void arco_pwl_decay(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/pwl/set int32 id, float y;
+ */
+static void arco_pwl_set(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float y = argv[1]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Pwl, pwl, id, "arco_pwe_decay");
+    if (y < 0) y = 0;
+    pwl->set(y);
+}
+
+
 static void pwl_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
@@ -97,6 +112,7 @@ static void pwl_init()
     o2sm_method_new("/arco/pwl/act", "ii", arco_pwl_act, NULL, true, true);
     o2sm_method_new("/arco/pwl/start", "i", arco_pwl_start, NULL, true, true);
     o2sm_method_new("/arco/pwl/decay", "if", arco_pwl_decay, NULL, true, true);
+    o2sm_method_new("/arco/pwl/set", "if", arco_pwl_set, NULL, true, true);
     // END INTERFACE INITIALIZATION
     // arco_pwl_env has a variable number of parameters:
     o2sm_method_new("/arco/pwl/env", NULL, arco_pwl_env, NULL, false, false);

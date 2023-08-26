@@ -12,9 +12,6 @@ class Thru (Ugen):
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt)
 
-
-# DO NOT DEFINE thru() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN thru_ugen
-# def thru(): purposefully not defined here!
-
-
+def thru(inp, optional chans = 1):
+    Thru(inp, chans)
 

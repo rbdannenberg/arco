@@ -65,7 +65,7 @@ public:
     void real_run() {
         Sample_ptr src = input->run(current_block);  // bring input up-to-date
         for (int i = 0; i < chans; i++) {
-            memcpy(out_samps, src, BLOCK_BYTES);
+            block_copy(out_samps, src);
             src += BL + input_stride;
             out_samps += BL;
         }

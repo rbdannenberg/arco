@@ -97,6 +97,8 @@ public:
         audio_bridge->outgoing.push((O2list_elem *) msg);
 
         load_block();  // even if error opening or seeking
+
+        arco_print("Opened %s, a %d channel audio file.\n", fn, chans);
     }
 
 
@@ -118,7 +120,7 @@ public:
         while (all_frames_count > 0 && frames_to_go > 0) {
             // compute how many frames we can read. Read until we hit
             //     either AUDIOBLOCK_FRAMES or all_frames_count:
-            int64_t frames = imin(frames_to_end, frames_to_go);
+            int64_t frames = MIN(frames_to_end, frames_to_go);
             if (frames > 0) {
                 int frames_read = (int) sf_readf_short(snd_in, ablock->dat,
                                                        frames);

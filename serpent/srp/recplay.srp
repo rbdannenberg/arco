@@ -25,5 +25,7 @@ class Recplay (Ugen):
 
     def stop():
         o2_send_cmd("/arco/recplay/stop", 0, "U", id)
-        
+
+    def set_speed(x):
+        o2_send_cmd("/arco/recplay/speed", 0, "Uf", id, x)
 

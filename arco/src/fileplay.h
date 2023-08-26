@@ -172,7 +172,7 @@ public:
     void real_run() {
         Audioblock *block = blocks[block_on_deck];
         if (!started || stopped || !block) {
-            memset(out_samps, 0, chans * BL * sizeof(float));
+            block_zero_n(out_samps, chans);
             if (stopped && action_id) {
                 send_action_id(action_id);
             }
@@ -180,7 +180,7 @@ public:
         }
         int i = 0;  // how many frames we have computed so far
         // how many channels to copy from input to output:
-        int nchans = imin(chans, block->channels);
+        int nchans = MIN(chans, block->channels);
         
         while (i < BL) {  // may execute 2x to read from next block
             if (!block) {  // zero the remaining output frames
@@ -192,7 +192,7 @@ public:
                 }
                 break;
             }
-            int nframes = imin(BL - i, block->frames - frame_in_block);
+            int nframes = MIN(BL - i, block->frames - frame_in_block);
             int16_t *in_base_ptr = &(block->dat[
                     (frame_in_block + i ) * block->channels]);
             for (int ch = 0; ch < nchans; ch++) {
@@ -228,12 +228,12 @@ public:
                 for (int ch = nchans; ch < chans; ch++) {
                     float *out = out_samps + ch * BL;
                     float *src = out_samps + (ch % nchans) * BL;
-                    memcpy(out, src, BL * sizeof(float));
+                    block_copy(out, src);
                 }
             } else {  // don't "expand" input; instead, fill with zeros
                 for (int ch = nchans; ch < chans; ch++) {
                     float *out = out_samps + ch * BL;
-                    memset(out, 0, BL * sizeof(float));
+                    block_zero(out);
                 }
             }
         }

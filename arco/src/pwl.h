@@ -19,12 +19,14 @@ public:
     Vec<float> points;  // envelope breakpoints (seg_len, final_value)
 
     Pwl(int id) : Ugen(id, 'a', 1) {
-        current = 0.0f;   // real_run() will compute the first envelope
-        seg_togo = 0;     //     segment as soon as it is called because 
-                          //     seg_togo == 0
-        final_value = 0.0f;      // if no envelope is loaded, output will
-        next_point_index = 0;    //     become constant zero.
-        action_id = 0; }
+        current = 0.0f;        // real_run() will compute the first envelope
+        seg_togo = INT_MAX;    //     after start(); initial output is 0
+        seg_incr = 0.0;
+        final_value = 0.0f;    // if no envelope is loaded, output will
+        next_point_index = 0;  //     become constant zero.
+        action_id = 0;
+        points.init(0);        // initially empty, so size = 0
+    }
     
     ~Pwl() { if (action_id) send_action_id(action_id); }
 
@@ -43,7 +45,7 @@ public:
                 if (next_point_index >= points.size()) {
                     seg_togo = INT_MAX;
                     seg_incr = 0.0f;
-                    if (current == 0 && action_id) {
+                    if (action_id) {
                         send_action_id(action_id);
                     }
                 } else {
@@ -73,6 +75,10 @@ public:
         seg_incr = -current / seg_togo;
         next_point_index = points.size();  // end of envelope
         final_value = 0.0f;
+    }
+
+    void set(float y) {
+        current = y;
     }
     
 };

@@ -167,5 +167,12 @@ Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation);
 #define ANY_UGEN_FROM_ID(var, id, op) \
     Ugen *var = id_to_ugen(id, NULL, op); if (!var) return;
 
-#define imin(x, y) ((x) <= (y) ? (x) : (y))
+#define block_copy(dst, src) memcpy(dst, src, BLOCK_BYTES)
 
+// copy n channels of blocks:
+#define block_copy_n(dst, src, n) memcpy(dst, src, BLOCK_BYTES * (n))
+
+#define block_zero(dst) memset(dst, 0, BLOCK_BYTES)
+
+// zero n channels of blocks:
+#define block_zero_n(dst, n) memset(dst, 0, BLOCK_BYTES * (n))

@@ -138,6 +138,6 @@ class Feedback : public Ugen {
         // we get samples from "from" to be used as feedback to the next
         // call to real_run():
         from_samps = from->run(current_block);
-        memcpy(&feedback[0], from_samps, from->chans * BL);
+        block_copy_n(&feedback[0], from_samps, from->chans);
     }
 };

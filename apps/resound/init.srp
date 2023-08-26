@@ -32,34 +32,32 @@ def arco_ready():
         return
 
     # Setup latency slider
-    x_slider = 900
-    y_slider = 5
-    Statictext(default_win, "Latency", x_slider+80, y_slider, 150,
-               'H', 'text_latency')
-    Labeled_slider(default_win, "", x_slider, y_slider+25, 250,
-                   28, 0, 5, 100, 50, 'integer', 'latency_slider')
+    var COL1 = 10
+    var COL2 = 275
+    var COL3 = 575
+    Labeled_slider(default_win, "Latency", COL3, 5, 350, 28, 80,
+                   0, 200, 50, 'integer', 'latency_slider')
 
     # four_of_a_kind.srp initialization
-    Four_of_a_kind(default_win, 10, 10)
+    Four_of_a_kind(default_win, COL1, 10)
 
     # hall_of_mirrors.srp initialization
-    Hall_of_mirrors(default_win, 10, 180)
+    Hall_of_mirrors(default_win, COL1, 180)
 
     # o_for_a_thousand.srp initialization
-    O_for_a_thousand(default_win, 10, 390)
+    O_for_a_thousand(default_win, COL1, 390)
 
     # the_bell_tower.srp initialization
-    The_bell_tower(default_win, 275, 10)
+    The_bell_tower(default_win, COL2, 10)
 
     # side_band.srp initialization 
-    The_side_band(default_win, 575, 10)
+    The_side_band(default_win, COL3, 40)
 
     # ripples_in_time initialization
-    Ripples_in_time(default_win, 575, 100)
+    Ripples_in_time(default_win, COL3, 130)
 
     # someone_is_following_you.srp initialization
-    Someone_is_following_you(default_win, 575, 425)
-
+    Someone_is_following_you(default_win, COL3, 455)
 
     ui_initialized = true
     default_window.fit_to_children()

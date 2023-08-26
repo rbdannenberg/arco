@@ -126,7 +126,13 @@ block-rate, and "constant-rate" (class Const) signals.
 
 ## Unit Generators and Messages
 
+In each section, Serpent constructor and methods are listed in **`bold`**
+followed by `O2 message formats`.
+
 ### alpass
+
+**`alpass(inp, dur, fb, maxdur [, chans])`**
+
 `/arco/alpass/new id chans inp dur fb maxdur` - Create a new alpass unit
 generator with audio input and output. All channels have the same maximum duration (`maxdur`), but each channel can have a different delay (`dur`) and feedback
 (`fb`). `id` is the object id. This is based on `delay`, but uses an allpass filter
@@ -145,6 +151,8 @@ are frequency (in Hz) and decay time (T60, in seconds), set `dur` to 1 / *hz* an
 `/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
 
 ### delay
+**`delay(inp, dur, fb, maxdur [, chans])`**
+
 `/arco/delay/new id chans inp dur fb maxdur` - Create a new feedback delay
 generator with audio input and output. All channels have the same maximum duration (`maxdur`), but each channel can have a different delay (`dur`) and feedback
 (`fb`). `id` is the object id.
@@ -160,6 +168,9 @@ generator with audio input and output. All channels have the same maximum durati
 `/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
 
 ### feedback
+
+**`feedback(inp, from, gain [, chans])`**
+
 `/arco/feedback/new id chans inp from gain` - Create a cycle in the
 graph of unit generators. Output from the unit generator specified
 by `from` (an id for another ugen) will be scaled by `gain` and mixed
@@ -201,6 +212,11 @@ freeing the `feedback` ugen. (See "IMPORTANT" paragraph above.)
 (`chan`) to a the float value `gain`.
 
 ### fileplay
+
+**`fileplay(filename, [chans], [start], [end], [cycle], [mix], [expand])`**
+**`.go([playflag])`**
+**`.stop()`**
+
 Used to stream audio files from disk, fileplay uses a paired object
 running in another thread to prefetch audio data into buffers. If
 prefetching cannot keep up, output is filled with zeros until the
@@ -232,6 +248,11 @@ message to `/actl/act` with `action_id` (an integer greater than 0)
 when file playback completes (or reaches `end`).
 
 ##filerec
+
+**`filerec(filename, inp [, chans])`**
+**`.go(rec_flag)`**
+**`.stop()`**
+
 The filerec unit generator writes its input to a file.
 
 `/arco/filerec/new id chans filename inp` - Create an audiofile writer
@@ -249,6 +270,18 @@ unit generator.
 
 
 ##flsyn
+
+**`flsyn(path)`**
+**`.alloff(chan)`**
+**`.control_change(chan, num, val)`**
+**`.channel_pressure(chan, val)`**
+**`.key_pressure(chan, key, val)`**
+**`.noteoff(chan, key)`**
+**`.noteon(chan, key, vel)`**
+**`.pitch_bend(chan, bend)`**
+**`.pitch_sens(chan, val)`**
+**`.program_change(chan, program)`**
+
 Fluidsynth is a popular open-source sample-based synthesizer. `flsyn` is a
 unit generator that uses the Fluidsynth engine to produce samples. This is
 a MIDI synthesizer, so you control it by sending Arco messages that correspond
@@ -301,6 +334,14 @@ the full-scale pitch bend. (The total pitch bend range is from `-val` to
 using channel `chan` and program number `program` (both int32).
 
 ### granstream
+
+**`granstream(inp, polyphony, dur, enable [, chans])`**
+**`.set_polyphony(p)`**
+**`.set_ratio(low, high)`**
+**`.set_graindur(lowdur, highdur)`**
+**`.set_density(density)`**
+**`.set_env(attack, release)`**
+**`.set_enable(enable)`**
 
 `/arco/granstream/new id chans inp polyphony dur enable` - Create a new
 granular synthesis from input audio unit generator with the given `id`
@@ -358,6 +399,13 @@ is set to false.
 
 
 ### mix
+
+**`mix([chans])`**
+**`.ins(name, ugen, gain [, at_end])`** (name is a symbol)
+**`.rem(name)`**
+**`.find_name_of(ugen)`**
+**`.set_gain(name, gain [, chan])`**
+
 Mix accepts any number of inputs. Each input has a name and an associated gain,
 which must be b-rate or c-rate. You can change the gain at any time. To change
 the input signal, insert a new input and gain using the same name.
@@ -397,7 +445,10 @@ object with id `gain_id`.
 channel `chan` to the float value `gain`.
 
 
-### mult*
+### mult, multb
+
+**`mult(x1, x2 [, chans])`**
+
 `/arco/mult/new id chans x1 x2` - Create a new multiplier.
 
 `/arco/mult/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`.
@@ -408,8 +459,14 @@ channel `chan` to the float value `gain`.
 
 `/arco/mult/set_x2 id chan x2` - Set channel `chan` of input to float value `x2`.
 
+The `multb` messages begin with `/arco/multb` and output is b-rate.
+
 
 ### olapitchshift
+
+**`olapitchshift(inp, ratio, xfade, windur [, chans])`**
+**`.set_ratio(value)`**
+
 `/arco/olaps/new id chans inp ratio xfade windur` - Create a new
 overlap-add pitch shifter with id given by `id`, `chans` channels,
 and input with id `inp`, a pitch shift ratio of `ratio`, a cross-fade
@@ -430,6 +487,12 @@ with the same window timing and pitch shift amount.
 `/arco/granstream/repl_inp id inp` - Set the input to the ugen with id `inp`.
 
 ## probe
+
+**`probe(inp, reply_addr)`**
+**`.probe(period, frames, chan, nchans, stride)`**
+**`.thrsh(threshold, direction, max_wait)`**
+**`.stop()`**
+
 A `probe` is used to send samples from the audio server to an O2 service.
 In particular, the oscilloscope display uses `probe` to obtain samples to display.
 
@@ -491,6 +554,11 @@ The O2 messages consists of the probe id (int32) followed by float samples
 (up to 64 of them).
 
 ## pv
+
+**`pv(inp, ratio, fftsize, hopsize, points, mode [, chans])`**
+**`.set_ratio(value)`**
+**`.set_stretch(value)`**
+
 The `pv` unit generator uses a phase vocoder to implement time stretching
 and pitch shifting. Time stretching is a standard function of the phase
 vocoder. Pitch shifting is obtained by stretching the signal (which
@@ -533,20 +601,29 @@ ratio. Greater than 1 means raise the pitch.
 
 ### pwe, pweb
 
+**`pwe(d0, y0, d1, y1, ..., [init=0], [start=true])`**
+**`.set_points(d0, y0, d1, y1, ...)`**
+**`.start()`**
+**`.decay(dur)`**
+**`.set(y)`**
+
 These envelope generators generate approximately exponential curves between
 positive breakpoints. To avoid the problem of zero (exponential decays never
 actually reach zero), all breakpoint values are increased by 0.01. The
 exponential interpolation occurs between these biased breakpoints. Then,
-0.01 is subtracted to obtain the output, which can truly reach zero. For
-very small breakpoint values, the curves are close to linear.
+0.01 is subtracted to obtain the output. This allows envelopes to decay all
+the way to zero, but for very small breakpoint values, the curves are close
+to linear.
 
-`/arco/pwe/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
+`/arco/pwe/new id` - Create a new piece-wise linear generator with audio
+output. `id` is the object id. Envelope does not start until `start`
+or `decay` is sent.
 
 `/arco/pwe/env id d0 y0 d1 y1 ... dn-1 [yn-1]` - set the envelope or function shape for object with id. All remaining parameters are floats, alternating segment durations (in samples) and segment final values. The envelope starts at the current output value and ends at yn-1 (defaults to 0).
 
 `/arco/pwe/start id` - starts object with id.
 
-`/arco/pwe/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
+`/arco/pwe/decay id dur` - decay from the current value of object with id to zero in `dur` (int32) blocks.
 
 `/arco/pwe/set id y` - sets current output value to `y` (float). If the unit
 generator is in the middle of an envelope, this will create a discontinuity
@@ -559,6 +636,13 @@ except the address begins with `/arco/pweb/`.
 
 ### pwl, pwlb
 
+**`pwl(d0, y0, d1, y1, ..., [init=0], [start=true])`**
+**`.set_points(d0, y0, d1, y1, ...)`**
+**`.start()`**
+**`.decay(dur)`**
+**`.set(y)`**
+
+
 `/arco/pwl/new id` - Create a new piece-wise linear generator with audio output. `id` is the object id.
 
 `/arco/pwl/env id d0 y0 d1 y1 ... dn-1 [yn-1]` - set the envelope or function shape for object with id. All remaining parameters are floats, alternating segment durations (in samples) and segment final values. The envelope starts at the current output value and ends at yn-1 (defaults to 0).
@@ -567,10 +651,20 @@ except the address begins with `/arco/pweb/`.
 
 `/arco/pwl/decay id dur` - decay from the current value of object with id to zero in `dur` samples.
 
+`/arco/pwl/set id y` - sets current output value to `y` (float). If the unit
+generator is in the middle of an envelope, this will create a discontinuity
+and may result in strange output because the output may continue to increase
+or decrease from `y`.
+
 If the case of **pwlb**, output is b-rate, and all messages are the same
 except the address begins with `/arco/pwlb/`.
 
 ### recplay
+
+**`recplay(inp, [chans], [gain], [fade_time], [loop])`**
+**`.record(record_flag)`**
+**`.start(start_time)`**
+**`.stop()`**
 
 `recplay` is a unit generator that can record sound and play it back. It applies a smooth envelope when the playback starts and stops, and it can automatically loop the recorded sound.
 
@@ -622,6 +716,9 @@ only freed when no `recplay` has a reference.
 
 
 ### reson
+
+**`reson(inp, center, q [, chans])`**
+
 `/arco/reson/new id chans center bandwidth` - Create a new reson filte with `center` frequency and `bandwidth` control inputs, audio input and audio output.
 
 `/arco/reson/repl_center id center_id` - Set center frequency to object with id `center_id`.
@@ -635,7 +732,10 @@ only freed when no `recplay` has a reference.
 `chan` to float value `bandwidth_id`.
 
 
-### sine
+### sine, sineb
+
+**`sine(freq, amp [, chans])`**
+
 `/arco/sine/new id chans freq amp` - Create a new sine oscillator.
 
 `/arco/sine/repl_freq id freq_id' - Set frequency to object with id `freq_id`.
@@ -648,7 +748,14 @@ float value `freq`.
 `/arco/sine/set_amp id chan amp` - Set amplitude of channel `chan` to 
 float value `amp`.
 
+The `sineb` unit generator addresses begin with `/arco/sineb` and the output
+is b-rate.
+
 ### thru
+
+**`Thru(inp [, chans] [, id_num])`**
+**`.set_alternate(alt)`**
+
 Thru objects are used for audio input (the audio input is written
 directly into the thru object's outputs and `inp_id` is ignored) and to
 make the audio output available with a one-block delay (after computing the
@@ -671,6 +778,11 @@ mute the output of `INPUT_ID`, create a new `zero` object and pass it as
 
 
 ### vu
+
+**`vu(reply_addr, period)`**
+**`.start(replay_addr, period)`**
+**`.set('inp', ugen)`**
+
 `/arco/vu/new id reply_addr period` - Create a vu object, which measures the peak
 values of input channels over every `period` (float, in seconds) and sends the
 values as floats to `reply_addr` (string representing a complete O2 address).
@@ -684,6 +796,9 @@ processing will start or resume, sending a peak every period.
 of this vu object.
 
 
-### zero*
+### zero, zerob
+
+**`zero()`** (Note that this always returns the unique system zero ugen.)
+
 `/arco/zero/new id` - Create a signal consisting of all-zeros.
 

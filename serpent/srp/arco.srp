@@ -382,6 +382,10 @@ def arco_gain(x):
     o2_send_cmd("/arco/gain", 0, "f", x)
 
 
+def arco_heartbeat(x):
+    o2_send_cmd("/arco/hb", 0, "i", x)
+
+
 arco_poll_to_free_ugens_id = 0
 
 
