@@ -15,3 +15,9 @@ class Thru (Ugen):
 def thru(inp, optional chans = 1):
     Thru(inp, chans)
 
+
+def fanout(inp, chans)
+# When thru is used for fanout, the preferred constructor is "fanout",
+# which requires the number of channels you are expanding to. You should
+# only use this if inp is mono.
+    Thru(inp, chans)

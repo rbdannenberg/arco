@@ -7,44 +7,48 @@ class The_side_band:
     var mod_freq
     var sin1
     var mult1
-    var win, init_x, init_y
+    var fan1
+
 
     def init(window, x, y):
     # Initialization of instance variables
-        mod_freq = nil
-        sin1 = nil
-        mult1 = nil
-        
         win = window // Main UI window
-        init_x = x // set the starting x coord of the movement
-        init_y = y // set the starting y coord of the movement
 
         // Setup UI
-        this.set_ui()
-
+        this.set_ui(x, y)
         mod_freq = freq_slide.value()
 
-    def set_ui():
+
+    def set_ui(x, y):
     # Setting up Movement1's UI
-        Checkbox(win, "V. The Side Band", init_x+5, init_y+5, 
+        Checkbox(win, "V. The Side Band", x + 5, y + 5, 
                  300, 'H', 'mod_check') // checkbox doubling as title
         mod_check.add_target_method(this, 'mod_handler')
 
         // Sliders
-        Labeled_slider(win, "hz", init_x+5, 'D', 250,
-                                30, 25, 20, 1000, 
-                                392.0, 'linear', 'freq_slide')
+        Labeled_slider(win, "hz", 'S', 'D', 250,
+                       30, 25, 20, 1000, 
+                       392.0, 'linear', 'freq_slide')
         freq_slide.add_target_method(this, 'freq_handler')
+
 
     def mod_handler(obj, event, x, y)
         if x:
-            mult1 = mult(input_ugen, sine(mod_freq, 1, 2), 2)
-            mult1.play()
+            // signatures: mult(x, y, [chans]); sine(freq, amp, [chans])
+            // we want only the left channel (trumpet) input, so use 1 chan:
+            mult1 = mult(input_ugen, sine(mod_freq, 1))
+            // but we want the mono result to appear on both output chans,
+            // so use fanout:
+            fan1 = fanout(mult1, 2)
+            fan1.play()
         else:
-            mult1.mute()
-            mult1 = nil 
+            fan1.mute()
+            fan1 = nil 
+            mult1 = nil
+            sin1 = nil
+
 
     def freq_handler(obj, x)
         mod_freq = x
-        if mult1:
-            mult1.set('x2', sine(x, 1, 2))
+        if sin1:
+            sin1.set('freq', x)

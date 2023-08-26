@@ -751,12 +751,23 @@ float value `amp`.
 The `sineb` unit generator addresses begin with `/arco/sineb` and the output
 is b-rate.
 
-### thru
+### thru, fanout
 
 **`Thru(inp [, chans] [, id_num])`**
+**`thru(inp [, chans])`**
+**`fanout(inp, chans)`**
 **`.set_alternate(alt)`**
 
-Thru objects are used for audio input (the audio input is written
+The Thru unit generator passes input to output without modification or delay.
+One application is to expand 1 channel to n channels, taking advantage of
+Arco's standard channel-adapting feature where single channel inputs are
+copied to form the required number of channels. Since this is a built-in
+fanout policy, you do not normally need `fanout` unless you want to force
+the number of channels or route  mono signal to all output channels (audio
+output is an exception in that if you play n channels which is fewer than
+exist in the output, only the first n output channels will receive a signal.)
+
+Thru objects are also used for audio input (the audio input is written
 directly into the thru object's outputs and `inp_id` is ignored) and to
 make the audio output available with a one-block delay (after computing the
 output, it is written to the thru object's outputs and `inp_id` is ignored.)
@@ -770,11 +781,12 @@ except that 1-channel inputs are expanded to `chans`.
 `/arco/thru/alt id alt_id` - When a unit generator requests output from
 this thru object (`id`), it will be redirected to the output of `alt_id`.
 The object there must have a compatible number of channels (either equal,
-or `alt_id` is single channel.)
+or `alt_id` has a single channel.)
 To remove the alternate and resume taking input from the thru object's
 input, pass ZERO_ID as `alt_id`. To make the thru's output zero, e.g., to
 mute the output of `INPUT_ID`, create a new `zero` object and pass it as
-`alt_id`.
+`alt_id`. The `alt_id` capability allows audio input (a Thru object) to
+be redirected to obtain input from a file or test signal.
 
 
 ### vu
