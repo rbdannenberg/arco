@@ -500,6 +500,8 @@ In particular, the oscilloscope display uses `probe` to obtain samples to displa
 `id`, initially with input from `input_id` and send samples to `reply_address`.
 Note that `chans` is not specified, but see below about how channels are handled.
 
+`/arco/probe/repl_inp id input_id` - replace input.
+
 `/arco/probe/probe id period frames chan nchans stride repeats` - probes the input
 signal, sending samples to the `reply_address` given in the `new` message.
 When a `probe` message is received, any previous operation is terminated
