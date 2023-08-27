@@ -131,6 +131,21 @@ void arco_probe_new(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/probe/repl_inp int32 id, int32 inp_id;
+ */
+static void arco_probe_repl_inp(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t inp_id = argv[1]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Probe, probe, id, "arco_probe_repl_inp");
+    ANY_UGEN_FROM_ID(inp, inp_id, "arco_probe_repl_inp");
+    probe->repl_inp(inp);
+}
+
+
 /* O2SM INTERFACE: /arco/probe/probe
        int32 id,
        float period,
@@ -191,10 +206,16 @@ void arco_probe_stop(O2SM_HANDLER_ARGS)
 static void probe_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/probe/new", "iis", arco_probe_new, NULL, true, true);
-    o2sm_method_new("/arco/probe/probe", "ifiiii", arco_probe_probe, NULL, true, true);
-    o2sm_method_new("/arco/probe/thresh", "ifif", arco_probe_thresh, NULL, true, true);
-    o2sm_method_new("/arco/probe/stop", "i", arco_probe_stop, NULL, true, true);
+    o2sm_method_new("/arco/probe/new", "iis", arco_probe_new, NULL, true,
+                     true);
+    o2sm_method_new("/arco/probe/repl_inp", "ii", arco_probe_repl_inp, NULL,
+                     true, true);
+    o2sm_method_new("/arco/probe/probe", "ifiiii", arco_probe_probe, NULL,
+                     true, true);
+    o2sm_method_new("/arco/probe/thresh", "ifif", arco_probe_thresh, NULL,
+                     true, true);
+    o2sm_method_new("/arco/probe/stop", "i", arco_probe_stop, NULL, true,
+                     true);
     // END INTERFACE INITIALIZATION
 }
 

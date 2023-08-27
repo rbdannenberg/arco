@@ -27,6 +27,12 @@ def audiodev_init()
     audio_devices_menu.item("Monitor Audio",
                             "open a window to monitor and control audio", 
                             nil, nil, 'monitor_audio_handler')
+    audio_devices_menu.item("Print O2 Messages",
+                            "set o2_debug_flags to print O2 messages",
+                            true, nil, 'print_o2_msgs_handler')
+    audio_devices_menu.item("Print Block Counts",
+                            "enable printing periodic block counts",
+                            true, nil, 'print_counts_handler')
     configure_audio = nil  // must be initialized to know window is not open
     monitor_audio = nil    // same for this window
     o2_method_new("/actl/inpks", nil, 'actl_inpks', false)
@@ -48,9 +54,9 @@ def actl_probe(timestamp, address, types, rest data):
         master_scope.probe_handler(data)
 
 
+def auto_open_audio():
 # this is called when the application starts. If devices are selected, we can
 # open them. Otherwise, we open the Audio Configuration window for the user.
-def auto_open_audio():
     var ca = configure_audio
     if not ca
         configure_audio_handler()
@@ -61,18 +67,30 @@ def auto_open_audio():
         configure_audio = nil
 
 
-# open window to select audio devices
 def configure_audio_handler(rest ignore):
+# open window to select audio devices
     if not configure_audio:
         configure_audio = Configure_audio()
         poll_for_status_id = poll_for_status_id + 1
         poll_for_status(poll_for_status_id)
 
 
-# open window to select audio devices
 def monitor_audio_handler(rest ignore):
+# open window to select audio devices
     if not monitor_audio:
         monitor_audio = Monitor_audio()
+
+
+def print_o2_msgs_handler(obj, event, x, y):
+# set o2 debug flags to print messages
+    display "print_o2_msgs_handler", x, y
+    o2_debug_flags("Ss" if y == 1 else "")
+
+
+def print_counts_handler(obj, event, x, y):
+# enable Arco to print count every 1000 sample blocks
+    display "print_counts_handler", x, y
+    arco_heartbeat(y)  // takes 1 or 0 for yes or no
 
 
 def find_channels(item, dir):
@@ -304,8 +322,14 @@ class Monitor_audio:
     var test_tone_osc
     var input_logger
     var output_logger
+    var scope_x  // coordinates for scope
+    var scope_y
+    var scope_h
 
     def init():
+        scope_x = 425
+        scope_y = 5
+        scope_h = 200 
         var left = 5
         Window("Monitor Audio", 520, 400, 300, 30, 'mon_win')
         mon_win.set_color(MONITOR_COLOR) // rgb(200, 200, 230)
@@ -386,31 +410,47 @@ class Monitor_audio:
             output_vu.run()  // add to run_set to make it compute peaks
 
         ## probe and scope to monitor input
-        var probe_what = input_ugen
-        if arco_input_chans == 0:
+        var probe_what, probe_name
+        if arco_input_chans > 0:
+            probe_what = input_ugen
+            probe_name = "Input"
+        else:
             probe_what = prev_output_ugen
             print "** Note: no input, Oscilloscope shows nothing **"
+            probe_name = "Output"
         master_probe = probe(probe_what, "/actl/probe")
+        display "audiodev.srp making probe on", probe_what, master_probe
 
-        var ms_x = 425
-        var ms_y = 5
-        var ms_h = 200 
-        master_scope = Arco_scope(mon_win, "scope", ms_x, ms_y, 212, ms_h, 
-                                  master_probe)
+        master_scope = Arco_scope(mon_win, "scope", scope_x, scope_y,
+                                  212, scope_h, master_probe)
         master_scope.start()
 
-        Checkbox(mon_win, "Enable Scope", ms_x, ms_y + ms_h + 5, 120, 15,
-                 'enable_scope_bn')
+        Checkbox(mon_win, "Enable Scope", scope_x, scope_y + scope_h + 5,
+                 120, 15, 'enable_scope_bn')
         enable_scope_bn.set_value(t) // initially enabled
         enable_scope_bn.add_target_method(this, 'enable_scope')
 
-        Statictext(mon_win, "Chan", ms_x + 120, ms_y + ms_h + 5, 40, 20,
-                   'scope_channel_lb')
-        Spinctrl(mon_win, 0, arco_output_chans - 1, 0,
-                 ms_x + 155, ms_y + ms_h, 40, 30, 'scope_channel_sp')
+        Choice(mon_win, 'S', 'D', 'S', 'S', 'scope_input_choice')
+        scope_input_choice.append("Input")
+        scope_input_choice.append("Output")
+        scope_input_choice.set_value(probe_name)  // set earlier
+        scope_input_choice.add_target_method(this, 'scope_input_handler')
+
+        Statictext(mon_win, "Chan", scope_x + 120, scope_y + scope_h + 5,
+                   40, 20, 'scope_channel_lb')
+        scope_channel_sp = nil  // spin control is not initialized
+        make_channel_selector(probe_what.chans)
         scope_channel_sp.set_size(40, 30) // reset size to work around bug
         scope_channel_sp.add_target_method(this, 'scope_channel_select')
         mon_win.fit_to_children()  // make window big enough
+
+
+    def make_channel_selector(chans):
+    # create or replace channel selector for scope input
+        if scope_channel_sp:
+            scope_channel_sp.delete()
+        Spinctrl(mon_win, 0, chans - 1, 0, scope_x + 155, scope_y + scope_h,
+                 40, 30, 'scope_channel_sp')
 
 
     def delete():
@@ -513,6 +553,27 @@ class Monitor_audio:
                 input_ugen.set_alternate(fileinput)
 
 
+    def scope_input_handler(obj, event, x, y):
+        display "scope_input_handler", x
+        var probe_what
+        if arco_input_chans > 0 and x == "Input":
+            probe_what = input_ugen
+        else:
+            probe_what = prev_output_ugen
+            if x == "Input":
+                print "There is no audio input, showing Output"
+                scope_input_choice.set_value("Output")
+        make_channel_selector(probe_what.chans)
+        // new channel selector now selects channel 0, so tell oscilloscope:
+        scope_channel_select(scope_channel_sp,  WXS_SPINCTRL_UPDATED, 0, nil)
+        master_probe.set('inp', probe_what)
+
+
+    def scope_channel_select(obj, event, x, y):
+        display "scope_channel_select", x
+        master_scope.probe_channel = x
+
+
     def mute_audio(rest ignore):
     # handler for mute button: something changed, so do an update
         set_audiomaster_gain(nil, audiomaster_gain)
@@ -526,274 +587,3 @@ class Monitor_audio:
         prefs.set('master_gain', g)
         print "Saving audiomaster_gain as", g
         prefs.save()
-
-
-#// this class receives level and peak messages
-#class Audio_monitor:
-#    var clip_obj
-#    var vu_obj
-#    var name  // used for debugging
-#    
-#
-#
-#    def init2(clip, vu, optional name_):
-#        clip_obj = clip
-#        vu_obj = vu
-#        name = name_
-#
-#    def set_clip()
-#        clip_obj.clip()
-#
-#    def set_peaks(vector)
-#        var ch = 0
-#        for x in vector
-#            vu_obj.update(ch, x)
-#            ch = ch + 1
-#        vu_obj.tick()
-#
-#
-#def audioin_mute():
-#    audioin_listbox.set_value("Mute Input")
-#
-#
-#def audioin_select(obj, event, x, y)
-#    display "audioin_select", x, audioin_aura.to_string()
-#    var inp
-#    if x == "Mute Input":
-#        inp = aura_null
-#    elif x == "Audio Input":
-#        inp = audioeng_aura
-#    else:
-#        if not fileinput_player:
-#            fileinput_player = istream_player_create("", 2, 0.0, 0.0, false,
-#                                                      audio_space_zone)
-#            fileinput_player <- set_blocksize(16000)
-#        fileinput_player <- set_enabled(t)
-#        fileinput_player <- set_source(x, 0.0, 0.0, false)
-#        inp = fileinput_player
-#        fileinput_player_active = true
-#    if fileinput_player_active and not (inp == fileinput_player):
-#        audioeng_aura <- remove(fileinput_player)
-#        fileinput_player_active = false
-#    elif not fileinput_player_active and (inp == fileinput_player):
-#        audioeng_aura <- insert(fileinput_player)
-#    display "audioin_select", current_audioin.to_string(), inp.to_string()
-#    if not current_audioin.equals(inp):
-#        if not current_audioin.equals(aura_null):
-#            audioin_aura <- remove_chan(current_audioin, -1)
-#        if not inp.equals(aura_null):
-#            audioin_aura <- insert_chan(inp, -1, 1)
-#        current_audioin = inp
-#        display "audioin_select", inp.to_string()
-#
-#
-#def print_tree(obj, event, x, y)
-#    print "print_tree"
-#    audioeng_aura <- print_tree()
-#
-#
-#monitor_state = false
-#def monitor_input(obj, event, x, y)
-#    display "monitor_input", monitor_state, x
-#    assert(monitor_state != x)
-#    if x:
-#        audioeng_aura <- play(audioin_aura)
-#    else:
-#        audioeng_aura <- mute(audioin_aura)
-#    monitor_state = x
-#
-#
-#// enable/disable audio, showing state on the "Enable" button
-#def aura_audio_enable(flag)
-#    enable_audio_button.set_value(flag)
-#
-#aura_audio_enabled = false
-#
-#// callback for enable button
-#def enable_audio(obj, event, x, y):
-#    if x != aura_audio_enabled:
-#        aura_audio_enabled = x
-#        aura_audio_open() if x else aura_audio_close()
-#        
-#def enable_scope(obj, event, x, y):
-#    display "enable_scope", x
-#    master_scope.start() if x else master_scope.stop()
-#
-#def scope_channel_select(obj, event, x, y)
-#    display "scope_channel_select", event, x, y
-#    aura_send_to(master_probe, "set_in_audio", ["ail", audioeng_aura, x, t])
-#
-#def test_tone(obj, event, x, y)
-#    display "test_tone", event, x
-#    if not test_tone_osc:
-#        // initial master gain is -12, so we expect amplitude will be -42dB
-#        test_tone_osc = Mult(Osc(880.0, name = "test-tone"), db_to_linear(-30.0),
-#                             name = "test-tone-gain")
-#        test_tone_osc.make_permanent()
-#    if x
-#        // first, make sure audio is enabled
-#        aura_audio_enable(true)
-#        // make sure solo_input is disabled
-#        display "test_tone: play", test_tone_osc.to_string()
-#        test_tone_osc.play()
-#    else
-#        test_tone_osc.mute()
-#
-#def audio_log(obj, event, x, y)
-#    display "audio_log", event
-#    audioeng_aura <- set_log_output(x)
-#
-#def audio_login(obj, event, x, y)
-#    display "audio_login", event
-#    audioeng_aura <- set_log_input(x)
-#
-#
-#// clipping light
-#class Clip_light:
-#    var light
-#    var off_time
-#    var x, y
-#
-#    def init2(window, the_x, the_y):
-#        x = the_x
-#        y = the_y
-#        light = Eventlight(window, 10, x, y)
-#        light.on_color = "RED" // make it look more like overload warning
-#
-#    def clip():
-#        if not light:
-#            print "error in Clip_light -- light is nil, x", x, "y", y
-#            return
-#        light.set(true)
-#        off_time = aura_get_logical_time() + 0.1
-#        cause(0.11, 'turn_off')
-#
-#    def turn_off():
-#        if aura_get_logical_time() > off_time:
-#            light.set(false)
-#
-#
-#//class Outclip_light (Clip_light):
-#//    def outclip():
-#//        clip()
-#//    def clip():
-#//        t // ignore clip messages -- we want to listen to outclip only
-#
-#audiomaster_gain = prefs.get('master_gain', -12.0)
-#display "audiomaster_gain", audiomaster_gain
-#
-#def audiomaster_create(w, x, y)
-#    display "audiomaster_create called", w, x, y
-#    init_ugen() // make sure we have ugen library initialized
-#    // audio gain slider
-#    if aura_get_audio_output_channels() > 0:
-#        master_slider = Aura_slider(w, "Master", x, y,
-#                                    -100.0, 24.0, audiomaster_gain,
-#                                    'db', audioeng_aura, "set_gain",
-#                                    slider_width = 240)
-#        master_slider.method = 'set_audiomaster_gain'
-#        // set audio gain to match initial slider value
-#        audioeng_aura <- set_gain(audiomaster_gain)
-#        // aura_send_to(audioeng_aura, "set_gain", ["d", -12.0])
-#        Statictext(w, "Out", x + 95, y + 23, 40, 20)
-#        //display "creating Clip_light", w, x, y
-#        //print "created Clip_light"
-#        outclip_light = Clip_light(w, x + 122, y + 28)
-#        output_vu = Vumeter(w, aura_get_audio_output_channels(), x + 125, y + 39)
-#        //print "created vumeter"
-#        audioout_monitor = Audio_monitor(outclip_light, output_vu, "output")
-#        //print "created Audio_monitors"
-#        display "audiomaster_create: creating audio_out", audio_space_zone
-#        // now unique and created by aura4audio.srp:
-#        //     audioout_aura = audio_out_create(audio_space_zone)
-#        ivu_out_aura = ivu_create(audioout_aura, audio_space_zone)
-#        aura_connect_from(audioout_monitor.aura, ivu_out_aura)
-#        // audio_monitor.aura <- set_debuglevel(100)
-#
-#
-#    if aura_get_audio_input_channels() > 0:
-#        Statictext(w, "In", x, y + 23, 40, 20)
-#        inclip_light = Clip_light(w, x + 15, y + 28)
-#        input_vu = Vumeter(w, aura_get_audio_input_channels(), x + 5, y + 39)
-#        audioin_monitor = Audio_monitor(inclip_light, input_vu, "input")
-#        ivu_in_aura = ivu_create(audioin_aura, audio_space_zone)
-#        aura_connect_from(audioin_monitor.aura, ivu_in_aura)
-#        // audio input selection -- audio in or file reader
-#        audioin_listbox = Listbox(w, x + 7, y + 106, 100, 50, nil)
-#        audioin_listbox.append("Audio Input")
-#        audioin_listbox.append("Mute Input")
-#
-#        for file in fileinput_files:
-#            // only add files that actually exist:
-#            rslt = open(file, "rb")
-#            if rslt:
-#                audioin_listbox.append(file)
-#                rslt.close()
-#        rslt = nil // just to be tidy
-#        audioin_listbox.method = 'audioin_select'
-#        // initially, audio_in is copied from "real" input:
-#        current_audioin = audioeng_aura
-#        // current_audioin is variable, depending on input you select, and
-#        // it could be AURA_NULL if you select "Mute", so use audioin_aura
-#        // if you want an audio source that reflects the current selection
-#
-#        // login button
-#        audio_login_button = Checkbox(w, "LogIn", x + 110, y + 130, 75, 15)
-#        audio_login_button.method = 'audio_login'
-#
-#        // monitor input button
-#        monitor_input_button = Checkbox(w, "Mon", x + 30, y + 20, 60, 15)
-#        monitor_input_button.method = 'monitor_input'
-#
-#    // print_tree button
-#    print_tree_button = Button(w, "Print Tree", x + 110, y + 106, 75, 20)
-#    print_tree_button.method = 'print_tree'
-#
-#    // enable audio button;
-#    enable_audio_button = Checkbox(w, "Enbl", x + 135, y + 20, 48, 15)
-#    enable_audio_button.set_value(t) // initially enabled
-#    enable_audio_button.method = 'enable_audio'
-#
-#    // test tone button:
-#    test_tone_button = Checkbox(w, "Tone", x + 185, y + 20, 55, 15)
-#    test_tone_button.method = 'test_tone'
-#    test_tone_osc = nil
-#
-#    // log button
-#    audio_log_button = Checkbox(w, "Log", x + 245, y + 20, 50, 15)
-#    audio_log_button.method = 'audio_log'
-#
-#    // probe and scope to monitor input
-#    display "creating Iprobe", hex(audio_space_zone)
-#    master_probe = aura_create_inst("Iprobe", audio_space_zone)
-#    var probe_what = audioin_aura
-#    if aura_get_audio_input_channels() == 0:
-#        probe_what = audioeng_aura
-#        print "** Note: no input, Oscilloscope shows nothing **"
-#    aura_send_to(master_probe, "init2", ["al", probe_what, t])
-#
-#    var ms_x = 245
-#    var ms_y = 5
-#    var ms_h = 200 
-#    master_scope = Aura_scope(w, "scope", ms_x, ms_y, 212, ms_h, master_probe)
-#    master_sco.start()
-#
-#    enable_scope_button = Checkbox(w, "Enbl", ms_x + 55, ms_y + ms_h + 5, 
-#                                   48, 15)
-#    enable_scope_button.set_value(t) // initially enabled
-#    enable_scope_button.method = 'enable_scope'
-#
-#    scope_channel_label = Statictext(w, "Chan", ms_x + 120, ms_y + ms_h + 5, 
-#                                     40, 20)
-#    scope_channel_spin = Spinctrl(w, 0, aura_get_audio_output_channels() - 1, 0, 
-#                                    ms_x + 155, ms_y + ms_h, 40, 30)
-#    scope_channel_spin.set_size(40, 30) // reset size to work around bug
-#    scope_channel_spin.method = 'scope_channel_select'
-#
-#    //audioeng_aura <- set_debuglevel(11)
-#
-#    #### debugging only -- pass input direct to output
-##    audioeng_aura <- play(audioin_aura)
-##    print "TEST:     audioin_aura <- remove_chan(audioeng_aura, -1)"
-##    audioin_aura <- remove_chan(audioeng_aura, -1)
-

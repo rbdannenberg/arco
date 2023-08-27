@@ -61,11 +61,7 @@ def arco_ready():
     display "arco_ready", wxs_h, wxs_space,
     display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
 
-    Checkbox(win, "Show block counts", 5, 5, 170, 20, 'bccheckbox')
-    bccheckbox.set_value(true)
-    bccheckbox.add_target_method(nil, 'show_block_counts')
-
-    Checkbox(win, "Simple test", 'S', 'D', 'S', 'S', 'stcheckbox')
+    Checkbox(win, "Simple test", 5, 5, 170, 20, 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
 
     Checkbox(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtcheckbox')
@@ -161,13 +157,6 @@ def host_openaggr_init()
     o2_service_new("host")
     o2_method_new("/host/openaggr", "s", 'host_openaggr', t)
 
-
-######### Show Block Counts ############
-
-// handler for bccheckbox: disable/enable printing of block counts
-def show_block_counts(obj, event, x, y):
-    display "show_block_counts", x
-    arco_heartbeat(1 if x else 0)
 
 
 ######### Synthesis Tests ##############

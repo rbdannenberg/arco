@@ -17,7 +17,7 @@ class Probe (Ugen):
                    'inp', inp, 'reply_addr', reply_addr)
 
     def probe(period, frames, chan, nchans, stride):
-        o2_send_cmd("/arco/probe/probe", 0, "Ufiiiii", id, period,
+        o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
                     frames, chan, nchans, stride)
         run(true) // suppress warning if we're already in run setx
     

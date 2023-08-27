@@ -453,6 +453,8 @@ def poll_for_arco():
         sched_cause(1.0, nil, 'poll_for_arco')
     else:
         print "**** discovered arco service. initialization starting ****"
+        arco_heartbeat(0)  // initially, block count printing is off
+        print "*** SENT arco_heartbeat(0) from poll_for_arco ***"
         reset_arco()
 
 

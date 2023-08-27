@@ -1,3 +1,8 @@
+# arcoscope.srp -- oscilloscope for Monitor window
+#
+# Roger B. Dannenberg
+# Aug 2023
+
 require "scope"
 
 // color scheme form colorhunt.co/palettes/pastel
@@ -17,6 +22,7 @@ class Arco_scope:
     var blocksize
     var points_per_sweep
     var probe
+    var probe_channel  // which channel of input to display
     var sample_rate
     var threshold
     var direction
@@ -39,6 +45,7 @@ class Arco_scope:
         threshold = 0.0
         direction = 0
         probe = probe_
+        probe_channel = 0  // default is show first channel
         scope = Scope(window, label, x, y, w, h, sample_rate,
                       panel_color = PANEL_COLOR, screen_color = SCREEN_COLOR,
                       screen_grid = GRID_COLOR)
@@ -95,9 +102,10 @@ class Arco_scope:
             var delay = 0.05 - sweep_time
             if delay > 0:
                 sched_select(rtsched)
-                sched_cause(delay, probe, 'probe', -1, points_per_sweep, 0, 1, skip)
+                sched_cause(delay, probe, 'probe', -1, points_per_sweep,
+                            probe_channel, 1, skip)
             else:
-                probe.probe(-1, points_per_sweep, 0, 1, skip)
+                probe.probe(-1, points_per_sweep, probe_channel, 1, skip)
 
 
     def zoom_in_x():
