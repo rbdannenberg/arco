@@ -9,5 +9,6 @@ class Yin(Ugen):
                    'minstep', minstep, 'maxstep', maxstep, 'hopsize', hopsize,
                    'address', address)
 
+
 def yin(inp, minstep, maxstep, hopsize, address, optional chans = 1):
     Yin(chans, inp, minstep, maxstep, hopsize, address)  # yin as a function

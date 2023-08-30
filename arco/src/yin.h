@@ -48,6 +48,7 @@ class Yin : public Windowed_input {
     struct Yin_state {
         float harmonicity;
         float pitch;
+        float rms;
     };
     Vec<Yin_state> yin_states;
     bool new_estimates; // set to true when yin runs
@@ -58,7 +59,7 @@ class Yin : public Windowed_input {
     float *results;  // temporary storage for yin
     
     Yin(int id, int chans, Ugen_ptr inp, int minstep, int maxstep,
-                int hopsize, const char *address_) : Windowed_input(id, chans, inp) {
+        int hopsize, const char *address_) : Windowed_input(id, chans, inp) {
         yin_states.init(chans);
         middle = std::ceil(AR / step_to_hz(minstep));
         int window_size = middle * 2;
@@ -100,7 +101,7 @@ class Yin : public Windowed_input {
         float cum_sum = 0;
         float period;
         int min_i;
-        float threshold = 0.1F;
+        const float threshold = 0.1F;
         
         // for each window, we keep the energy so we can compute the next one 
         // incrementally. First, we need to compute the energies for lag m-1:
@@ -166,6 +167,9 @@ class Yin : public Windowed_input {
             yin_states[channel].harmonicity = results[min_i - m];
         }
         yin_states[channel].pitch = (float) hz_to_step((float) (AR / period));
+        // rms = sqrt(sum_of_squares / n)
+        yin_states[channel].rms = sqrt((right_energy + left_energy) /
+                                       (2 * middle));
         new_estimates = true;
     }
 
@@ -176,8 +180,10 @@ class Yin : public Windowed_input {
             // message format is pitch0, harmo0, pitch1, harmo1, ...
             o2sm_send_start();
             for (int channel = 0; channel < chans; channel++) {
-                o2sm_add_float(yin_states[channel].pitch);
-                o2sm_add_float(yin_states[channel].harmonicity);
+                Yin_state *ys = &yin_states[channel];
+                o2sm_add_float(ys->pitch); 
+                o2sm_add_float(ys->harmonicity);
+                o2sm_add_float(ys->rms);
             }
             o2sm_send_finish(0, address, false);
             new_estimates = false;

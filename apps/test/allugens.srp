@@ -13,7 +13,7 @@ class Vu (Ugen):
                    'reply_addr', reply_addr, 'period', period)
 
     def start(reply_addr, period):
-        o2_send_cmd("/arco/vu/start", 0, "sf", reply_addr, period)
+        o2_send_cmd("/arco/vu/start", 0, "Usf", id, reply_addr, period)
 
     def set(input, value):  // patterned after Ugen.set()
         // Note that the only thing you can set is 'inp'
@@ -39,7 +39,7 @@ class Probe (Ugen):
                    'inp', inp, 'reply_addr', reply_addr)
 
     def probe(period, frames, chan, nchans, stride):
-        o2_send_cmd("/arco/probe/probe", 0, "Ufiiiii", id, period,
+        o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
                     frames, chan, nchans, stride)
         run(true) // suppress warning if we're already in run setx
     
@@ -685,6 +685,7 @@ class Yin(Ugen):
                    'minstep', minstep, 'maxstep', maxstep, 'hopsize', hopsize,
                    'address', address)
 
+
 def yin(inp, minstep, maxstep, hopsize, address, optional chans = 1):
     Yin(chans, inp, minstep, maxstep, hopsize, address)  # yin as a function
 # thru.srp -- audio pass-through
@@ -704,7 +705,12 @@ class Thru (Ugen):
 def thru(inp, optional chans = 1):
     Thru(inp, chans)
 
-# zero.srp -- audio zero
+
+def fanout(inp, chans)
+# When thru is used for fanout, the preferred constructor is "fanout",
+# which requires the number of channels you are expanding to. You should
+# only use this if inp is mono.
+    Thru(inp, chans)# zero.srp -- audio zero
 #
 # Roger B. Dannenberg
 # May 2023

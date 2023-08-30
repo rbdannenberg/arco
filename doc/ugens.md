@@ -810,6 +810,37 @@ processing will start or resume, sending a peak every period.
 of this vu object.
 
 
+## yin
+
+`yin(inp, minstep, maxstep, hopsize, address, [chans]))`
+`.thresh(x)`
+`.set('inp', ugen)`
+
+The `yin` unit generator implements the YIN algorithm for pitch estimation.
+
+`/arco/yin/new id chans inp_id minstep maxstep hopsize address` -
+Creates a YIN pitch estimating unit generator that processes `chans`
+channels of input audio. The algorithm searches for a fundamental
+frequency between `minstep` and `maxstep` (both integers expressed as
+MIDI key numbers), performing an analysis every `hopsize` samples.
+The best candidate, its "harmonicity," and RMS are sent (as floats) to
+`address`, an O2 address. If there are multiple channels, a single
+message is sent with triples of results: frequency, harmonicity, rms
+for channel 0, then frequency, harmonicity, rms for channel 1, etc.
+Fundamental frequency is reported in units corresponding to MIDI
+key numbers, but floats are used to give a continuous scale.
+Harmonicity might be better labeled "aperiodicity" because it measures
+a relative difference between two successive periods. The number
+varies from 0 to 1, and small numbers indicate confidence in the pitch
+estimate. RMS is the root-mean-square of the signal measured over two
+periods of `minstep` (this is a longer window than two periods at the
+reported frequency.)
+
+`/arco/yin/repl_inp id inp_id` - Set the input to be analyzed to `inp_id`.
+If `inp_id` names a unit generator of class Zero, analysis is stopped;
+otherwise, processing will start or resume.
+
+
 ### zero, zerob
 
 **`zero()`** (Note that this always returns the unique system zero ugen.)
