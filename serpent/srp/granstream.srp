@@ -9,6 +9,9 @@ class Granstream (Ugen):
 	           'input', input, 'polyphony', polyphony, 'dur', dur,
                    'enable', enable)
 
+    def set_gain(gain)
+        o2_send_cmd("/arco/granstream/gain", 0, "Uf", id, gain)
+
     def set_polyphony(p):
         o2_send_cmd("/arco/granstream/polyphony", 0, "Uf", id, p)
 
@@ -27,6 +30,9 @@ class Granstream (Ugen):
     def set_enable(enable)
         o2_send_cmd("/arco/granstream/enable", 0, "UB", id, enable)
         
+    def set_dur(dur)
+        o2_send_cmd("/arco/granstream/dur", 0, "Uf", id, dur)
+
 
 
 def granstream(input, polyphony, dur, enable, optional chans = 1):

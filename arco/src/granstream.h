@@ -40,6 +40,7 @@ public:
     float phase;  // buffer offset relative to now (negative)
     float env_val;  // current envelope value
     float env_inc;  // increment to next envelope value
+    float gain;     // gain applied to the current grain
 
     void reset() {
         state = GS_FALL;
@@ -127,6 +128,7 @@ public:
     float density;  // average number of active grains/input channel
     float attack;   // the grain attack time in seconds
     float release;  // the grain release time in seconds
+    float gain;     // gain applied to the next grain
     int bufferlen;  // buffer length in samples (based on dur)
     int warning_block;  // used to limit rate of warning messages
     bool stop_request;  // waiting for last grain to finish before setting
@@ -149,6 +151,7 @@ public:
         highdur = 0.1;
         lowdur = 0.1;
         density = polyphony * 0.5;
+        gain = 1.0;
         warning_block = 0;
         stop_request = false;
 
@@ -196,6 +199,9 @@ public:
         reset_gens();
     }
 
+    void set_gain(float g) {
+        gain = g;
+    }
     
     void set_dur(float d) {
         dur = d;

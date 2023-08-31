@@ -153,9 +153,9 @@ public:
             lender_ptr->unref();
             return;  // don't free buffers, they belong to lender
         }
-        for (int i = 0; i < chans; i++) {
-            Vec<Sample_ptr> &buffers = states[i].my_buffers;
-            for (i = 0; i < buffers.size(); i++) {
+        for (int chan = 0; chan < chans; chan++) {
+            Vec<Sample_ptr> &buffers = states[chan].my_buffers;
+            for (int i = 0; i < buffers.size(); i++) {
                 O2_FREE(buffers[i]);
             }
             buffers.finish();

@@ -336,6 +336,8 @@ using channel `chan` and program number `program` (both int32).
 ### granstream
 
 **`granstream(inp, polyphony, dur, enable [, chans])`**
+**`.set_gain(gain)`**
+**`.set_dur(dur)`**
 **`.set_polyphony(p)`**
 **`.set_ratio(low, high)`**
 **`.set_graindur(lowdur, highdur)`**
@@ -367,6 +369,11 @@ so there is no synchronization among them or between channels.
 grains are taken to `dur` (float) in seconds. Current buffer samples are
 retained, and if `dur` increases, then the unknown samples (older than the
 original value of `dur`) are set to zero.
+
+`/arco/granstream/gain id gain` - Set the gain, a scale factor applied to
+each grain. If gain is set less than or equal to zero, `enable` it is
+equivalent to setting enable to false. The `granstream` must be both
+enabled and have a gain greater than zero to produce any grains.
 
 `/arco/granstream/polyphony id polyphony` - Set the number of grain generators
 per channel to `polyphony` (integer).

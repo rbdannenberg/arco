@@ -51,7 +51,7 @@ bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps) {
         tail = 0;
     }
     bool active = false;
-    if (gs->enable) {
+    if (gs->enable && gs->gain > 0) {
         for (int i = 0; i < gs->polyphony; i++) {
             active |= gens[i].run(gs, this, out_samps, i);
         }
@@ -69,7 +69,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             printf("end grain, env_val %g env_inc %g\n", env_val, env_inc);
             env_val = 0;
             env_inc = 0;
-            if (!gs->enable) {
+            if (!gs->enable || gs->gain == 0) {
                 return false;  // do not start another grain; we're done
             }
             dur_blocks = (int) (unifrand_range(gs->lowdur, gs->highdur) *
@@ -96,7 +96,8 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             // avgdur does not contain half of attack and decay times, the
             // minimum ioi is:
             float minioi = avgdur + effective_attack_release;
-            // the average ioi is based on density, polyphony, and input channels:
+            // the average ioi is based on density, polyphony, and
+            // input channels:
             float avgioi = avgdur * gs->polyphony * gs->chans / gs->density;
             // we want to add a random time delay to minioi to achieve avgioi:
             float maxioi = avgioi + (avgioi - minioi);
@@ -116,8 +117,8 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             }  // otherwise, we skip the delay and immediately start ramping up:
           }
           case GS_PREDELAY: {  // predelay is finished, start grain computation
-            if (!gs->enable) {
-                return true;
+            if (!gs->enable || gs->gain == 0) {
+                return false;
             }
             // phase (here) is where we start in buffer relative to now
             phase = -gs->dur * AR * unifrand();
@@ -144,7 +145,9 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 phase < 0 && final_phase < 0) {
                 // start the note
                 env_val = 0;
-                env_inc = 1.0 / (attack_blocks * BL);
+                gain = gs->gain;  // copy gain from unit generator. Gain
+                // for this grain will not be updated.
+                env_inc = gain / (attack_blocks * BL);
                 // note: phase is negative; map phase to buffer offset
                 // in case ratio is 1, avoid interpolation
                 printf("start grain at phase %gs to %gs (%d blocks)\n",
@@ -179,7 +182,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             } // otherwise begin fall immediately
           case GS_HOLD:  // hold has finished, start fall
             delay = release_blocks;
-            env_inc = -1.0 / (release_blocks * BL);
+            env_inc = -gain / (release_blocks * BL);
             state = GS_FALL;
             printf("state GS_FALL delay %d\n", delay);
             break;
@@ -252,6 +255,20 @@ static void arco_granstream_repl_inp(O2SM_HANDLER_ARGS)
     UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_repl_inp");
     ANY_UGEN_FROM_ID(inp, inp_id, "arco_granstream_repl_inp");
     granstream->repl_inp(inp);
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/gain int32 id, float gain;
+ */
+void arco_granstream_gain(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float gain = argv[1]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_gain");
+    granstream->set_gain(gain);
 }
 
 
@@ -367,6 +384,8 @@ static void granstream_init()
                      NULL, true, true);
     o2sm_method_new("/arco/granstream/repl_inp", "ii",
                      arco_granstream_repl_inp, NULL, true, true);
+    o2sm_method_new("/arco/granstream/gain", "if", arco_granstream_gain, NULL,
+                     true, true);
     o2sm_method_new("/arco/granstream/dur", "if", arco_granstream_dur, NULL,
                      true, true);
     o2sm_method_new("/arco/granstream/polyphony", "ii",
