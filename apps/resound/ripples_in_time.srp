@@ -21,12 +21,14 @@ class Ripples_in_time:
 
         this.set_ui()
     
+
     def set_ui():
         Radiobox(win, "VI. Ripples in Time", 
-        ["off", "1", "2", "3", "4", "5", "6", "7", "8"],
-        init_x, init_y, 175, 300, 'ripp_radio')
+                 ["off", "1", "2", "3", "4", "5", "6", "7", "8"],
+                 init_x, init_y, 175, 300, 'ripp_radio')
         ripp_radio.add_target_method(this, 'ripple_handler')
     
+
     def ripple_handler(obj, event, x, y):
         if x == 0:
             m1.mute()
@@ -49,6 +51,7 @@ class Ripples_in_time:
                 set_shift_delay(0.25, freq_ratio([-3, -5, -7, -8, -12]))
             m1.play()
 
+
     def freq_ratio(semi_arr): # From Hall of Mirrors
     # returns an array of freq_ratios from 
     # semi_arr (semitone array)
@@ -62,12 +65,10 @@ class Ripples_in_time:
     def set_shift_delay(delay, shift_arr): # From Hall of Mirrors
     # Sets up the delay and shift values  
     # in the shift-delay bank
-
         # turn off shift units that are to be inactive
         for i = len(shift_arr) to shift_delay_bank.get_len():
             m1.set_gain(str(i), 0, 0) // set gain for left channel
             m1.set_gain(str(i), 0, 1) // set gain for right channel 
-
 
         for i = 0 to len(shift_arr):
             shift_delay_bank.set_delay(i, (i+1)*delay) // Do I include latency? Confirm!!

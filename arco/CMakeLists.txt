@@ -51,6 +51,13 @@ if(APPLE)
   # linked - it depends on dspsources.cmakeinclude, which is generated
   # from the application's dspmanifest.txt file:
   set(CURSES_LIB curses)
+
+  # I am debugging with Xcode, and symbols are not included in binary now.
+  # Debugging used to work automatically (before 2023). See if this helps.
+  # set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS "YES")
+  # (The above does not set Generate Debug Symbols to Yes)
+  set(CMAKE_CXX_FLAGS -g)
+  message(STATUS "set CMAKE_CXX_FLAGS to -g")
 else()
   set(CURSES_LIB ncurses)
 endif() 

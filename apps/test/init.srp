@@ -101,7 +101,8 @@ def arco_ready():
     gscheckbox.add_target_method(nil, 'gstest')
 
     # start a 2nd column
-    wxs_x = 200
+    COLUMN_TWO = 200
+    wxs_x = COLUMN_TWO
     wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
 
     Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
@@ -119,8 +120,22 @@ def arco_ready():
     Button(win, "File Play/Record", 'S', 'D', 'S', 'S', 'fprbutton')
     fprbutton.add_target_method(nil, 'file_play_record')
 
-    Checkbox(win, "Yin", 'S', 'D', 'S', 'S', 'yincheckbox')
+    Checkbox(win, "Yin", 'S', 'D', 55, 'S', 'yincheckbox')
     yincheckbox.add_target_method(nil, 'yintest')
+
+    Statictext(win, "", 'R', wxs_y + 2, 100, wxs_h - 2, 'yintext')
+    
+    wxs_x = COLUMN_TWO
+    Checkbox(win, "Trig", 'S', 'D', 55, 'S', 'trigcheckbox')
+    trigcheckbox.add_target_method(nil, 'trigtest')
+
+    TRIG_ON_TEXT = "◼ Trig"
+    TRIG_OFF_TEXT = "◻ Trig"
+    Statictext(win, TRIG_OFF_TEXT, 'R', wxs_y + 2, 50, 'S', 'trigtext')
+
+    ONOFF_ON_TEXT = "◼ On/Off"
+    ONOFF_OFF_TEXT = "◻ On/Off"
+    Statictext(win, ONOFF_OFF_TEXT, 'R', 'S', 'S', 'S', 'onofftext')
 
     ui_initialized = true
     default_window.fit_to_children()
@@ -291,9 +306,8 @@ def play_sound_file(rest ignore):
     sp.atend(MUTE, m1)  // "when the sound file finishes, mute m1"
     // The mute method will delete m1. If it were not a local var,
     // we would call m1.ref() here.
-    sp.go()     // play the sound file. Technically, we do not have
-    // a reference because we gave it to m1, but this is non-preemptive
-    // and our local m1 shadow holds the reference.
+    sp.go()     // play the sound file
+
 
 ########## DELAY TEST ################
 
@@ -488,12 +502,18 @@ def pvtest(obj, event, x, y):
         pv = nil
 
 
+
 ########## YIN TEST #############
 
 yin_handler_installed = false
 
 def actl_yin(timestamp, address, types, pitch, harmonicity, rms)
     print "YIN OUTPUT:", pitch, harmonicity, rms
+    var text = ""
+    if harmonicity < 0.1 and rms > 0.01:
+        text = str(pitch)
+    yintext.set_string(text)
+
     
 // handler for yincheckbox: play/stop yin analysis of input
 def yintest(obj, event, x, y):
@@ -503,11 +523,51 @@ def yintest(obj, event, x, y):
             o2_method_new("/actl/yin", "fff", 'actl_yin', t)
             print "installed yin handler"
             yin_handler_installed = true
-        yin = yin(input_ugen, 36, 72, 882, "/actl/yin")
+        yininp = input_ugen
+        // yininp = fileplay("/Users/rbd/tmp/ahh.wav", 1)
+        // yininp.go()
+
+        yin = yin(yininp, 36, 72, 882, "/actl/yin")
         yin.run()
     else:
         yin.unrun()
         yin = nil
+        yininp = nil
+
+
+
+########## TRIG TEST #############
+
+trig_handler_installed = false
+
+def actl_trig(timestamp, address, types, idnum, rms)
+    display "TRIG ONSET DETECTED:", idnum, rms
+    trigtext.set_string(TRIG_ON_TEXT)
+    sched_select(rtsched)
+    sched_cause(0.1, trigtext, 'set_string', TRIG_OFF_TEXT)
+
+    
+def actl_onoff(timestamp, address, types, idnum, onoff)
+    display "TRIG ONOFF OUTPUT:", idnum, onoff
+    onofftext.set_string(ONOFF_ON_TEXT if onoff == 1 else ONOFF_OFF_TEXT)
+
+    
+// handler for trigcheckbox: play/stop trig analysis of input
+def trigtest(obj, event, x, y):
+    display "trigtest", x
+    if x:
+        if not trig_handler_installed:
+            o2_method_new("/actl/trig", "if", 'actl_trig', t)
+            o2_method_new("/actl/onoff", "ii", 'actl_onoff', t)
+            print "installed trig handler"
+            trig_handler_installed = true
+        trig = trig(input_ugen, "/actl/trig", 128, 0.05, 0.2)
+        trig.onoff("/actl/onoff", 0.03, 0.1)
+        trig.run()
+    else:
+        trig.unrun()
+        trig = nil
+
 
 
 ########## File Play/Record TEST #############

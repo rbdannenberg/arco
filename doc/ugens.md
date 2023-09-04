@@ -798,13 +798,54 @@ mute the output of `INPUT_ID`, create a new `zero` object and pass it as
 be redirected to obtain input from a file or test signal.
 
 
+## trig
+
+**`trig(inp, reply_addr, window, threshold, pause)`**
+**`.set('inp', ugen)`**
+**`.set_window(window)`**
+**`.set_threshold(threshold)`**
+**`.set_pause(pause)`**
+**`.onoff(reply_addr, threshold, runlen)`**
+
+The `trig` unit generator detects audio onsets and the presence of audio.
+
+`/arco/trig/new id repl_addr inp window threshold pause` - Create `trig` object
+which takes input from `inp` and computes RMS in 50% overlapping frames with
+square windows. The frame size is `window` (in samples, rounded up to a 
+multiple of BL). It the input is multi-channel, the channels are summed before
+taking the RMS. When the RMS crosses threshold, a message is sent to
+`repl_addr` with the type string "i" and the unit generator `id`. After the
+message is sent, analysis pauses for `pause` seconds.
+
+`/arco/trig/onoff id repl_addr threshold runlen` - A `trig` can also report
+on sound vs. silence by sending messages when the sound goes above and 10%
+below `threshold` for a duration of `runlen` (float, seconds). When a change occurs a message is sent to `repl_addr` with signature "ii", the unit
+generator `id` and either 0 for "below" or 1 for "above threshold."
+The threshold, run length, or reply address can be changed by sending
+this message again. The on/off processing and reports can be
+disabled by setting `repl_addr` to the empty string.
+
+`/arco/trig/repl_inp id ip_id` - Set the input to the object with
+`id` to `inp_id`.
+
+`/arco/trig/window id size` - Set the window size to size.
+
+`/arco/trig/thresh id threshold` - Set the threshold to `threshold`.
+
+`/arco/trig/pause id pause` - Set the pause time to `pause` (float in
+seconds). Processing is paused for `pause` seconds after threshold is
+exceeded, causing a message to be sent.
+
+
 ### vu
 
 **`vu(reply_addr, period)`**
-**`.start(replay_addr, period)`**
+**`.start(reply_addr, period)`**
 **`.set('inp', ugen)`**
 
-`/arco/vu/new id reply_addr period` - Create a vu object, which measures the peak
+The `vu` unit generator is used to implement "VU" meters.
+
+`/arco/vu/new id reply_addr period` - Create a `vu` object, which measures the peak
 values of input channels over every `period` (float, in seconds) and sends the
 values as floats to `reply_addr` (string representing a complete O2 address).
 No messages are sent until input is set with `repl_inp`:

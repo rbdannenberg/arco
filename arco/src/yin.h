@@ -15,31 +15,28 @@ extern const char *Yin_name;
 float parabolic_interp(float x1, float x2, float x3,
                        float y1, float y2, float y3, float *min)
 {
-  float a, b, c;
-  float pos;
+    float a, b, c;
+    float pos;
 
-  //  y1=a*x1^2+b*x1+c
-  //  y2=a*x2^2+b*x2+c
-  //  y3=a*x3^2+b*x3+c
+    //  y1=a*x1^2+b*x1+c
+    //  y2=a*x2^2+b*x2+c
+    //  y3=a*x3^2+b*x3+c
 
-  //  y1-y2=a*(x1^2-x2^2)+b*(x1-x2)
-  //  y2-y3=a*(x2^2-x3^2)+b*(x2-x3)
+    //  y1-y2=a*(x1^2-x2^2)+b*(x1-x2)
+    //  y2-y3=a*(x2^2-x3^2)+b*(x2-x3)
 
-  //  (y1-y2)/(x1-x2)=a*(x1+x2)+b
-  //  (y2-y3)/(x2-x3)=a*(x2+x3)+b
+    //  (y1-y2)/(x1-x2)=a*(x1+x2)+b
+    //  (y2-y3)/(x2-x3)=a*(x2+x3)+b
 
-  a= ((y1-y2)/(x1-x2)-(y2-y3)/(x2-x3))/(x1-x3);
-  b= (y1-y2)/(x1-x2) - a*(x1+x2);
-  c= y1-a*x1*x1-b*x1;
+    a = ((y1 - y2) / (x1 - x2) - (y2 - y3) / (x2 - x3)) / (x1 - x3);
+    b = (y1 - y2) / (x1 - x2) - a * (x1 + x2);
+    c = y1 -a * x1 * x1 - b * x1;
 
-  *min= c;
-
-  // dy/dx = 2a*x + b = 0
+    // dy/dx = 2a*x + b = 0
   
-  pos= -b/2.0F/a;
-
-  return pos;
-
+    pos = -b / (a + a);
+    *min = /* ax^2 + bx + c */ (a * pos + b) * pos + c;
+    return pos;
 }
 
 
@@ -98,7 +95,7 @@ class Yin : public Windowed_input {
         float left_energy = 0;
         float right_energy = 0;
         float auto_corr;
-        float cum_sum = 0;
+        float cum_sum = 0.000001;  // avoid divide-by-zero on zero input
         float period;
         int min_i;
         const float threshold = 0.1F;
@@ -131,7 +128,7 @@ class Yin : public Windowed_input {
         // normalize by the cumulative sum
         for (int i = m; i <= middle; i++) {
             cum_sum += results[i - m];
-            results[i - m] = results[i - m] / (cum_sum / (i - m + 1));
+            results[i - m] = results[i - m] / ( cum_sum / (i - m + 1));
         }
 
         min_i = m;  // value of initial estimate

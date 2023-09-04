@@ -69,7 +69,7 @@ class Pwl (Ugen):
     # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
     # If the length is odd, a final yn = 0.0 is appended.
         o2_send_start()
-        o2_add_int32(id)
+        o2_add_int32(arco_ugen_id(id))
         # track cummulative time and samples to avoid accumulated time error
         var time = 0
         var count = 0
@@ -590,6 +590,9 @@ class Granstream (Ugen):
 	           'input', input, 'polyphony', polyphony, 'dur', dur,
                    'enable', enable)
 
+    def set_gain(gain)
+        o2_send_cmd("/arco/granstream/gain", 0, "Uf", id, gain)
+
     def set_polyphony(p):
         o2_send_cmd("/arco/granstream/polyphony", 0, "Uf", id, p)
 
@@ -608,6 +611,9 @@ class Granstream (Ugen):
     def set_enable(enable)
         o2_send_cmd("/arco/granstream/enable", 0, "UB", id, enable)
         
+    def set_dur(dur)
+        o2_send_cmd("/arco/granstream/dur", 0, "Uf", id, dur)
+
 
 
 def granstream(input, polyphony, dur, enable, optional chans = 1):
@@ -688,6 +694,33 @@ class Yin(Ugen):
 
 def yin(inp, minstep, maxstep, hopsize, address, optional chans = 1):
     Yin(chans, inp, minstep, maxstep, hopsize, address)  # yin as a function
+# trig.srp -- sound event detection
+#
+# Roger B. Dannenberg
+# August 2023
+
+class Trig(Ugen):
+    def init(inp, reply_addr, window, threshold, pause):
+        super.init(create_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
+                   'inp', inp, 'reply_addr', reply_addr, 'window', window,
+                   'threshold', threshold, 'pause', pause)
+
+    def set_window(window):
+        o2_send_cmd("/arco/trig/window", 0, "Ui", id, window)
+
+    def set_threshold(threshold):
+        o2_send_cmd("/arco/trig/threshold", 0, "Uf", id, threshold)
+
+    def set_threshold(pause):
+        o2_send_cmd("/arco/trig/pause", 0, "Uf", id, pause)
+
+    def onoff(reply_addr, threshold, runlen):
+        o2_send_cmd("/arco/trig/onoff", 0, "Usff",
+                    id, reply_addr, threshold, runlen)
+
+
+def trig(inp, reply_addr, window, threshold, pause):
+    Trig(inp, reply_addr, window, threshold, pause)  # trig as a function
 # thru.srp -- audio pass-through
 #
 # Roger B. Dannenberg

@@ -13,9 +13,6 @@ require "o2util"
 require "utils"
 require "prefs"
 
-prefs = Prefs("arco")
-audiomaster_gain = prefs.get('master_gain', -12.0)
-
 AR = 44100.0  // audio rate
 AP = 1 / AR // audio sample period
 BL = 32
@@ -198,9 +195,19 @@ def actl_act(timestamp, address, types, rest parameters):
 # require "wxserpent" -- works with wxserpent64 only (not serpent64)
 def arco_main_win_handler(obj, event, x, y):
     if event == WXS_CLOSE_WINDOW:
+        display "arco_main_win_handler", event, x, y
+        // ask for confirmation:
+        if prefs.modified and
+           wxs_message_box("Save current settings to preferences?",
+                   "Quit Requested", WXS_STYLE_YES_NO, 0) == WXS_MSG_YES:
+            prefs.save()
         // request Arco to shut down
         arco_quit()
         // event is handled, so we do not actually quit yet
+
+
+def file_quit_handler(rest ignore):
+    arco_main_win_handler(default_window, WXS_CLOSE_WINDOW, 1, 0)
 
 
 # To quit, application should call arco_quit(). Alternatively, 
@@ -293,7 +300,11 @@ def find_one_audio_device(selections, dir):
 
 def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
               latency = 30, buffersize = BL,
-              color, title, o2trace):
+              color, title, o2trace, appname="arco"):
+
+    prefs = Prefs(appname)
+    audiomaster_gain = prefs.get('master_gain', -12.0)
+
     if not set_arco_state('discovery'):
         return
     // set title and Quit handlers to shut down Arco on exit
@@ -306,7 +317,8 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
         default_window.method = 'arco_main_win_handler'
         display "####### arco_init GETTING File MENU FROM", default_window
         var file_menu = default_window.get_menu("File")
-        file_menu.item("Quit", "quit the application", nil, nil, 'arco_quit')
+        file_menu.item("Quit", "quit the application", nil, nil,
+                       'file_quit_handler')
         
     arco_input_chans = ins
     arco_output_chans = outs

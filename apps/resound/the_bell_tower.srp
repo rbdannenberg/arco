@@ -1,295 +1,187 @@
 # Project Author: Roger B. Dannenberg
 # Date: July 13, 2023
 
-class BellObjs:
-# This class contains three bell objects which
-# record trumpets and allow for playback
+class Bell_obj:
+# Implements one of the bells and its user interface
+    var bell_recplay  // recplay bell obj
+    var radiobox  // the control
+    var name    // symbol used as identifier of mixer input
 
-# Instance variables
-  var bell_obj1, bell_obj2, bell_obj3 // recplay bell objs
-  var radioboxes // To track clicks on UI radioboxes
-  var latency
-  var bell_mix
 
-  def init(mixer):
-    bell_obj1 = recplay(input_ugen, 2, 1, 3, true)
-    bell_obj2 = recplay(input_ugen, 2, 1, 3, true)
-    bell_obj3 = recplay(input_ugen, 2, 1, 3, true)
-    bell_mix = mixer
-    radioboxes = array(3)
-    latency = latency_slider.value()/1000 # initialize latency variable
+    def init(win, name_):
+        name = name_
+        radiobox = Radiobox(win, "Bell 1", ["reset", "record", "play"],
+                            'S', 'D', 175, 125, name)
+        radiobox.add_target_method(this, 'bell_handler')
 
-    // Attach latency slider to lshandler
-    latency_slider.add_target_method(this, 'lshandler')
-    latency = 0 // Remove this after interpolation effects have been fixed
 
-  def lshandler(obj, x):
-  # latency slider handler
-    latency = x/1000
-    latency = 0 // Remove this after interpolation effects have been fixed
-  
-  def trackers(mixer, rest radio_bxs):
-  # Each radiobox is connected to a symbol that
-  # helps track if "reset", "record" or "play" is clicked
-    for i=1 to 4:
-      radioboxes[i-1] = radio_bxs[i-1]
+    def audio_init(mixer, rvb_mixer, pan):
+        bell_recplay = recplay(input_ugen, 1, 1, 0.1, true)
+        mixer.ins(name, bell_recplay, pan)
+        rvb_mixer.ins(name, bell_recplay, bellwet_slider.value())
 
-  def bell1_event(obj, event, x, y):
-  # Handles what happens when "reset". "record" or "play"
-  # is clicked for bell1
-    if radioboxes[0].value() == 0:
-      if bell_obj1:
-        bell_mix.rem('1')
-      bell_obj1 = nil
-    elif radioboxes[0].value() == 1:
-      // Record into bell_obj1's buffer
 
-      if not bell_obj1:
-        // Prevents an error if bell_obj1 is reset w/out turning on/off the reverb
-        bell_obj1 = recplay(input_ugen, 2, 1, 3, true)
-        bell_mix.ins('1', this.bell_obj1, [1,1])
+    def audio_finish():
+        bell_recplay = nil
 
-      bell_obj1.run()
-      bell_obj1.record(true)
-    else:
-      bell_obj1.record(false)
-      bell_obj1.unrun()
-      bell_obj1.start(latency)
-      
 
-  def bell2_event(obj, event, x, y):
-  # Handles what happens when "reset". "record" or "play"
-  # is clicked for bell2
-    if radioboxes[1].value() == 0:
-      if bell_obj2:
-        bell_mix.rem('2')
-      bell_obj2 = nil
-    elif radioboxes[1].value() == 1:
-      // Record into bell_obj2's buffer
+    def bell_handler(obj, event, x, y):
+    # Handles what happens when "reset". "record" or "play"
+    # is clicked
+        if not bell_recplay:
+            return
+        if x == 0:
+            bell_recplay.stop()
+        elif x == 1:  // Record into bell_recplay buffer
+            bell_recplay.run()
+            bell_recplay.record(true)
+        else:
+            bell_recplay.record(false)
+            bell_recplay.unrun()
+            bell_recplay.start(resound_latency)
 
-      if not bell_obj2:
-        // Prevents an error if bell_obj2 is reset w/out turning on/off the reverb
-        bell_obj2 = recplay(input_ugen, 2, 1, 3, true)
-        bell_mix.ins('2', this.bell_obj2, [1,1])
 
-      bell_obj2.run()
-      bell_obj2.record(true)
-    else:
-      bell_obj2.record(false)
-      bell_obj2.unrun()
-      bell_obj2.start(latency)
-
-  def bell3_event(obj, event, x, y):
-  # Handles what happens when "reset". "record" or "play"
-  # is clicked for bell3
-    if radioboxes[2].value() == 0:
-      if bell_obj3:
-        bell_mix.rem('3')
-      bell_obj3 = nil
-    elif radioboxes[2].value() == 1:
-      // Record into bell_obj3's buffer
-      if not bell_obj3:
-        // Prevents an error if bell_obj3 is reset w/out turning on/off the reverb
-        bell_obj3 = recplay(input_ugen, 2, 1, 3, true)
-        bell_mix.ins('3', this.bell_obj3, [1,1])
-      bell_obj3.run()
-      bell_obj3.record(true)
-    else:
-      bell_obj3.record(false)
-      bell_obj3.unrun()
-      bell_obj3.start(latency)
 
 class The_bell_tower:
-# Instance variables
-  var bell_objs
-  var win, init_x, init_y // GUI params
-  var played
-  var bell_wet, mic_wet 
-  var rvb
-  var bell_mixer, rvb_mixer
-  var finalmix, output
+    var bells
+    var bell_wet, mic_wet 
+    var rvb
+    var bell_mixer, rvb_mixer
+    var final_mix, output
  
-  def init(window, x, y):
-  # Initialization of instance variables
-    win = window // Main UI window
-    init_x = x // set the starting x coord of the movement
-    init_y = y // set the starting y coord of the movement 
+    def init(window, x, y):
+    # Initialization of instance variables
+        wxs_x = x
+        wxs_y = y
 
-    // Set played to nil as movement has not been played yet
-    played = nil
+        // main audio on/off checkbox, y - 4 to align with other text:
+        Checkbox(window, "IV. The Bell Tower", x, y - 4, 175, 'H', 'audio_on')
+        audio_on.add_target_method(this, 'audio_on_handler')
 
-    // Init bell mixer
-    bell_mixer = Mix(2)
+        # passes symbols 'bell1', 'bell2', 'bell3' as names:
+        bells = [Bell_obj(window, intern("bell" + str(i + 1))) for i = 0 to 3]
 
-    // Create the bell objs
-    bell_objs = BellObjs(bell_mixer)
-
-    // Add the bells to the mixer
-    bell_mixer.ins('1', bell_objs.bell_obj1, [1,1])
-    bell_mixer.ins('2', bell_objs.bell_obj2, [1,1])
-    bell_mixer.ins('3', bell_objs.bell_obj3, [1,1])
-
-    // Setup UI
-    this.set_ui()
-
-    // Track the radioboxes
-    bell_objs.trackers(bell_mixer, bell1, bell2, bell3)
-
-    // Init bell wetness
-    bell_wet = mult(bell_mixer, bellwet_slider.value(), 2)
-
-    // Init mic wetness
-    mic_wet = mult(input_ugen, micwet_slider.value() , 2)
-
-    // Init reverb
-    rvb_mixer = Mix(2)
-    rvb_mixer.ins('rvb_bell', mic_wet, [1,1])
-    rvb_mixer.ins('rvb_mic', bell_wet, [1,1])
-    rvb = reverb(rvb_mixer, 1)
-
-    // Init finalmix
-    finalmix = Mix(2)
-    finalmix.ins('mic', input_ugen, [1,1])
-    finalmix.ins('rvb', rvb, [1,1])
-    finalmix.ins('bell_mixer', bell_mixer, [1,1])
-
-    // Init output
-    output = mult(finalmix, 1, 2)
-
-  def reinit():
-  # This method reinitializes the entire movement
-  # in case it is to be played again.
-    // Init bell mixer
-    bell_mixer = Mix(2)
-
-    // Create the bell objs
-    bell_objs = BellObjs()
-
-    // Add the bells to the mixer
-    bell_mixer.ins('1', bell_objs.bell_obj1, [1,1])
-    bell_mixer.ins('2', bell_objs.bell_obj2, [1,1])
-    bell_mixer.ins('3', bell_objs.bell_obj3, [1,1])
-
-    // Track the radioboxes
-    bell_objs.trackers(bell_mixer, bell1, bell2, bell3)
-
-    // Init bell wetness
-    bell_wet = mult(bell_mixer, bellwet_slider.value(), 2)
-
-    // Init mic wetness
-    mic_wet = mult(input_ugen, micwet_slider.value() , 2)
-
-    // Init reverb
-    rvb_mixer = Mix(2)
-    rvb_mixer.ins('rvb_bell', mic_wet, [1,1])
-    rvb_mixer.ins('rvb_mic', bell_wet, [1,1])
-    rvb = reverb(rvb_mixer, 1)
-
-    // Init finalmix
-    finalmix = Mix(2)
-    finalmix.ins('mic', input_ugen, [1,1])
-    finalmix.ins('rvb', rvb, [1,1])
-    finalmix.ins('bell_mixer', bell_mixer, [1,1])
-
-    // Init output
-    output = mult(finalmix, 1, 2)
+        // setup remaining UI elements: sliders and fadeout button
+        this.set_ui(window)
 
 
-  def set_ui():
-  # Setting up The_bell_tower's UI
-    // setting up reverb's checkbox 
-    Checkbox(win, "IV. The Bell Tower", init_x, init_y-4,
-              175, 'H', 'rverb') // init_y - 5 to allign top of checkbox with other text
-    rverb.add_target_method(this, 'reverb_handler')
+    def audio_init():
+        // bell_mixer is the main mix for stereo output
+        bell_mixer = Mix(2)
+        // rvb_mixer combines bells and mic to form reverb input
+        rvb_mixer = Mix(1)
+        // ~4.5dB pan law for bell1 (left), bell2 (right), bell3 (center):
+        var pans = [[0.88, 0.22], [0.22, 0.88], [0.6, 0.6]]
 
-    // Bell 1
-    Radiobox(win, "Bell 1", ["reset", "record", "play"], 
-             'S', 'D', 175, 125, 'bell1')
-    bell1.add_target_method(bell_objs, 'bell1_event')
+        for bell at i in bells:  // reset all radioboxes to initial (reset)
+            bell.radiobox.set_value(0)
+            bell.audio_init(bell_mixer, rvb_mixer, pans[i])
+        rvb_mixer.ins('mic', input_ugen, micwet_slider.value())
+        rvb = reverb(rvb_mixer, rt60_slider.value())
+        rvb.set_cutoff(filter_slider.value())
 
-    // Bell 2
-    Radiobox(win, "Bell 2", ["reset", "record", "play"], 
-             'S', 'D', 175, 125, 'bell2')
-    bell2.add_target_method(bell_objs, 'bell2_event')
+        // final_mix combines reverb and bells
+        final_mix = Mix(2)
+        final_mix.ins('rvb', rvb, [1, 1])  // expand to stereo
+        final_mix.ins('bells', bell_mixer, 1)
 
-    // Bell 3
-    Radiobox(win, "Bell 3", ["reset", "record", "play"], 
-             'S', 'D', 175, 125, 'bell3')
-    bell3.add_target_method(bell_objs, 'bell3_event')
-
-    // Micwet
-    Labeled_slider(win, "micwet", 'S', init_y + 425, 275, 30, 75, 0, 1,
-                    0.5, 'linear', 'micwet_slider')
-    micwet_slider.add_target_method(this, 'micwet_handler')
-
-    // Bellwet
-    Labeled_slider(win, "bellwet", 'S', 'D', 275, 30, 75, 0, 1,
-                    0.5, 'linear', 'bellwet_slider')
-    bellwet_slider.add_target_method(this, 'bellwet_handler')
-
-    // RT60
-    Labeled_slider(win, "rt60", 'S', 'D', 275, 30, 75, 0, 10,
-                    5, 'linear', 'rt60_slider')
-    rt60_slider.add_target_method(this, 'rt60_handler')
-
-    // Filter
-    Labeled_slider(win, "filter", 'S', 'D', 275, 30, 75, 1, 20000,
-                    9000, 'integer', 'filter_slider') // lowest cutoff set to 1 due to dist.
-    filter_slider.add_target_method(this, 'filter_handler')
-
-    // Fadeout
-    Checkbox(win, "fadeout", 'S', 'D', 150, 'H', 'fadeout')
-    fadeout.add_target_method(this, 'fadeout_handler')
-
-    // Fadelength
-    Labeled_slider(win, "fadelen", 'S', 'D', 275, 30, 75, 0, 30,
-                    30, 'integer', 'fadelen_slider')
+        // final fade uses multiplier on finalmix output:
+        output = mult(final_mix, 1, 2)
+        output.play()
 
 
-  def fadeout_handler(obj, event, x, y):
-    // Create pwe envelope
-    fade_val = fadelen_slider.value()
-    envelope = pweb(0, 1, fade_val, 0)
-    output.set('x2', envelope)
+    def audio_finish():
+        for bell in bells:
+            bell.audio_finish()
+        output.mute()
+        output = nil
+        final_mix = nil
+        rvb_mixer = nil
+        rvb = nil
+        mic_wet = nil
+        bell_wet = nil
+        bell_mixer = nil
 
-  def reverb_handler(obj, event, x, y):
-    if x:
-      // Play reverb and output once reverb is clicked
-      if played:
-        // reinitialize if movement has been played at 
-        // least once
-        reinit()
-      output.play()
-      played = t
-    else:
-      // Note that the bell objects are not deleted
-      // from memory and still exist. This is a design 
-      // choice and can be changed later. If this is changed,
-      // they have to bre reinitialized in reinit()
-      output.mute()
-      output = nil
-      finalmix = nil
-      rvb_mixer = nil
-      rvb = nil
-      mic_wet = nil
-      bell_wet = nil
-      bell_mixer = nil
 
-  def rt60_handler(obj, x):
-  # Set the reverb time (RT60 time)
-    rt60_val = rt60_slider.value()
-    if rt60_val == 0:
-      rt60_val = 0.1
-    rvb.set_rt60(rt60_val)
+    def set_ui(win):
+    # Setting up The_bell_tower's UI
+        // Micwet
+        Labeled_slider(win, "micwet", 'S', 'D', 275, 30, 75, 0, 1,
+                       prefs.get('micwet', 0.1), 'linear', 'micwet_slider')
+        micwet_slider.add_target_method(this, 'micwet_handler')
 
-  def bellwet_handler(obj, x):
-  # Determines the wetness of the currently active bell
-    bell_wet.set('x2', bellwet_slider.value())
+        // Bellwet
+        Labeled_slider(win, "bellwet", 'S', 'D', 275, 30, 75, 0, 1,
+                       prefs.get('bellwet', 0.1), 'linear', 'bellwet_slider')
+        bellwet_slider.add_target_method(this, 'bellwet_handler')
 
-  def micwet_handler(obj, x):
-  # Determines the wetness of the mic
-    mic_wet.set('x2', micwet_slider.value())
+        // RT60
+        Labeled_slider(win, "rt60", 'S', 'D', 275, 30, 75, 0, 10,
+                       prefs.get('rt60', 5), 'linear', 'rt60_slider')
+        rt60_slider.add_target_method(this, 'rt60_handler')
 
-  def filter_handler(obj, x):
-  # Change the frequency of the lowpass filter
-    rvb.set_cutoff(filter_slider.value())
+        // Filter -  lowest cutoff set to 1 due to dist.
+        Labeled_slider(win, "filter", 'S', 'D', 275, 30, 75, 1, 20000,
+                       prefs.get('filter', 9000), 'integer', 'filter_slider')
+        filter_slider.add_target_method(this, 'filter_handler')
+
+        // Fadeout
+        Checkbox(win, "fadeout", 'S', 'D', 150, 'H', 'fadeout')
+        fadeout.add_target_method(this, 'fadeout_handler')
+
+        // Fadelength
+        Labeled_slider(win, "fadelen", 'S', 'D', 275, 30, 75, 0, 30,
+                       prefs.get('fadelen', 30), 'integer', 'fadelen_slider')
+        fadelen_slider.add_target_method(this, 'fadelen_handler')
+
+
+    def fadeout_handler(obj, event, x, y):
+        // Create pwe envelope
+        if not output:
+            return
+        if x:
+            fade_val = fadelen_slider.value()
+            var envelope = pweb(0, 1, fade_val, 0)
+            output.set('x2', envelope)
+        else:
+            output.set('x2', 1)
+
+
+    def audio_on_handler(obj, event, x, y):
+        if x and not bell_mixer:
+            audio_init()
+        else:
+            audio_finish()
+
+
+    def rt60_handler(obj, x):
+    # Set the reverb time (RT60 time)
+        prefs.set('rt60', x)
+        if rvb:
+            rvb.set_rt60(max(0.1, x))
+
+
+    def bellwet_handler(obj, x):
+    # Determines the wetness of the currently active bell
+        prefs.set('bellwet', x)
+        if bell_mixer:
+            for bell in bells:
+                rvb_mixer.set_gain(bell.name, x)
+
+
+    def micwet_handler(obj, x):
+    # Determines the wetness of the mic
+        prefs.set('micwet', x)
+        if bell_mixer:
+            rvb_mixer.set_gain('mic', x)
+
+
+    def filter_handler(obj, x):
+    # Change the frequency of the lowpass filter
+        prefs.set('filter', x)
+        if rvb:
+            rvb.set_cutoff(x)
+
+    def fadelen_handler(obj, x):
+    # Change the fade length
+        prefs.set('fadelen', x)

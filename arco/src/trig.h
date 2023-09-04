@@ -1,0 +1,154 @@
+// trig.h -- trig unit generator for sound event detection
+//
+// Roger B. Dannenberg
+// Aug 2023
+
+/* trig is an audio unit generator that sends messages when
+   RMS exceeds a threshold or when RMS indicates sound on
+   and sound off.
+*/
+
+extern const char *Trig_name;
+
+
+class Trig : public Ugen {
+  public:
+
+    const char *address; // where to send messages
+    int window_size;  // in samples
+    float trig_threshold;
+    int pause;  // in blocks
+    float sum0;  // sum for current window
+    float sum1;  // sum for next window
+    int count;   // how many samples processed since last window end
+    bool enabled;  // true if enabled to detect audio event
+
+    const char *onoff_addr;  // where to send onoff messages
+    float onoff_threshold;   // threshold for onoff detection
+    int onoff_runlen;        // measured in blocks
+    bool onoff_state;        // current onoff detected
+    int onoff_count;        // how many times state is repeated
+    bool reported_state;     // last onoff reported
+    int pause_for;           // number of blocks remaining in current pause
+
+    Ugen_ptr inp;
+    int inp_stride;
+    Sample_ptr inp_samps;
+
+    
+    Trig(int id, Ugen_ptr inp, const char *address_, int window_size,
+         float threshold, float pause) : Ugen(id, 'a', 0) {
+        // round up to multiple of BL:
+        address = o2_heapify(address_);
+        set_window(window_size);
+        trig_threshold = threshold;
+        set_pause(pause);
+        init_inp(inp);
+        sum0 = 0;
+        sum1 = 0;
+        count = 0;
+        onoff_addr = NULL;
+        onoff_threshold = 0;
+        onoff_count = 0;
+        onoff_runlen = 2;  // this value is not used - see onoff() method
+        reported_state = false;
+    }
+
+
+    ~Trig() {
+        O2_FREE((char *) address);
+        if (onoff_addr) {
+            O2_FREE((char *) onoff_addr);
+        }
+    }
+
+    void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
+
+    const char *classname() { return Trig_name; }
+
+    void onoff(const char *repl_addr, float threshold, float runlen) {
+        if (onoff_addr) {
+            O2_FREE((char *) onoff_addr);
+        }
+        if (!repl_addr[0]) {  // empty string means disable
+            onoff_addr = NULL;
+        } else {
+            onoff_addr = o2_heapify(repl_addr);
+            onoff_threshold = threshold;
+            onoff_runlen = std::ceil(runlen * BR);
+        }
+    }
+
+
+    void repl_inp(Ugen_ptr inp_) {
+        inp->unref();
+        init_inp(inp_);
+    }
+
+
+    void set_window(int size) {
+        window_size = (size + BL - 1) & ~ (BL - 1);
+    }
+
+
+    void set_threshold(float thresh) {
+        trig_threshold = thresh;
+    }
+
+
+    void set_pause(float pause_) {
+        pause = std::ceil(pause_ * BR);
+    }
+    
+    
+    void real_run() {
+        inp_samps = inp->run(current_block);
+        // compute sum of squares of input samples
+        int inp_chans = inp->chans;
+        float sum = 0;
+        int n = inp->chans * BL;
+        for (int i = 0; i < n ; i++) {
+            float s = *inp_samps;
+            sum += s * s;
+        }
+        sum0 += sum;
+        sum1 += sum;
+        count += BL;
+        // end of half window?
+        if (count >= (window_size >> 1)) {
+            sum0 = sqrt(sum0 / (window_size * inp->chans));
+            if (enabled && sum0 > trig_threshold && pause_for <= 0) {
+                o2sm_send_start();
+                o2sm_add_int32(id);
+                o2sm_add_float(sum0);
+                o2sm_send_finish(0, address, false);
+                pause_for = pause;
+                enabled = false;
+            } else if (sum0 < trig_threshold) {
+                enabled = true;
+            }
+
+            if (onoff_addr) {  // is onoff mode enabled?
+                if (sum0 > onoff_threshold) {
+                    onoff_state = true;
+                } else if (sum0 < onoff_threshold * 0.9) { // hysteresis
+                    onoff_state = false;
+                }
+                onoff_count++;
+                if (onoff_state == reported_state) {
+                    onoff_count = 0;  // reset run length counter
+                } else if (onoff_count >= onoff_runlen) {
+                    reported_state = onoff_state;
+                    o2sm_send_start();
+                    o2sm_add_int32(id);
+                    o2sm_add_int32((int) onoff_state);
+                    o2sm_send_finish(0, onoff_addr, false);
+                }
+            }
+            count = 0;
+            sum0 = sum1;  // now sum1 (next window) is moved to sum0
+            sum1 = 0;  // and sum1 (next window) is just starting, set to 0
+        }
+        pause_for--;
+    }
+};

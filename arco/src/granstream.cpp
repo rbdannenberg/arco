@@ -66,7 +66,6 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
     if (--delay == 0) {
         switch (state) {
           case GS_FALL: {  // fall has finished, now at end of envelope
-            printf("end grain, env_val %g env_inc %g\n", env_val, env_inc);
             env_val = 0;
             env_inc = 0;
             if (!gs->enable || gs->gain == 0) {
@@ -150,13 +149,10 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 env_inc = gain / (attack_blocks * BL);
                 // note: phase is negative; map phase to buffer offset
                 // in case ratio is 1, avoid interpolation
-                printf("start grain at phase %gs to %gs (%d blocks)\n",
-                       phase * AP, final_phase * AP, dur_blocks);
                 phase = (int) (perchannel->tail - BL + phase);
                 if (phase < 0) phase += bufferlen;
                 state = GS_RISE;
                 delay = attack_blocks;
-                printf("state GS_RISE delay %d\n", delay);
                 assert(phase >= 0 && phase < bufferlen &&
                        bufferlen == perchannel->samps.size());
             } else {
@@ -171,12 +167,10 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             break;
           }
           case GS_RISE:  // attack has finished, start hold until fall
-            printf("end rise, env_val %g env_inc %g\n", env_val, env_inc);
             delay = dur_blocks - attack_blocks - release_blocks;
             state = GS_HOLD;
             env_val = 1;
             env_inc = 0;
-            printf("state GS_HOLD delay %d\n", delay);
             if (delay > 0) {
                 break;
             } // otherwise begin fall immediately
@@ -184,7 +178,6 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             delay = release_blocks;
             env_inc = -gain / (release_blocks * BL);
             state = GS_FALL;
-            printf("state GS_FALL delay %d\n", delay);
             break;
         }
     }
@@ -313,6 +306,7 @@ static void arco_granstream_ratio(O2SM_HANDLER_ARGS)
     UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_ratio");
     granstream->low = low;
     granstream->high = high;
+    printf("granstream ratios set %g %g\n", low, high);
 }
 
 

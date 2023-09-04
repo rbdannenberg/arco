@@ -16,7 +16,7 @@ class Pwl (Ugen):
     # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
     # If the length is odd, a final yn = 0.0 is appended.
         o2_send_start()
-        o2_add_int32(id)
+        o2_add_int32(arco_ugen_id(id))
         # track cummulative time and samples to avoid accumulated time error
         var time = 0
         var count = 0
