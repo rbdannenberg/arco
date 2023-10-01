@@ -29,7 +29,7 @@ class Feedback : public Ugen {
 
     Feedback(int id, int nchans, Ugen_ptr inp, Ugen_ptr from, Ugen_ptr gain) :
             Ugen(id, 'a', nchans) {
-        states.init(chans);
+        states.set_size(chans);
         init_input(inp);
         init_from(from);
         init_gain(gain);
@@ -95,8 +95,7 @@ class Feedback : public Ugen {
     }
 
     void set_gain(int chan, float g) {
-        assert(gain->rate == 'c');
-        gain->output[chan] = g;
+        gain->const_set(chan, g, "Feedback::set_gain");
     }
 
     void init_input(Ugen_ptr inp) { init_param(inp, input, input_stride); }

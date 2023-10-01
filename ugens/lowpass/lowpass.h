@@ -64,7 +64,7 @@ public:
             Ugen(id, 'a', nchans) {
         snd = snd_;
         cutoff = cutoff_;
-        states.init(chans);
+        states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_snd(snd);
         init_cutoff(cutoff);
@@ -130,13 +130,11 @@ public:
     }
 
     void set_snd(int chan, float f) {
-        assert(snd->rate == 'c');
-        snd->output[chan] = f;
+        snd->const_set(chan, f, "Lowpass::set_snd");
     }
 
     void set_cutoff(int chan, float f) {
-        assert(cutoff->rate == 'c');
-        cutoff->output[chan] = f;
+        cutoff->const_set(chan, f, "Lowpass::set_cutoff");
     }
 
     void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, snd_stride); }

@@ -18,7 +18,7 @@ public:
 
     Upsample(int id, int nchans, Ugen_ptr input_) : Ugen(id, 'a', nchans) {
         input = input_;
-        states.init(chans);
+        states.set_size(chans);
 
         // initialize channel states
         for (int i = 0; i < chans; i++) {
@@ -43,8 +43,7 @@ public:
     }
 
     void set_input(int chan, float f) {
-        assert(input->rate == 'c');
-        input->output[chan] = f;
+        input->const_set(chan, f, "Upsample::set_input");
     }
 
     void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }

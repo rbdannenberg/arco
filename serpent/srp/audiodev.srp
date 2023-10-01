@@ -313,9 +313,11 @@ class Audio_monitor:
         vu_obj = nil
 
 
+// This is global because we could close and reopen Monitor_audio and
+// we want to remember what input is selected:
+current_input = "Audio Input"
 
 class Monitor_audio:
-    var current_input  // string with current input selection
     var input_vu
     var output_vu
     var monitoring_input
@@ -351,9 +353,8 @@ class Monitor_audio:
             input_vu.run()  // add to run_set to make it compute peaks
 
             # Audio Input Selection
-            Listbox(mon_win, 'S', 'D', 100, 50, nil, 'audioin_lb')
-            current_input = "Audio Input"
-            audioin_lb.append(current_input)
+            Listbox(mon_win, 'S', 'D', 250, 100, nil, 'audioin_lb')
+            audioin_lb.append("Audio Input")
             audioin_lb.append("Mute Input")
 
             if fileinput_files:
@@ -361,9 +362,13 @@ class Monitor_audio:
                     // only add files that actually exist:
                     rslt = open(file, "rb")
                     if rslt:
-                        audioin_lb.append(file)
+                        var name = file
+                        if len(name) > 28:
+                            name = "..." + subseq(name, -25)
+                        audioin_lb.append(name)
                         rslt.close()
             rslt = nil // just to be tidy
+            audioin_lb.set_value(current_input)
             audioin_lb.add_target_method(this, 'audioin_select')
 
             # monitor input button
@@ -536,21 +541,23 @@ class Monitor_audio:
         var inp
         if x == current_input:
             return
+        current_input = x
         if x == "Mute Input":
             // we need a unique Zero object to provide input:
             var silence = Zero()
             input_ugen.set_alternate(silence)
-            // silence is local variable so the only reference we leave is
-            // from input_ugen to silence. The last reference is deleted and
-            // silence is freed when the input is unmuted.
+            // The Zero will be freed when the input is unmuted.
         elif x == "Audio Input":
             input_ugen.set_alternate(zero_ugen)  // clears alternate input
         else:
-            if not fileinput_player:
-                fileinput_player = fileplay(x, arco_input_channels, 0, 0,
-                                            false, true, true)
+            // find full filename:
+            for name in fileinput_files:
+                if (len(name) <= 28 and name == x) or
+                   (len(name) > 28 and subseq(name, -25) == subseq(x, -25)):
+                    var fileinput_player = fileplay(name, arco_input_chans,
+                                                    0, 0, false, true, true)
+                input_ugen.set_alternate(fileinput_player)
                 fileinput_player.go()
-                input_ugen.set_alternate(fileinput)
 
 
     def scope_input_handler(obj, event, x, y):

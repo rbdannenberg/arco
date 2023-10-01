@@ -100,6 +100,10 @@ def arco_ready():
     Checkbox(win, "Granstream Test", 'S', 'D', 'S', 'S', 'gscheckbox')
     gscheckbox.add_target_method(nil, 'gstest')
 
+    Checkbox(win, "Gran. with Feedback", 'S', 'D', 'S', 'S',
+             'gsfbcheckbox')
+    gsfbcheckbox.add_target_method(nil, 'gsfbtest')
+
     # start a 2nd column
     COLUMN_TWO = 200
     wxs_x = COLUMN_TWO
@@ -358,13 +362,47 @@ def gstest(obj, event, x, y):
     display "gstest - granstream applied microphone input ", x
     if x:
         gs1 = granstream(input_ugen, 20, 3.0, true, 2)  // 2 channel
+        gs1.set_density(5.0)
         // gs1 = granstream(input_ugen, 1, 3.0, true, 2)  // 2 channel
         // gs1 = granstream(input_ugen, 1, 3.0, true, 1)  // 1 channel
         // gs1 = granstream(input_ugen, 20, 1.0, true, 1)  // 1 channel
         gs1.play()
+        grfr = filerec("./groutput.wav", gs1, 2)
+        grfr.run()
+        grfr.go()
     else:
         gs1.mute()  // immediate stop
         gs1 = nil   // eventual cleanup
+        grfr.stop()
+        grfr.unrun()
+        grfr = nil
+
+
+########## GRANSTREAM WITH FEEDBACK TEST #############
+// uses a very short duration so input gets "smeared" by only 0.3s
+// allowing us to clearly hear the feedback that comes 2s later.
+
+def gsfbtest(obj, event, x, y):
+# create a granstream to granulate microphone input
+    display "gstest - granstream applied microphone input ", x
+    if x:
+        gs1 = granstream(input_ugen, 20, 1.0, true, 2)  // 2 channel
+        gs1.set_density(5.0)
+        // gs1 = granstream(input_ugen, 1, 3.0, true, 2)  // 2 channel
+        // gs1 = granstream(input_ugen, 1, 3.0, true, 1)  // 1 channel
+        // gs1 = granstream(input_ugen, 20, 1.0, true, 1)  // 1 channel
+        gs1.set_delay(2)
+        gs1.set_feedback(0.9)
+        gs1.play()
+        grffr = filerec("./grfoutput.wav", gs1, 2)
+        grffr.run()
+        grffr.go()
+    else:
+        gs1.mute()  // immediate stop
+        gs1 = nil   // eventual cleanup
+        grffr.stop()
+        grffr.unrun()
+        grffr = nil
 
 
 ########## PWE TEST #############
@@ -491,14 +529,14 @@ def pvtest(obj, event, x, y):
         pv = pv(input_ugen, 0.5, 2048, 512, 8, 1)
         display "pvtest made pv", pv
         pv.play()
-        pvfr = filerec("./pvoutput.wav", pv, 1)
-        pvfr.run()
-        pvfr.go()
+//        pvfr = filerec("./pvoutput.wav", pv, 1)
+//        pvfr.run()
+//        pvfr.go()
     else:
         pv.mute()
-        pvfr.stop()
-        pvfr.unrun()
-        pvfr = nil
+//        pvfr.stop()
+//        pvfr.unrun()
+//        pvfr = nil
         pv = nil
 
 
@@ -524,8 +562,6 @@ def yintest(obj, event, x, y):
             print "installed yin handler"
             yin_handler_installed = true
         yininp = input_ugen
-        // yininp = fileplay("/Users/rbd/tmp/ahh.wav", 1)
-        // yininp.go()
 
         yin = yin(yininp, 36, 72, 882, "/actl/yin")
         yin.run()
@@ -613,6 +649,7 @@ def arco_ugen_gc_info_handler(rest ignore):
 
 def main():
     o2_debug_flags("") // ("SsBl")
+    arco_set_input_files([sound_file_path])
     arco_init(latency = 60, network = false, title = "Arco Test")
     arco_run()
     sched_select(rtsched)

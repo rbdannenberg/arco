@@ -20,16 +20,15 @@
 #define __Delay_H__
 
 #include <climits>
+#include "ringbuf.h"
 
 extern const char *Delay_name;
 
 class Delay : public Ugen {
 public:
     struct Delay_state {
-        Vec<float> samps;  // delay line
-        int tail;  // tail indexes the *next* location to put input
-        // tail also indexes the oldest input, which has a delay of
-        // samps.size() samples
+        Ringbuf samps;  // delay line
+        Dcblock dcblock;
         Sample fb_prev;
     };
     Vec<Delay_state> states;
@@ -52,15 +51,16 @@ public:
         inp = inp_;
         dur = dur_;
         fb = fb_;
-        states.init(nchans);
+        states.set_size(nchans);
 
         for (int i = 0; i < chans; i++) {
-            Vec<Sample> *delay = &states[i].samps;
-            delay->init((int) (maxdur * AR) + 1);  // round up
-            delay->set_size(delay->get_allocated());
-            delay->zero();
-            states[i].tail = 0;
+            Ringbuf &delay = states[i].samps;
+            delay.init((int) (maxdur * AR) + 1);  // round up
+            // use all 2^n - 1 slots since delay is variable and might increase,
+            // we want as much history as we can store in the allocated space:
+            delay.set_fifo_len(delay.mask, true);
             states[i].fb_prev = 0;
+            states[i].dcblock.init();
         }
         init_inp(inp);
         init_dur(dur);
@@ -81,25 +81,8 @@ public:
 
     void set_state_max(Delay_state *state, int len) {
         // tail indexes the oldest sample
-        Vec<Sample> &delay = state->samps;
-        int tail = state->tail;
-        if (len > delay.size()) {
-            int old_length = delay.size();
-            Sample_ptr ptr = delay.append_space(len - old_length);
-            delay.set_size(delay.get_allocated());  // use all the space
-            // how much did we grow?
-            int n = delay.size() - old_length;
-            // how many samples from tail to the end of the old buffer?
-            int m = (tail == 0 ? 0 : old_length - tail);
-            // we had [tuvwxTpqrs], where x is the most recent sample, T
-            // represents tail pointer and oldest sample, and so Tpqrs are
-            // the oldest. When the buffer is extended, we get:
-            // [tuvwxTpqrs???????????????] and we want to convert it to
-            // [tuvwxT00000000000000opqrs] where o was the value at tail T.
-            // opqrs has length m. ??????????????? has length n.
-            memmove(&delay[tail + n], &delay[tail], n * sizeof(Sample));
-            memset(&delay[tail], 0, n * sizeof(Sample));
-        }
+        Ringbuf &delay = state->samps;
+        delay.set_fifo_len(len, true);
     }
     
     void set_max(float dur) {
@@ -146,13 +129,11 @@ public:
     }
 
     void set_dur(int chan, float f) {
-        assert(dur->rate == 'c');
-        dur->output[chan] = f;
+        dur->const_set(chan, f, "Delay::set_dur");
     }
 
     void set_fb(int chan, float f) {
-        assert(fb->rate == 'c');
-        fb->output[chan] = f;
+        fb->const_set(chan, f, "Delay::set_fb");
     }
 
     void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
@@ -163,25 +144,21 @@ public:
         Sample_ptr inp = inp_samps;
         Sample_ptr dur = dur_samps;
         Sample_ptr fb = fb_samps;
-        int tail = state->tail;
-        Vec<Sample> &delay = state->samps;
+        Ringbuf &delay = state->samps;
         
         for (int i = 0; i < BL; i++) {
             // get from delay line
             int len = round(dur[i] * AR);
-            if (len > delay.size()) {
+            if (len > delay.mask) {
                 set_state_max(state, len);
             }
-            int head = tail - len;
-            if (head < 0) head += delay.size();
-            Sample out = delay[head];
+            Sample out = delay.get_nth(len);
             *out_samps++ = out;
             
             // insert input with feedback
-            delay[tail] = inp[i] + out * fb[i];
-            if (++tail >= delay.size()) tail = 0;  // wrap
+            delay.toss(1);  // make space
+            delay.enqueue(state->dcblock.filter(inp[i] + out * fb[i]));
         }
-        state->tail = tail;
     }
 
     void chan_aab_a(Delay_state *state) {
@@ -190,8 +167,7 @@ public:
         Sample fb = *fb_samps;
         Sample fb_prev = state->fb_prev;
         Sample fb_incr = (fb - fb_prev) * BL_RECIP;
-        int tail = state->tail;
-        Vec<Sample> &delay = state->samps;
+        Ringbuf &delay = state->samps;
         
         state->fb_prev = fb;
 
@@ -202,40 +178,33 @@ public:
             if (len > delay.size()) {
                 set_state_max(state, len);
             }
-            int head = tail - len;
-            if (head < 0) head += delay.size();
-            Sample out = delay[head];
+            Sample out = delay.get_nth(len);
             *out_samps++ = out;
 
             // insert input with feedback
-            delay[tail] = inp[i] + out * fb_prev;
-            if (++tail >= delay.size()) tail = 0;  // wrap
+            delay.toss(1);  // make space
+            delay.enqueue(state->dcblock.filter(inp[i] + out * fb_prev));
         }
-        state->tail = tail;
     }
 
     void chan_aba_a(Delay_state *state) {
         Sample_ptr inp = inp_samps;
         int len = round(*dur_samps * AR);
         Sample_ptr fb = fb_samps;
-        int tail = state->tail;
-        Vec<Sample> &delay = state->samps;
+        Ringbuf &delay = state->samps;
         if (len > delay.size()) {
             set_state_max(state, len);
         }
 
         for (int i = 0; i < BL; i++) {
             // get from delay line
-            int head = tail - len;
-            if (head < 0) head += delay.size();
-            Sample out = delay[head];
+            Sample out = delay.get_nth(len);
             *out_samps++ = out;
 
             // insert input with feedback
-            delay[tail] = inp[i] + out * fb[i];
-            if (++tail >= delay.size()) tail = 0;  // wrap
+            delay.toss(1);  // make space
+            delay.enqueue(state->dcblock.filter(inp[i] + out * fb[i]));
         }
-        state->tail = tail;
     }
 
     void chan_abb_a(Delay_state *state) {
@@ -244,8 +213,7 @@ public:
         Sample fb = *fb_samps;
         Sample fb_prev = state->fb_prev;
         Sample fb_incr = (fb - fb_prev) * BL_RECIP;
-        int tail = state->tail;
-        Vec<Sample> &delay = state->samps;
+        Ringbuf &delay = state->samps;
         if (len > delay.size()) {
             set_state_max(state, len);
         }
@@ -254,16 +222,13 @@ public:
         for (int i = 0; i < BL; i++) {
             fb_prev += fb_incr;
             // get from delay line
-            int head = tail - len;
-            if (head < 0) head += delay.size();
-            Sample out = delay[head];
+            Sample out = delay.get_nth(len);
             *out_samps++ = out;
 
             // insert input with feedback
-            delay[tail] = inp[i] + out * fb_prev;
-            if (++tail >= delay.size()) tail = 0;  // wrap
+            delay.toss(1);
+            delay.enqueue(state->dcblock.filter(inp[i] + out * fb_prev));
         }
-        state->tail = tail;
     }
 
     void real_run() {

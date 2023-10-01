@@ -6,7 +6,7 @@
 // long, so as the buffer fills, we can plot the boundary of
 // valid samples as a stairstep starting at BL at the origin
 // (because we read BL samples before anything else) and increasing
-// by BL every VP seconds. Because the buffer is actually
+// by BL every BP seconds. Because the buffer is actually
 // circular, the buffer is invalidated in a stairstep as well,
 // with BL - bufferlen at the origin, and stepping by BL every
 // VP seconds.
@@ -20,24 +20,37 @@
 // these bounds we get from 0 to BL - bufferlen.
 // The starting point in the buffer is calculated as
 // a random number between 0 and delay * AR, where delay 
-// tells how far back in time we can grab audio data:
-//     phase = lincongr() * delay * AR;
+// tells how far back in time we can grab audio data, and phase
+// is how far back in time (in samples) we actually read. Note
+// that we are changing our perspective from the vertical axis
+// of the plot (buffer position) to "phase", which is how far back
+// we reach from the tail of the buffer ("now"):
+//     phase = random() * delay * AR;
 // The ending point is:
 //     phase + dur * AR * ratio - (dur * AR),
 // where dur is the time duration of the grain and ratio is
 // the phase increment used to effect pitch shifting of grains.
-// The -(dur * AR) term accounts for samples being added to the
+// The (dur * AR) term accounts for samples being added to the
 // buffer. We can simplify to:
-//     phase + dur * AR * (ratio - 1)
-// which must lie between 0 and BL - bufferlen
+//     phase + dur * AR * (1 - ratio)
+// which must lie between 0 and bufferlen - BL
 // We interpolate by reading one sample ahead, so take this into
 // account too, but basically, if we start within the buffer and 
 // end within the buffer, all intermediate reads will be within
 // the buffer.
 
+// DEBUG PRINTING:
+#define D if (0)
+
 #include "arcougen.h"
 #include "fastrand.h"
+#include "ringbuf.h"
+#include "dcblock.h"
 #include "granstream.h"
+
+// Define SEEFB to "see feedback" on first output channel, from which
+// grains are suppressed (for debugging only)
+// #define SEEFB 1
 
 const char *Granstream_name = "Granstream";
 
@@ -45,10 +58,36 @@ const char *Granstream_name = "Granstream";
 //
 bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps) {
     // first, read input audio into input buffer
-    block_copy(&samps[tail], gs->inp_samps);
-    tail += BL;
-    if (tail >= samps.size()) {
-        tail = 0;
+    buf.enqueue_block(gs->inp_samps);
+    // if feedback enabled, add feedback from delay buffer:
+
+    Ringbuf &delay_buf = gs->delay_buf;
+
+    if (this == &(gs->states[0]) && gs->delay > 0) {
+        if (gs->feedback > 0.00003 || gs->feedback_out_smoothed > 0.00003) {
+            // the feedback loop gain is roughly like feedback * density
+            // since the final output is the sum of all the grains. If
+            // density is high, we want to divide by density to avoid gain > 1,
+            // but if density is < 1, dividing by density will produce very
+            // high feedback amplitudes that will clip:
+            Sample target = gs->feedback / fmax(1.0, gs->density);
+            for (int i = 0; i < BL; i++) {
+                gs->feedback_out_smoothed = target +
+                        gs->feedbackfactor *
+                        (gs->feedback_out_smoothed - target);
+                Sample fb = delay_buf.dequeue() * gs->feedback_out_smoothed;
+                fb = gs->dcblock.filter(fb);
+                buf.add_to_nth(fb, BL - i);
+#ifdef SEEFB
+                out_samps[i] = fb * 0.1;  // force chan 1 to be just feedback
+                // scaled by 0.1 because we want to see the waveform even when
+                // it is out of [-1, +1] range
+#endif
+            }
+            D printf("fbgain %g\n", gs->feedback_out_smoothed);
+        } else {  // need to remove samples from delay_buf in any case
+            delay_buf.toss(BL);
+        }
     }
     bool active = false;
     if (gs->enable && gs->gain > 0) {
@@ -61,8 +100,8 @@ bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps) {
 
 
 bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
-             Sample_ptr out_samps, int i) {
-    int bufferlen = perchannel->samps.size();  //
+             Sample_ptr out_samps, int chan) {
+    int bufferlen = perchannel->buf.get_fifo_len();
     if (--delay == 0) {
         switch (state) {
           case GS_FALL: {  // fall has finished, now at end of envelope
@@ -91,23 +130,31 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             float effective_attack_release = (gs->attack + gs->release) * 0.5;
             float avgdur = (gs->lowdur + gs->highdur) * 0.5 -
                            effective_attack_release;
-            // pretend that all grains have the same avgdur duration. Since
-            // avgdur does not contain half of attack and decay times, the
-            // minimum ioi is:
+            // pretend that all grains have the same avgdur duration and are
+            // separated by the same avgioi duration. Since avgdur does not
+            // contain half of attack and decay times, the minimum ioi is:
             float minioi = avgdur + effective_attack_release;
             // the average ioi is based on density, polyphony, and
-            // input channels:
-            float avgioi = avgdur * gs->polyphony * gs->chans / gs->density;
+            // input channels. The density for a single grain stream is
+            // gs->polyphony / avgioi. The factor of gs->polyphony accounts
+            // for the fact that we have multiple grain streams. We do NOT
+            // depend on gs->chans because grains are simply distributed among
+            // output channels, but density is based on total grains, not
+            // per-channel grain counts. Solve for avgioi:
+            float avgioi = gs->density <= 0 ? MAX_BLOCK_COUNT * BP :
+                                   gs->polyphony * avgdur / gs->density;
             // we want to add a random time delay to minioi to achieve avgioi:
             float maxioi = avgioi + (avgioi - minioi);
+            // compute ts = "random ioi in range" - (avdur + ear) =
+            //              "random ioi in range" - minioi:
             float ts = (maxioi - minioi) * unifrand();
-            // Check the result: By substitution, letting
-            //   ear = effective_attack_release, and
-            //   unifrand() = 0.5 to represent the mean value,
-            //   ts = (avgioi + (avgioi - avgdur - ear) - avgdur - ear) * 0.5
-            //      = avgioi - avgdur - ear
             // So avgioi = ts + avgdur + ear. Thus using ts gives the right ioi.
-            delay = (int) (ts * BR);
+            // avoid overflow:
+            double delay_blocks = ts * BR;
+            delay = delay_blocks > MAX_BLOCK_COUNT ? MAX_BLOCK_COUNT
+                                                   : (int) delay_blocks;
+            D printf("grain dens %g poly %d ts %g delay_blocks %d\n",
+                   gs->density, gs->polyphony, ts, delay);
             // Make sure delay is plausible:
             if (delay < 0) delay = 0;
             state = GS_PREDELAY;
@@ -120,28 +167,28 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 return false;
             }
             // phase (here) is where we start in buffer relative to now
-            phase = -gs->dur * AR * unifrand();
+            // (positive phase means earlier in time, measured in samples)
+            phase = gs->dur * AR * unifrand();
             // number of samples from input buffer is increment per
             // output sample * number of output samples
             float dur_in_samples = dur_blocks * BL;
             // To avoid underflow, check the following (see notes at top)
             // (another note: add 2 to allow interpolation and rounding):
-            float final_phase = phase + (dur_in_samples + 2) * ratio;
-            if (final_phase < BL - bufferlen) {
+            float final_phase = phase + (dur_in_samples + 2) * (ratio - 1);
+            if (final_phase > bufferlen - BL) {  // too far back in time
                 // 1 sample fudge factor:
-                float advance = (BL - bufferlen) - final_phase - 1;
-                final_phase += advance;
-                phase += advance;
-            } else if (final_phase > -1) {
-                phase -= (final_phase + 1); // 1 sample fudge factor
+                float advance = final_phase - (bufferlen - BL - 1);
+                final_phase -= advance;  // now final_phase is bufferlen-BL-1
+                phase -= advance;
+            } else if (final_phase < 1) {  // not far enough back in time
+                phase -= (final_phase - 1); // 1 sample fudge factor
                 final_phase = -1;
             }
             // it may be that we can't satisfy both constraints, 
             // so check again. Also, make sure phase is initially 
             // in buffer. Only play grain if it is possible:
-            if (phase > BL - bufferlen &&
-                final_phase > BL - bufferlen &&
-                phase < 0 && final_phase < 0) {
+            if (phase < bufferlen - BL && final_phase < bufferlen - BL &&
+                phase > 0 && final_phase > 0) {
                 // start the note
                 env_val = 0;
                 gain = gs->gain;  // copy gain from unit generator. Gain
@@ -149,19 +196,22 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 env_inc = gain / (attack_blocks * BL);
                 // note: phase is negative; map phase to buffer offset
                 // in case ratio is 1, avoid interpolation
-                phase = (int) (perchannel->tail - BL + phase);
-                if (phase < 0) phase += bufferlen;
                 state = GS_RISE;
                 delay = attack_blocks;
-                assert(phase >= 0 && phase < bufferlen &&
-                       bufferlen == perchannel->samps.size());
+                assert(phase > 0 && phase < bufferlen &&
+                       bufferlen == perchannel->buf.get_fifo_len());
+                D printf("grain start: chan %d gen %d phase %g dur %g "
+                         "ratio %g\n",
+                       perchannel - &(gs->states[0]),
+                       this - &(perchannel->gens[0]), phase, dur_blocks * BP,
+                       ratio);
             } else {
                 delay = 1; // try again next block
                 state = GS_PREDELAY;
                 // only one message per 1000 blocks to avoid flood of errors
                 if (gs->warning_block > gs->current_block) {
                     printf("granstream grain too long\n");
-                    gs->warning_block = gs->current_block + 1000;
+                    gs->warning_block = (int) (gs->current_block + 1000);
                 }
             }
             break;
@@ -182,7 +232,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
         }
     }
     if (state != GS_PREDELAY) {  // envelope is non-zero
-        assert(perchannel->samps.bounds_check((int) phase));
+        assert(perchannel->buf.bounds_check((int) phase));
         Sample ampl;
         // non-standard output: Instead of each channel (perchannel)
         // generating one channel of output, in this Ugen, grains
@@ -191,25 +241,33 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
         // an instance variable, and neither does real_run().
         //
         // first, we select the output channel in round-robin fashion:
-        out_samps += (i % gs->chans) * BL;
+        assert(ratio > 0);
+#ifndef SEEFB
+        out_samps += (chan % gs->chans) * BL;
+#else
+        assert(gs->chans > 1);  // SEEFB requires at least 2 channels
+        out_samps += BL + (chan % (gs->chans - 1));
+#endif
         for (int i = 0; i < BL; i++) {
             int index = (int) phase;
-            Sample x = perchannel->samps[index];
+            Sample x = perchannel->buf.get_nth(index);
             if (ratio != 1.0) {  // for tranposition, phase is fractional
                 int index2 = index + 1;  // so do linear interpolation
-                if (index2 >= bufferlen) {
-                    index2 = 0;
-                }
-                Sample x2 = perchannel->samps[index2];
+                Sample x2 = perchannel->buf.get_nth(index2);
                 x += (phase - index) * (x2 - x);
             }
             env_val += env_inc;
             *out_samps++ += x * env_val;
-            phase += ratio;
-            if (phase >= bufferlen) {
-                phase -= bufferlen;
-            }
+            phase -= ratio;  // tricky - on average, the phase really
+            // advances by (ratio - 1) each sample, but since the tail
+            // got added to buf in a block and not while we're in this
+            // loop, we have to advance by ratio. Also, phase is how far
+            // *back* we access, so to advance in the buffer, we have to
+            // decrease phase, hence -= instead of +=.
         }
+        phase += BL;  // before we are called back, BL samples will be
+        // inserted at the tail, so we need to bump phase by BL so that
+        // it will reference the same location in time.
         return true;  // this grain is active
     }
     return false;  // this grain is not active
@@ -279,6 +337,34 @@ void arco_granstream_dur(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/granstream/delay int32 id, float delay;
+ */
+void arco_granstream_delay(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float delay = argv[1]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_delay");
+    granstream->set_delay(delay);
+}
+
+
+/* O2SM INTERFACE: /arco/granstream/feedback int32 id, float feedback;
+ */
+void arco_granstream_feedback(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float feedback = argv[1]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_feedback");
+    granstream->set_feedback(feedback);
+}
+
+
 /* O2SM INTERFACE: /arco/granstream/polyphony int32 id, int32 polyphony;
  */
 static void arco_granstream_polyphony(O2SM_HANDLER_ARGS)
@@ -306,7 +392,7 @@ static void arco_granstream_ratio(O2SM_HANDLER_ARGS)
     UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_ratio");
     granstream->low = low;
     granstream->high = high;
-    printf("granstream ratios set %g %g\n", low, high);
+    // printf("granstream ratios set %g %g\n", low, high);
 }
 
 
@@ -380,8 +466,12 @@ static void granstream_init()
                      arco_granstream_repl_inp, NULL, true, true);
     o2sm_method_new("/arco/granstream/gain", "if", arco_granstream_gain, NULL,
                      true, true);
+    o2sm_method_new("/arco/granstream/delay", "if", arco_granstream_delay, NULL,
+                     true, true);
     o2sm_method_new("/arco/granstream/dur", "if", arco_granstream_dur, NULL,
                      true, true);
+    o2sm_method_new("/arco/granstream/feedback", "if",
+                    arco_granstream_feedback, NULL, true, true);
     o2sm_method_new("/arco/granstream/polyphony", "ii",
                      arco_granstream_polyphony, NULL, true, true);
     o2sm_method_new("/arco/granstream/ratio", "iff", arco_granstream_ratio,

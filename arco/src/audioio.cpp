@@ -549,7 +549,10 @@ static int callback_entry(float *input, float *output,
     aud_blocks_done++;  // bring everyone up to this count
     if (input_ug && (aout = &input_ug->output[0])) {
         copy_deinterleave(aout, input_ug->chans, input, actual_in_chans);
-        input_ug->set_current_block(aud_blocks_done);
+        if (((Thru *) input_ug)->alternate == NULL) {
+            input_ug->set_current_block(aud_blocks_done);
+        }  // otherwise, the input is overwritten by alternate, and we must
+           // not update current_block so run will call real_run.
     }
 
     for (int i = 0; i < run_set.size(); i++) {
@@ -780,6 +783,39 @@ static void arco_mute(O2SM_HANDLER_ARGS)
     } else {
         arco_warn("/arco/mute %d not in output set, ignored\n", id);
     }
+}
+
+
+/* O2SM INTERFACE:  /arco/swap int32 id, int32 id2; -- replace first ugen
+ *    with the second one. This is an atomic operation to support inserting
+ *    a fadeout between a source and the output when the source is already
+ *    connected and playing, avoiding any race condition.
+ */
+static void arco_swap(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t id2 = argv[1]->i;
+    // end unpack message
+
+    ANY_UGEN_FROM_ID(ugen, id, "arco_swap");
+    ANY_UGEN_FROM_ID(replacement, id2, "arco_swap");
+    if (replacement->rate != 'a') {
+        arco_warn("/arco/swap id2 (%d) is not audio rate\n", id2);
+        return;
+    }
+    if (replacement->flags & IN_OUTPUT_SET) {
+        arco_warn("/arco/swap id2 (%d) already in output set\n", id2);
+        return;
+    }
+    if (!ugen || !(ugen->flags & IN_OUTPUT_SET)) {
+        arco_warn("/arco/swap id (%d) not in output set, ignored\n", id);
+        return;
+    }
+    forget_ugen_id(id, output_set);
+    ugen->flags &= ~IN_OUTPUT_SET;
+    replacement->flags |= IN_OUTPUT_SET;
+    output_set.push_back(id);
 }
 
 
@@ -1242,6 +1278,7 @@ void audioio_initialize()
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);
     o2sm_method_new("/arco/output", "i", arco_output, NULL, true, true);
     o2sm_method_new("/arco/mute", "i", arco_mute, NULL, true, true);
+    o2sm_method_new("/arco/swap", "ii", arco_swap, NULL, true, true);
     o2sm_method_new("/arco/run", "i", arco_run, NULL, true, true);
     o2sm_method_new("/arco/unrun", "i", arco_unrun, NULL, true, true);
     o2sm_method_new("/arco/open", "iiiiiis", arco_open, NULL, true, true);

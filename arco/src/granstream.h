@@ -16,6 +16,31 @@
  * Grains are on block boundaries, and on/off ramps are also
  * on block boundaries.
  *
+ * There is optional feedback from sum of all output channels
+ * to the first channel's input buffer. The feedback is limited
+ * using the following sample-by-sample algorithm:
+ *    A peak_envelope is instantly set to the peak, and otherwise
+ *        decays to 1 with time constant 1 sec.
+ *    The peak_smoothed converges to the peak_envelope with time
+ *        constant 2 msec.
+ *    Time constants are time to converge to 1/e (not 1/2)
+ *    Feedback samples are multiplied by 1/peak_smoothed.
+ *    Decay is computed by out = in + g * (prev – in), where g is
+ *        exp(-1/time_const_in_samples). Note that this produces
+ *        the weighted sum g * prev + (1 - g) * in. g is almost 1,
+ *        so out is almost prev, but moves toward in.
+ * In addition, the feedback inserted into the delay and applied
+ * after the delay ramps up and down slowly when feedback is changed
+ * to prevent glitches.
+ *
+ * Feedback is initially zero, and there is no feedback. Delay is
+ * also initially zero. When either feedback or delay is set to
+ * non-zero, feedback delay is started, and it continues even when
+ * feedback becomes zero (although there is a small optimization where
+ * output channels are not summed into the feedback if the feedback
+ * amount is zero; thus, when feedback becomes non-zero, there will
+ * be some delay before feedback is heard. You can avoid this delay
+ * by setting feedback to -90dB or at least 0.00003 instead of zero.)
  */
 
 extern const char *Granstream_name;
@@ -55,24 +80,18 @@ public:
 
 class Granstream_state {  // information for a single channel
 public:
-    Vec<float> samps;  // delay line
-    int tail;  // tail indexes the *next* location to put input
-    // tail also indexes the oldest input, which has a delay of
-    // samps.size() samples
+    Ringbuf buf;  // input buffer (source for grains)
     Vec<Gran_gen> gens;  // individual grains
 
     void init(float dur, int polyphony) {
         int len = ((int) (dur * AR) + BL) & ~(BL - 1);  // round up to BL
-        samps.init(len);
-        samps.set_size(samps.get_allocated());  // zeros samps
-        tail = 0;
-        gens.init(polyphony);
+        buf.init(len, true);
         gens.set_size(polyphony, false);
         reset_gens(polyphony);
     }
     
     void finish() {
-        samps.finish();
+        buf.finish();
         gens.finish();
     }
     
@@ -91,18 +110,13 @@ public:
     }
 
     void set_dur(int len) {  // called by Granstream::set_dur(float dur)
-        // note that buffer duration never shrinks -- because we could be reading
-        // from a long delay that would become inaccessible if the buffer size
-        // is reduced. dur, however, can be reduced so that future grains come
-        // from more recent history (lower delay).
-        if (len > samps.size()) {  // see delay.h for algorithm notes
-            int old_length = samps.size();
-            int grow = len - old_length;
-            Sample_ptr ptr = samps.append_space(grow);
-            int m = (tail == 0 ? 0 : old_length - tail);
-            memmove(&samps[tail + grow], &samps[tail],
-                    grow * sizeof(Sample));
-            memset(&samps[tail], 0, grow * sizeof(Sample));
+        // note that buffer duration never shrinks -- because we could be
+        // reading from a long delay that would become inaccessible if the
+        // buffer size is reduced. dur, however, can be reduced so that future
+        // grains come from more recent history (lower delay).
+        if (len > buf.get_fifo_len()) {
+            buf.set_fifo_len(len, true);
+            assert(buf.get_fifo_len() == len);
         }
     }
 };
@@ -115,7 +129,20 @@ public:
     int polyphony;  // how many grains can we have at once per channel
     float dur;      // how far we can reach back in time to find a grain
     bool enable;    // start/stop making grains
+
+    float delay;    // in seconds
+    Ringbuf delay_buf;  // delay line
+    float feedback;
+    float peak_envelope;  // used for feedback limiter
+    float peak_smoothed;  // used for feedback limiter
+    float risefactor;
+    float fallfactor;
+    float feedbackfactor;
+    float feedback_in_smoothed;  // used to smoothly adjust feedback
+    float feedback_out_smoothed;  // used to smoothly adjust feedback
     Vec<Granstream_state> states;
+    Dcblock dcblock;  // used to block DC in feedback
+
 
     Ugen_ptr inp;
     int inp_stride;
@@ -134,16 +161,24 @@ public:
     bool stop_request;  // waiting for last grain to finish before setting
                         // enable to false.
     
-    Granstream(int id, int nchans, Ugen_ptr inp_, int polyphony_,
+    Granstream(int id, int nchans, Ugen_ptr inp, int polyphony_,
                     float dur_, bool enable_) : Ugen(id, 'a', nchans) {
     /* polyphony - number of grains per channel
      * dur - the duration (s) of the sample buffer per channel
      */
-        inp = inp_;
+        init_inp(inp);
         polyphony = polyphony_;
         dur = dur_;
         enable = enable_;
-
+        delay = 0;
+        feedback = 0.0;  // no feedback is default
+        feedback_in_smoothed = 0.0;
+        feedback_out_smoothed = 0.0;
+        peak_envelope = 1.0;
+        peak_smoothed = 1.0;
+        risefactor = exp(-1.0 / (0.002 * AR));  // 2 msec rise time
+        fallfactor = exp(-1.0 / AR);            // 1 sec fall time
+        feedbackfactor = exp(-1 / (0.1 * AR));  // 100 msec feedback smoothing
         attack = 0.02;
         release = 0.02;
         high = 1.0;
@@ -155,7 +190,7 @@ public:
         warning_block = 0;
         stop_request = false;
 
-        states.init(chans);
+        states.set_size(chans);
         states.set_size(chans, false);
         for (int i = 0; i < chans; i++) {
             states[i].init(dur, polyphony);
@@ -199,10 +234,35 @@ public:
         reset_gens();
     }
 
+    void set_delay(float d) {
+        delay = MAX(BP, d);  // must delay at least one block
+        int len = round(delay * AR);
+        if (len > delay_buf.get_fifo_len()) {  // (code from delay.h)
+            delay_buf.set_fifo_len(len, true);
+            assert(delay_buf.get_fifo_len() == len);
+        }
+    }
+
+
+    void set_feedback(float f) {
+        if (f > 0) {      // turning feedback on
+            feedback = f;
+            if (delay == 0) {  // initial value must be corrected
+                delay = 1.0;
+            }
+            set_delay(delay);
+        } else {
+            feedback = 0.0;
+            return;  // feedback turned off
+        }
+    }
+
+
     void set_gain(float g) {
         gain = g;
     }
-    
+
+
     void set_dur(float d) {
         dur = d;
         int len = ((int) (dur * AR) + BL) & ~(BL - 1);  // round up to BL
@@ -237,11 +297,51 @@ public:
         // clear all output here because each channel (state) can sum grains
         // to each channel
         block_zero_n(out_samps, chans);
+        
         for (int i = 0; i < states.size(); i++) {
             active |= chan_a(state);
             state++;
             inp_samps += inp_stride;
         }
+
+        Sample fb[BL];
+        block_zero(fb);
+        // see if feedback is significant (above -90dB):
+        if (feedback >= 0.00003 || feedback_in_smoothed >= 0.00003) {
+            // sum all output channels, constructing feedback signal
+            for (int chan = 0; chan < states.size(); chan++) {
+                for (int i = 0; i < BL; i++) {
+                    fb[i] += *out_samps++;
+                }
+            }
+
+            // feedback is not applied here: we only ramp the gain,
+            // feedback_in_smoothed from 0 to 1 and back to 0, depending
+            // on feedback > 0. For faster response, feedback signal is
+            // multiplied by feedback_out_smoothed (which tracks feedback)
+            // when the signal comes out of delay_buf.
+            float fbis_target = (feedback > 0);  // feedback_in_smoothed target
+
+            // apply limiter and smoothly ramp on/off following fbis_target
+            for (int i = 0; i < BL; i++) {
+                peak_envelope = fmax(peak_envelope, fabs(fb[i]));
+                peak_smoothed = peak_envelope +
+                        risefactor * (peak_smoothed - peak_envelope);
+                feedback_in_smoothed = fbis_target +
+                        feedbackfactor * (feedback_in_smoothed - fbis_target);
+                fb[i] *= feedback_in_smoothed / peak_smoothed;
+                peak_envelope = 1 + fallfactor * (peak_envelope - 1);
+            }
+            D printf("peak %g peaksm %g fbenv %g fbgain %g\n", peak_envelope,
+                   peak_smoothed, feedback_in_smoothed,
+                   feedback_in_smoothed / peak_smoothed);
+        }
+        if (delay > 0) {
+            delay_buf.enqueue_block(fb);
+        }
+        // printf("peak_smoothed %g peak_envelope %g\n",
+        //        peak_smoothed, peak_envelope);
+
         if (stop_request && !active) {
             stop_request = false;
             enable = false;

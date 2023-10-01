@@ -85,13 +85,12 @@ class Ola_pitch_shift: public Ugen {
     int ixfade;   // xfade measured in samples
     float xfade_recip;  // used in inner loop
     int iwindur;  // windur measured in samples
-    int bufmask;  // used to wrap around circular buffer
     int intap;    // where to insert sample
     int fouttap;  // where to take interpolated output
     float fouttap_delta;
 
     struct Ola_pitch_shift_state {
-        Vec<float> delaybuf;
+       Ringbuf delaybuf;
     };
     Vec<Ola_pitch_shift_state> states;
 
@@ -109,7 +108,7 @@ class Ola_pitch_shift: public Ugen {
         intap = 0;
         fouttap = 0;
         fouttap_delta = 0;
-        states.init(chans);
+        states.set_size(chans);
         for (int i = 0; i < chans; i++) {
             states[i].delaybuf.init(0);
         }
@@ -165,21 +164,8 @@ class Ola_pitch_shift: public Ugen {
         int bl = iwindur + 1;  // bl = delay buffer len in samples
         for (int i = 0; i < chans; i++) {
             Ola_pitch_shift_state *state = &states[i];
-            if (state->delaybuf.size() < bl) {  // expand delaybuf
-                int len = 32;
-                while (len < bl) len <<= 1;
-                bufmask = len - 1;
-                state->delaybuf.finish(); // reallocate
-                printf("ola_pitch_shift reallocate delaybuf chan %d length %d"
-                       " bufmask %x\n", i, len, bufmask);
-                state->delaybuf.init(len, true);  // fill new buffer with zeros
-            } else {
-                printf("ola_pitch_shift reuse delaybuf chan %d (size %d)"
-                       " bufmask %x\n", i, state->delaybuf.size(), bufmask);
-                state->delaybuf.zero();
-            }
+            state->delaybuf.set_fifo_len(bl, true);
         }
-        intap = 0;
         fouttap = 0.0;
     }
 
@@ -189,12 +175,11 @@ class Ola_pitch_shift: public Ugen {
     }
 
     void chan_a(Ola_pitch_shift_state *state) {
-        Vec<Sample> &delaybuf = state->delaybuf;
+        Ringbuf &delaybuf = state->delaybuf;
 
         for (int i = 0; i < BL; i++)  {
-            assert(delaybuf.bounds_check(intap));
-            delaybuf[intap++] = inp_samps[i];
-            intap &= bufmask;
+            delaybuf.toss(1);  // make room for mor
+            delaybuf.enqueue(inp_samps[i]);
 
             // adjust fouttap_delta to the range -(iwindur-ixfade) to 0.
             // when it exceeds either extreme, we wrap around, and due
@@ -207,33 +192,27 @@ class Ola_pitch_shift: public Ugen {
             // see diagram above. Need to crossfade when fouttap_delta
             // is in the range -ixfade to 0. But we always need at least
             // one sample, which we get first:
-            float fouttap = intap + delaybuf.size() + fouttap_delta;
-            // delaybuf->size() was added to ensure that fouttap is positive
-            int tap1a = (int) fouttap;
-            float alpha = fouttap - tap1a;  // fractional part for interpolation
-            tap1a &= bufmask;
-            int tap2a = (tap1a + 1) & bufmask;
-            assert(delaybuf.bounds_check(tap1a));
-            assert(delaybuf.bounds_check(tap2a));
-            float x1a = delaybuf[tap1a];
-            float x2a = delaybuf[tap2a];
+            int tap1a = (int) fouttap_delta;
+            float alpha = fouttap_delta - tap1a;  // fractional part
+            int tap2a = tap1a + 1;
+            // fouttap is an offset from input (tail) and it is negative.
+            // get_nth(n) goes back to nth previous sample, n is positive.
+            // so we have to flip the sign by using -tap1a and -tap2a
+            float x1a = delaybuf.get_nth(-tap1a);
+            float x2a = delaybuf.get_nth(-tap2a);
             float xa = x1a +  alpha * (x2a - x1a);
          
             if (fouttap_delta < -ixfade) { 
                 *out_samps++ = xa;  // and we're done
             } else {
-                int tap1b = (tap1a + delaybuf.size() - (iwindur - ixfade)) &
-                            bufmask;
-                int tap2b = (tap1b + 1) & bufmask;
-             
-                assert(delaybuf.bounds_check(tap1b));
-                assert(delaybuf.bounds_check(tap2b));
-                float x1b = delaybuf[tap1b];
-                float x2b = delaybuf[tap2b];
+                int tap1b = tap1a - (iwindur - ixfade);
+                int tap2b = tap1b + 1;
+                float x1b = delaybuf.get_nth(-tap1b);
+                float x2b = delaybuf.get_nth(-tap2b);
                 // note that since we are at an integer offset, the fractional
                 // part of tap1b is alpha, the fractional part of tap1a
                 float xb = x1b + alpha * (x2b - x1b);
-                // another interpolation, this time interpolating to compute xfade
+                // this different interpolation is to compute xfade:
                 float beta = -fouttap_delta * xfade_recip;
                 *out_samps++ = xb + beta * (xa - xb);
             }

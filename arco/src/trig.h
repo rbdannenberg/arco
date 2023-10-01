@@ -37,7 +37,7 @@ class Trig : public Ugen {
 
     
     Trig(int id, Ugen_ptr inp, const char *address_, int window_size,
-         float threshold, float pause) : Ugen(id, 'a', 0) {
+         float threshold, float pause) : Ugen(id, 0, 0) {
         // round up to multiple of BL:
         address = o2_heapify(address_);
         set_window(window_size);

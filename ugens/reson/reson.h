@@ -72,7 +72,7 @@ public:
         snd = snd_;
         center = center_;
         q = q_;
-        states.init(chans);
+        states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_snd(snd);
         init_center(center);
@@ -151,18 +151,15 @@ public:
     }
 
     void set_snd(int chan, float f) {
-        assert(snd->rate == 'c');
-        snd->output[chan] = f;
+        snd->const_set(chan, f, "Reson::set_snd");
     }
 
     void set_center(int chan, float f) {
-        assert(center->rate == 'c');
-        center->output[chan] = f;
+        center->const_set(chan, f, "Reson::set_center");
     }
 
     void set_q(int chan, float f) {
-        assert(q->rate == 'c');
-        q->output[chan] = f;
+        q->const_set(chan, f, "Reson::set_q");
     }
 
     void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, snd_stride); }

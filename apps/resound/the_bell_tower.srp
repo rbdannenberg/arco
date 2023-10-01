@@ -106,23 +106,23 @@ class The_bell_tower:
     def set_ui(win):
     # Setting up The_bell_tower's UI
         // Micwet
-        Labeled_slider(win, "micwet", 'S', 'D', 275, 30, 75, 0, 1,
-                       prefs.get('micwet', 0.1), 'linear', 'micwet_slider')
+        Labeled_slider(win, "micwet", 'S', 'D', 275, 30, 75, 0, 1, 0.1,
+                       'linear', 'micwet_slider', prefs = prefs)
         micwet_slider.add_target_method(this, 'micwet_handler')
 
         // Bellwet
-        Labeled_slider(win, "bellwet", 'S', 'D', 275, 30, 75, 0, 1,
-                       prefs.get('bellwet', 0.1), 'linear', 'bellwet_slider')
+        Labeled_slider(win, "bellwet", 'S', 'D', 275, 30, 75, 0, 1, 0.1,
+                       'linear', 'bellwet_slider', prefs = prefs)
         bellwet_slider.add_target_method(this, 'bellwet_handler')
 
         // RT60
-        Labeled_slider(win, "rt60", 'S', 'D', 275, 30, 75, 0, 10,
-                       prefs.get('rt60', 5), 'linear', 'rt60_slider')
+        Labeled_slider(win, "rt60", 'S', 'D', 275, 30, 75, 0, 10, 5,
+                       'linear', 'rt60_slider', prefs = prefs)
         rt60_slider.add_target_method(this, 'rt60_handler')
 
         // Filter -  lowest cutoff set to 1 due to dist.
-        Labeled_slider(win, "filter", 'S', 'D', 275, 30, 75, 1, 20000,
-                       prefs.get('filter', 9000), 'integer', 'filter_slider')
+        Labeled_slider(win, "filter", 'S', 'D', 275, 30, 75, 1, 20000, 9000,
+                       'integer', 'filter_slider', prefs = prefs)
         filter_slider.add_target_method(this, 'filter_handler')
 
         // Fadeout
@@ -130,9 +130,8 @@ class The_bell_tower:
         fadeout.add_target_method(this, 'fadeout_handler')
 
         // Fadelength
-        Labeled_slider(win, "fadelen", 'S', 'D', 275, 30, 75, 0, 30,
-                       prefs.get('fadelen', 30), 'integer', 'fadelen_slider')
-        fadelen_slider.add_target_method(this, 'fadelen_handler')
+        Labeled_slider(win, "fadelen", 'S', 'D', 275, 30, 75, 0, 30, 30,
+                       'integer', 'fadelen_slider', prefs = prefs)
 
 
     def fadeout_handler(obj, event, x, y):
@@ -156,14 +155,12 @@ class The_bell_tower:
 
     def rt60_handler(obj, x):
     # Set the reverb time (RT60 time)
-        prefs.set('rt60', x)
         if rvb:
             rvb.set_rt60(max(0.1, x))
 
 
     def bellwet_handler(obj, x):
     # Determines the wetness of the currently active bell
-        prefs.set('bellwet', x)
         if bell_mixer:
             for bell in bells:
                 rvb_mixer.set_gain(bell.name, x)
@@ -171,17 +168,11 @@ class The_bell_tower:
 
     def micwet_handler(obj, x):
     # Determines the wetness of the mic
-        prefs.set('micwet', x)
         if bell_mixer:
             rvb_mixer.set_gain('mic', x)
 
 
     def filter_handler(obj, x):
     # Change the frequency of the lowpass filter
-        prefs.set('filter', x)
         if rvb:
             rvb.set_cutoff(x)
-
-    def fadelen_handler(obj, x):
-    # Change the fade length
-        prefs.set('fadelen', x)

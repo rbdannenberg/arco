@@ -291,7 +291,7 @@ void Recplay::real_run()
             return;
         }
         int buffer = (int) INDEX_TO_BUFFER(play_index);
-        long offset = INDEX_TO_OFFSET(play_index);
+        int offset = INDEX_TO_OFFSET(play_index);
         // phase is exact offset within buffer. Computed by subtracting
         // off the length of the previous buffers, which is play_index
         // minus offset, which is where we are in the current buffer.

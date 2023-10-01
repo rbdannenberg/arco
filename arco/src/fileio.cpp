@@ -23,6 +23,8 @@
 #include "ugen.h"
 #include "fileio.h"
 
+#define D if (0)
+
 extern O2sm_info *audio_bridge;
     
 O2sm_info *fileio_bridge = NULL;
@@ -207,9 +209,11 @@ public:
 
     bool write_block(int64_t block_addr) {  // return true if last block
         Audioblock *block = (Audioblock *) block_addr;
-        printf("fileio::write_block dat address %p\n", block->dat);
+        D printf("fileio::write_block dat address %p\n", block->dat);
         sf_writef_short(snd_out, block->dat, block->frames);
-        printf("fileio::write_block wrote %d frames\n", block->frames);
+        D printf("fileio::write_block wrote %d frames\n", block->frames);
+        
+        /* DEBUG: write sample values as text to testout.txt:
         static FILE *outf = NULL;
         if (!outf) outf = fopen("testout.txt", "w");
         for (int i = 0; i < block->frames; i++) {
@@ -218,6 +222,11 @@ public:
         if (block->frames < 8000) {
             fclose(outf);
         }
+        */
+        
+        /* DEBUG: Look for 4 zeros in a row -- this was some test looking for
+         *    blocks that were missing data, but in practice, 4 zeros in a row
+         *    is not too uncommon, even from live microphone input
         for (int i = 0; i < block->frames - 4; i++) {
             int j;
             for (j = 0; j < 4; j++) {
@@ -232,6 +241,7 @@ public:
                 }
             }
         }
+        */
 
         // o2sm_send_cmd("/arco/fileplay/samps", 0, "hh", addr);
         // instead of sending through O2, deliver straight to Arco:
@@ -376,12 +386,12 @@ void fileio_filerec_write(O2SM_HANDLER_ARGS)
     int64_t block = argv[1]->h;
     // end unpack message
     int i = fileio_find(addr);
-    printf("fileio_filerec_write addr %p block %p index %d last %d\n",
+    D printf("fileio_filerec_write addr %p block %p index %d last %d\n",
            (void *) addr, (void *) block, i, ((Audioblock *) block)->last);
     if (i >= 0) {
         Fileio_writer *writer = (Fileio_writer *) fileio_objs[i];
         bool last = writer->write_block(block);
-        printf("wrote audioblock %p, last %d\n", (void *) block, last);
+        D printf("wrote audioblock %p, last %d\n", (void *) block, last);
         o2_send_start();
         o2_add_int64(addr);
         O2message_ptr msg = 

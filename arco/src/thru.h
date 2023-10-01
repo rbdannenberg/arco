@@ -53,22 +53,30 @@ public:
     void init_input(Ugen_ptr inp) { init_param(inp, input, input_stride); }
 
 
-    Sample_ptr run(int64_t block_count) {
-        // first, act normal and update output if needed
-        Ugen::run(block_count);
-        if (alternate) {  // redirect caller to get samples from alternate
-            return alternate->run(block_count);
-        }
-        return &output[0];
-    }
-
-
     void real_run() {
         Sample_ptr src = input->run(current_block);  // bring input up-to-date
-        for (int i = 0; i < chans; i++) {
-            block_copy(out_samps, src);
-            src += BL + input_stride;
-            out_samps += BL;
+        if (!alternate) {  // redirect caller to get samples from alternate
+            for (int i = 0; i < chans; i++) {
+                block_copy(out_samps, src);
+                src += input_stride;
+                out_samps += BL;
+            }
+        } else {  // redirect caller to get samples from alternate
+            Sample_ptr src = alternate->run(current_block);
+            Sample_ptr src_end = src + BL * alternate->chans;
+            int stride = (alternate->chans == 1 ? 0 : BL);
+            int i;
+            for (i = 0; i < chans; i++) {  // does fan-out if 1 input channel
+                block_copy(out_samps, src);
+                src += stride;
+                out_samps += BL;
+                if (src == src_end) {  // more output than input channels
+                    break;
+                }
+            }
+            if (i < chans) {  // zero-pad input to fill out remaining channels
+                block_zero_n(out_samps, chans - i);
+            }
         }
     }
 };

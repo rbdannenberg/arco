@@ -10,7 +10,7 @@ class Thru (Ugen):
                    "Thru", chans, 'a', "U", 'inp', inp)
 
     def set_alternate(alt):
-        o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt)
+        o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
 
 def thru(inp, optional chans = 1):
     Thru(inp, chans)

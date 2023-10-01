@@ -29,7 +29,7 @@ class Resamp {
         span = span_;
         ov = ov_;
         int m = (span / 2) * ov + 1;
-        sinc.init(m);
+        sinc.set_size(m + 1, false);
         for (int i = 0; i <= m; i++) {
             double w = 0.42 - 0.5 * cos(2 * M_PI * (i + m) / (2 * m)) +
                               0.08 * cos(4 * M_PI * (i + m) / (2 * m));

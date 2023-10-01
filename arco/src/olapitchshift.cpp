@@ -6,6 +6,7 @@
  */
 
 #include "arcougen.h"
+#include "ringbuf.h"
 #include "olapitchshift.h"
 
 const char *Ola_pitch_shift_name = "Ola_pitch_shift";

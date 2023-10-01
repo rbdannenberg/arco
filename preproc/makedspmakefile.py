@@ -90,15 +90,19 @@ def make_makefile(arco_path, manifest, outf):
     print("\ttouch allugens.srp", file=outf)
     for src in srp_srcs:
         print("\tcat", src, ">> allugens.srp", file=outf)
+        # this newline also is needed for files with no final newline:
+        print("\techo >> allugens.srp", file=outf)  # blank line separator
 
 
 def make_inclfile(arco_path, manifest, outf):
     "make the CMake include file that lists all the sources"
 
+    need_ringbuf = False  # need to compile with ringbuf.h
     need_flsyn_lib = False  # special: ugen needs fluidsynth library
     need_fft = False  # need to compile and link with ffts files
     need_windowed_input = False  # need to compile and link with windowedinput.h
         # (this is an abstract superclass; perhaps multiple ugens depend on it)
+    need_dcblocker = False # need to compile and link with dcblocker.h
     
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
@@ -117,6 +121,10 @@ def make_inclfile(arco_path, manifest, outf):
 
     print("set(ARCO_SRC ${ARCO_SRC}", file=outf)
 
+    ## Compute Dependencies
+    if "granstream" in manifest:  # add ringbuf which granstream depends on
+        need_ringbuf = True
+
     if "pv" in manifest:  # add cmupv which pv depends on
         print("    " + arco_path + "/cmupv/src/cmupv.c",
                        arco_path + "/cmupv/src/cmupv.h\n",
@@ -128,6 +136,13 @@ def make_inclfile(arco_path, manifest, outf):
 
     if "yin" in manifest:
         need_windowed_input = True
+
+    if ("delay" in manifest) or ("granstream" in manifest):
+        need_dcblocker = True
+
+    ## Include source files to satisfy dependencies
+    if need_ringbuf:
+        print("    " + arco_path + "/arco/src/ringbuf.h", file=outf)
 
     if need_fft:
         print("    " + arco_path + "/ffts/src/fftext.c",
@@ -141,6 +156,11 @@ def make_inclfile(arco_path, manifest, outf):
     if need_windowed_input:
         print("    " + arco_path + "/arco/src/windowedinput.h")
 
+    if need_dcblocker:
+        print("    " + arco_path + "/arco/src/dcblock.h")
+
+
+    ## Add source files for specified ugens
     for ugen in manifest:
         both = False
         basename = ugen

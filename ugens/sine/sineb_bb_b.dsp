@@ -1,7 +1,7 @@
 declare name "sineb";
 
 declare description "Sine Unit Generator for Arco";
-declare interoplate "amp";
+declare interpolated "amp";
 
 import("stdfaust.lib");
 

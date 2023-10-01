@@ -57,7 +57,7 @@ class Yin : public Windowed_input {
     
     Yin(int id, int chans, Ugen_ptr inp, int minstep, int maxstep,
         int hopsize, const char *address_) : Windowed_input(id, chans, inp) {
-        yin_states.init(chans);
+        yin_states.set_size(chans);
         middle = std::ceil(AR / step_to_hz(minstep));
         int window_size = middle * 2;
         Windowed_input::init(window_size + BL * 2, window_size, hopsize);

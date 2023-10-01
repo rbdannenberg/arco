@@ -57,3 +57,36 @@ class Reverb (Instrument):
 
 
 def reverb(inp, rt60): return Reverb(inp, rt60)
+
+
+class Stereo_reverb(Instrument):
+# Stereo_reverb takes in input, wet (reverb gain), and reverb time
+# It constructs two Reverb instruments and scales the gain and cutoff
+# of the right reverb by 1.1 to get slightly different output
+# The reverb outputs are assigned to left and right channels and the
+# input is added to form a stereo output. A mono input will be
+# duplicated, which will give it a boost in power.
+
+    var left, right, mix
+    
+    def init(inp, wet, rt60):
+        left = Reverb(inp, rt60)
+        right = Reverb(inp, rt60)
+        mix = mix(2)
+        mix.ins('left', left, [wet, 0])
+        mix.ins('right', right, [0, wet])
+        mix.ins('inp', inp, [1, 1])
+        super.init("Stereo_reverb",  mix)
+
+    def set_inp(inp):
+        left.set_inp(inp)
+        right.set_inp(inp)
+
+    def set_rt60(rt60)
+        left.set_rt60(rt60)
+        right.set_rt60(rt60)
+
+    def set_cutoff(freq)
+        left.set_cutoff(freq)
+        right.set_cutoff(freq)
+

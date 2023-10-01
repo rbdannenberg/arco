@@ -6,6 +6,8 @@
 
 /* References and reference counting: see fileplay.h for overview. */
 
+#define D if (0)
+
 extern const char *Filerec_name;
 extern O2sm_info *fileio_bridge;
 
@@ -132,7 +134,7 @@ public:
         o2_send_start();
         o2_add_int64((int64_t) this);
         o2_add_int64((int64_t) blocks[block_to_send]);
-        printf("filerec send_a_block: block %p block dat %p\n",
+        D printf("filerec send_a_block: block %p block dat %p\n",
                blocks[block_to_send], blocks[block_to_send]->dat);
         O2message_ptr msg =
                 o2_message_finish(0.0, "/fileio/filerec/write", true);
@@ -189,7 +191,7 @@ public:
         }
         // read one frame at a time and write to block
         int16_t *out = &(block->dat[frame_in_block * block->channels]);
-        if (frame_in_block == 0) {
+        D if (frame_in_block == 0) {
             printf("real_run, frame_in_block == 0, write to %p (out) dat %p\n",
                    out, &(block->dat[0]));
         }

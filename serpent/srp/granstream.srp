@@ -33,6 +33,11 @@ class Granstream (Ugen):
     def set_dur(dur)
         o2_send_cmd("/arco/granstream/dur", 0, "Uf", id, dur)
 
+    def set_delay(d)
+        o2_send_cmd("/arco/granstream/delay", 0, "Uf", id, d)
+
+    def set_feedback(fb)
+        o2_send_cmd("/arco/granstream/feedback", 0, "Uf", id, fb)
 
 
 def granstream(input, polyphony, dur, enable, optional chans = 1):

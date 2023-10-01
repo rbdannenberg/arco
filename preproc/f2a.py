@@ -916,7 +916,7 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
         constructor += "        " + p + " = " + p + "_;\n"
 
     # initialize states
-    constructor += "        states.init(chans);\n"
+    constructor += "        states.set_size(chans);\n"
     constants = initialize_constants(classname, instvars)
     if constants == True:  # error occurred
         return
@@ -968,8 +968,8 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
     ## Generate set_* methods to set constant rate input parameters
     for p in parameters:
         methods += "    void set_" + p + "(int chan, float f) {\n"
-        methods += "        assert(" + p + "->rate == 'c');\n"
-        methods += "        " + p + "->output[chan] = f;\n"
+        methods += "        " + p + "->const_set(chan, f, "
+        methods += '"' + classname + "::set_" + p + '");\n'
         methods += "    }\n\n"
 
     ## Generate init_* methods shared by constructor and repl_* methods
@@ -1065,6 +1065,7 @@ def get_params_a(fsrc):
     returns: [[p1, False], [p2, True], ...] where boolean indicates
         interpolation when the output is audio, or on error, True
     """
+    print("get_params_a fsrc", fsrc)
     loc = fsrc.find("process(")
     if loc < 0:
         loc = fsrc.find("process")
@@ -1087,12 +1088,14 @@ def get_params_a(fsrc):
     # now look for interpolated declaration
     interpolated = []
     loc = fsrc.find("declare interpolated")
+    print("interpolated declare at", loc, "SOURCE", fsrc)
     if loc >= 0:
         loc = fsrc.find('"', loc)  # first quote
         if loc < 0:
             print("Error: could not find string after declare interpolated")
             return True
         loc2 = fsrc.find('"', loc + 1)
+        print("interpolated loc", loc, "loc2", loc2)
         interpolated = fsrc[loc + 1 : loc2].replace(",", " ").split()
     print("interpolated", interpolated)
 

@@ -52,7 +52,6 @@ public:
             }
         }
         *out_samps = current - bias;
-        printf("pweb out %g\n", *out_samps);
         current *= seg_factor;
         seg_togo--;
     }

@@ -5,6 +5,7 @@
  */
 
 #include "arcougen.h"
+#include "dcblock.h"
 #include "delay.h"
 
 const char *Delay_name = "Delay";

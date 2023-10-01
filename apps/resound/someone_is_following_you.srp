@@ -42,15 +42,15 @@ class Someone_is_following_you:
 
         // Sliders
         Labeled_slider(win, "del1", init_x+5, init_y + 50, 250, 28, 65,
-                       0.8, 1.2, 1, 'linear', 'd1_slide')
+                       0.8, 1.2, 1, 'linear', 'd1_slide', prefs = prefs)
         d1_slide.add_target_method(this, 'delay1_handler')
 
         Labeled_slider(win, "del2", init_x+5, 'D', 250, 28, 65,
-                       1.8, 2.2, 2, 'linear', 'd2_slide')
+                       1.8, 2.2, 2, 'linear', 'd2_slide', prefs = prefs)
         d2_slide.add_target_method(this, 'delay2_handler')
 
         Labeled_slider(win, "fadelen", init_x+5, 'D', 250, 28, 65,
-                       0.1, 4, 2.5, 'exponential', 'fl_slide')
+                       0.1, 4, 2.5, 'exponential', 'fl_slide', prefs = prefs)
         fl_slide.add_target_method(this, 'fadelen_handler')
         
 

@@ -10,7 +10,7 @@ class Zerob : public Ugen {
 public:
     Zerob(int id) : Ugen(id, 'a', 1) {
         current_block = MAX_BLOCK_COUNT;
-        output[0] = 0.0f; }
+        *out_samps = 0.0f; }
 
     const char *classname() { return zerob_name; }
 

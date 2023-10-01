@@ -66,7 +66,7 @@ public:
             Ugen(id, 'b', nchans) {
         x1 = x1_;
         x2 = x2_;
-        states.init(chans);
+        states.set_size(chans);
 
         init_x1(x1);
         init_x2(x2);
@@ -101,13 +101,11 @@ public:
     }
 
     void set_x1(int chan, float f) {
-        assert(x1->rate == 'c');
-        x1->output[chan] = f;
+        x1->const_set(chan, f, "Multb::set_x1");
     }
 
     void set_x2(int chan, float f) {
-        assert(x2->rate == 'c');
-        x2->output[chan] = f;
+        x2->const_set(chan, f, "Multb::set_x2");
     }
 
     void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, x1_stride); }

@@ -55,19 +55,25 @@ class Mix (Ugen):
                 print "WARNING: Mix gain for", name, "is a", gain_ugen.chans,
                 print "channel Const, but set_gain requests channel", chan
             // a Const exists, so we just write to it using set_gain
-            display "mix set_gain, calling /set_gain", id, name, chan, gain
-            o2_send_cmd("/arco/mix/set_gain", 0, "Usif", id, str(name), chan, gain)
+            // display "mix set_gain, calling /set_gain", id, name, chan, gain
+            o2_send_cmd("/arco/mix/set_gain", 0, "Usif", id, str(name),
+                                                         chan, gain)
         else:  // have to replace with either gain as Ugen or make a const
             if isnumber(gain) or isarray(gain):
                 if chan != 0:
                     print "WARNING: set_gain is creating Const, but chan != 0"
                 gain = const(gain)
-                display "mix set_gain is number(s), convert", gain.id
+                // display "mix set_gain is number(s), convert", gain.id
             inputs[name][2] = gain
-            display "mix set_gain, calling /repl_gain", id, name, gain.id
+            // display "mix set_gain, calling /repl_gain", id, name, gain.id
             o2_send_cmd("/arco/mix/repl_gain", 0, "UsU", id, str(name), gain.id)
     
 
 def mix(optional chans = 1):
     Mix(chans)
 
+
+def mix_name(i):
+# handy function to convert index into a symbol to name an input when
+# inputs are originally created in a loop or come from an array
+    intern("in" + str(i))

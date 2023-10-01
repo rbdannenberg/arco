@@ -88,6 +88,8 @@ public:
     struct Sine_state {
         int iVec1[2];
         float fRec1[2];
+        Sample fSlow0_prev;
+        Sample fSlow1_prev;
     };
     Vec<Sine_state> states;
     void (Sine::*run_channel)(Sine_state *state);
@@ -106,7 +108,7 @@ public:
             Ugen(id, 'a', nchans) {
         freq = freq_;
         amp = amp_;
-        states.init(chans);
+        states.set_size(chans);
         fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_freq(freq);
         init_amp(amp);
@@ -129,6 +131,8 @@ public:
             for (int l3 = 0; l3 < 2; l3 = l3 + 1) {
                 states[i].fRec1[l3] = 0.0f;
             }
+            states[i].fSlow0_prev = 0.0f;
+            states[i].fSlow1_prev = 0.0f;
         }
     }
 
@@ -176,13 +180,11 @@ public:
     }
 
     void set_freq(int chan, float f) {
-        assert(freq->rate == 'c');
-        freq->output[chan] = f;
+        freq->const_set(chan, f, "Sine::set_freq");
     }
 
     void set_amp(int chan, float f) {
-        assert(amp->rate == 'c');
-        amp->output[chan] = f;
+        amp->const_set(chan, f, "Sine::set_amp");
     }
 
     void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, freq_stride); }
@@ -205,11 +207,19 @@ public:
     void chan_bb_a(Sine_state *state) {
         float fSlow0 = float(*amp_samps);
         float fSlow1 = fConst0 * float(*freq_samps);
+        Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
+        Sample fSlow0_fast = state->fSlow0_prev;
+        state->fSlow0_prev = fSlow0;
+        Sample fSlow1_incr = (fSlow1 - state->fSlow1_prev) * BL_RECIP;
+        Sample fSlow1_fast = state->fSlow1_prev;
+        state->fSlow1_prev = fSlow1;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            fSlow0_fast += fSlow0_incr;
+            fSlow1_fast += fSlow1_incr;
             state->iVec1[0] = 1;
-            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1 + state->fRec1[1]);
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1_fast + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            *out_samps++ = FAUSTFLOAT(fSlow0 * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            *out_samps++ = FAUSTFLOAT(fSlow0_fast * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
@@ -231,11 +241,15 @@ public:
     void chan_ab_a(Sine_state *state) {
         FAUSTFLOAT* input0 = freq_samps;
         float fSlow0 = float(*amp_samps);
+        Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
+        Sample fSlow0_fast = state->fSlow0_prev;
+        state->fSlow0_prev = fSlow0;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
+            fSlow0_fast += fSlow0_incr;
             state->iVec1[0] = 1;
             float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : state->fRec1[1] + fConst0 * float(input0[i0]));
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            *out_samps++ = FAUSTFLOAT(fSlow0 * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            *out_samps++ = FAUSTFLOAT(fSlow0_fast * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }

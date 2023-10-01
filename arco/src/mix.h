@@ -104,12 +104,7 @@ public:
             Input *input = &inputs[i];
             Ugen *gain_ugen = input->gain;
             if (gain_ugen->rate == 'c') {
-                if (0 <= chan && chan < gain_ugen->chans) {
-                    gain_ugen->output[chan] = gain;
-                } else {
-                    printf("WARNING: channel out of range for Mix::set_gain on"
-                           " Mix %d, name %s, chan %d\n", id, name, chan);
-                }
+                gain_ugen->const_set(chan, gain, "Mix::set_gain");
             } else if (chan == 0) {
                 gain_ugen->unref();
                 init_param(new Const(-1, 1, gain), input->gain, input->gain_stride);

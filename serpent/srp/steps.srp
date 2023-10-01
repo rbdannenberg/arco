@@ -1,0 +1,26 @@
+# steps.srp -- conversion from frequency, ratio, and steps
+#
+# Roger B. Dannenberg
+# Sep. 2023
+
+STEP_P1 = 0.0577622650466621
+STEP_P2 = 2.1011784386926213
+
+def hz_to_step(hz)
+# converts absolute hz to step: 440 -> 69 (MIDI A4)
+    return (log(hz) - STEP_P2) / STEP_P1
+
+
+def step_to_hz(steps)
+# converts absolute step to hz: 69 (MIDI A4) -> 440
+    return exp(steps * STEP_P1 + STEP_P2)
+
+
+def step_to_ratio(steps)
+# converts steps to frequency ratio: 7 -> ~1.5
+    return step_to_hz(69 + steps) / 440.0
+
+
+def ratio_to_step(ratio)
+# converts frequency rato to steps: 1.5 -> ~7
+    return hz_to_step(ratio * 440.0) - 69

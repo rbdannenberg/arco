@@ -121,7 +121,7 @@ public:
         speed = 1.0;
         recording = false;
         playing = false;
-        states.init(chans);
+        states.set_size(chans);
 
         for (int i = 0; i < chans; i++) {
             states[i].buffers = NULL;
@@ -136,9 +136,8 @@ public:
 
         // allocate a block and capture its actual size
         Sample *buffer = O2_MALLOCNT(SAMPLES_PER_BUFFER, Sample);
-        samples_per_buffer = (o2_allocation_size(buffer,
-                                                 SAMPLES_PER_BUFFER / BL) /
-                              BLOCK_BYTES) * BL;
+        samples_per_buffer = ((int) (o2_allocation_size(buffer,
+                              SAMPLES_PER_BUFFER / BL) / BLOCK_BYTES)) * BL;
         O2_FREE(buffer);  // we just needed it so get the true allocation size
     }
 
@@ -181,8 +180,7 @@ public:
     }
 
     void set_gain(int chan, float g) {
-        assert(gain->rate == 'c');
-        gain->output[chan] = g;  }
+        gain->const_set(chan, g, "Recplay::set_gain");  }
     
     void set_speed(float speed_) { speed = speed_;  }
 

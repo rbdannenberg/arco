@@ -65,7 +65,8 @@ void arco_const_set(O2SM_HANDLER_ARGS)
     float value = argv[2]->f;
     // end unpack message
 
-    ugen_table[id]->output[chan] = value;
+    ANY_UGEN_FROM_ID(ugen, id, "arco_const_set");
+    ugen->const_set(chan, value, "arco_const_set");
 }
 
 

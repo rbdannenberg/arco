@@ -1,0 +1,36 @@
+# pan.srp -- panning laws
+#
+# Roger B. Dannenberg
+# Sep 2023
+
+def pan_linear(x, optional gain = 1):
+# produce [L, R] for x where x=0 means full left, and x=1 means full right
+# using linear panning law. This code uses a linear pan rather than
+# an angle pan, so instead of x representing 0 to 90 degrees.
+    x = min(1, max(0, x))  // clip x
+    return [(1 - x) * gain, x * gain]
+
+    
+def pan_eqlpow(x, optional gain = 1):
+# produce [L, R] for x where x=0 means full left, and x=1 means full right
+# using the equal-power panning law. This code uses a linear pan rather than
+# an angle pan, so instead of x representing 0 to 90 degrees and requiring
+# sin() and cos() functions, x represents a linear path from speaker to speaker
+# and equations use square and square-root functions.
+    var pan = pan_linear(x)
+    pan[0] = sqrt(pan[0]) * gain
+    pan[1] = sqrt(pan[1]) * gain
+    return pan  // now L^2 + R^2 = 1-x + x = 1 (scaled by gain)
+
+
+def pan_45(x, optional gain = 1):
+# produce [L, R] for x where x=0 means full left, and x=1 means full right
+# using the -4.5dB panning law. This code uses a linear pan rather than
+# an angle pan, so instead of x representing 0 to 90 degrees and requiring
+# sin() and cos() functions, x represents a linear path from speaker to speaker
+# and equations use square and square-root functions.
+    x = min(1, max(0, x))  // clip x
+    var pan = pan_linear(x)
+    pan[0] = sqrt(pan[0] * sqrt(pan[0])) * gain
+    pan[1] = sqrt(pan[1] * sqrt(pan[1])) * gain
+    return pan  // pan is geometric mean of pan_linear and pan_eqlpow

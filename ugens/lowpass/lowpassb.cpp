@@ -90,15 +90,15 @@ static void lowpassb_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/lowpassb/new", "iiii", arco_lowpassb_new, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/lowpassb/repl_snd", "ii", arco_lowpassb_repl_snd,
-                     NULL, true, true);
+                    NULL, true, true);
     o2sm_method_new("/arco/lowpassb/set_snd", "iif", arco_lowpassb_set_snd,
-                     NULL, true, true);
+                    NULL, true, true);
     o2sm_method_new("/arco/lowpassb/repl_cutoff", "ii",
-                     arco_lowpassb_repl_cutoff, NULL, true, true);
+                    arco_lowpassb_repl_cutoff, NULL, true, true);
     o2sm_method_new("/arco/lowpassb/set_cutoff", "iif",
-                     arco_lowpassb_set_cutoff, NULL, true, true);
+                    arco_lowpassb_set_cutoff, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
 }

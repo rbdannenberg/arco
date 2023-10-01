@@ -90,15 +90,15 @@ static void lowpass_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/lowpass/new", "iiii", arco_lowpass_new, NULL, true,
-                     true);
+                    true);
     o2sm_method_new("/arco/lowpass/repl_snd", "ii", arco_lowpass_repl_snd,
-                     NULL, true, true);
+                    NULL, true, true);
     o2sm_method_new("/arco/lowpass/set_snd", "iif", arco_lowpass_set_snd,
-                     NULL, true, true);
+                    NULL, true, true);
     o2sm_method_new("/arco/lowpass/repl_cutoff", "ii",
-                     arco_lowpass_repl_cutoff, NULL, true, true);
+                    arco_lowpass_repl_cutoff, NULL, true, true);
     o2sm_method_new("/arco/lowpass/set_cutoff", "iif",
-                     arco_lowpass_set_cutoff, NULL, true, true);
+                    arco_lowpass_set_cutoff, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     // class initialization code from faust:

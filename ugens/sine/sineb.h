@@ -73,7 +73,7 @@ public:
             Ugen(id, 'b', nchans) {
         freq = freq_;
         amp = amp_;
-        states.init(chans);
+        states.set_size(chans);
         fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_freq(freq);
         init_amp(amp);
@@ -113,13 +113,11 @@ public:
     }
 
     void set_freq(int chan, float f) {
-        assert(freq->rate == 'c');
-        freq->output[chan] = f;
+        freq->const_set(chan, f, "Sineb::set_freq");
     }
 
     void set_amp(int chan, float f) {
-        assert(amp->rate == 'c');
-        amp->output[chan] = f;
+        amp->const_set(chan, f, "Sineb::set_amp");
     }
 
     void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, freq_stride); }

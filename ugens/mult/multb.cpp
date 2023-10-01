@@ -90,15 +90,15 @@ static void multb_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/multb/new", "iiii", arco_multb_new, NULL, true,
-                     true);
+                    true);
     o2sm_method_new("/arco/multb/repl_x1", "ii", arco_multb_repl_x1, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/multb/set_x1", "iif", arco_multb_set_x1, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/multb/repl_x2", "ii", arco_multb_repl_x2, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/multb/set_x2", "iif", arco_multb_set_x2, NULL,
-                     true, true);
+                    true, true);
     // END INTERFACE INITIALIZATION
 
 }

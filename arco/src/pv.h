@@ -50,13 +50,11 @@ class Pv: public Ugen {
         points = points_;
         fftsize = fftsize_;
         hopsize = hopsize_;
-        states.init(chans);
+        states.set_size(chans);
         for (int i = 0; i < chans; i++) {
             states[i].inputbuf.init(fftsize * 2);
             // input is initially big enough for FFT if needed
-            states[i].inputbuf.set_size(fftsize);
-            memset(&states[i].inputbuf[0], 0,
-                   sizeof(states[i].inputbuf[0]) * fftsize);
+            states[i].inputbuf.set_size(fftsize);  // zero fills
             // output
             states[i].outputbuf.init(hopsize + 3 * points);
             // initially, set up as if our offset for the next sample
@@ -67,11 +65,9 @@ class Pv: public Ugen {
             // outputbuf can hold some extra samples to allow points to
             // be scaled when downsampling where we need a wider filter
             // for antialiasing.
-            states[i].outputbuf.set_size(hopsize + points);
+            states[i].outputbuf.set_size(hopsize + points);  // zero fills
             states[i].outputbuf_offset = hopsize + points;
             states[i].outputbuf_filled = false;
-            memset(&states[i].outputbuf[hopsize], 0,
-                   sizeof(states[i].inputbuf[0]) * points);
             Phase_vocoder pv = pv_create(o2_malloc_ptr, o2_free_ptr);
             pv_set_fftsize(pv, fftsize);
             // this means we will get one analysis input window each time

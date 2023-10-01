@@ -26,9 +26,8 @@ class The_side_band:
         mod_check.add_target_method(this, 'mod_handler')
 
         // Sliders
-        Labeled_slider(win, "hz", 'S', 'D', 250,
-                       30, 25, 20, 1000, 
-                       392.0, 'linear', 'freq_slide')
+        Labeled_slider(win, "hz", 'S', 'D', 250, 30, 25, 20, 1000, 
+                       392.0, 'linear', 'freq_slide', prefs = prefs)
         freq_slide.add_target_method(this, 'freq_handler')
 
 

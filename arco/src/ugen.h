@@ -86,8 +86,11 @@ class Ugen : public O2obj {
         rate = ab;
         chans = nchans;
         if (rate) {  // if no output, pass 0 for rate
-            output.init(nchans * (rate == 'a' ? BL : 1));
-            output.set_size(output.get_allocated(), false);
+            int output_size = nchans * (rate == 'a' ? BL : 1);
+            output.set_size(output_size, false);
+            out_samps = &output[0];
+        } else {
+            out_samps = NULL;
         }
         current_block = 0;
     }
@@ -128,12 +131,13 @@ class Ugen : public O2obj {
     virtual void real_run() = 0;
 
     virtual Sample_ptr run(int64_t block_count) {
+        Sample_ptr save_out_samps = out_samps;
         if (block_count > current_block) {
-            out_samps = &output[0];
             current_block = block_count;
             real_run();
         }
-        return &output[0];
+        out_samps = save_out_samps;
+        return save_out_samps;
     }
 
     void set_current_block(int64_t n) { current_block = n; }
@@ -148,7 +152,21 @@ class Ugen : public O2obj {
         o2sm_send_finish(0.0, control_service_addr, true);
         action_id = 0;  // one-shot
     }
+
+    void const_set(int chan, Sample value, const char *op) {
+        if (rate != 'c') {
+            arco_warn("In %s, Ugen::const_set id %d is not c-rate", op, id);
+            return;
+        }
+        if (!output.bounds_check(chan)) {
+            arco_warn("In %s, Ugen::const_set id %d chan %d but actual chans"
+                      " is %d", op, id, chan, chans);
+            return;
+        }
+        output[chan] = value;
+    }
 };
+
 
 typedef Ugen *Ugen_ptr;
 
