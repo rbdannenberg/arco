@@ -1,0 +1,681 @@
+# vu.srp -- record and play audio in memory
+#
+# Roger B. Dannenberg
+# May 2023
+
+def vu(reply_addr, period):
+    Vu(reply_addr, period)
+
+
+class Vu (Ugen):
+    def init(reply_addr, period)
+        super.init(create_ugen_id(), "Vu", 0, '', "sf",
+                   'reply_addr', reply_addr, 'period', period)
+
+    def start(reply_addr, period):
+        o2_send_cmd("/arco/vu/start", 0, "Usf", id, reply_addr, period)
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'inp'
+        inputs['inp'] = value
+        display "Vu set", id, value.id
+        o2_send_cmd("/arco/vu/repl_inp", 0, "UU", id, value.id)
+
+# probe.srp -- stream audio from file
+#
+# Roger B. Dannenberg
+# May 2023
+
+def probe(inp, reply_addr)
+    Probe(inp, reply_addr)
+
+
+
+class Probe (Ugen):
+    var action_id
+
+    def init(inp, reply_addr):
+        super.init(create_ugen_id(), "Probe", 0, '', "Us",
+                   omit_chans = t,
+                   'inp', inp, 'reply_addr', reply_addr)
+
+    def probe(period, frames, chan, nchans, stride):
+        o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
+                    frames, chan, nchans, stride)
+        run(true) // suppress warning if we're already in run setx
+    
+    def thresh(threshold, direction, max_wait):
+        o2_send_cmd("/arco/probe/thresh", 0, "Ufif", id,
+                    threshold, direction, max_wait)
+        
+    def stop():
+        o2_send_cmd("/arco/probe/stop", 0, "U", id)
+        unrun(true) // suppress warning if we're not in run set
+        
+
+# pwl.srp -- piece-wise linear envelope
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Pwl (Ugen):
+    def init(points):
+        super.init(create_ugen_id(), "Pwl", 1, 'a', "", omit_chans = true)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+    # define the shape of the envelope with an array of floats, 
+    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
+    # If the length is odd, a final yn = 0.0 is appended.
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0
+        var count = 0
+        for i = 0 to len(points) by 2:  // process points pair-wise
+            time = time + points[i]
+            var samps = round(time * AR - count)
+            count = count + samps
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                o2_add_float(points[i + 1])  // the destination amplitude
+        o2_send_finish(0, "/arco/pwl/env", true)
+        this
+
+    def start():
+        o2_send_cmd("/arco/pwl/start", 0, "U", id)
+        this
+
+    def decay(dur):
+    # end envelope with decay to zero over given duration (seconds)
+        o2_snd_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
+
+    def set(y):
+    # set current value to y
+        o2_snd_cmd("/arco/pwl/set", 0, "Uf", id, y)
+
+
+
+def pwl(keyword init, start = true, rest points):
+    var pwl = Pwl(points)
+    if init:
+       pwe.set(init)
+    if start:
+       pwe.start()
+    return pwl
+
+
+
+class Pwlb (Ugen):
+    var action_id
+
+    def init(points):
+        super.init(create_ugen_id(), "Pwlb", 1, 'b', "", omit_chans = true)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+    # define the shape of the envelope with an array of floats, 
+    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
+    # If the length is odd, a final yn = 0.0 is appended. Times are
+    # converted to block periods (seconds * block_rate).
+        // display "Pwlb", points
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0   // accumulate the total duration (d0 + d1 + ...) here
+        var count = 0  // accumulate the integer block counts here
+        // print "               ";
+        for i = 0 to len(points) by 2:  // process points pair-wise
+            time = time + points[i]
+	    // Avoid accumulated rounding error from converting durations to
+	    // block counts as follows:
+	    //   count is the block count where this segment begins
+	    //   time * BR is the exact fractional block count where it ends
+	    //   samps is therefore the duration we want with compensation
+	    //   for any accumulated rounding error.
+            var samps = round(time * BR - count)
+            count = count + samps
+            // print samps,
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                // print points[i + 1],
+                o2_add_float(points[i + 1])  // the destination amplitude
+        // print
+        o2_send_finish(0, "/arco/pwlb/env", true)
+        this
+
+
+    def start():
+        o2_send_cmd("/arco/pwlb/start", 0, "U", id)
+        this
+
+
+    def decay(dur):
+    # end envelope with decay to zero over given duration (seconds)
+        o2_snd_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
+
+
+    def set(y):
+    # set current value to y
+        o2_send_cmd("/arco/pwlb/set", 0, "Uf", id, y)
+
+
+
+def pwlb(keyword init, start = true, rest points):
+    var pwlb = Pwlb(points)
+    if init:
+        pwlb.set(init)
+    if start:
+        pwlb.start()
+    return pwlb
+
+# pwe.srp -- piece-wise linear envelope
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Pwe (Ugen):
+    def init(points):
+        super.init(create_ugen_id(), "Pwe", 1, 'a', "", omit_chans = true)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+    # define the shape of the envelope with an array of floats, 
+    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
+    # If the length is odd, a final yn = 0.0 is appended.
+        o2_send_start()
+        o2_add_int32(id)
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0
+        var count = 0
+        for i = 0 to len(points) by 2:  // process points pair-wise
+            time = time + points[i]
+            var samps = round(time * AR - count)
+            count = count + samps
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                o2_add_float(points[i + 1])  // the destination amplitude
+        o2_send_finish(0, "/arco/pwe/env", true)
+        this
+
+    def start():
+        o2_send_cmd("/arco/pwe/start", 0, "U", id)
+        this
+
+    def decay(dur):
+    # end envelope with decay to zero over given duration (seconds)
+        o2_snd_cmd("/arco/pwe/decay", 0, "Uf", id, dur * AR)
+
+    def set(y):
+    # set current value to y
+        o2_snd_cmd("/arco/pwe/set", 0, "Uf", id, y)
+
+
+def pwe(keyword init, start = true, rest points):
+    var pwe = Pwe(points)
+    if init:
+        pwe.set(init)
+    if start:
+        pwe.start()
+    return pwe
+
+
+
+class Pweb (Ugen):
+    var action_id
+
+    def init(points):
+        super.init(create_ugen_id(), "Pweb", 1, 'b', "", omit_chans = true)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+
+    def set_point_array(points):
+    # define the shape of the envelope with an array of floats, 
+    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
+    # If the length is odd, a final yn = 0.0 is appended. Times are
+    # converted to block periods (seconds * block_rate).
+        // display "Pweb", points
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0   // accumulate the total duration (d0 + d1 + ...) here
+        var count = 0  // accumulate the integer block counts here
+        // print "               ";
+        for i = 0 to len(points) by 2:  // process points pair-wise
+            time = time + points[i]
+	    // Avoid accumulated rounding error from converting durations to
+	    // block counts as follows:
+	    //   count is the block count where this segment begins
+	    //   time * BR is the exact fractional block count where it ends
+	    //   samps is therefore the duration we want with compensation
+	    //   for any accumulated rounding error.
+            var samps = round(time * BR - count)
+            count = count + samps
+            // print samps,
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                // print points[i + 1],
+                o2_add_float(points[i + 1])  // the destination amplitude
+        // print
+        o2_send_finish(0, "/arco/pweb/env", true)
+        this
+
+
+    def start():
+        o2_send_cmd("/arco/pweb/start", 0, "U", id)
+        this
+
+
+    def decay(dur):
+    # end envelope with decay to zero over given duration (seconds)
+        o2_send_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
+
+
+    def set(y):
+    # set current value to y
+        o2_send_cmd("/arco/pweb/set", 0, "Uf", id, y)
+
+
+def pweb(keyword init, start = true, rest points):
+    var pweb = Pweb(points)
+    if init:
+        pweb.set(init)
+    if start:
+        pweb.start()
+    return pweb
+
+# mix.srp -- audio mixer
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Mix (Ugen):
+    
+    def init(chans_):
+        super.init(create_ugen_id(), "Mix", chans_, A_RATE, "")
+
+        
+    def set(input, value, optional chan = 0):
+        print "ERROR: set method not available for Mix class"
+
+
+    def ins(name, ugen, gain, optional atend):
+        if isnumber(gain) or isarray(gain):
+            gain = const(gain)
+        inputs[name] = [name, ugen, gain]
+        o2_send_cmd("/arco/mix/ins", 0, "UsUU", id, str(name), ugen.id, gain.id)
+        if atend:
+            if atend == SIGNAL and issubclass(ugen, Instrument) and 
+               ugen.get['envelope']:
+                create_action(ugen.envelope, this, 'rem', ugen)
+            elif atend == GAIN and issubclass(gain, Pwlb):
+                create_action(gain, this, 'rem', ugen)
+            else:
+                print "Mix.ins() ignoring unknown atend parameter -", atend
+        return this
+    
+
+    def rem(name):
+        if inputs.has_key(name):
+            inputs.remove(name)
+            o2_send_cmd("/arco/mix/rem", 0, "Us", id, str(name))
+        return this
+
+
+    def find_name_of(ugen):
+        for key in inputs.keys():
+            if inputs[key][1] == ugen:
+                return key
+        return nil
+
+
+    def set_gain(name, gain, optional chan = 0):
+    # general set gain to either a Ugen or float (constant value)
+        if not inputs.has_key(name):
+            print "ERROR: Mix set_gain cannot find input", name
+            return
+        var gain_ugen = inputs[name][2]
+        display "in set_gain", inputs[name], gain_ugen, repr(gain_ugen.rate)
+        if isinstance(gain_ugen, Ugen) and gain_ugen.rate == C_RATE:
+            if chan >= gain_ugen.chans:
+                print "WARNING: Mix gain for", name, "is a", gain_ugen.chans,
+                print "channel Const, but set_gain requests channel", chan
+            // a Const exists, so we just write to it using set_gain
+            // display "mix set_gain, calling /set_gain", id, name, chan, gain
+            o2_send_cmd("/arco/mix/set_gain", 0, "Usif", id, str(name),
+                                                         chan, gain)
+        else:  // have to replace with either gain as Ugen or make a const
+            if isnumber(gain) or isarray(gain):
+                if chan != 0:
+                    print "WARNING: set_gain is creating Const, but chan != 0"
+                gain = const(gain)
+                // display "mix set_gain is number(s), convert", gain.id
+            inputs[name][2] = gain
+            // display "mix set_gain, calling /repl_gain", id, name, gain.id
+            o2_send_cmd("/arco/mix/repl_gain", 0, "UsU", id, str(name), gain.id)
+    
+
+def mix(optional chans = 1):
+    Mix(chans)
+
+
+def mix_name(i):
+# handy function to convert index into a symbol to name an input when
+# inputs are originally created in a loop or come from an array
+    intern("in" + str(i))
+
+# sine.srp - constructor implementation
+#
+# (machine generated by u2f.py)
+
+def sine(freq, amp, optional chans = 1):
+    Ugen(create_ugen_id(), "sine", chans, 'a', "UU", 'freq', freq, 'amp', amp)
+
+def sineb(freq, amp, optional chans = 1):
+    if freq.rate != 'b':
+        print "ERROR: 'freq' input to Ugen 'sineb' must be block rate"
+        return nil
+    if amp.rate != 'b':
+        print "ERROR: 'amp' input to Ugen 'sineb' must be block rate"
+        return nil
+    Ugen(create_ugen_id(), "sineb", chans, 'b', "UU", 'freq', freq, 'amp', amp)
+
+
+# mult.srp - constructor implementation
+#
+# (machine generated by u2f.py)
+
+def mult(x1, x2, optional chans = 1):
+    Ugen(create_ugen_id(), "mult", chans, 'a', "UU", 'x1', x1, 'x2', x2)
+
+def multb(x1, x2, optional chans = 1):
+    if x1.rate != 'b':
+        print "ERROR: 'x1' input to Ugen 'multb' must be block rate"
+        return nil
+    if x2.rate != 'b':
+        print "ERROR: 'x2' input to Ugen 'multb' must be block rate"
+        return nil
+    Ugen(create_ugen_id(), "multb", chans, 'b', "UU", 'x1', x1, 'x2', x2)
+
+
+# reson.srp - constructor implementation
+#
+# (machine generated by u2f.py)
+
+def reson(snd, center, q, optional chans = 1):
+    if snd.rate != 'a':
+        print "ERROR: 'snd' input to Ugen 'reson' must be audio rate"
+        return nil
+    Ugen(create_ugen_id(), "reson", chans, 'a', "UUU", 'snd', snd, 'center', center, 'q', q)
+
+def resonb(snd, center, q, optional chans = 1):
+    if snd.rate != 'b':
+        print "ERROR: 'snd' input to Ugen 'resonb' must be block rate"
+        return nil
+    if center.rate != 'b':
+        print "ERROR: 'center' input to Ugen 'resonb' must be block rate"
+        return nil
+    if q.rate != 'b':
+        print "ERROR: 'q' input to Ugen 'resonb' must be block rate"
+        return nil
+    Ugen(create_ugen_id(), "resonb", chans, 'b', "UUU", 'snd', snd, 'center', center, 'q', q)
+
+
+# lowpass.srp - constructor implementation
+#
+# (machine generated by u2f.py)
+
+def lowpass(snd, cutoff, optional chans = 1):
+    if snd.rate != 'a':
+        print "ERROR: 'snd' input to Ugen 'lowpass' must be audio rate"
+        return nil
+    Ugen(create_ugen_id(), "lowpass", chans, 'a', "UU", 'snd', snd, 'cutoff', cutoff)
+
+def lowpassb(snd, cutoff, optional chans = 1):
+    if snd.rate != 'b':
+        print "ERROR: 'snd' input to Ugen 'lowpassb' must be block rate"
+        return nil
+    if cutoff.rate != 'b':
+        print "ERROR: 'cutoff' input to Ugen 'lowpassb' must be block rate"
+        return nil
+    Ugen(create_ugen_id(), "lowpassb", chans, 'b', "UU", 'snd', snd, 'cutoff', cutoff)
+
+
+# fileplay.srp -- stream audio from file
+#
+# Roger B. Dannenberg
+# May 2023
+
+def fileplay(filename, optional chans = 2, start = 0, end = 0, 
+            cycle, mix, expand)
+    Fileplay(chans, filename, start, end, cycle, mix, expand)
+
+
+
+class Fileplay (Ugen):
+    var action_id
+
+    def init(chans, filename, start, end, cycle, mix, expand):
+        // -chans cuts off standard creation:
+        super.init(create_ugen_id(), "Fileplay", chans, 'a', "sffBBB",
+                   'filename', filename, 'start', start,'end', end,
+                   'cycle', cycle, 'mix', mix, 'expand', expand)
+
+    def go(optional play_flag = true):
+        o2_send_cmd("/arco/fileplay/play", 0, "UB", id, play_flag)
+    
+    def stop():
+        go(false)
+
+# filerec.srp -- stream audio from file
+#
+# Roger B. Dannenberg
+# May 2023
+
+def filerec(filename, inp, optional chans = 2)
+    Filerec(chans, filename, inp)
+
+
+
+class Filerec (Ugen):
+    var action_id
+
+    def init(chans, filename, inp):
+        super.init(create_ugen_id(), "Filerec", chans, '', "sU",
+                   'filename', filename, 'inp', inp)
+
+    def go(optional rec_flag = true):
+        o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
+    
+    def stop():
+        go(false)
+
+# recplay.srp -- record and play audio in memory
+#
+# Roger B. Dannenberg
+# May 2023
+
+def recplay(input, optional chans = 1, gain = 1, 
+            fade_time = 0.1, loop = false):
+    Recplay(chans, input, gain, fade_time, loop)
+
+
+class Recplay (Ugen):
+    var action_id
+
+    def init(chans, input, gain, fade_time, loop):
+        super.init(create_ugen_id(), "Recplay", chans, 'a', "UUfB",
+                   'input', input, 'gain', gain, 'fade_time', fade_time,
+                   'loop', loop)
+
+    def record(record_flag):
+        o2_send_cmd("/arco/recplay/rec", 0, "UB", id, record_flag)
+
+    def start(start_time):
+    # start playing recording from offset start_time
+        o2_send_cmd("/arco/recplay/start", 0, "Ud", id, start_time)
+
+    def stop():
+        o2_send_cmd("/arco/recplay/stop", 0, "U", id)
+
+    def set_speed(x):
+        o2_send_cmd("/arco/recplay/speed", 0, "Uf", id, x)
+
+    def borrow(u):
+        o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u)
+
+# delay.srp -- feedback delay unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Delay(Ugen):
+    def init(chans, inp, dur, fb, maxdur):
+        super.init(create_ugen_id(), "Delay", chans, 'a', "UUUf",
+	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+
+
+def delay(inp, dur, fb, maxdur, optional chans = 1):
+    Delay(chans, inp, dur, fb, maxdur)  # delay as a function
+
+
+
+# alpass.srp -- feedback all-pass filter unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Alpass (Ugen):
+    def init(chans, inp, dur, fb, maxdur):
+        super.init(create_ugen_id(), "Alpass", chans, 'a', "UUUf",
+	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+
+
+def alpass(inp, dur, fb, maxdur, optional chans = 1):
+    Alpass(chans, inp, dur, fb, maxdur)  # alpass as a function
+
+
+
+# olapitchshift.srp -- overlap add pitch shift unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Ola_pitch_shift (Ugen):
+    def init(chans, input, ratio, xfade, windur):
+        super.init(create_ugen_id(), "olaps", chans, 'a', "Ufff",
+	           'input', input, 'ratio', ratio, 'xfade', xfade,
+                   'windur', windur)
+    
+    def set_ratio(value):
+        o2_send_cmd("/arco/olaps/ratio", 0, "Uf", id, value)
+        
+
+def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
+    Ola_pitch_shift(chans, input, ratio, xfade, windur)
+
+# feedback.srp -- mix input with most recent output of some Ugen
+#
+# Roger B. Dannenberg
+# June 2023
+#
+# By NOT calling the "from" ugen to update, feedback avoids creating a cyclical
+# dependency in an audio graph, at the cost of using "stale" samples from
+# the "from" source, which will normally be the previous 32 samples, creating
+# feedback with a 32-sample delay.
+
+class Feedback (Ugen):
+    def init(chans, input, from, gain):
+        super.init(create_ugen_id(), "feedback", chans, 'a', "UUU",
+	           'input', input, 'from', from, 'gain', gain)
+
+def feedback(input, from, gain, optional chans = 1):
+    Feedback(chans, input, from, gain)
+
+# trig.srp -- sound event detection
+#
+# Roger B. Dannenberg
+# August 2023
+
+class Trig(Ugen):
+    def init(inp, reply_addr, window, threshold, pause):
+        super.init(create_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
+                   'inp', inp, 'reply_addr', reply_addr, 'window', window,
+                   'threshold', threshold, 'pause', pause)
+
+    def set_window(window):
+        o2_send_cmd("/arco/trig/window", 0, "Ui", id, window)
+
+    def set_threshold(threshold):
+        o2_send_cmd("/arco/trig/threshold", 0, "Uf", id, threshold)
+
+    def set_threshold(pause):
+        o2_send_cmd("/arco/trig/pause", 0, "Uf", id, pause)
+
+    def onoff(reply_addr, threshold, runlen):
+        o2_send_cmd("/arco/trig/onoff", 0, "Usff",
+                    id, reply_addr, threshold, runlen)
+
+
+def trig(inp, reply_addr, window, threshold, pause):
+    Trig(inp, reply_addr, window, threshold, pause)  # trig as a function
+
+# thru.srp -- audio pass-through
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Thru (Ugen):
+
+    def init(inp, optional chans = 1, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Thru", chans, 'a', "U", 'inp', inp)
+
+    def set_alternate(alt):
+        o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
+
+def thru(inp, optional chans = 1):
+    Thru(inp, chans)
+
+
+def fanout(inp, chans)
+# When thru is used for fanout, the preferred constructor is "fanout",
+# which requires the number of channels you are expanding to. You should
+# only use this if inp is mono.
+    Thru(inp, chans)
+# zero.srp -- audio zero
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Zero (Ugen):
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zero", 1, 'a', "", omit_chans = true)
+
+
+# DO NOT DEFINE zero() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN zero_ugen
+# def zero(): purposefully not defined here!
+
+
+class Zerob (Ugen)
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zerob", 1, 'b', "", omit_chans = true)
+
+# DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen
+# def zerob(): purposefully not defined here!
+

@@ -1,0 +1,17 @@
+vu
+probe
+pwl*
+pwe*
+mix
+sine*
+mult*
+reson*
+lowpass*
+fileplay
+filerec
+recplay
+delay
+alpass
+olapitchshift
+feedback
+trig

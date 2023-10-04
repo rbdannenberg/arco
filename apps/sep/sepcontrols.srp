@@ -1,0 +1,130 @@
+// in case debug controls are not created, we need
+// to initialize globals. These are overwritten if
+// Sep_controls is instantiated
+step1box = nil
+step2box = nil
+step3box = nil
+step4box = nil
+step5box = nil
+step6box = nil
+step7box = nil
+step8box = nil
+step9box = nil
+
+
+class Sep_controls (Window):
+
+    def init(title):
+        super.init(title, 550, 10, 280, 300)
+        Checkbox(this, "step1", 5, 5, 250, 'H', 'step1box')
+        step1box.add_target_method(simulator, 'step1')
+        Checkbox(this, "step2", 'S', 'D', 'S', 'H', 'step2box')
+        step2box.add_target_method(simulator, 'step2')
+        Checkbox(this, "step3", 'S', 'D', 'S', 'H', 'step3box')
+        step3box.add_target_method(simulator, 'step3')
+        Checkbox(this, "step4", 'S', 'D', 'S', 'H', 'step4box')
+        step4box.add_target_method(simulator, 'step4')
+        Checkbox(this, "step5", 'S', 'D', 'S', 'H', 'step5box')
+        step5box.add_target_method(simulator, 'step5')
+        Checkbox(this, "step6", 'S', 'D', 'S', 'H', 'step6box')
+        step6box.add_target_method(simulator, 'step6')
+        Checkbox(this, "step7", 'S', 'D', 'S', 'H', 'step7box')
+        step7box.add_target_method(simulator, 'step7')
+        Checkbox(this, "step8", 'S', 'D', 'S', 'H', 'step8box')
+        step8box.add_target_method(simulator, 'step8')
+        Checkbox(this, "step9", 'S', 'D', 'S', 'H', 'step9box')
+        step9box.add_target_method(simulator, 'step9')
+
+        Checkbox(this, "cycles", 'S', 'D', 'S', 'H', 'cyclesbox')
+        cyclesbox.add_target_method(this, 'cycles')
+        Checkbox(this, "ending", 'S', 'D', 'S', 'H', 'endingbox')
+        endingbox.add_target_method(this, 'ending')
+        Checkbox(this, "fastcloud", 'S', 'D', 'S', 'H', 'fastcloudbox')
+        fastcloudbox.add_target_method(this, 'fastcloud')
+
+        Button(this, "start enable", 'S', 'D', 'S', 'H', 'startenablebutton')
+        startenablebutton.add_target_method(this, 'start_enable')
+        Button(this, "enable2", 'S', 'D', 'S', 'H', 'enable2button')
+        enable2button.add_target_method(this, 'enable2')
+
+        Button(this, "fasta", 'S', 'D', 'S', 'H', 'fastabutton')
+        fastabutton.add_target_method(this, 'fasta')
+        Button(this, "fastb", 'S', 'D', 'S', 'H', 'fastbbutton')
+        fastbbutton.add_target_method(this, 'fastb')
+        Button(this, "fastc", 'S', 'D', 'S', 'H', 'fastcbutton')
+        fastcbutton.add_target_method(this, 'fastc')
+        Button(this, "fastd", 'S', 'D', 'S', 'H', 'fastdbutton')
+        fastdbutton.add_target_method(this, 'fastd')
+        Button(this, "faste", 'S', 'D', 'S', 'H', 'fastebutton')
+        fastebutton.add_target_method(this, 'faste')
+
+        aura_slider("articulation", audio_server, 'articulation', 0, 1, 0.5)
+        aura_slider("fast decay", audio_server, 'set_fast_decay', 0.01, 2, 0.5)
+        aura_slider("set_delay", audio_server, 'set_delay', 0, 2, 0.1)
+        aura_slider("set_density", audio_server, 'set_density', 0.1, 50, 5)
+        aura_slider("set_attack", audio_server, 'set_attack', 0, 0.2, 0.01)
+        aura_slider("set_release", audio_server, 'set_release', 0, 0.2, 0.01)
+        aura_slider("set_length", audio_server, 'set_length', 0.1, 2, 0.1)
+        aura_slider("set_low", audio_server, 'set_low', 0.25, 2, 1.0)
+        aura_slider("set_high", audio_server, 'set_high', 0.25, 2, 1.0)
+        aura_slider("set_lowdur", audio_server, 'set_lowdur', 0.03, 0.3, 0.1)
+        aura_slider("set_highdur", audio_server, 'set_highdur', 0.03, 0.3, 0.1)
+        aura_slider("set_delay2", audio_server, 'set_delay2', 0.03, 3.0, 2.0)
+        aura_slider("set_feedback", audio_server, 'set_feedback', 0.0, 0.9, 0.0)
+        aura_slider("revtime", audio_server, 'revtime', 1.0, 20.0, 12.0)
+        wet_slider = aura_slider("wet", audio_server, 'wet', 0.0, 0.03, 0.007)
+        aura_slider("threshold", audio_server, 'set_threshold', 0.0, 0.3, 0.1)
+        gliss_slider = aura_slider("gliss_rate", audio_server, 'set_gliss_rate', -20, 20, 1)
+        spinctrl("play from", nil, 'play_from', 1, 9, 1)
+        spinctrl("play thru", nil, 'play_through', 1, 9, 9)
+        button("run", 'run')
+        stopwatch()
+        button("all flute", 'all_flute')
+        fix_layout()
+        //if not monitor_state:
+        //    monitor_input_button.set_value(t)
+
+    def run(rest ignore):
+        audioin_listbox.set_value("Mute Input")
+        simulator.start()
+        stopwatch_start()
+
+//    def points(rest ignore):
+//        simulator.step2()
+
+//    def pizz(rest ignore):
+//        simulator.step3()
+
+//    def melo(rest ignore):
+//        simulator.step4()
+
+//    def fast(rest ignore):
+//        simulator.step5()
+
+    def fasta(rest ignore):
+        simulator.fastx("5-fast-a.wav")
+
+    def fastb(rest ignore):
+        simulator.fastx("5-fast-b.wav")
+
+    def fastc(rest ignore):
+        simulator.fastx("5-fast-c.wav")
+
+    def fastd(rest ignore):
+        simulator.fastx("5-fast-d.wav")
+
+    def faste(rest ignore):
+        simulator.fastx("5-fast-e.wav")
+
+    def fastcloud(obj, event, x, y)
+        //display "Sep_controls::fastcloud", x
+        audio_server <- fast(x)
+
+    def cycles(obj, event, x, y):
+        simulator.cycles_control(x, false)
+
+    def ending(obj, event, x, y):
+        simulator.cycles_control(x, true)
+
+    def all_flute(obj, event, x, y)
+        simulator.all_flute() // use simulator for cause()

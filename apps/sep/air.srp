@@ -1,0 +1,62 @@
+# air.srp -- control and implementation of opening section of Separation Logic
+#
+# based on previous implementation in Aura
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+AIR_TRANS = [ step_to_ratio(x) for x in [-2, -5, -8, -11, -16, -19, -22, -26,
+                                         -29, -34, -34, -34, -34, -34] ]
+AIR_DELS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.5, 15.7, 27.9, 33]
+AIR_GAINS = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.45, 0.4, 0.35, 0.3,
+             0.3, 0.3, 0.3, 0.4]
+assert(len(AIR_TRANS) == len(AIR_DELS))
+assert(len(AIR_DELS) == len(AIR_GAINS))
+
+
+class Air_mgr:
+#TODO: airs2 is now called airmix
+    var airmix
+    var air_rp  // a Recplay -- this instance does the recording
+
+    def air(on_flag):
+        if on_flag and not airs2:
+            air_rp = recplay(input_ugen, 1, 1, 2)  // chans, gain, fade_time
+            air_rp.run()
+            air_rp.record(t)
+
+            airmix = Mix(2)
+            for tran at i in AIR_TRANS:
+                //display "airs", i, tran, AIR_DELS[i]
+                if AIR_DELS[i] == 0:
+                    // produce the series .04, .92, .08, .88, ..., .32, .64
+                    var panx = (i + 1) * 0.04
+                    if i & 1: panx = 1 - panx // odd ones go from 1 down
+                    var pan = pan_45(panx, AIR_GAINS[i])
+
+                    var rp = recplay(zero_ugen, 1, 1, 2)
+                    rp.borrow(air_rp)
+                    rp.set_speed(tran)
+                    airmix.add(rp, pan)
+                else:
+                    cause(AIR_DELS[i], this, 'make_new_del',
+                          tran, AIR_GAINS[i], i == 13)
+                    //display "cause make_new_air", i, i == 13, i
+                    if i == 13:
+                        print "SCHEDULE PULSE ****", AIR_DELS[i]
+            set_intro_gain(intro_gain)
+            airmix.play()
+        elif airs2:
+            airmix.fade(1)
+            airmix = nil
+
+
+    def make_new_del(tran, gain, pulse):
+        var rp = recplay(zero_ugen, 1, 1, 2)
+        rp.borrow(air_rp)
+        rp.set_speed(tran)
+        if pulse:
+            print "PULSE ****"
+            var osc = sine(3, 1)
+            rp = mult(mult(osc, osc), rp)
+        airmix.add(rp, gain)

@@ -1,0 +1,216 @@
+class Simulator (Auraobj):
+    var cycles_index
+    var pattern_x
+    var start_id
+    var actions
+
+    // we can't make these at initialization time because
+    // the stepNbox variables are not set until the debug
+    // control window is opened, but on the other hand we
+    // have to make this Simulator instance at once because
+    // it is used even without the debug control window.
+    // Fortunately, we don't need actions with non-nil
+    // stepNbox values until the control window Run button
+    // is pressed, which implies the control window exists,
+    // which implies the stepNbox values have been set to
+    // checkboxes.
+    def make_actions()
+        actions = [[1.0, step1box],
+                   [17, step2box],
+                   [53, step3box],
+                   [15, step4box], // was 10
+                   [39, step5box], // was 28
+                   [46, step6box],
+                   [30, step7box],
+                   [118, step8box],
+                   [14, step9box]]
+    
+    def init2():
+        //print "Simulator created"
+        cycles_index = 0
+        start_id = 0
+        # cause(3.0, 'autorun')
+
+    def autorun():
+        controls.run()
+
+    def start():
+        start_id = start_id + 1
+        print "********** STARTING TO PLAY FROM STEP", play_from,
+        print     " THROUGH STEP ", play_through, "***********"
+        var start_time = 1
+        var first_time = true
+        make_actions()
+        for action at i in actions:
+            if i >= play_through:
+                return
+            if i + 1 >= play_from:
+                if not first_time:
+                    start_time = start_time + action[0]
+                first_time = false
+                cause(start_time, 'stoppable_start_action',
+                      action[1], start_id)
+
+    def stop():
+        start_id = start_id + 1
+        
+    def stoppable_start_action(cb, id):
+        if id == start_id:
+            cb.set_value(t)
+
+    def all_flute():
+        var files = ["1-air.wav",
+                     "2-points.wav",
+                     "3-pizz.wav",
+                     "4-melody.wav",
+                     "5-fast.wav",
+                     "long.wav",
+                     nil,
+                     "whistle.wav",
+                     "air-only.wav"]
+        // use actions for timing and files for what to play
+        make_actions()
+        var start_time = 1
+        for action at i in actions:
+            start_time = start_time + action[0]
+            if files[i]:
+                cause(start_time, 'pre_play_file', files[i])
+
+    def pre_play_file(file)
+        print "*********************** about to play", file
+        cause(2, 'play_file', file)
+
+    def play_file(file):
+        audioin_listbox.set_value(file)
+        print "******************** starting to play", file
+
+    def enable_trigger():
+        aura_send_to(audio_server, "start_enable")
+
+    def enable2():
+        // aura_send_to(audio_server, "enable2")
+        fastcloud_checkbox.set_value(t)
+
+    def disable2():
+        fastcloud_checkbox.set_value(false)
+
+    def step1(obj, event, flag, y):
+        //print "start 1-air", flag
+        if flag:
+            audioin_listbox.set_value("1-air.wav")
+            cause(1.1, 'enable_trigger')
+        else:
+            audioin_mute()
+            audio_server <- air(false)
+
+    def step2(obj, event, flag, y):
+        //print "start 2-points", flag
+        if flag:
+            audioin_listbox.set_value("2-points.wav")
+        else:
+            audioin_mute()
+        audio_server <- points(flag)
+
+    def step3(obj, event, flag, y):
+        //print "start 3-pizz", flag
+        if flag:
+            audioin_listbox.set_value("3-pizz.wav")
+        else:
+            audioin_mute()
+        audio_server <- pizz(flag)
+
+    def step4(obj, event, flag, y):
+        //print "start 4-melody", flag
+        if flag:
+            audioin_listbox.set_value("4-melody.wav")
+        else:
+            audioin_mute()
+        audio_server <- melo(flag)
+
+    def step5(obj, event, flag, y):
+        //print "start 5-fast"
+        cyclesbox.set_value(t)
+        // audio_server <- fast(t)
+        // audio_server <- gran(t)
+        if flag:
+            audioin_listbox.set_value("5-fast.wav")
+            audio_server <- start_fast()
+            cause(37, 'enable2')
+        else:
+            audioin_mute()
+            
+
+    def step6(obj, event, flag, y):
+        //display "start gliss", flag
+        cyclesbox.set_value(false)
+        disable2()
+        audio_server <- gliss(flag)
+        cause(117 , 'glissup', true)
+        cause(132, 'glissup', false)
+        if flag:
+            audioin_listbox.set_value("long.wav")
+        else:
+            audioin_mute()
+
+    def glissup(flag):
+        gliss_slider.set_value(-20.0 if flag else 4.0)
+
+    def step7(obj, event, flag, y):
+        //display "step7", flag
+        audio_server <- pizz_rep(flag)
+
+    def step8(obj, event, flag, y):
+        //display "step8", flag
+        if flag:
+            audioin_listbox.set_value("whistle.wav")
+        else:
+            audioin_mute()
+
+    def step9(obj, event, flag, y):
+        //display "step9", flag
+        cyclesbox.set_value(true)
+        wet_slider.set_value(0.03)
+        if flag:
+            audioin_listbox.set_value("air-only.wav")
+        else:
+            audioin_mute()
+
+
+    def fastx(fn):
+        // fastcloud_checkbox.set_value(t)
+        stop()  // prevent sequencer from starting more things
+        //print "start fastx:", fn
+        audioin_listbox.set_value(fn)
+        audio_server <- start_fast()
+
+        
+    def mute_input()
+        audioin_listbox.set_value("Mute Input")
+        
+    def stopwatch(s):
+        //print "t+";s
+        cause(1, 'stopwatch', s + 1)
+        
+    def cycles_control(x, ending):
+        audio_server <- cycles(x, ending)
+        if x:
+            pattern_x = 0
+            cycles(cycles_index)
+        else:
+            cycles_index = cycles_index + 1
+
+    def cycles(x):
+        if cycles_index == x:
+            // do pattern
+            //var shift = pattern[pattern_x]
+            shift1 = irandom(12)
+            if pattern_x & 1 == 1:
+                shift2 = irandom(12) - 12
+            if pattern_x & 2 == 2:
+                shift3 = irandom(12) - 24
+            //            pattern_x = (pattern_x + 1) % len(pattern)
+            pattern_x = pattern_x + 1
+            audio_server <- shiftby(shift1 + cycle_transpose, shift2 + cycle_transpose,
+                                    shift3 + cycle_transpose)
+            cause(cycle_period, 'cycles', x)
+
