@@ -544,6 +544,12 @@ static int callback_entry(float *input, float *output,
 
     o2sm_poll();  // called here to get block-accurate timing
     aud_frames_done += BL;
+    // If main program is shutting down due to an error, it could free the
+    // audio thread's memory. That shouldn't happen, but did once, so this
+    // safeguard stops the audio thread before more damage occurs.
+    if (!ugen_table.bounds_check(INPUT_ID)) {
+        return paAbort;
+    }
     Ugen_ptr input_ug = ugen_table[INPUT_ID];
     Sample_ptr aout;
     aud_blocks_done++;  // bring everyone up to this count

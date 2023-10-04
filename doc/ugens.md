@@ -132,6 +132,79 @@ generator to an audio-rate signal. Unless otherwise noted, inputs to
 an audio-rate unit generator can be any mix of audio-rate, block-rate,
 and "constant-rate" (class Const) signals.
 
+## General Methods
+
+These are common methods for unit generator objects in Serpent:
+
+### ugen.play([quiet])
+Mix the output of `ugen` into the overall audio output. If `ugen`
+is already playing no action is taken, and if `quiet` is false
+(the default), a warning is printed.
+
+### ugen.mute([status], [quiet])
+Remove `ugen` from the audio output mix. This will also stop
+computing `ugen` unless some other ugen is still using its output.
+The opposite of `play`. If `ugen` is not already playing no action
+is taken, and if `quiet` is false (the default), a warning is
+printed. `status` is always ignored. It is an optional parameter
+because "atend" actions always pass a status (you can access the
+status by overriding `mute` in a `Ugen` subclass).
+
+### ugen.run([quiet])
+Run `ugen`. Use this method instead of `play` when `ugen` does not 
+produce any output, e.g. see `recplay` (when recording), `trig`,
+`vu`, etc. If if `ugen` is already running, no action is taken, and
+if `quiet` is false (the default), a warning is printed
+.
+
+### ugen.unrun([quiet])
+Stop running `ugen` in the audio processing loop. The opposite of
+`run`. If `ugen` is not running, no actions is taken, and if `quiet`
+is false (the default), a warning is printed.
+
+### ugen.fade(dur, [quiet])
+Fade the output of `ugen` to zero. `dur` is the fade time. This
+method inserts a fader between `ugen` and the audio output, so it
+does not affect other uses, such as connecting `ugen` to a mixer
+(see `mix()`). If `ugen` is not playing (via `play()`), no action
+is taken, and if `quiet` is false (the default), a warning is
+printed.
+
+### ugen.get(name)
+Unit generators have named inputs. E.g. the `alpass` ugen has
+inputs named `'inp'`, `'dur'`, and `'fb'`. You can retrieve the
+input with this method. Note that for c-rate (`Const`) inputs, this
+method will return the Const object, not the constant value(s).
+
+### ugen.set(name, value, [chan], [quiet])
+Set the input to `ugen` named by `name` to `value`. If `value` is
+a number and the current input is a `Const` (e.g., it was initialized
+by passing a number to the constructor), then the `Const` is updated
+by writing `value` to the channel specified by `chan`.
+If `value` is an array of numbers and the current input is a `Const`,
+then `chan` is ignored and multiple channels, starting with 0, are
+updated in the named input. If a number or array of numbers is
+specified and the curren tinput is *not* constant or there is a
+mismatch in channels, then a new `Const` object is constructed to
+replace the current input. Note that if `chan` is zero and a `Const`
+object exists, then only one channel is updated, but if a `Const`
+must be created with one channel, the "mono" constant will apply to
+all channels. This could lead to surprising behavior. Therefore,
+*if channel is unspecified, the Const will be replaced if necessary
+so that the input is single-channel*, and if channel *is* specified,
+either `ugen` must be single channel and `chan` is 0, or a
+multi-channel Const must already exist. Otherwise, no action is taken
+and, if `quiet` is false (the default), a warning is printed.
+Therefore, the case to avoid is providing a numberical `value` and
+specifying a channel when the current value is not a `Const`'.
+
+### ugen.atend(action, [arg])
+When this unit generator ends, `action` will be sent to `this` or, if
+provided, to `arg`, which in either case must handle "/arco/*class*/act"
+which is currently handled by `Pwlb` and `Fileplay` classes. Allowed
+actions are currently `MUTE`, which invokes `mute`, and `FINISH`,
+which should be implemented by the receiving object (`this` or `arg`).
+
 ## Unit Generators and Messages
 
 In each section, Serpent constructor and methods are listed in
@@ -151,18 +224,21 @@ frequency has the same gain. If the desired control parameters are
 frequency (in Hz) and decay time (T60, in seconds), set `dur` to 1 /
 *hz* and set `fb` (feedback) to `exp(-6.9087 * dur / decay_time)`
 
-`/arco/delay/max id dur` - Reallocates delay memory for a maximum
+`/arco/alpass/max id dur` - Reallocates delay memory for a maximum
 duration of `dur`.
 
-`/arco/delay/repl_dur id dur_id` - Set duration input to object with
+`/arco/alpass/repl_inp id inp_id` - Set input to object with
+id `inp_id`.
+
+`/arco/alpass/repl_dur id dur_id` - Set duration input to object with
 id `dur_id`.
 
-`/arco/delay/set_dur id chan dur` - Set duration to a float value
+`/arco/alpass/set_dur id chan dur` - Set duration to a float value
 `dur`.
 
-`/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
+`/arco/alpass/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
-`/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
+`/arco/alpass/set_fb id chan fb` - Set feedback to float value `fb`.
 
 ### delay
 ```
@@ -176,6 +252,9 @@ different delay (`dur`) and feedback (`fb`). `id` is the object id.
 
 `/arco/delay/max id dur` - Reallocates delay memory for a maximum
 duration of `dur`.
+
+`/arco/delay/repl_dur id dur_id` - Set input to object with
+id `inp_id`.
 
 `/arco/delay/repl_dur id dur_id` - Set duration input to object with
 id `dur_id`.
@@ -781,6 +860,7 @@ recplay(inp, [chans], [gain], [fade_time], [loop])
 .record(record_flag)
 .start(start_time)
 .stop()
+.set_speed(ratio)
 .borrow(lender)
 ```
 
@@ -916,7 +996,7 @@ alternate and resume taking input from the thru object's input, pass
 ZERO_ID as `alt_id`. To make the thru's output zero, e.g., to mute the
 output of `INPUT_ID`, create a new `zero` object and pass it as
 `alt_id`. The `alt_id` capability allows audio input (a Thru object)
-to be redirected to obtain input from a file or test signal. 
+to be redirected to obtain input from a file or test signal.
 
 ## trig
 ```

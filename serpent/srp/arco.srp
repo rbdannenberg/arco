@@ -13,6 +13,11 @@ require "o2util"
 require "utils"
 require "prefs"
 
+PI = 3.1415926535898
+PI_recip = 1/PI
+PI2 = 6.2831853071794
+PI2_recip = 1/PI2
+
 AR = 44100.0  // audio rate
 AP = 1 / AR // audio sample period
 BL = 32
@@ -122,11 +127,12 @@ def set_arco_state(newstate):
 SIGNAL = 'signal'
 GAIN = 'gain'
 BOTH = 'both'
-// atend types for ugen.atend(). Various Ugens can send notification of end events:
-//    Pwlb, Fileplay, ...
-MUTE = 'mute'  // standard thing to do at end: call mute() to delete a sound instance
-FINISH = 'finish'  // custom behavior - the target should implement finish() to
-                   // handle the event
+// atend types for ugen.atend(). Various Ugens can send notification of
+// end events: Pwlb, Fileplay, ...
+MUTE = 'mute'      // standard thing to do at end: call mute() to delete
+                   //     a sound instance
+FINISH = 'finish'  // custom behavior - the target should implement finish()
+                   //     to handle the event
 
 ZERO_ID = 0
 ZEROB_ID = 1
@@ -595,36 +601,38 @@ class Ugen:
         // print
 
 
-    def play():  # connect this Ugen to audio output
+    def play(optional quiet):  # connect this Ugen to audio output
         if this not in arco_output_set:
             arco_output_set.append(this)
             display "Ugen play", id
             o2_send_cmd("/arco/output", 0, "U", id)
-        else:
+        elif not quiet:
             print "WARNING: in play(), Ugen already in output set", this
         this
 
 
-    def mute(optional status):  # disconnect this Ugen from audio output
+    def mute(optional status, optional quiet):
+    # disconnect this Ugen from audio output
     # since "atend" actions always have a status, we accept a status
     # but ignore it.
         if this in arco_output_set:
             display "Ugen mute", id
             arco_output_set.remove(this)
             o2_send_cmd("/arco/mute", 0, "U", id)
-        else:
+        elif not quiet:
             print "WARNING: in mute(), Ugen is not in output set", this
         this
 
 
-    def fade(dur):  # fade to nothing, then disconnect from audio output
+    def fade(dur, optional quiet):
+    # fade to nothing, then disconnect from audio output
         if this in arco_output_set:
             display "Ugen fade", id, dur
             var faded = mult(id, pweb(0, 1, dur, 0))
             o2_send_cmd("/arco/swap", 0, "UU", id, faded.id)
             sched_select(rtsched)
             sched_cause(dur + 0.1, this, 'mute', faded)
-        else:
+        elif not quiet:
             print "WARNING: in fade(), Ugen is not in output set", this
 
 

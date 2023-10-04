@@ -271,22 +271,13 @@ class Configure_audio:
 
 // clipping light
 class Clip_light (Eventlight):
-    var off_time
 
     def init(window, x, y, optional varname):
         super.init(window, 10, x, y, varname)
         on_color = "RED" // make it look more like overload warning
 
     def clip():
-        set(true)
-        sched_select(rtsched)
-        off_time = sched_rtime + 0.1
-        sched_cause(0.11, this, 'turn_off')
-
-    def turn_off():
-        if sched_rtime > off_time:
-            set(false)
-
+        blink()
 
 
 // this class receives level and peak messages
@@ -513,7 +504,7 @@ class Monitor_audio:
             test_tone_osc = nil
 
 
-    def audio_loginp(obj, event, x, y):
+    def audio_login(obj, event, x, y):
         if x and not input_logger:
             input_logger = filerec("input.wav", input_ugen, arco_input_chans)
             input_logger.run()
