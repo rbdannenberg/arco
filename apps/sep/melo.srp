@@ -1,0 +1,44 @@
+# melo.srp -- control and implementation of "melo" section of
+#             Separation Logic
+#
+# based on previous implementation in Aura
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Melo:
+    var mix, recplay, outgain
+    
+    def init():
+        mix = mix(2)
+        recplay = recplay(input_ugen, 1, 1, 0.5)
+        recplay.run()
+        recplay.record(true)
+
+        # launch some echos
+        sched_select(rtsched)
+        sched_cause(9.3, this, 'echo', 'in9')
+        sched_cause(13.3, this, 'echo', 'in13')
+        sched_cause(19.7, this, 'echo', 'in20')
+        sched_cause(22.6, this, 'echo', 'in23')
+        sched_cause(24, this, 'stop_recording')
+        sched_cause(45, this, 'stop')
+
+        outgain = gain_control(mix, melo_gain_sl)
+        outgain.play()  // initially no inputs and silence -- see echo()
+
+
+    def echo(name):
+        var rp = recplayer(zero_ugen, 1, 1)
+        rp.start(0)
+        mix.ins(name, rp, pan45(random()))
+
+
+    def stop():
+        recplay.record(false)
+        recplay.unrun()
+        recplay = nil
+        mix = nil
+        outgain.fade(1)
+        constrained_ugen_finish(outgain)
+        outgain = nil

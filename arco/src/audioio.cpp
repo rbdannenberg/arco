@@ -283,14 +283,41 @@ static void arco_prtree(O2SM_HANDLER_ARGS)
         if (ugen->flags & UGEN_MARK) { // special case: print again
             ugen->flags &= ~UGEN_MARK;
         }
-        ugen->print_tree(0, true, "in audioio output_set");
+        ugen->print_tree(0, true, "member of output_set");
     }
+    for (int i = 0; i < run_set.size(); i++) {
+        Ugen_ptr ugen = ugen_table[run_set[i]];
+        if (ugen->flags & UGEN_MARK) { // special case: print again
+            ugen->flags &= ~UGEN_MARK;
+        }
+        ugen->print_tree(0, true, "member of run_set");
+    }
+
     // clear the marks by traversing tree again
     for (int i = 0; i < output_set.size(); i++) {
         Ugen_ptr ugen = ugen_table[output_set[i]];
         ugen->print_tree(0, false, "");
     }
+    for (int i = 0; i < run_set.size(); i++) {
+        Ugen_ptr ugen = ugen_table[run_set[i]];
+        ugen->print_tree(0, false, "");
+    }
     arco_print("---------------------------------------\n");
+}
+
+
+/* O2SM INTERFACE:  /arco/prugen int32 id string param; 
+   -- print one Ugen to console
+ */
+static void arco_prugen(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    const char *param = argv[1]->s;
+    // end unpack message
+
+    ANY_UGEN_FROM_ID(ugen, id, "arco_output");
+    ugen->print(0, param);
 }
 
 
@@ -301,8 +328,9 @@ static void arco_prugens(O2SM_HANDLER_ARGS)
     for (int i = 0; i < ugen_table.size(); i++) {
         Ugen_ptr ugen = ugen_table[i];
         if (ugen) {
-            arco_print("%s_%d #%d\n", ugen->classname(), i, ugen->refcount);
-        }   
+            ugen->print(1,
+                        "");
+        }
     }
     arco_print("---------------------------------------\n");
 }
@@ -841,7 +869,7 @@ static void arco_run(O2SM_HANDLER_ARGS)
     }
     ugen->flags |= IN_RUN_SET;
     run_set.push_back(id);
-    printf("arco_run %d @ %p inserted, flags %x\n", id, ugen, ugen->flags);
+    // printf("arco_run %d @ %p inserted, flags %x\n", id, ugen, ugen->flags);
 }
 
 
@@ -856,7 +884,8 @@ static void arco_unrun(O2SM_HANDLER_ARGS)
     if (ugen && (ugen->flags & IN_RUN_SET)) {
         forget_ugen_id(id, run_set);
         ugen->flags &= ~IN_RUN_SET;
-        printf("arco_unrun %d @ %p removed, flags %x\n", id, ugen, ugen->flags);
+        /* printf("arco_unrun %d @ %p removed, flags %x\n",
+                  id, ugen, ugen->flags); */
     } else {
         arco_warn("/arco/unrun %d not in run set, ignored\n", id);
     }
@@ -1279,6 +1308,7 @@ void audioio_initialize()
     o2sm_method_new("/arco/test1", "s", arco_test1, NULL, true, true);
     o2sm_method_new("/arco/prtree", "", arco_prtree, NULL, true, true);
     o2sm_method_new("/arco/prugens", "", arco_prugens, NULL, true, true);
+    o2sm_method_new("/arco/prugen", "is", arco_prugen, NULL, true, true);
     o2sm_method_new("/arco/reset", "s", arco_reset, NULL, true, true);
     o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);

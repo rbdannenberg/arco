@@ -1,0 +1,64 @@
+# points.srp -- control and implementation of "pointilistic" section of
+#               Separation Logic
+#
+# based on previous implementation in Aura
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Points:
+    var recplay, mix, outgain
+
+    def init():
+    # pointillistic short flute notes: record and later play
+        mix = mix(2)
+        recplay = recplay(input_ugen, 1, 1, 0.5)
+        recplay.run()
+        recplay.record(true)
+        sched_select(rtsched)  // for scheduling below
+
+        # launch a bunch of echoes at random offsets
+        for i = 0 to 40:
+            # start with no rate changes.
+            # add rate changes after 17s
+            # rate should be from 0.5 to 1.5, with minimum
+            # increasing from 0.3 to 1 from 17 to 45s
+            # (note: this seems backward - wouldn't that min decrease to
+            # expand the range? Nevertheless, this is what was described
+            # and implemented, so I'm leaving it this way in 2023. I guess
+            # the idea was to have greater control over final duration
+            # (0.3 would lengthen playback by x3.3) or to avoid large
+            # transpositions at the end when the "points" thin out.
+            # Also, max returns to 1 after 45s, so I guess it's intentional
+            # to return to no speedup/slowdown after 45s. -RBD)
+            var delay = pr_unif(5, 85)
+            var rate_min = 1 if delay < 17 else
+                           min(1, interpolate(delay, 17, 0.3, 45, 1))
+            var rate_max = 1 if delay < 17 or delay > 45 else 1.5
+            var rate = pr_unif(rate_min, rate_max)
+            var gain = min(1, max(0.2, interpolate(delay, 5, 1, 55, 0.4)))
+            // max duration is approx. 85 (max delay) + 47 (dur) = 132
+            // don't always repeat from the beginning of the recording; use
+            // a random offset up to 10 sec, but since we start after 5 sec,
+            // we can't make the start time in the future, so maximum start
+            // time is approximately delay:
+            var start_time = pr_unif(min(10, delay + 0.1))
+            sched_cause(delay, this, 'echo', i, start_time, rate, gain)
+        outgain = gain_control(mix, points_gain_sl)
+        outgain.play()  // initially no inputs and silence -- see echo()
+
+
+    def echo(i, start_time, rate, gain):
+        var rp = recplay(zero_ugen, 1, 0.5)
+        rp.borrow(recplay)
+        rp.set_speed(rate)
+        // randomly choose pan for each delay:
+        mix.ins(mix_name(i), rp, pan_45(random()))
+        rp.start(start_time)
+
+
+    def stop_recording():
+        recplay.record(false)
+        recplay.unrun()
+        display "stop_recording"
+

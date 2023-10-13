@@ -27,10 +27,10 @@ class Feedback : public Ugen {
     int from_stride;
     Sample_ptr from_samps;
 
-    Feedback(int id, int nchans, Ugen_ptr inp, Ugen_ptr from, Ugen_ptr gain) :
+    Feedback(int id, int nchans, Ugen_ptr input, Ugen_ptr from, Ugen_ptr gain) :
             Ugen(id, 'a', nchans) {
         states.set_size(chans);
-        init_input(inp);
+        init_input(input);
         init_from(from);
         init_gain(gain);
         run_channel = (void (Feedback::*)(Feedback_state *)) 0;
@@ -71,15 +71,15 @@ class Feedback : public Ugen {
         }
     }
 
-    void print_sources(int indent, bool print) {
-        input->print_tree(indent, print, "input");
-        from->print_tree(indent, print, "from");
-        gain->print_tree(indent, print, "gain");
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
+        from->print_tree(indent, print_flag, "from");
+        gain->print_tree(indent, print_flag, "gain");
     }
 
-    void repl_input(Ugen_ptr inp) {
+    void repl_input(Ugen_ptr ugen) {
         input->unref();
-        init_input(inp);
+        init_input(ugen);
     }
 
     void repl_from(Ugen_ptr f) {
@@ -98,11 +98,11 @@ class Feedback : public Ugen {
         gain->const_set(chan, g, "Feedback::set_gain");
     }
 
-    void init_input(Ugen_ptr inp) { init_param(inp, input, input_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
 
-    void init_from(Ugen_ptr frm) { init_param(frm, from, from_stride); }
+    void init_from(Ugen_ptr ugen) { init_param(ugen, from, from_stride); }
 
-    void init_gain(Ugen_ptr gn) { init_param(gn, gain, gain_stride); }
+    void init_gain(Ugen_ptr ugen) { init_param(ugen, gain, gain_stride); }
 
     void chan_aa_a(Feedback_state *state) {
         for (int i = 0; i < BL; i++) {

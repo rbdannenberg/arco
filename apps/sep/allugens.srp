@@ -1,3 +1,86 @@
+# smoothb.srp -- class for Smoothb unit generator
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Smoothb (Const_like):
+    def init(x, optional cutoff = 10, chans):
+    # x is initial value or array of initial values
+    # cutoff is the lowpass cutoff frequency for smoothing
+    # chans defaults to size of x
+    # if len(x) > chans (consider len(x) = 1 if isnumber(x)),
+    # then extra values are ignored. if len(x) < chans, then
+    # if isnumber(x), *all* channels are set to x, and otherwise
+    # channels from len(x) are initialized to zero
+        var chans_default = max(len(x), 1) if isarray(x) else 1
+        chans = chans if chans else chans_default
+        super.init(create_ugen_id(), "Smoothb", chans, C_RATE, "",
+                   no_msg = true)
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_float(cutoff)
+        add_floats(x, "/arco/smoothb/newn")        
+
+
+    def set(x):
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        add_floats(x, "/arco/smoothb/setn")
+
+
+    def set_chan(chan, x):
+        o2_send_cmd("/arco/smoothb/set", 0, "Uif", id, chan, x)
+
+
+    def set_cutoff(cutoff):
+        o2_send_cmd("/arco/smoothb/cutoff", 0, "Uf", id, cutoff)
+
+
+
+def smoothb(x, optional cutoff = 10, chans):
+    return Smoothb(x, cutoff, chans)
+# route.srp -- route input channels to output channels
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Route (Ugen):
+    def init(input, chan):
+        var chans = len(chan) if isarray(chan) else 1
+        super.init(create_ugen_id(), "Route", chans, A_RATE, "",
+                   no_msg = true)
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_int32(arco_ugen_id(input.id))
+        add_chan_and_send(chans, chan, "/arco/route/new")
+        inputs = {'input': input}
+
+
+    def set_routes(chan):
+        var chans = len(chan) if isarray(chan) else 1
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        add_chan_and_send(chans, chan, "/arco/route/routes")
+
+
+    def add_chan_and_send(chans, chan, msg):
+    # adding channel sources to message is similar for new and routes:
+        for i = 0 to chans:
+            o2_add_int32(chan if isnumber(chan) else chan[i])
+        o2_send_finish(0, msg, true)
+
+    def set_route(output_chan, input_chan):
+        o2_send_cmd("/arco/route/route", 0, "Uii", id, output_chan, input_chan)
+
+
+
+def route(input, chan):
+# route from input channels to output channels.
+# If chan is an integer, create one channel output routed from input
+#     channel given by chan.
+# If chan is an array, create an output channel for each element.
+    return Route(input, chan)
+
 # vu.srp -- record and play audio in memory
 #
 # Roger B. Dannenberg
@@ -533,7 +616,7 @@ class Recplay (Ugen):
         o2_send_cmd("/arco/recplay/speed", 0, "Uf", id, x)
 
     def borrow(u):
-        o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u)
+        o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u.id)
 
 # delay.srp -- feedback delay unit generator
 #
@@ -630,6 +713,62 @@ class Trig(Ugen):
 
 def trig(inp, reply_addr, window, threshold, pause):
     Trig(inp, reply_addr, window, threshold, pause)  # trig as a function
+
+# dnsampleb.srp -- feedback dnsampleb unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Dnsampleb(Ugen):
+    def init(chans, inp, mode):
+        super.init(create_ugen_id(), "Dnsampleb", chans, 'a', "UUf",
+	           'inp', inp, 'mode', mode)
+
+    def set_cutoff(hz):
+        o2_send_cmd("/arco/dnsampleb/cutoff", 0, "Uf", id, hz)
+
+    def set_mode(mode):
+        o2_send_cmd("/arco/dnsampleb/mode", 0, "Ui", id, mode)
+
+
+def dnsampleb(inp, mode, optional chans = 1):
+    Dnsampleb(chans, inp, mode)  # dnsampleb as a function
+
+DNSAMPLE_BASIC = 0
+DNSAMPLE_AVG = 1
+DNSAMPLE_PEAK = 2
+DNSAMPLE_RMS = 3
+DNSAMPLE_POWER = 4
+DNSAMPLE_LOWPASS500 = 5
+DNSAMPLE_LOWPASS100 = 6
+
+# dualslewb.srp -- feedback dualslewb unit generator
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Dualslewb(Ugen):
+    def init(chans, inp, attack, release, optional current = 0,
+             attack_linear = 1, release_linear = 1):
+        super.init(create_ugen_id(), "Dualslewb", chans, 'a', "UUfffii",
+	           'inp', inp, 'attack', attack, 'release', release,
+                   'current', current, 'attack_linear', attack_linear,
+                   'release_linear', release_linear)
+
+    def set_current(current):
+        o2_send_cmd("/arco/dualslewb/current", "Uf", id, current)
+
+    def set_attack(attack, optional attack_linear = 1):
+        o2_send_cmd("/arco/dualslewb/attack", "Ufi", id, attack, attack_linear)
+
+    def set_release(release, optional release_linear = 1):
+        o2_send_cmd("/arco/dualslewb/release", "Ufi",
+                         id, release, release_linear)
+
+
+def dualslewb(inp, mode, optional chans = 1):
+    Dualslewb(chans, inp, mode)  # dualslewb as a function
+
 
 # thru.srp -- audio pass-through
 #

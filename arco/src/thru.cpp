@@ -10,33 +10,33 @@
 
 const char *Thru_name = "Thru";
 
-/* O2SM INTERFACE: /arco/thru/new int32 id, int32 chans, int32 inp;
+/* O2SM INTERFACE: /arco/thru/new int32 id, int32 chans, int32 input_id;
  */
 void arco_thru_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
-    int32_t inp = argv[2]->i;
+    int32_t input_id = argv[2]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(ugen, inp, "arco_thru_new");
-    new Thru(id, chans, ugen);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_thru_new");
+    new Thru(id, chans, input);
 }
 
 
-/* O2SM INTERFACE: /arco/thru/repl_inp int32 id, int32 inp;
+/* O2SM INTERFACE: /arco/thru/repl_inp int32 id, int32 input_id;
  */
 void arco_thru_repl_inp(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Thru, thru, id, "arco_thru_repl_inp")
-    ANY_UGEN_FROM_ID(ugen, inp, "arco_thru_repl_inp");
-    thru->repl_inp(ugen);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_thru_repl_inp");
+    thru->repl_inp(input);
 }
 
 
@@ -59,7 +59,8 @@ static void thru_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/thru/new", "iii", arco_thru_new, NULL, true, true);
-    o2sm_method_new("/arco/thru/repl_inp", "ii", arco_thru_repl_inp, NULL, true, true);
+    o2sm_method_new("/arco/thru/repl_inp", "ii", arco_thru_repl_inp, NULL,
+                    true, true);
     o2sm_method_new("/arco/thru/alt", "ii", arco_thru_alt, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }

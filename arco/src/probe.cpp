@@ -16,10 +16,10 @@ const char *Probe_name = "Probe";
 
 void Probe::real_run()
 {
-    if (state == PROBE_IDLE || inp == NULL) return;
-    int inp_len = (inp->rate == 'a' ? BL : 1);
+    if (state == PROBE_IDLE || input == NULL) return;
+    int input_len = (input->rate == 'a' ? BL : 1);
 
-    inp_samps = inp->run(current_block);  // update input
+    input_samps = input->run(current_block);  // update input
 
     if (state == PROBE_DELAYING) { // wait for next period to start
         wait_count--;
@@ -37,7 +37,7 @@ void Probe::real_run()
         next = 0;
         if (direction > 0) {
             while (next < BL) {
-                Sample s = inp_samps[next];
+                Sample s = input_samps[next];
                 if ((prev_sample < threshold) && (s >= threshold)) {
                     goto start_collect;
                 }
@@ -46,7 +46,7 @@ void Probe::real_run()
             }
         } else if (direction < 0) {
             while (next < BL) {
-                Sample s = inp_samps[next];
+                Sample s = input_samps[next];
                 if ((prev_sample > threshold) && (s <= threshold)) {
                     goto start_collect;
                 }
@@ -73,7 +73,7 @@ void Probe::real_run()
         // channel, inp_stride will be zero and not helpful, so we need to
         // use inp_len, a local variable computed above.
         for (int c = channel_offset; c < channel_offset + channels; c++) {
-            *sample_ptr++ = inp_samps[next + inp_len * c];
+            *sample_ptr++ = input_samps[next + input_len * c];
         }
         frames_sent++;
         next += stride;
@@ -116,33 +116,33 @@ void Probe::real_run()
 }
 
 
-/* O2SM INTERFACE: /arco/probe/new int32 id, int32 inp_id, string reply_addr;
+/* O2SM INTERFACE: /arco/probe/new int32 id, int32 input_id, string reply_addr;
  */
 void arco_probe_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     char *reply_addr = argv[2]->s;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_probe_new");
-    new Probe(id, inp, reply_addr);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_probe_new");
+    new Probe(id, input, reply_addr);
 }
 
 
-/* O2SM INTERFACE: /arco/probe/repl_inp int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/probe/repl_input int32 id, int32 input_id;
  */
-static void arco_probe_repl_inp(O2SM_HANDLER_ARGS)
+static void arco_probe_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Probe, probe, id, "arco_probe_repl_inp");
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_probe_repl_inp");
-    probe->repl_inp(inp);
+    UGEN_FROM_ID(Probe, probe, id, "arco_probe_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_probe_repl_input");
+    probe->repl_input(input);
 }
 
 
@@ -207,15 +207,15 @@ static void probe_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/probe/new", "iis", arco_probe_new, NULL, true,
-                     true);
-    o2sm_method_new("/arco/probe/repl_inp", "ii", arco_probe_repl_inp, NULL,
-                     true, true);
+                    true);
+    o2sm_method_new("/arco/probe/repl_input", "ii", arco_probe_repl_input,
+                    NULL, true, true);
     o2sm_method_new("/arco/probe/probe", "ifiiii", arco_probe_probe, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/probe/thresh", "ifif", arco_probe_thresh, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/probe/stop", "i", arco_probe_stop, NULL, true,
-                     true);
+                    true);
     // END INTERFACE INITIALIZATION
 }
 

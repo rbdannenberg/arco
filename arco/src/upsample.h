@@ -33,20 +33,24 @@ public:
 
     const char *classname() { return Upsample_name; }
 
-    void print_sources(int indent, bool print) {
-        input->print_tree(indent, print, "input");
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
     }
 
-    void repl_input(Ugen_ptr inp) {
-        input->unref();
-        init_input(inp);
-    }
-
-    void set_input(int chan, float f) {
-        input->const_set(chan, f, "Upsample::set_input");
-    }
 
     void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
+    
+
+    void repl_input(Ugen_ptr input) {
+        input->unref();
+        init_input(input);
+    }
+
+
+    void set_input(int chan, Sample x) {
+        input->const_set(chan, x, "Upsample::set_input");
+    }
+
 
     void real_run() {
         Sample_ptr input_samps = input->run(current_block); // update input

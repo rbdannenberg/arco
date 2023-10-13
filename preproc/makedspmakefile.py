@@ -32,7 +32,8 @@ written to the same folder as dspmanifest.txt.
 NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
             "alpass", "mix", "fileplay", "filerec", "fileio", "nofileio", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
-            "pweb", "flsyn", "pv", "yin", "trig"]
+            "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
+            "smoothb", "route"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -98,6 +99,7 @@ def make_inclfile(arco_path, manifest, outf):
     "make the CMake include file that lists all the sources"
 
     need_ringbuf = False  # need to compile with ringbuf.h
+    need_fastrand = False # need to compile with fastrand.h
     need_flsyn_lib = False  # special: ugen needs fluidsynth library
     need_fft = False  # need to compile and link with ffts files
     need_windowed_input = False  # need to compile and link with windowedinput.h
@@ -124,6 +126,7 @@ def make_inclfile(arco_path, manifest, outf):
     ## Compute Dependencies
     if "granstream" in manifest:  # add ringbuf which granstream depends on
         need_ringbuf = True
+        need_fastrand = True
 
     if "pv" in manifest:  # add cmupv which pv depends on
         print("    " + arco_path + "/cmupv/src/cmupv.c",
@@ -143,6 +146,9 @@ def make_inclfile(arco_path, manifest, outf):
     ## Include source files to satisfy dependencies
     if need_ringbuf:
         print("    " + arco_path + "/arco/src/ringbuf.h", file=outf)
+
+    if need_fastrand:
+        print("    " + arco_path + "/arco/src/fastrand.h", file=outf)
 
     if need_fft:
         print("    " + arco_path + "/ffts/src/fftext.c",

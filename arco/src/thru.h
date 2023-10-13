@@ -12,10 +12,10 @@ public:
     int input_stride;
     Ugen_ptr alternate;  // allow input to come from another Ugen
 
-    Thru(int id, int nchans, Ugen_ptr inp) : Ugen(id, 'a', nchans) {
+    Thru(int id, int nchans, Ugen_ptr input) : Ugen(id, 'a', nchans) {
         printf("Thru@%p created, id %d, ugen_table[id] %p\n",
                this, id, ugen_table[id]);
-        init_input(inp);
+        init_input(input);
         alternate = NULL;
     };
 
@@ -23,13 +23,13 @@ public:
 
     const char *classname() { return Thru_name; }
 
-    void print_sources(int indent, bool print) {
-        input->print_tree(indent, print, "input");
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
     }
 
-    void repl_inp(Ugen_ptr inp) {
+    void repl_inp(Ugen_ptr ugen) {
         input->unref();
-        init_input(inp);
+        init_input(ugen);
     }
 
     void set_alternate(Ugen_ptr alt) {
@@ -50,7 +50,7 @@ public:
     }
 
 
-    void init_input(Ugen_ptr inp) { init_param(inp, input, input_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
 
 
     void real_run() {

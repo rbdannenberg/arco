@@ -60,9 +60,9 @@ extern const char *Probe_name;
 
 class Probe : public Ugen {
   public:
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     // need 24 bytes overhead + up to 68 bytes for type string with
     // 64 floats; allow 64 bytes for address -> 156, add 4 extra:
@@ -100,7 +100,7 @@ class Probe : public Ugen {
     Sample prev_sample; // one-sample history for threshold crossing detection
     
 
-    Probe(int id, Ugen_ptr inp, char *reply_addr) : Ugen(id, 0, 1) {
+    Probe(int id, Ugen_ptr input, char *reply_addr) : Ugen(id, 0, 1) {
         O2message_ptr m = (O2message_ptr) msg_header;
         m->next = 0;
         m->data.misc = 0;
@@ -129,7 +129,7 @@ class Probe : public Ugen {
         max_wait = 0.02;
         prev_sample = 0.0;
 
-        init_inp(inp);
+        init_input(input);
     }
 
 
@@ -138,16 +138,24 @@ class Probe : public Ugen {
 
     const char *classname() { return Probe_name; }
 
-    void repl_inp(Ugen_ptr inp_) {
-        inp->unref();
-        init_inp(inp_);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
+    }
+
+    void print_details(int indent) {
+        arco_print("period %g frames %d channels %d stride %d repeats %d\n",
+                   period, frames, channels, stride, repeats);
+        indent_spaces(indent + 2);
+        arco_print("threshold %g direction %d max_wait %g",
+                   threshold, direction, max_wait);
     }
 
 
-    void init_inp(Ugen_ptr ugen) {
-        init_param(ugen, inp, inp_stride);
+    void init_input(Ugen_ptr ugen) {
+        init_param(ugen, input, input_stride);
         // TODO: we should fail gracefully in this case:
-        assert(inp->rate == 'a' || inp->rate == 'b');
+        assert(input->rate == 'a' || input->rate == 'b');
         stop();  // after input change we need another probe() to start again
     }
 
@@ -162,7 +170,7 @@ class Probe : public Ugen {
     void probe(float period_, int frames_, int chan, 
                int nchans, int stride_) {
         stop();  // make sure we are stopped
-        if (!inp) {
+        if (!input) {
             return;
         }
 
@@ -185,12 +193,12 @@ class Probe : public Ugen {
         frames = frames_;
         frames_sent = 0;
         channel_offset = chan;
-        if (channel_offset >= inp->chans || channel_offset < 0) {
+        if (channel_offset >= input->chans || channel_offset < 0) {
             channel_offset = 0;
         }
         channels = nchans;
-        if (channel_offset + channels > inp->chans) {
-            channels = inp->chans - channel_offset;
+        if (channel_offset + channels > input->chans) {
+            channels = input->chans - channel_offset;
         }
         if (channels < 1) channels = 1;
 

@@ -1,0 +1,41 @@
+# smoothb.srp -- class for Smoothb unit generator
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Smoothb (Const_like):
+    def init(x, optional cutoff = 10, chans):
+    # x is initial value or array of initial values
+    # cutoff is the lowpass cutoff frequency for smoothing
+    # chans defaults to size of x
+    # if len(x) > chans (consider len(x) = 1 if isnumber(x)),
+    # then extra values are ignored. if len(x) < chans, then
+    # if isnumber(x), *all* channels are set to x, and otherwise
+    # channels from len(x) are initialized to zero
+        var chans_default = max(len(x), 1) if isarray(x) else 1
+        chans = chans if chans else chans_default
+        super.init(create_ugen_id(), "Smoothb", chans, C_RATE, "",
+                   no_msg = true)
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_float(cutoff)
+        add_floats(x, "/arco/smoothb/newn")        
+
+
+    def set(x):
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        add_floats(x, "/arco/smoothb/setn")
+
+
+    def set_chan(chan, x):
+        o2_send_cmd("/arco/smoothb/set", 0, "Uif", id, chan, x)
+
+
+    def set_cutoff(cutoff):
+        o2_send_cmd("/arco/smoothb/cutoff", 0, "Uf", id, cutoff)
+
+
+
+def smoothb(x, optional cutoff = 10, chans):
+    return Smoothb(x, cutoff, chans)

@@ -1,0 +1,59 @@
+# pizz.srp -- control and implementation of "pizz" section of
+#             Separation Logic
+#
+# based on previous implementation in Aura
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+
+class Pizz (Instrument):
+    var mix, count, off, outgain
+
+    def init(recplay, delay_spread, rate_origin, rate_slope, gain, dur):
+    # count is number of pizz players to launch
+    # delay_spread is the spread in seconds between each launch (not counting
+    #       added jitter of 0 to 1 seconds)
+    # rate_origin is the initial rate in (half)steps
+    # each pizz player's rate (after the initial one) is incremented by
+    #       rate_slope (also measured in (half)steps)
+        instr_begin()
+        mix = mix(2)
+
+        # launch some echos. Each recplayer will be restarted at random
+        # times until off; then we stop each one, keeping track with
+        # count how many players are acive.
+        sched_select(rtsched)  // for scheduling below
+        off = false // set true to end everything
+        count = 4
+        for i = 0 to count:
+            var delay = i * delay_spread + random()  # spread out the delays
+            // for the first pizz section, rates will be 3, 1.5, 0, -1.5:
+            var rate = step_to_ratio(rate_origin + i * rate_slope)
+            var rp = recplayer(zero_ugen, 1, 1)
+            rp.set('speed', rate)
+            rp.borrow(recplay)
+            mix.ins(mix_name(i), rp, pan_45(unif(0.3, 0.7), gain))
+            sched_cause(delay, 'echo', rp, rate)
+        sched_cause(dur, this, 'end_all')
+        outgain = gain_control(mix, pizz_gain_sl)
+        super.init("Pizz", outgain)
+
+
+    def echo(rp, rate):
+        if off:
+            count = count - 1
+        else:
+            rp.start(0)
+            sched_cause(6.7 / rate + random(), this, 'echo', rp, rate)
+
+    def end_all():
+        display "stopping Pizz", count
+        off = true
+        if count > 0:
+            cause(3, 'end_all')
+        else:
+            outgain.mute()
+            constrained_ugen_finish(outgain)
+            outgain = nil
+            // TODO: creator should remove references to this instance

@@ -22,15 +22,15 @@ Mix::~Mix()
     // inputs, gains, input_strides, gain_strides are all freed
 }
 
-void Mix::print_sources(int indent, bool print)
+void Mix::print_sources(int indent, bool print_flag)
 {
     char name[80];
     Input *input = &inputs[0];
     for (int i = 0; i < inputs.size(); i++) {
         snprintf(name, 80, "input %d", i);
-        input->input->print_tree(indent, print, name);
+        input->input->print_tree(indent, print_flag, name);
         snprintf(name, 80, "gain %d", i);
-        input->gain->print_tree(indent, print, name);
+        input->gain->print_tree(indent, print_flag, name);
         input++;
     }
 }

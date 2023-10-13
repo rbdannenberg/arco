@@ -49,7 +49,7 @@ static void arco_upsample_set_input(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Upsample, upsample, id, "arco_upsample_repl_input");
+    UGEN_FROM_ID(Upsample, upsample, id, "arco_upsample_set_input");
     upsample->set_input(chan, val);
 }
 
@@ -57,9 +57,12 @@ static void arco_upsample_set_input(O2SM_HANDLER_ARGS)
 static void upsample_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/new/upsample", "iiii", arco_upsample_new, NULL, true, true);
-    o2sm_method_new("/arco/upsample/repl_input", "ii", arco_upsample_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/upsample/set_input", "iif", arco_upsample_set_input, NULL, true, true);
+    o2sm_method_new("/arco/new/upsample", "iii", arco_upsample_new, NULL,
+                    true, true);
+    o2sm_method_new("/arco/upsample/repl_input", "ii",
+                    arco_upsample_repl_input, NULL, true, true);
+    o2sm_method_new("/arco/upsample/set_input", "iif",
+                    arco_upsample_set_input, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
 

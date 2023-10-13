@@ -61,7 +61,6 @@ public:
         stopped = false;
         mix = mix_;
         expand = expand_;
-        started = false;
         block_on_deck = 0; 
         next_block = 0;
         blocks[0] = NULL;
@@ -98,7 +97,12 @@ public:
 
     const char *classname() { return Fileplay_name; }
 
-    void print_sources(int indent, bool print) { return; }
+
+    void print_details(int indent) {
+        arco_print("started %s stopped %s action %d",
+                   btos(started), btos(stopped), action_id);
+    }
+
 
     void play(bool play) {
         // You can only play once, no play after stopped:

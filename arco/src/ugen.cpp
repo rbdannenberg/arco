@@ -10,6 +10,7 @@
 #include "arcotypes.h"
 #include "ugenid.h"
 #include "ugen.h"
+#include "const.h"
 #include "audioio.h"
 
 Vec<Ugen_ptr> ugen_table;
@@ -73,17 +74,26 @@ void Ugen::indent_spaces(int indent)
     }
 }
 
+
+void Ugen::print(int indent, const char *param) {
+    arco_print("%s_%d(%s) refs %d chans %d ",
+               classname(), id, param, refcount, chans);
+    print_details(indent);
+    arco_print("\n");
+}    
+
+
 // this method runs a mark and print algorithm when print is true
 // it simply unmarks everything when print is false
 //
-void Ugen::print_tree(int indent, bool print, const char *param)
+void Ugen::print_tree(int indent, bool print_flag, const char *param)
 {
-    if (print) {
+    if (print_flag) {
         if (flags & UGEN_MARK) {
             return;  // cut off the search; we've been here before
         }
         indent_spaces(indent);
-        arco_print("%s_%d #%d (%s)\n", classname(), id, refcount, param);
+        print(indent, param);
         flags |= UGEN_MARK;
     } else {
         if (!(flags & UGEN_MARK)) {
@@ -91,8 +101,24 @@ void Ugen::print_tree(int indent, bool print, const char *param)
         }
         flags &= ~UGEN_MARK;  // clear flag
     }
-    print_sources(indent + 1, print);
+    print_sources(indent + 1, print_flag);
 }
+
+
+void Ugen::const_set(int chan, Sample x, const char *from)
+// Assume this is a Const. Set channel chan of the const output to x.
+// Do nothing but print warnings if this is not a Const ugen.
+// Normally, this is called to implement a "set_input" or in general
+// "set_xxxx" where xxxx is a signal input to another ugen, so from
+// is a string name of the method, e.g. "Upsample::set_input".
+{
+    if (rate != 'c') {
+        arco_warn("%s: ugen (%d) is not a Const\n", from, id);
+    } else {
+        ((Const *) this)->set_value(chan, x, from);
+    }
+}
+
 
 
 /* /arco/free id id id ...

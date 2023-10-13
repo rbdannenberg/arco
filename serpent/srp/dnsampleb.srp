@@ -1,0 +1,27 @@
+# dnsampleb.srp -- feedback dnsampleb unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Dnsampleb(Ugen):
+    def init(chans, inp, mode):
+        super.init(create_ugen_id(), "Dnsampleb", chans, 'a', "UUf",
+	           'inp', inp, 'mode', mode)
+
+    def set_cutoff(hz):
+        o2_send_cmd("/arco/dnsampleb/cutoff", 0, "Uf", id, hz)
+
+    def set_mode(mode):
+        o2_send_cmd("/arco/dnsampleb/mode", 0, "Ui", id, mode)
+
+
+def dnsampleb(inp, mode, optional chans = 1):
+    Dnsampleb(chans, inp, mode)  # dnsampleb as a function
+
+DNSAMPLE_BASIC = 0
+DNSAMPLE_AVG = 1
+DNSAMPLE_PEAK = 2
+DNSAMPLE_RMS = 3
+DNSAMPLE_POWER = 4
+DNSAMPLE_LOWPASS500 = 5
+DNSAMPLE_LOWPASS100 = 6

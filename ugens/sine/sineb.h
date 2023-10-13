@@ -97,9 +97,9 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print) {
-        freq->print_tree(indent, print, "freq");
-        amp->print_tree(indent, print, "amp");
+    void print_sources(int indent, bool print_flag) {
+        freq->print_tree(indent, print_flag, "freq");
+        amp->print_tree(indent, print_flag, "amp");
     }
 
     void repl_freq(Ugen_ptr inp) {

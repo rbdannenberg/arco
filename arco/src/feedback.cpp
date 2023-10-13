@@ -11,67 +11,67 @@
 const char *Feedback_name = "Feedback";
 
 /* O2SM INTERFACE: /arco/feedback/new int32 id, int32 chans, 
-                          int32 inp, int32 from, int32 gain;
+                          int32 input_id, int32 from_id, int32 gain_id;
  */
 void arco_feedback_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
-    int32_t inp = argv[2]->i;
-    int32_t from = argv[3]->i;
-    int32_t gain = argv[4]->i;
+    int32_t input_id = argv[2]->i;
+    int32_t from_id = argv[3]->i;
+    int32_t gain_id = argv[4]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp_ugen, inp, "arco_feedback_new");
-    ANY_UGEN_FROM_ID(from_ugen, from, "arco_feedback_new");
-    ANY_UGEN_FROM_ID(gain_ugen, gain, "arco_feedback_new");
-    new Feedback(id, chans, inp_ugen, from_ugen, gain_ugen);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_feedback_new");
+    ANY_UGEN_FROM_ID(from, from_id, "arco_feedback_new");
+    ANY_UGEN_FROM_ID(gain, gain_id, "arco_feedback_new");
+    new Feedback(id, chans, input, from, gain);
 }
 
 
-/* O2SM INTERFACE: /arco/feedback/repl_inp int32 id, int32 inp;
+/* O2SM INTERFACE: /arco/feedback/repl_input int32 id, int32 input_id;
  */
-void arco_feedback_repl_inp(O2SM_HANDLER_ARGS)
+void arco_feedback_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Feedback, feedback, id, "arco_feedback_repl_inp")
-    ANY_UGEN_FROM_ID(ugen, inp, "arco_feedback_repl_inp");
-    feedback->repl_input(ugen);
+    UGEN_FROM_ID(Feedback, feedback, id, "arco_feedback_repl_input")
+    ANY_UGEN_FROM_ID(input, input_id, "arco_feedback_repl_input");
+    feedback->repl_input(input);
 }
 
 
-/* O2SM INTERFACE: /arco/feedback/repl_from int32 id, int32 from;
+/* O2SM INTERFACE: /arco/feedback/repl_from int32 id, int32 from_id;
  */
 void arco_feedback_repl_from(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t from = argv[1]->i;
+    int32_t from_id = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Feedback, feedback, id, "arco_feedback_repl_from")
-    ANY_UGEN_FROM_ID(ugen, from, "arco_feedback_repl_from");
-    feedback->repl_from(ugen);
+    ANY_UGEN_FROM_ID(from, from_id, "arco_feedback_repl_from");
+    feedback->repl_from(from);
 }
 
 
-/* O2SM INTERFACE: /arco/feedback/repl_gain int32 id, int32 gain;
+/* O2SM INTERFACE: /arco/feedback/repl_gain int32 id, int32 gain_id;
  */
 void arco_feedback_repl_gain(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t gain = argv[1]->i;
+    int32_t gain_id = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Feedback, feedback, id, "arco_feedback_repl_gain")
-    ANY_UGEN_FROM_ID(ugen, gain, "arco_feedback_repl_gain");
-    feedback->repl_gain(ugen);
+    ANY_UGEN_FROM_ID(gain, gain_id, "arco_feedback_repl_gain");
+    feedback->repl_gain(gain);
 }
 
 
@@ -93,11 +93,16 @@ static void arco_feedback_set_gain(O2SM_HANDLER_ARGS)
 static void feedback_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/feedback/new", "iiiii", arco_feedback_new, NULL, true, true);
-    o2sm_method_new("/arco/feedback/repl_inp", "ii", arco_feedback_repl_inp, NULL, true, true);
-    o2sm_method_new("/arco/feedback/repl_from", "ii", arco_feedback_repl_from, NULL, true, true);
-    o2sm_method_new("/arco/feedback/repl_gain", "ii", arco_feedback_repl_inp, NULL, true, true);
-    o2sm_method_new("/arco/feedback/set_gain", "iif", arco_feedback_set_gain, NULL, true, true);
+    o2sm_method_new("/arco/feedback/new", "iiiii", arco_feedback_new, NULL,
+                    true, true);
+    o2sm_method_new("/arco/feedback/repl_input", "ii",
+                    arco_feedback_repl_input, NULL, true, true);
+    o2sm_method_new("/arco/feedback/repl_from", "ii", arco_feedback_repl_from,
+                    NULL, true, true);
+    o2sm_method_new("/arco/feedback/repl_gain", "ii", arco_feedback_repl_gain,
+                    NULL, true, true);
+    o2sm_method_new("/arco/feedback/set_gain", "iif", arco_feedback_set_gain,
+                    NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
 

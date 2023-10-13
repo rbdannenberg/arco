@@ -101,10 +101,10 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print) {
-        snd->print_tree(indent, print, "snd");
-        center->print_tree(indent, print, "center");
-        q->print_tree(indent, print, "q");
+    void print_sources(int indent, bool print_flag) {
+        snd->print_tree(indent, print_flag, "snd");
+        center->print_tree(indent, print_flag, "center");
+        q->print_tree(indent, print_flag, "q");
     }
 
     void repl_snd(Ugen_ptr inp) {

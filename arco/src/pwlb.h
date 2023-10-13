@@ -32,6 +32,12 @@ public:
 
     const char *classname() { return Pwlb_name; }
 
+
+    void print_details(int indent) {
+        arco_print("cur %f action %d", current, action_id);
+    }
+
+   
     void real_run() {
         if (seg_togo == 0) { // set up next segment
             current = final_value;  // make output value exact

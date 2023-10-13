@@ -1,0 +1,41 @@
+# route.srp -- route input channels to output channels
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Route (Ugen):
+    def init(input, chan):
+        var chans = len(chan) if isarray(chan) else 1
+        super.init(create_ugen_id(), "Route", chans, A_RATE, "",
+                   no_msg = true)
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_int32(arco_ugen_id(input.id))
+        add_chan_and_send(chans, chan, "/arco/route/new")
+        inputs = {'input': input}
+
+
+    def set_routes(chan):
+        var chans = len(chan) if isarray(chan) else 1
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        add_chan_and_send(chans, chan, "/arco/route/routes")
+
+
+    def add_chan_and_send(chans, chan, msg):
+    # adding channel sources to message is similar for new and routes:
+        for i = 0 to chans:
+            o2_add_int32(chan if isnumber(chan) else chan[i])
+        o2_send_finish(0, msg, true)
+
+    def set_route(output_chan, input_chan):
+        o2_send_cmd("/arco/route/route", 0, "Uii", id, output_chan, input_chan)
+
+
+
+def route(input, chan):
+# route from input channels to output channels.
+# If chan is an integer, create one channel output routed from input
+#     channel given by chan.
+# If chan is an array, create an output channel for each element.
+    return Route(input, chan)

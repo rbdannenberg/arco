@@ -101,16 +101,16 @@ public:
     // and also a multiple of BLOCK_BYTES so we can transfer a block at at time:
     int samples_per_buffer;
         
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     Ugen_ptr gain;
     int gain_stride;
     Sample_ptr gain_samps;
 
 
-    Recplay(int id, int nchans, Ugen_ptr inp, Ugen_ptr gain, 
+    Recplay(int id, int nchans, Ugen_ptr input, Ugen_ptr gain,
             float fade_, bool loop_) : Ugen(id, 'a', nchans) {
         action_id = 0;
         fade = fade_;
@@ -119,8 +119,11 @@ public:
         loan_count = 0;
         lender_ptr = NULL;
         speed = 1.0;
+        borrowing = false;
         recording = false;
         playing = false;
+        fading = false;
+        stopping = false;
         states.set_size(chans);
 
         for (int i = 0; i < chans; i++) {
@@ -131,7 +134,7 @@ public:
             states[i].my_buffers.init(0);
             states[i].prev_sample = 0;
         }
-        init_inp(inp);
+        init_input(input);
         init_gain(gain);
 
         // allocate a block and capture its actual size
@@ -143,7 +146,7 @@ public:
 
     ~Recplay() {
         int i;
-        inp->unref();
+        input->unref();
         gain->unref();
         if (loan_count) {
             arco_error("Recplay::~Recplay -- loan_count non-zero!");
@@ -164,14 +167,20 @@ public:
 
     const char *classname() { return Recplay_name; }
 
-    void print_sources(int indent, bool print) {
-        inp->print_tree(indent, print, "inp");
-        gain->print_tree(indent, print, "gain");
+    void print_details(int indent) {
+        arco_print("recording %s, playing %s",
+                   recording ? "true" : "false", playing ? "true" : "false");
+    }
+
+
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
+        gain->print_tree(indent, print_flag, "gain");
     }
 
     void repl_inp(Ugen_ptr ugen) {
-        inp->unref();
-        init_inp(ugen);
+        input->unref();
+        init_input(ugen);
     }
 
     void repl_gain(Ugen_ptr ugen) {
@@ -184,9 +193,9 @@ public:
     
     void set_speed(float speed_) { speed = speed_;  }
 
-    void init_inp(Ugen_ptr ugen) { 
+    void init_input(Ugen_ptr ugen) {
         assert(ugen->rate == 'a');
-        init_param(ugen, inp, inp_stride);  }
+        init_param(ugen, input, input_stride);  }
 
     void init_gain(Ugen_ptr ugen) {
         assert(ugen->rate != 'a');  // allow 'c' and (non-interpolated) 'b'

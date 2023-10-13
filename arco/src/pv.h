@@ -15,6 +15,7 @@ class Pv: public Ugen {
     int fftsize;
     int hopsize;
     float ratio;
+    int mode;
     float stretch;  // time stretch factor
     bool use_stretch;  // use stretch to control when to read input
     // (use_stretch is true iff input is a Fileplay Ugen).
@@ -45,11 +46,12 @@ class Pv: public Ugen {
 
 
     Pv(int id, int nchans, Ugen_ptr inp, float ratio, int fftsize_,
-       int hopsize_, int points_, int mode) : Ugen(id, 'a', nchans) {
+       int hopsize_, int points_, int mode_) : Ugen(id, 'a', nchans) {
         init_inp(inp);
         points = points_;
         fftsize = fftsize_;
         hopsize = hopsize_;
+        mode = mode_;
         states.set_size(chans);
         for (int i = 0; i < chans; i++) {
             states[i].inputbuf.init(fftsize * 2);
@@ -96,6 +98,12 @@ class Pv: public Ugen {
     const char *classname() { return Pv_name; }
     
 
+    void print_details(int indent) {
+        arco_print("ratio %g fftsize %d hopsize %d points %d mode %d",
+                   ratio, fftsize, hopsize, points, mode);
+    }
+
+
     void init_inp(Ugen_ptr ugen) {
         init_param(ugen, inp, inp_stride);
         use_stretch = (inp->classname() == Fileplay_name);
@@ -134,7 +142,7 @@ class Pv: public Ugen {
     }
 
 
-    void repl_inp(Ugen_ptr ugen) {
+    void repl_input(Ugen_ptr ugen) {
         inp->unref();
         init_inp(ugen);
     }

@@ -31,19 +31,19 @@ class Trig : public Ugen {
     bool reported_state;     // last onoff reported
     int pause_for;           // number of blocks remaining in current pause
 
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     
-    Trig(int id, Ugen_ptr inp, const char *address_, int window_size,
+    Trig(int id, Ugen_ptr input, const char *address_, int window_size,
          float threshold, float pause) : Ugen(id, 0, 0) {
         // round up to multiple of BL:
         address = o2_heapify(address_);
         set_window(window_size);
         trig_threshold = threshold;
         set_pause(pause);
-        init_inp(inp);
+        init_input(input);
         sum0 = 0;
         sum1 = 0;
         count = 0;
@@ -62,7 +62,19 @@ class Trig : public Ugen {
         }
     }
 
-    void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
+
+    void print_details(int indent) {
+        arco_print("trig_threshold %g pause %d enabled %s",
+                   trig_threshold, pause, enabled ? "true" : "false");
+    }
+
+   
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
+    }
+
+
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
 
     const char *classname() { return Trig_name; }
 
@@ -80,9 +92,9 @@ class Trig : public Ugen {
     }
 
 
-    void repl_inp(Ugen_ptr inp_) {
-        inp->unref();
-        init_inp(inp_);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
     }
 
 
@@ -102,13 +114,13 @@ class Trig : public Ugen {
     
     
     void real_run() {
-        inp_samps = inp->run(current_block);
+        input_samps = input->run(current_block);
         // compute sum of squares of input samples
-        int inp_chans = inp->chans;
+        int input_chans = input->chans;
         float sum = 0;
-        int n = inp->chans * BL;
+        int n = input_chans * BL;
         for (int i = 0; i < n ; i++) {
-            float s = *inp_samps;
+            float s = *input_samps;
             sum += s * s;
         }
         sum0 += sum;
@@ -116,7 +128,7 @@ class Trig : public Ugen {
         count += BL;
         // end of half window?
         if (count >= (window_size >> 1)) {
-            sum0 = sqrt(sum0 / (window_size * inp->chans));
+            sum0 = sqrt(sum0 / (window_size * input->chans));
             if (enabled && sum0 > trig_threshold && pause_for <= 0) {
                 o2sm_send_start();
                 o2sm_add_int32(id);

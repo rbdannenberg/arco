@@ -51,18 +51,18 @@ void arco_trig_onoff(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/trig/repl_inp int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/trig/repl_input int32 id, int32 input_id;
  */
-void arco_trig_repl_inp(O2SM_HANDLER_ARGS)
+void arco_trig_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Trig, trig, id, "arco_trig_repl_inp");
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_trig_repl_inp");
-    trig->repl_inp(inp);
+    UGEN_FROM_ID(Trig, trig, id, "arco_trig_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_trig_repl_input");
+    trig->repl_input(input);
 }
 
 
@@ -112,17 +112,17 @@ static void trig_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/trig/new", "iisiff", arco_trig_new, NULL, true,
-                     true);
+                    true);
     o2sm_method_new("/arco/trig/onoff", "isff", arco_trig_onoff, NULL, true,
-                     true);
-    o2sm_method_new("/arco/trig/repl_inp", "ii", arco_trig_repl_inp, NULL,
-                     true, true);
+                    true);
+    o2sm_method_new("/arco/trig/repl_input", "ii", arco_trig_repl_input, NULL,
+                    true, true);
     o2sm_method_new("/arco/trig/window", "ii", arco_trig_window, NULL, true,
-                     true);
+                    true);
     o2sm_method_new("/arco/trig/thresh", "if", arco_trig_thresh, NULL, true,
-                     true);
+                    true);
     o2sm_method_new("/arco/trig/pause", "if", arco_trig_pause, NULL, true,
-                     true);
+                    true);
     // END INTERFACE INITIALIZATION
 }
 

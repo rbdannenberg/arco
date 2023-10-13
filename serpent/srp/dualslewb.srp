@@ -1,0 +1,27 @@
+# dualslewb.srp -- feedback dualslewb unit generator
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+class Dualslewb(Ugen):
+    def init(chans, inp, attack, release, optional current = 0,
+             attack_linear = 1, release_linear = 1):
+        super.init(create_ugen_id(), "Dualslewb", chans, 'a', "UUfffii",
+	           'inp', inp, 'attack', attack, 'release', release,
+                   'current', current, 'attack_linear', attack_linear,
+                   'release_linear', release_linear)
+
+    def set_current(current):
+        o2_send_cmd("/arco/dualslewb/current", "Uf", id, current)
+
+    def set_attack(attack, optional attack_linear = 1):
+        o2_send_cmd("/arco/dualslewb/attack", "Ufi", id, attack, attack_linear)
+
+    def set_release(release, optional release_linear = 1):
+        o2_send_cmd("/arco/dualslewb/release", "Ufi",
+                         id, release, release_linear)
+
+
+def dualslewb(inp, mode, optional chans = 1):
+    Dualslewb(chans, inp, mode)  # dualslewb as a function
+

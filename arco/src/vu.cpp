@@ -14,11 +14,11 @@ void Vu::real_run()
     if (!running) {
         return;
     }
-    inp_samps = inp->run(current_block);
+    input_samps = input->run(current_block);
     for (int chan = 0; chan < chans; chan++) {
         float peak = peaks[chan];
         for (int i = 0; i < BL; i++) {
-            float samp = *inp_samps++;
+            float samp = *input_samps++;
             if (samp > peak) {
                 peak = samp;
             } else if (samp < -peak) {
@@ -52,7 +52,7 @@ void Vu::start(char *reply_addr, float period)
     }
     vu_reply_addr = O2_MALLOCNT(len + 1, char);
     memcpy(vu_reply_addr, reply_addr, len + 1);
-    running = (inp != NULL);
+    running = (input != NULL);
 }
 
 
@@ -71,18 +71,18 @@ static void arco_vu_start(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/vu/repl_inp int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/vu/repl_input int32 id, int32 input_id;
  */
-static void arco_vu_repl_inp(O2SM_HANDLER_ARGS)
+static void arco_vu_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Vu, vu, id, "arco_vu_repl_inp");
-    ANY_UGEN_FROM_ID(ugen, inp_id, "arco_vu_repl_inp inp");
-    vu->repl_inp(ugen);
+    UGEN_FROM_ID(Vu, vu, id, "arco_vu_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_vu_repl_input");
+    vu->repl_input(input);
     //printf("vu input set to %p (%s)\n", ugen, ugen->classname());
 }
 
@@ -107,7 +107,8 @@ static void vu_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/vu/start", "isf", arco_vu_start, NULL, true, true);
-    o2sm_method_new("/arco/vu/repl_inp", "ii", arco_vu_repl_inp, NULL, true, true);
+    o2sm_method_new("/arco/vu/repl_input", "ii", arco_vu_repl_input, NULL,
+                    true, true);
     o2sm_method_new("/arco/vu/new", "iisf", arco_vu_new, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }

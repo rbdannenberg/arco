@@ -216,7 +216,7 @@ void Recplay::real_run()
     long offset = 0;
     double phase = 0;
 
-    inp_samps = inp->run(current_block);
+    input_samps = input->run(current_block);
     gain_samps = gain->run(current_block);
 
     if (recording) {
@@ -235,8 +235,8 @@ void Recplay::real_run()
         
         // record the input
         for (int i = 0; i < chans; i++) {
-            block_copy(states[i].my_buffers[buffer] + offset, inp_samps);
-            inp_samps += inp_stride;
+            block_copy(states[i].my_buffers[buffer] + offset, input_samps);
+            input_samps += input_stride;
         }
         rec_index += BL;
         if (rec_index > sample_count) sample_count = rec_index;
@@ -505,37 +505,37 @@ void Recplay::borrow(int lender_id)
 
 
 /* O2SM INTERFACE: /arco/recplay/new int32 id, int32 chans, 
-              int32 inp_id, int32 gain_id, float fade, bool loop;
+              int32 input_id, int32 gain_id, float fade, bool loop;
  */
 void arco_recplay_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
-    int32_t inp_id = argv[2]->i;
+    int32_t input_id = argv[2]->i;
     int32_t gain_id = argv[3]->i;
     float fade = argv[4]->f;
     bool loop = argv[5]->B;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_recplay_new inp");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_recplay_new inp");
     ANY_UGEN_FROM_ID(gain, gain_id, "arco_recplay_new gain");
-    new Recplay(id, chans, inp, gain, fade, loop);
+    new Recplay(id, chans, input, gain, fade, loop);
 }
 
 
-/* O2SM INTERFACE: /arco/recplay/repl_inp int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/recplay/repl_inp int32 id, int32 input_id;
  */
 static void arco_recplay_repl_inp(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Recplay, recplay, id, "arco_recplay_repl_inp");
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_recplay_repl_inp");
-    recplay->repl_inp(inp);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_recplay_repl_inp");
+    recplay->repl_inp(input);
 }
 
 
@@ -603,7 +603,7 @@ static void arco_recplay_start(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    double start_time = argv[1]->d;
+    float start_time = argv[1]->f;
     // end unpack message
 
     UGEN_FROM_ID(Recplay, recplay, id, "arco_recplay_start");
@@ -657,16 +657,26 @@ static void arco_replay_borrow(O2SM_HANDLER_ARGS)
 static void recplay_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/recplay/new", "iiiifB", arco_recplay_new, NULL, true, true);
-    o2sm_method_new("/arco/recplay/repl_inp", "ii", arco_recplay_repl_inp, NULL, true, true);
-    o2sm_method_new("/arco/recplay/repl_gain", "ii", arco_recplay_repl_gain, NULL, true, true);
-    o2sm_method_new("/arco/recplay/set_gain", "iif", arco_recplay_set_gain, NULL, true, true);
-    o2sm_method_new("/arco/recplay/speed", "if", arco_recplay_speed, NULL, true, true);
-    o2sm_method_new("/arco/recplay/rec", "iB", arco_recplay_rec, NULL, true, true);
-    o2sm_method_new("/arco/recplay/start", "id", arco_recplay_start, NULL, true, true);
-    o2sm_method_new("/arco/recplay/act", "ii", arco_recplay_act, NULL, true, true);
-    o2sm_method_new("/arco/recplay/stop", "i", arco_replay_stop, NULL, true, true);
-    o2sm_method_new("/arco/recplay/borrow", "ii", arco_replay_borrow, NULL, true, true);
+    o2sm_method_new("/arco/recplay/new", "iiiifB", arco_recplay_new, NULL,
+                    true, true);
+    o2sm_method_new("/arco/recplay/repl_inp", "ii", arco_recplay_repl_inp,
+                    NULL, true, true);
+    o2sm_method_new("/arco/recplay/repl_gain", "ii", arco_recplay_repl_gain,
+                    NULL, true, true);
+    o2sm_method_new("/arco/recplay/set_gain", "iif", arco_recplay_set_gain,
+                    NULL, true, true);
+    o2sm_method_new("/arco/recplay/speed", "if", arco_recplay_speed, NULL,
+                    true, true);
+    o2sm_method_new("/arco/recplay/rec", "iB", arco_recplay_rec, NULL, true,
+                    true);
+    o2sm_method_new("/arco/recplay/start", "if", arco_recplay_start, NULL,
+                    true, true);
+    o2sm_method_new("/arco/recplay/act", "ii", arco_recplay_act, NULL, true,
+                    true);
+    o2sm_method_new("/arco/recplay/stop", "i", arco_replay_stop, NULL, true,
+                    true);
+    o2sm_method_new("/arco/recplay/borrow", "ii", arco_replay_borrow, NULL,
+                    true, true);
     // END INTERFACE INITIALIZATION
 }
 

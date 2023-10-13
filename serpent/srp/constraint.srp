@@ -1,0 +1,197 @@
+# constraint -- one-way contraints integrated with wxWidgets and Arco
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+# A constraint is an object with instance variables and a method to
+# compute an "output" from instance variables, thus implementing a
+# one-way constraint.  The method is invoked when a variable is set
+# using set(name, value). The val instance variable is reserved and
+# is effectively constrained to a function of other variables.
+#
+# The value can be a number or an array of numbers, and it can be
+# directed to a Const.
+#
+# The implementation is a "push" architecture, where changes force
+# "forward" computations. An option exists to *not* recompute the
+# constraint for inputs that change slowly, assuming there is another
+# input that will soon force an update after any changes.
+#
+# If trace is non-null, updates will be traced (printed). If trace is
+# a string, the string will be printed in the trace to identify the
+# constraint.
+
+class Constraint:
+    var val  // the output value of the constraint
+    var non_updating_set  // when these are set, do not compute()
+    var const_ugen  // associated Const instance set to val
+    var control_to_var_map  // what variable gets new value from control
+    var method
+    var target
+    var trace
+
+
+    def init():
+        val = compute()
+        inputs = []
+        control_to_var_map = {}
+        non_updating_set = {}
+
+
+    def value(): val
+
+
+    def trace_prefix():
+        var id = trace if isstring(trace) else str(hash(this))
+        print "Constraint", id,
+    
+
+    def set(name, value):
+        var old = get_slot(this, name)
+        if old != value:
+            if trace:
+                trace_prefix()
+                print "changing", name, "to", value
+            set_slot(this, name, value)
+            if not non_updating_set.has_key(name):
+                val = compute()
+                if trace: print "    -> updated val", val
+                if method:
+                    if isarray(method):
+                        for meth at i in method:
+                            dispatch(val, target[i], meth) 
+                    else:
+                        dispatch(val, target, method)
+                if const_ugen:
+                    const_ugen.set(val)
+                    if trace: print "    -> sent to", const_ugen
+
+
+    def dispatch(val, target, method):
+        if target:
+            send(target, method, this, val)
+        else:
+            funcall(method, this, val)
+
+
+    def passive(name):
+    # make name a "passive" input that does not cause a constraint update or
+    # deliver any value to output
+        non_updating_set[name] = t
+
+
+    def get_const():
+        if not const_ugen:
+            const_ugen = const(val)
+            if trace:
+                trace_prefix()
+                print "created const ugen with", val
+        return const_ugen
+
+
+    def get_smoothb(optional time_const):
+        if not const_ugen:
+            const_ugen = smoothb(val, time_const)
+            if trace:
+                trace_prefix()
+                print "created smoothb ugen with", val, time_const
+        return const_ugen
+
+
+    def connect(control, optional name = 'x'):
+    # control must be one of: Checkbox (val is 1 or 0), Spinctrl, Slider,
+    # Labeled_slider OR it can be another Constraint
+        var meth = 'control_change'
+        var initial_value = 0
+        if isinstance(control, Checkbox):
+            meth = 'check_change'
+            initial_value = 1 if control.value() else 0
+        elif isinstance(control, Spinctrl) or
+              isinstance(control, Slider) or
+              isinstance(control, Labeled_slider) or
+              isinstance(control, Constraint):
+            initial_value = control.value()
+        else:
+            print "Constraint.connect_control: control must be Checkbox,",
+            print     "Spinctrl, Slider or Labeled_slider, not",
+            print     object_class(control)
+            return
+        control.add_target_method(this, meth)
+        control_to_var_map[control] = name
+        set(name, initial_value)
+
+
+    def disconnect(control):
+        control.remove_target_method(this)
+
+
+    def finish():
+        var controls = control_to_var_map.get_keys()
+        for control in controls:
+            disconnect(control)
+        const_ugen = nil
+        non_updating_set.clear()
+
+
+    def add_target_method(tar, met):
+    # make constraint "active" by invoking method like a Control
+        if not method:
+            method = met
+            target = tar
+        elif issymbol(method):
+            method = [method, met]
+            target = [target, tar]
+        else:
+            method.append(met)
+            target.append(tar)
+
+
+    def remove_target_method(tar, optional met)
+    # if met is omitted (or nil), any target matching tar is removed. If met
+    # is also specified, both target and method must match tar and met.
+        if not method:
+            return
+        elif issymbol(method):
+            if target == tar and ((not met) or method == met):
+                target = nil
+                method = nil
+        else:
+            index = 0
+            while index < len(target):
+                if target[index] == tar and ((not met) or method[index] == met):
+                    target.uninsert(index)
+                    method.uninsert(method)
+                else:
+                    index = index + 1
+
+
+    def check_change(control, event, x, y):
+        var name = control_to_var_map[control]
+        set(name, 1 if x else 0)
+
+
+    def control_change(control, rest args):
+    # this is a callback for numerical control change events
+    # args will be simply [value] if the control is Labeled_slider,
+    # or [event, x, y] for all other controls. Use len(args) to
+    # distinguish. (We could also test isinstance(control, Labled_slider),
+    # but this way we can handle future non-primitive controls that just
+    # provide a value.)
+        var x = args[0] if len(args) == 1 else args[1]
+        var name = control_to_var_map[control]
+        set(name, x)
+
+
+class Simple_constraint (Constraint):
+# a constraint with one input named 'x' (which is the default for connect)
+    var x
+
+    def init(optional initial_x = 0):
+        x = initial_x
+        super.init()
+
+    # override this:
+    def compute(): x
+
+
+Ident_constraint = Simple_constraint  // default compute for Simple is Ident

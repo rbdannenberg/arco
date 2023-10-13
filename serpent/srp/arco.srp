@@ -548,6 +548,16 @@ class Ugen:
     # SPECIAL HACK #2: if omit_chans is true, omit adding chans as the
     # usual 2nd parameter in the /arco/*/new message.
     #
+    # We support polymorphism where constant (Const) inputs can be
+    # specified by numbers. For this to work, the init() method needs
+    # to know whether a parameter represents a (possibly c-rate) Ugen
+    # or just a number. Therefore, there is a types_ parameter for
+    # an O2-like type string. As an extension to O2, the type "U" means
+    # an Arco Ugen is expected, so numbers will be coerced to a new
+    # Const Ugen and an array of numbers will be coerced to a
+    # multi-channel Const Ugen.  Other types are one of "sihdft", which
+    # have the usual O2 interpretation.
+    # 
     # When initial parameters are numbers, they can represent either
     # int32, int64, double, float, time, or be coerced into a Const
     # unit generator. To handle these different interpretations, we
@@ -556,14 +566,18 @@ class Ugen:
     # which means "unit generator" in which case a number is coerced
     # to a Const. The type string does NOT include an initial "i" for
     # the id or a second "i" for chans, if any. The first type string
-    # character refers to the first input value in inputs_. If the
-    # type is "U", the actual parameter may also be an array of floats
-    # with a length equal to chans_. A Const with multiple channels is
-    # created. inputs_ are in pairs, with the name (a symbol) followed
-    # by value. If the type is not "U", the name must still be present
+    # character refers to the first input value in inputs_.
+    #
+    # Implementation note: For type "U", in addition to numbers and
+    # arrays of numbers, you can pass an instance of (some subclass of)
+    # Ugen. The Ugen contains an id field set to a Serpent External
+    # of type Ugen_id, which in turn contains the actual Arco ID, which
+    # is sent via O2 as type "i" (int32).
+    #
+    # If the type is not "U", the param_symbol must still be present
     # as a place-holder, and by convention should be a helpful
-    # parameter name, but it is ignored. Otherwise, names allow the
-    # set method to replace the Ugen input with another Ugen.
+    # parameter name, but it is ignored. Otherwise, param_symbol allows
+    # the set method to replace the Ugen input with another Ugen.
     #
     def init(id_, classname_, chans_, rate_, types_,
              keyword no_msg = nil, omit_chans = nil, rest inputs_):
@@ -584,7 +598,6 @@ class Ugen:
         o2_send_start()  // build and send new method
         o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
         if not omit_chans: // some Ugens, (Probe), do not have chans parameter
-            display "arco.srp:520", chans, type(chans)
             o2_add_int32(chans)
         // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
 
@@ -604,7 +617,7 @@ class Ugen:
     def play(optional quiet):  # connect this Ugen to audio output
         if this not in arco_output_set:
             arco_output_set.append(this)
-            display "Ugen play", id
+            // display "Ugen play", id
             o2_send_cmd("/arco/output", 0, "U", id)
         elif not quiet:
             print "WARNING: in play(), Ugen already in output set", this
@@ -616,7 +629,7 @@ class Ugen:
     # since "atend" actions always have a status, we accept a status
     # but ignore it.
         if this in arco_output_set:
-            display "Ugen mute", id
+            // display "Ugen mute", id
             arco_output_set.remove(this)
             o2_send_cmd("/arco/mute", 0, "U", id)
         elif not quiet:
@@ -627,7 +640,7 @@ class Ugen:
     def fade(dur, optional quiet):
     # fade to nothing, then disconnect from audio output
         if this in arco_output_set:
-            display "Ugen fade", id, dur
+            // display "Ugen fade", id, dur
             var faded = mult(id, pweb(0, 1, dur, 0))
             o2_send_cmd("/arco/swap", 0, "UU", id, faded.id)
             sched_select(rtsched)
@@ -639,7 +652,7 @@ class Ugen:
     def run(optional quiet):  # add this Ugen to the run set
         if this not in arco_run_set:
             arco_run_set.append(this)
-            display "Ugen run", id
+            // display "Ugen run", id
             o2_send_cmd("/arco/run", 0, "U", id)
         elif not quiet:
             print "WARNING: in run(), Ugen already in run set", this
@@ -648,7 +661,7 @@ class Ugen:
 
     def unrun(optional quiet):  # remove this Ugen from the run set
         if this in arco_run_set:
-            display "Ugen unrun", id
+            // display "Ugen unrun", id
             arco_run_set.remove(this)
             o2_send_cmd("/arco/unrun", 0, "U", id)
         elif not quiet:
@@ -794,26 +807,43 @@ def zerob(): zerob_ugen
 //        return Ugen(create_ugen_id(), "Sineb", chans, B_RATE, "UU", 
 //                    'freq', freq, 'amp', amp)
 
-class Const (Ugen):
-    def init(x, optional chans = 1):
-        if isarray(x):
-            chans = max(len(x), 1)
+class Const_like (Ugen):
+# abstract superclass for Const and Smoothb, which are similar
+
+    def add_floats(x, msg):
+    # finish a message with address msg by adding float values from x
+        for i = 0 to chans:
+            var f = x if isnumber(x) else (x[i] if len(x) > i else 0)
+            o2_add_float(real(f))
+        o2_send_finish(0, msg, true)
+
+
+class Const (Const_like):
+
+    def init(x, optional chans):
+    # x is initial value or array of initial values
+    # chans defaults to size of x
+    # if len(x) > chans (consider len(x) = 1 if isnumber(x)),
+    # then extra values are ignored. if len(x) < chans, then
+    # if isnumber(x), *all* channels are set to x, and otherwise
+    # channels from len(x) are initialized to zero
+        var chans_default = max(len(x), 1) if isarray(x) else 1
+        chans = chans if chans else chans_default
         super.init(create_ugen_id(), "Const", chans, C_RATE, "", no_msg = true)
-        if chans > 1:
-            o2_send_cmd("/arco/const/new", 0, "Ui", id, chans)
-            for i = 0 to chans:  // send "set" message for each channel
-                var f = x    if isnumber(x) else
-                       (x[i] if len(x) > i  else
-                       (x[0] if len(x) == 1 else
-                        x.last()))
-                o2_send_start()
-                o2_add_int32(arco_ugen_id(id))
-                o2_add_int32(i)
-                o2_add_float(real(f))
-                o2_send_finish(0, "/arco/const/set", true)
-        else: // simple case - 1 channel Const and initial value in one message
-            o2_send_cmd("/arco/const/newf", 0, "Uf", id, x)
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        add_floats(x, "/arco/const/newn")
+        
+
+    def set(x):
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        add_floats(x, "/arco/const/setn")
 
 
-def const(x, optional chans = 1):
+    def set_chan(chan, x):
+        o2_send_cmd("/arco/const/set", 0, "Uif", id, chan, x)
+
+
+def const(x, optional chans):
     return Const(x, chans)

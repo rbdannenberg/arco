@@ -94,14 +94,13 @@ class Ola_pitch_shift: public Ugen {
     };
     Vec<Ola_pitch_shift_state> states;
 
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
 
-    Ola_pitch_shift(int id, int nchans, Ugen_ptr inp_, float ratio,
+    Ola_pitch_shift(int id, int nchans, Ugen_ptr input, float ratio,
                     float xfade, float windur) : Ugen(id, 'a', nchans) {
-        inp = inp_;
         ixfade = 1;
         iwindur = 1;
         xfade_recip = 1;
@@ -118,19 +117,25 @@ class Ola_pitch_shift: public Ugen {
 
         intap = 0;
         fouttap = 0.0;
-        init_inp(inp);
+        init_input(input);
     }
 
     ~Ola_pitch_shift() {
-        inp->unref();
+        input->unref();
         for (int i = 0; i < chans; i++) {
             states[i].delaybuf.finish();
         }
     }
 
     const char *classname() { return Ola_pitch_shift_name; }
+
     
-    void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
+    void print_details(int indent) {
+        arco_print("ratio %g xfade %g windur %g", ratio, xfade, windur);
+    }
+
+
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
 
     void set_ratio(float r) {
         ratio = r;
@@ -150,8 +155,8 @@ class Ola_pitch_shift: public Ugen {
         
     
     void repl_inp(Ugen_ptr ugen) {
-        inp->unref();
-        init_inp(ugen);
+        input->unref();
+        init_input(ugen);
     }
 
     
@@ -179,7 +184,7 @@ class Ola_pitch_shift: public Ugen {
 
         for (int i = 0; i < BL; i++)  {
             delaybuf.toss(1);  // make room for mor
-            delaybuf.enqueue(inp_samps[i]);
+            delaybuf.enqueue(input_samps[i]);
 
             // adjust fouttap_delta to the range -(iwindur-ixfade) to 0.
             // when it exceeds either extreme, we wrap around, and due
@@ -221,10 +226,10 @@ class Ola_pitch_shift: public Ugen {
     }
     
     void real_run() {
-        inp_samps = inp->run(current_block);
+        input_samps = input->run(current_block);
         for (int i = 0; i < chans; i++) {
             chan_a(&states[i]);
-            inp_samps += inp_stride;
+            input_samps += input_stride;
         }
     }
 

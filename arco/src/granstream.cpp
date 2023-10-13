@@ -58,7 +58,7 @@ const char *Granstream_name = "Granstream";
 //
 bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps) {
     // first, read input audio into input buffer
-    buf.enqueue_block(gs->inp_samps);
+    buf.enqueue_block(gs->input_samps);
     // if feedback enabled, add feedback from delay buffer:
 
     Ringbuf &delay_buf = gs->delay_buf;
@@ -200,7 +200,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 delay = attack_blocks;
                 assert(phase > 0 && phase < bufferlen &&
                        bufferlen == perchannel->buf.get_fifo_len());
-                D printf("grain start: chan %d gen %d phase %g dur %g "
+                D printf("grain start: chan %ld gen %ld phase %g dur %g "
                          "ratio %g\n",
                        perchannel - &(gs->states[0]),
                        this - &(perchannel->gens[0]), phase, dur_blocks * BP,
@@ -275,37 +275,37 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
 
 
 /* O2SM INTERFACE: /arco/granstream/new int32 id, int32 chans,
-            int32 inp, int32 polyphony, float dur, bool enable;
+            int32 input_id, int32 polyphony, float dur, bool enable;
  */
 void arco_granstream_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
-    int32_t inp = argv[2]->i;
+    int32_t input_id = argv[2]->i;
     int32_t polyphony = argv[3]->i;
     float dur = argv[4]->f;
     bool enable = argv[5]->B;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp_ugen, inp, "arco_granstream_new");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_granstream_new");
 
-    new Granstream(id, chans, inp_ugen, polyphony, dur, enable);
+    new Granstream(id, chans, input, polyphony, dur, enable);
 }
 
 
-/* O2SM INTERFACE: /arco/granstream/repl_inp int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/granstream/repl_input int32 id, int32 input_id;
  */
-static void arco_granstream_repl_inp(O2SM_HANDLER_ARGS)
+static void arco_granstream_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_repl_inp");
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_granstream_repl_inp");
-    granstream->repl_inp(inp);
+    UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_granstream_repl_input");
+    granstream->repl_input(input);
 }
 
 
@@ -461,29 +461,29 @@ static void granstream_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/granstream/new", "iiiifB", arco_granstream_new,
-                     NULL, true, true);
-    o2sm_method_new("/arco/granstream/repl_inp", "ii",
-                     arco_granstream_repl_inp, NULL, true, true);
+                    NULL, true, true);
+    o2sm_method_new("/arco/granstream/repl_input", "ii",
+                    arco_granstream_repl_input, NULL, true, true);
     o2sm_method_new("/arco/granstream/gain", "if", arco_granstream_gain, NULL,
-                     true, true);
-    o2sm_method_new("/arco/granstream/delay", "if", arco_granstream_delay, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/granstream/dur", "if", arco_granstream_dur, NULL,
-                     true, true);
+                    true, true);
+    o2sm_method_new("/arco/granstream/delay", "if", arco_granstream_delay,
+                    NULL, true, true);
     o2sm_method_new("/arco/granstream/feedback", "if",
                     arco_granstream_feedback, NULL, true, true);
     o2sm_method_new("/arco/granstream/polyphony", "ii",
-                     arco_granstream_polyphony, NULL, true, true);
+                    arco_granstream_polyphony, NULL, true, true);
     o2sm_method_new("/arco/granstream/ratio", "iff", arco_granstream_ratio,
-                     NULL, true, true);
+                    NULL, true, true);
     o2sm_method_new("/arco/granstream/graindur", "iff",
-                     arco_granstream_graindur, NULL, true, true);
+                    arco_granstream_graindur, NULL, true, true);
     o2sm_method_new("/arco/granstream/density", "if", arco_granstream_density,
-                     NULL, true, true);
+                    NULL, true, true);
     o2sm_method_new("/arco/granstream/env", "iff", arco_granstream_env, NULL,
-                     true, true);
+                    true, true);
     o2sm_method_new("/arco/granstream/enable", "iB", arco_granstream_enable,
-                     NULL, true, true);
+                    NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
 

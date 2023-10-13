@@ -77,9 +77,9 @@ class Yin : public Windowed_input {
 
     const char *classname() { return Yin_name; }
 
-    void repl_inp(Ugen_ptr inp_) {
+    void repl_input(Ugen_ptr ugen) {
         inp->unref();
-        init_inp(inp_);
+        init_inp(ugen);
     }
 
 

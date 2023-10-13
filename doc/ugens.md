@@ -227,8 +227,8 @@ frequency (in Hz) and decay time (T60, in seconds), set `dur` to 1 /
 `/arco/alpass/max id dur` - Reallocates delay memory for a maximum
 duration of `dur`.
 
-`/arco/alpass/repl_inp id inp_id` - Set input to object with
-id `inp_id`.
+`/arco/alpass/repl_input id input_id` - Set input to object with
+id `input_id`.
 
 `/arco/alpass/repl_dur id dur_id` - Set duration input to object with
 id `dur_id`.
@@ -239,6 +239,26 @@ id `dur_id`.
 `/arco/alpass/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
 `/arco/alpass/set_fb id chan fb` - Set feedback to float value `fb`.
+
+### const
+```
+const(x, [chans])  // x is number or array
+.set(x)            // x is number or array
+.set_chan(chan, x) // x is number
+```
+
+`/arco/const/new id chans` - Create a c-rate output ugen. This behaves
+like a b-rate ugen except that the `real_run` method returns immediately.
+The output is set by messages and represents a piece-wise constant signal.
+
+`/arco/const/newn id x0 x1 x2 ...` - Similar to `new`, but the number of
+channels depends on the number of floats, which become initial values. At
+least one float (channel) is required.
+
+`/arco/const/set id chan value` - Set the output indexed by chan to value.
+
+`/arco/const/setn id x0 x1 x2 ...` - Set output channels to `x0` through
+`xn-1`. Extra values are ignored.
 
 ### delay
 ```
@@ -264,6 +284,30 @@ id `dur_id`.
 `/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
 `/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
+
+### dualslewb
+```
+dualslewb(inp, attack, [, decay] [, attack_linear] [, release_linear]
+          [, chans])
+```
+
+`/arco/dualslewb/new id chans inp attack release attack_linear`
+`    release_linear` - create a slew-rate limiter that smooths the
+input by limiting the slope. There are separate parameters for upward
+and downward slopes, specified by attack (time in seconds) and
+release (time in seconds). The limiter can also use exponential
+curves, in which case, attack and release are times needed to slew
+from 0 to 1. (A bias of 0.01 is used so that exponential curves can
+decay all the way to zero.) Control the shape (linear or non-linear)
+with the parameters `attack_linear` and `release_linear`, which are
+1 for linear and 0 for exponential. Any negative input is considered
+to be zero and output is strictly non-negative.
+
+`/arco/dualslewb/set_attack id attack attack_linear` - Change the
+`attack` and `attack_linear` control parameters.
+
+`/arco/dualslewb/set_release id release release_linear` - Change the
+`release` and `release_linear` control parameters.
 
 ### feedback
 ```
@@ -298,8 +342,8 @@ translates ids to unit generators. This reduces the reference count on
 the unit generator, but the memory is not freed unless the reference
 count goes to zero, which cannot happen if there is a cycle.
 
-`/arco/feedback/repl_inp id inp` - Set input to the object with id
-`inp`.
+`/arco/feedback/repl_input id input_id` - Set input to the object with id
+`input_id`.
 
 `/arco/feedback/repl_from id from` - Set the source of the feedback
 (called "from") to the object with id `from`. This is especially useful
@@ -363,8 +407,8 @@ The filerec unit generator writes its input to a file.
 that writes `chans` channels to `filename`. The source of audio is
 `inp`.
 
-`/arco/filerec/repl_inp id inp` - Set the input to the object with id
-`inp`.
+`/arco/filerec/repl_input id input_id` - Set the input to the object
+with id `input_id`.
 
 `/arco/filerec/act id action_id` - Set the action id to `action_id`.
 This id is sent when the file is open and ready for writing.
@@ -490,8 +534,8 @@ randomly distributed across all output channels evenly. If feedback
 is non-zero (the default is zero), output is delayed and mixed with
 input channel 1 (only).
 
-`/arco/granstream/repl_inp id inp` - Set the input to the ugen with id
-`inp`.
+`/arco/granstream/repl_input id input_id` - Set the input to the ugen
+with id `input_id`.
 
 `/arco/granstream/dur id dur` - Set the length of the buffer from which
 grains are taken to `dur` (float) in seconds. Current buffer samples are
@@ -656,8 +700,8 @@ amount.
 `/arco/olaps/windur id windur` - Set the window duration to `windur`
 (float).
 
-`/arco/granstream/repl_inp id inp` - Set the input to the ugen with id
-`inp`.
+`/arco/granstream/repl_input id input_id` - Set the input to the ugen
+with id `input_id`.
 
 ## probe
 ```
@@ -676,7 +720,7 @@ the given `id`, initially with input from `input_id` and send samples
 to `reply_address`. Note that `chans` is not specified, but see below
 about how channels are handled.
 
-`/arco/probe/repl_inp id input_id` - replace input.
+`/arco/probe/repl_input id input_id` - replace input.
 
 `/arco/probe/probe id period frames chan nchans stride repeats` -
 probes the input signal, sending samples to the `reply_address` given
@@ -781,8 +825,8 @@ shifting and time stretching can be applied together.
 `arco/pv/ratio` id ratio - Sets the pitch shift in terms of frequency
 ratio. Greater than 1 means raise the pitch.
 
-`arco/pv/repl_inp id inp_id` - Set the input to the object with id
-`inp_id`.
+`arco/pv/repl_input id input_id` - Set the input to the object with id
+`input_id`.
 
 ### pwe, pweb
 ```
@@ -881,8 +925,8 @@ during playback. `loop` is a boolean. When `loop` is true, playback
 restarts immediately when the end of the recording is reached while
 playing.
 
-`/arco/recplay/repl_inp id inp_id` - Set the input to the object with
-id `inp_id`.
+`/arco/recplay/repl_input id input_id` - Set the input to the object with
+id `input_id`.
 
 `/arco/recplay/repl_gain id gain_id` - Set the gain to the object with
 id `gain_id`.
@@ -921,7 +965,7 @@ reference.
 reson(inp, center, q [, chans])
 ```
 
-`/arco/reson/new id chans center bandwidth` - Create a new reson filte
+`/arco/reson/new id chans center bandwidth` - Create a new reson filter
 with `center` frequency and `bandwidth` control inputs, audio input
 and audio output.
 
@@ -936,6 +980,35 @@ with id `bandwidth_id`.
 
 `/arco/reson/set_bandwidth id chan bandwidth_id` - Set bandwidth of
 channel `chan` to float value `bandwidth_id`.
+
+
+### route
+```
+route(input, chan)  // chan is integer channel or 
+                    // array of channel numbers
+.set_routes(chan)   // chan is integer or array
+.set_route(output_chan, input_chan)
+```
+A `route` provides a sort of patch bay to route input chnanels to
+output channels. The input can have an arbitrary number of channels.
+There is a fan-out of N: input channels can be replicated to multiple
+output channels. The fan-in is 1: an output channel cannot mix inputs.
+
+`/arco/route/new id input_id chan0 chan1 ...` - Create a new route
+ugen with input from `input_id`. The number of `chan` parameters
+determines the number of output channels. Each `chani` indicates
+the source channel. If the source channel does not exist, zero is
+output, so -1 can be used to indicate output silence on that channel.
+
+`/arco/route/routes id chan0 chan1 ...` - Set new routing info.
+The number of output channels is not changed. Extra parameters are
+ignored. Missing parameters result in no change to the mapping for
+the missing channels.
+
+`/arco/route/route id outchan inchan` - Route `inchan` to `outchan`,
+leaving other routes unaltered.
+
+`/arco/route/repl_input id input` - Replace the current input with `input`.
 
 
 ### sine, sineb
@@ -958,6 +1031,33 @@ float value `amp`.
 
 The `sineb` unit generator addresses begin with `/arco/sineb` and the
 output is b-rate.
+
+### smoothb
+```
+smoothb(x, [cutoff = 10], [chans])
+.set_cutoff(cutoff)
+.set(x)             // x is a number or an array
+.set_chan(chan, x)  // x is a number
+```
+
+`/arco/smoothb/new id chans cutoff` - Create a b-rate ugen. This behaves
+like `const` except that the output values are low-pass filtered with a
+first-order IIR filter (exponential smoothing). `cutoff` is the cutoff
+frequency of the filter.
+
+`/arco/smoothb/newn id cutoff x0 x1 x2 ...` - Similar to `new`, but the
+number of channels depends on the number of floats, which become initial
+values. At least one float (channel) is required.
+
+`/arco/smoothb/set id chan value` - Set the output indexed by chan to value.
+(Value is actually the filter input, so the output will converge to value
+smoothly.)
+
+`/arco/smoothb/setn id x0 x1 x2 ...` - Set output channels to `x0` through
+`xn-1`. Extra values are ignored. Each output channel is smoothed as in `set`.
+
+`/arco/smoothb/cutoff id cutoff` - set the cuoff frequency of the filter
+(same cutoff for all channels).
 
 ### thru, fanout
 ```
@@ -1029,8 +1129,8 @@ for "above threshold." The threshold, run length, or reply address can
 be changed by sending this message again. The on/off processing and
 reports can be disabled by setting `repl_addr` to the empty string.
 
-`/arco/trig/repl_inp id ip_id` - Set the input to the object with
-`id` to `inp_id`.
+`/arco/trig/repl_input id input_id` - Set the input to the object with
+`id` to `input_id`.
 
 `/arco/trig/window id size` - Set the window size to size.
 
@@ -1045,7 +1145,7 @@ exceeded, causing a message to be sent.
 ```
 vu(reply_addr, period)
 .start(reply_addr, period)
-.set('inp', ugen)
+.set('input', ugen)
 ```
 
 The `vu` unit generator is used to implement "VU" meters.
@@ -1054,9 +1154,9 @@ The `vu` unit generator is used to implement "VU" meters.
 measures the peak values of input channels over every `period` (float,
 in seconds) and sends the values as floats to `reply_addr` (string
 representing a complete O2 address). No messages are sent until input
-is set with `repl_inp`.
+is set with `repl_input`.
 
-`/arco/vu/repl_inp id inp_id` - Set the input to be analyzed to
+`/arco/vu/repl_input id input_id` - Set the input to be analyzed to
 `inp_id`. If `inp_id` names a unit generator of class Zero, analysis
 is stopped; otherwise, processing will start or resume, sending a peak
 every period.
@@ -1092,8 +1192,8 @@ estimate. RMS is the root-mean-square of the signal measured over two
 periods of `minstep` (this is a longer window than two periods at the
 reported frequency.)
 
-`/arco/yin/repl_inp id inp_id` - Set the input to be analyzed to
-`inp_id`. If `inp_id` names a unit generator of class Zero, analysis
+`/arco/yin/repl_input id input_id` - Set the input to be analyzed to
+`input_id`. If `input_id` names a unit generator of class Zero, analysis
 is stopped; otherwise, processing will start or resume.
 
 

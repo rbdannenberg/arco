@@ -21,6 +21,10 @@ const int IN_OUTPUT_SET = 1;
 const int IN_RUN_SET = 2;
 const int UGEN_MARK = 4;  // used for graph traversal
 
+// special Unit generator IDs:
+const int ZERO_ID = 0;
+const int ZEROB_ID = 1;
+
 extern char control_service_addr[64];  // where to send messages
         // this is set in audioio.cpp by /arco/open messages and is
         // "!" followed by the service followed by "/" so that you can
@@ -102,10 +106,16 @@ class Ugen : public O2obj {
     
     void indent_spaces(int indent);
 
-    virtual void print_tree(int indent, bool print, const char *param);
+    virtual void print(int indent, const char *param);
+
+    virtual void print_tree(int indent, bool print_flag, const char *param);
+    
+    virtual void print_details(int indent) { ; }  // default: none to print
+
+    const char *btos(bool b) { return (b ? "true" : "false"); }
 
     // inherit print_sources if there are no inputs:
-    virtual void print_sources(int indent, bool print) { ; }
+    virtual void print_sources(int indent, bool print_flag) { ; }
 
     void init_param(Ugen_ptr newp, Ugen_ptr &p, int &pstride) {
         // either map single channel output to all inputs, or map
@@ -142,28 +152,17 @@ class Ugen : public O2obj {
 
     void set_current_block(int64_t n) { current_block = n; }
 
+    void const_set(int chan, Sample x, const char *from);
+
     void send_action_id(int &action_id, int status = 0) {
         o2sm_send_start();
         o2sm_add_int32(action_id);
         o2sm_add_int32(status);
         strcpy(control_service_addr + control_service_addr_len, "act");
-        printf("send_action_id address %s status(actl) %d\n", control_service_addr,
-               o2_status("actl"));
+        printf("send_action_id address %s status(actl) %d\n",
+               control_service_addr, o2_status("actl"));
         o2sm_send_finish(0.0, control_service_addr, true);
         action_id = 0;  // one-shot
-    }
-
-    void const_set(int chan, Sample value, const char *op) {
-        if (rate != 'c') {
-            arco_warn("In %s, Ugen::const_set id %d is not c-rate", op, id);
-            return;
-        }
-        if (!output.bounds_check(chan)) {
-            arco_warn("In %s, Ugen::const_set id %d chan %d but actual chans"
-                      " is %d", op, id, chan, chans);
-            return;
-        }
-        output[chan] = value;
     }
 };
 

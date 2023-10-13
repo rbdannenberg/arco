@@ -30,12 +30,12 @@ public:
     int block_to_send;  // the block to send next
     
     
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
 
-    Filerec(int id, int chans, const char *filename, Ugen_ptr inp) :
+    Filerec(int id, int chans, const char *filename, Ugen_ptr input) :
             Ugen(id, 0, chans) {
         isready = false;
         recording = false;
@@ -51,7 +51,7 @@ public:
         num_free = 1;
         block_to_send = 0;
 
-        init_inp(inp);
+        init_input(input);
 
         o2_send_start();
         o2_add_int64((int64_t) this);
@@ -78,14 +78,19 @@ public:
 
     const char *classname() { return Filerec_name; }
 
-    void print_sources(int indent, bool print) { return; }
 
-    void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
+    void print_details(int indent) {
+        arco_print("isready %d recording %d stopped %d",
+                   isready, recording, stopped);
+    }
+
+    
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
 
 
-    void repl_inp(Ugen_ptr inp_) {
-        inp->unref();
-        init_inp(inp_);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
     }
 
 
@@ -185,7 +190,7 @@ public:
 
     void real_run() {
         Audioblock *block = blocks[block_on_deck];
-        inp_samps = inp->run(current_block);  // update input
+        input_samps = input->run(current_block);  // update input
         if (stopped || !recording || full) {  // nothing we can do with input
             return;
         }
@@ -196,10 +201,10 @@ public:
                    out, &(block->dat[0]));
         }
         for (int i = 0; i < BL; i++) {
-            Sample_ptr in = inp_samps + i;
+            Sample_ptr in = input_samps + i;
             for (int ch = 0; ch < chans; ch++) {
                 *out++ = FLOAT_TO_INT16(*in);
-                in += inp_stride;
+                in += input_stride;
             }
         }
         frame_in_block += BL;

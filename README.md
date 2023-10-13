@@ -28,11 +28,15 @@ features of Arco are:
    implementation. Arco is also intended to run on microcomputers and
    single-board computers. Arco can run as a standalone server or it
    can be linked into an application or loaded as a language extension.
+   DSP code is linked according to a manifest, so your application is not
+   burdened with 100's of unit generator implementations you have no plans
+   to use.
  - **O2.** In all configurations, Arco is based on O2, which provides
    message-based communications between the application or control
    language and the synthesis engine. O2 supports lock-free communication,
    real-time memory allocation, clock synchronization and other useful
-   features.
+   features. Built-in discovery lets you connect to an Arco server without
+   messing with IP addresses or port numbers.
  - **Polymorphic Unit Generators.** Arco unit generators (dsp objects) are
    polymorphic to simplify their use, accepting different types of input
    that can change on the fly. For efficiency, there are 2 sample rates:
@@ -47,7 +51,8 @@ features of Arco are:
    located in an application or in another process, and control software can be
    written in any language. Pointers are avoided by "naming" unit generators
    with integers. Reference counting is used, although it can be largely hidden
-   by libraries used on the control side.
+   by libraries used on the control side, e.g. Serpent (programming language)
+   garbage collects references to Arco, so users do not see reference counts.
  - **FAUST.** Unit generators can be written in FAUST, allowing FAUST programs
    to be used in a dynamic environment with real-time patching and control.
    Users can focus on using a library of ready-made unit generators, but
@@ -60,5 +65,6 @@ features of Arco are:
  - [Arco installation](doc/installation.md)
  - [Writing an Arco application](doc/building.md)
  - [What's where in the repository](doc/directories.md)
+ - [Constraints - from GUI to DSP](doc/constraints.md)
 
 

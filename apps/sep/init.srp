@@ -11,7 +11,14 @@ require "allugens"
 require "slider"
 require "reverb"
 require "steps"
+require "constraint"
 require "air"
+require "points"
+require "pizz"
+require "melo"
+require "fast"
+require "pan"
+
 
 SHOWTRIG_X = 330
 SHOWTRIG_Y = 320
@@ -19,25 +26,26 @@ SHOWTRIG_Y = 320
 
 # Sound files for testing:
 
-audioinput_files = ["1-air.wav",    // intro sound, 2 air tones
-                    "2-points.wav", // short tones that are recorded and layered
-                    "3-pizz.wav",   // pizz tones that are recorded and layered
-                    "4-melody.wav", // a lyrical passage that is recorded and layered
-                    "5-fast.wav",   // fast riffs that are processed and reverbed
-                    "6-slow.wav",   // not used
-                    "5-fast-a.wav", // first fast riff only
-                    "5-fast-b.wav", // 2nd fast riff only
-                    "5-fast-c.wav", // 3rd fast riff only
-                    "5-fast-d.wav", // 4th fast riff only
-                    "5-fast-e.wav", // 5th fast riff only
-                    "7-fastpoints.wav", // 2-points.wav sped up, not used
-                    "multiphonic.wav",  // multiphonics
-                    "sing.wav",     // sung tone with voice sweep
-                    "singtone.wav", // sung tone steady
-                    "whistle.wav",  // whistle tones at end
-                    "long.wav",     // long melody at end
-                    "air-only.wav"  // just air tones from 1-air.wav used at end
-                    ]
+audioinput_files = [
+        "1-air.wav",    // intro sound, 2 air tones
+        "2-points.wav", // short tones that are recorded and layered
+        "3-pizz.wav",   // pizz tones that are recorded and layered
+        "4-melody.wav", // a lyrical passage that is recorded and layered
+        "5-fast.wav",   // fast riffs that are processed and reverbed
+        "6-slow.wav",   // not used
+        "5-fast-a.wav", // first fast riff only
+        "5-fast-b.wav", // 2nd fast riff only
+        "5-fast-c.wav", // 3rd fast riff only
+        "5-fast-d.wav", // 4th fast riff only
+        "5-fast-e.wav", // 5th fast riff only
+        "7-fastpoints.wav", // 2-points.wav sped up, not used
+        "multiphonic.wav",  // multiphonics
+        "sing.wav",     // sung tone with voice sweep
+        "singtone.wav", // sung tone steady
+        "whistle.wav",  // whistle tones at end
+        "long.wav",     // long melody at end
+        "air-only.wav"  // just air tones from 1-air.wav used at end
+        ]
 
 arco_set_input_files(audioinput_files)
 
@@ -48,6 +56,11 @@ def main():
 
 
 ui_initialized = false
+
+class Center_constraint (Simple_constraint):
+# constraint that adjusts overall gain for [left, right] that pans to center:
+    def compute(): return pan_45(0.5, db_to_linear(x))
+
 
 def arco_ready():
 # called when arco is intialized and ready to make sound or when
@@ -70,6 +83,12 @@ def arco_ready():
     sep_cue = Sep_cue
     win.fit_to_children()
 
+    // -------- input to output ----------
+    monitor_gain_constraint = Center_constraint(0.0)
+    monitor_gain = gain_control(route(input_ugen, 0), monitor_gain_sl,
+                                monitor_gain_constraint)
+    monitor_gain.play()
+
 
 def create_debug_controls(rest ignore)
     controls = Sep_controls("Separation Logic - Test")
@@ -85,6 +104,24 @@ cycle_transpose = 0
 
 
 //---------------------- MIDI and CONTROL ---------------------
+
+// create and apply gain constraint connected to a slider
+
+ugen_to_constraint = {}  // mapping from ugen to constraint
+
+def gain_control(input, slider, optional constraint):
+    if not constraint:
+        constraint = Ident_constraint()
+    constraint.connect(slider)
+    var ugen = constraint.get_const()
+    ugen_to_constraint[ugen] = constraint
+    return mult(input, ugen)
+
+def constrained_ugen_finish(ugen):
+    var constraint = ugen_to_constraint.get(ugen)
+    if constraint:
+        constraint.finish()
+
 
 // make a trigger indicator
 
@@ -112,11 +149,9 @@ class Trigger_mgr:
 
     def trigger():
         showtrig_light.blink()
+        display "Trigger_mgr.trigger", trigger_mode
         if trigger_mode == 'start':
-            sched_select(rtsched)
-            sched_cause(first_node_delay, air_mgr, 'air', t)
-            cause(5, air_mgr, 'airs_stop_recording')
-            cause(70, air_mgr, 'air', false)
+            air_mgr.trigger()
             trigger_mode = nil
         elif trigger_mode == 'gliss':
 #TODO: gliss_mgr
@@ -150,7 +185,6 @@ class Sep_cue:
     var advance_last_time
 
 
-
     def init():
         cue_num = 0
         Statictext(default_window, " ", 245, 230, 80, 100, 'sepcue_text')
@@ -174,13 +208,13 @@ class Sep_cue:
         advance_last_time = rtsched.time
         cue_num = cue_num + 1
         if cue_num == CUE_START:
-            trigger_mgr.enable()
+            trigger_mgr.enable()  // runs unit generator
+            trigger_mgr.start()   // enables "air" section
         elif cue_num == CUE_POINTS:
             points_obj = Points()
         elif cue_num == CUE_PIZZ:
             pizz_rec_obj = Pizz_rec()
-            pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5,
-                              pizz_gain, 75)
+            pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5, 75)
             pizz_instr.play()
         elif cue_num == CUE_MELO:
             melo_instr = Melo()
@@ -233,55 +267,6 @@ class Sep_cue:
 
 
 
-// ------------ points: pointillism processing ---------------
-//
-class Points:
-    var recplay, mix
-
-    def init():
-    # pointillistic short flute notes: record and later play
-        mix = mix(2)
-        recplay = recplay(input_ugen, 1, 1, 0.5)
-        recplay.run()
-        recplay.record(true)
-        sched_select(rtsched)  // for scheduling below
-
-        # launch a bunch of echoes at random offsets
-        for i = 0 to 40:
-            # start with no rate changes.
-            # add rate changes after 17s
-            # rate should be from 0.5 to 1.5, with minimum
-            # increasing from 0.3 to 1 from 17 to 45s
-            # (note: this seems backward - wouldn't that min decrease to
-            # expand the range? Nevertheless, this is what was described
-            # and implemented, so I'm leaving it this way in 2023. Oh,
-            # also max returns to 1 after 45s, so I guess it's intentional
-            # to return to no speedup/slowdown after 45s. -RBD)
-            var delay = pr_unif(5, 85)
-            var rate_min = 1 if delay < 17 else
-                           min(1, interpolate(delay, 17, 0.3, 45, 1))
-            var rate_max = 1 if delay < 17 or delay > 45 else 1.5
-            var rate = unif(rate_min, rate_max)
-            var gain = min(1, max(0.2, interpolate(delay, 5, 1, 55, 0.4)))
-            // max duration is approx. 85 (max delay) + 47 (dur) = 132
-            sched_cause(delay, this, 'echo', i, unif(10), rate, gain)
-
-        mix.play()
-
-
-    def echo(i, start_time, rate, gain):
-        var rp = recplay(zero_ugen, 1, 0.5)
-        rp.borrow(recplay)
-        rp.set('speed', rate)
-        mix.ins(mix_name(i), rp, pan_45(random()))
-        rp.start(start_time)
-
-
-    def stop_recording():
-        recplay.record(false)
-        recplay.unrun()
-        display "stop_recording"
-
 
 // -------------- pizz processing -----------------
 //
@@ -299,110 +284,7 @@ class Pizz_rec:
         recplay.unrun()
 
 
-
-class Pizz (Instrument):
-    var mix, count, off
-
-    def init(recplay, delay_spread, rate_origin, rate_slope, gain, dur):
-    # count is number of pizz players to launch
-    # delay_spread is the spread in seconds between each launch (not counting
-    #       added jitter of 0 to 1 seconds)
-    # rate_origin is the initial rate in (half)steps
-    # each pizz player's rate (after the initial one) is incremented by
-    #       rate_slope (also measured in (half)steps)
-        count = count_
-        instr_begin()
-        mix = mix(2)
-
-        # launch some echos. Each recplayer will be restarted at random
-        # times until off; then we stop each one, keeping track with
-        # count how many players are acive.
-        sched_select(rtsched)  // for scheduling below
-        off = false // set true to end everything
-        count = 4
-        for i = 0 to count:
-            var delay = i * delay_spread + random()  # spread out the delays
-            // for the first pizz section, rates will be 3, 1.5, 0, -1.5:
-            var rate = step_to_ratio(rate_origin + i * rate_slope)
-            var rp = recplayer(zero_ugen, 1, 1)
-            rp.set('speed', rate)
-            rp.borrow(recplay)
-            mix.ins(mix_name(i), rp, pan_45(unif(0.3, 0.7), gain))
-            sched_cause(delay, 'echo', rp, rate)
-        sched_cause(dur, this, 'end_all')
-        super.init("Pizz", mix)
-
-
-    def echo(rp, rate):
-        if off:
-            count = count - 1
-        else:
-            rp.start(0)
-            sched_cause(6.7 / rate + random(), this, 'echo', rp, rate)
-
-    def end_all():
-        display "stopping Pizz", count
-        off = true
-        if count > 0:
-            cause(3, 'end_all')
-        else:
-            mute()
-            // creator should remove references to this instance
-
-
-// ---------------- Melo processing -----------------
 //
-class Melo (Instrument):
-    var mix, recplay
-    
-    def init():
-        mix = mix(2)
-        recplay = recplay(input_ugen, 1, 1, 0.5)
-        recplay.run()
-        recplay.record(true)
-
-        # launch some echos
-        sched_select(rtsched)
-        sched_cause(9.3, this, 'echo', 'in9')
-        sched_cause(13.3, this, 'echo', 'in13')
-        sched_cause(19.7, this, 'echo', 'in20')
-        sched_cause(22.6, this, 'echo', 'in23')
-        sched_cause(24, this, 'stop_recording')
-        sched_cause(45, this, 'stop')
-
-        super.init("Melo", mix)
-
-
-    def echo(name):
-        var rp = recplayer(zero_ugen, 1, 1)
-        rp.start(0)
-        mix.ins(name, rp, melo_gain)
-
-
-    def stop():
-        recplay.record(false)
-        recplay.unrun()
-        fade(1)
-        
-
-// ----------------- Fast processing -----------------
-//
-class Fast (Instrument):
-    var mix, gated_foo
-
-    def init():
-        mix = Mix(2)
-        var gf1 = Gated_foo(input_ugen, 0.5, 0.15, 0.6, 100, 1, 1, 0.05, 1)
-        mix.ins('gf1', gf1, [1 * fast_gain, 0.75 * fast_gain])
-
-        var gf2 = Gated_foo(input_ugen, 0.3, 0.2, 0.6, 100, 1, 1, 0.05, 1)
-        mix.ins('gf2', gf2, [1.2 * fast_gain, 1.6 * fast_gain])
-
-        gated_foo = [gf1, gf2]
-        super.init("Fast", mix)
-        
-
-
 #TODO:
 #require "midicontrol"
 
@@ -419,12 +301,8 @@ class Fast (Instrument):
 
 class Sep_mixer:
     var win
-    var monitor_gain, trigger_threshold, intro_gain, points_gain
-    var pizz_gain, melo_gain, fast_gain, droop_gain, ending_gain
+    var trigger_threshold
 
-    def set_monitor_gain(obj, x):
-    # handler for monitor_gain_sl
-        nil
 
     def set_trig_thresh(obj, x):
     # handler for trig_thresh_sl
@@ -434,101 +312,103 @@ class Sep_mixer:
 
     def set_intro_gain(obj, x):
     # handler for intro_gain_sl
-        nil
+        air_mgr.set_gain(x)
 
 
     def set_points_gain(obj, x):
     # handler for points_gain_sl
-        nil
+        points.set_gain(x)
 
 
     def set_pizz_gain(obj, x):
     # handler for pizz_gain_sl
-        nil
+        pizz.set_gain(x)
 
 
-    def set_melo_gain(obj, x):
-    # handler for melo_gain_sl
-        nil
+//    def set_melo_gain(obj, x):
+//    # handler for melo_gain_sl
+//        ??
 
 
-    def set_fast_gain(obj, x):
-    # handler for fast_gain_sl
-        nil
+//    def set_fast_gain(obj, x):
+//    # handler for fast_gain_sl
+//        ??
 
 
-    def set_cycles_gain(obj, x):
-    # handler for cycles_gain_sl
-        nil
+//    def set_cycles_gain(obj, x):
+//    # handler for cycles_gain_sl
+//        ??
 
 
-    def set_droop_gain(obj, x):
-    # handler for droop_gain_sl
-        nil
+//    def set_droop_gain(obj, x):
+//    # handler for droop_gain_sl
+//        ??
 
 
-    def set_pizzrep_gain(obj, x):
-    # handler for pizzrep_gain_sl
-        nil
+//    def set_pizzrep_gain(obj, x):
+//    # handler for pizzrep_gain_sl
+//        pizzrep_gain = x
+
+
+//    def set_ending_gain(obj, x):
+//    # handler for pizzrep_gain_sl
+//        ??
 
 
     def init()
         win = Window("Separation Logic", 550, 40, 280, 100)
 
         Labeled_slider(win, "Flute thru", 10, 5, 250, 'H',
-                       80, -60, 20, 0, 'db', 'monitor_gain_sl')
-        monitor_gain_sl.add_target_method(this, 'set_monitor_gain')
-#TODO: remove these comments containing Aura messages:
-        //                            'set_monitor_gain', 0, 2, 0)
+                       80, -60, 20, 0, 'db', 'monitor_gain_sl', prefs = prefs)
+        display "init", monitor_gain_sl.val, prefs.get('monitor_gain_sl')
 
         Labeled_slider(win, "Threshold", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 0.1, 'linear', 'trig_thresh_sl')
+                       80, 0, 2, 0.1, 'linear', 'trig_thresh_sl', prefs = prefs)
         trig_thresh_sl.add_target_method(this, 'set_trig_thresh')
-        //                     'set_trigger_threshold', 0, 2, 0)
 
         Labeled_slider(win, "0 - Intro", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'intro_gain_sl')
-        intro_gain_sl.add_target_method(this, 'set_intro_gain')
+                       80, 0, 2, 1, 'linear', 'intro_gain_sl', prefs = prefs)
+        // intro_gain_sl.add_target_method(this, 'set_intro_gain')
         //                          'set_intro_gain', 0, 2, 1)
 
         Labeled_slider(win, "A - Points", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'points_gain_sl')
-        points_gain_sl.add_target_method(this, 'set_points_gain')
+                       80, 0, 2, 1, 'linear', 'points_gain_sl', prefs = prefs)
+        // points_gain_sl.add_target_method(this, 'set_points_gain')
         //                           'set_points_gain', 0, 2, 1)
 
         Labeled_slider(win, "B - Pizz", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'pizz_gain_sl')
-        pizz_gain_sl.add_target_method(this, 'set_pizz_gain')
+                       80, 0, 2, 1, 'linear', 'pizz_gain_sl', prefs = prefs)
+        // pizz_gain_sl.add_target_method(this, 'set_pizz_gain')
         //                         'set_pizz_gain', 0, 2, 1)
 
         Labeled_slider(win, "C - Melody", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'melo_gain_sl')
-        melo_gain_sl.add_target_method(this, 'set_melo_gain')
+                       80, 0, 2, 1, 'linear', 'melo_gain_sl', prefs = prefs)
+        // melo_gain_sl.add_target_method(this, 'set_melo_gain')
         //                         'set_melo_gain', 0, 2, 1)
 
         Labeled_slider(win, "D - Riffs", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'fast_gain_sl')
-        fast_gain_sl.add_target_method(this, 'set_fast_gain')
+                       80, 0, 2, 1, 'linear', 'fast_gain_sl', prefs = prefs)
+        // fast_gain_sl.add_target_method(this, 'set_fast_gain')
         //                         'set_fast_gain', 0, 2, 1)
 
         Labeled_slider(win, "D - Extra", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'cycles_gain_sl')
-        cycles_gain_sl.add_target_method(this, 'set_cycles_gain')
+                       80, 0, 2, 1, 'linear', 'cycles_gain_sl', prefs = prefs)
+        // cycles_gain_sl.add_target_method(this, 'set_cycles_gain')
         //                           'set_cycles_gain', 0, 2, 1)
 
         Labeled_slider(win, "E - Droop", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'droop_gain_sl')
-        droop_gain_sl.add_target_method(this, 'set_droop_gain')
+                       80, 0, 2, 1, 'linear', 'droop_gain_sl', prefs = prefs)
+        // droop_gain_sl.add_target_method(this, 'set_droop_gain')
         //                          'set_droop_gain', 0, 2, 1)
 
         Labeled_slider(win, "Pizz-rep", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'pizzrep_gain_sl')
-        pizzrep_gain_sl.add_target_method(this, 'set_pizzrep_gain')
+                       80, 0, 2, 1, 'linear', 'pizzrep_gain_sl', prefs = prefs)
+        // pizzrep_gain_sl.add_target_method(this, 'set_pizzrep_gain')
         //                            'set_pizzrep_gain', 0, 2, 1)
 
         Labeled_slider(win, "Ending", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'ending_gain_sl')
-        ending_gain_sl.add_target_method(this, 'set_ending_gain')
+                       80, 0, 2, 1, 'linear', 'ending_gain_sl', prefs = prefs)
+        // ending_gain_sl.add_target_method(this, 'set_ending_gain')
         //                           'set_ending_gain', 0, 2, 1)
 
         Button(win, "Save", 80, 'D', 'S', 'S', 'save_bt')
@@ -538,38 +418,27 @@ class Sep_mixer:
         reload_bt.add_target_method(this, 'reload_button_handler')
         
         win.fit_to_children()
-        reload_button_handler()
 
 
     def save_button_handler(rest ignore)
     # handler for Save button
-        prefs.set('monitor_gain', monitor_gain_sl.val)
-        prefs.set('trigger_threshold', trig_thresh_sl.val)
-        prefs.set('intro_gain', intro_gain_sl.val)
-        prefs.set('points_gain', points_gain_sl.val)
-        prefs.set('pizz_gain', pizz_gain_sl.val)
-        prefs.set('melo_gain', melo_gain_sl.val)
-        prefs.set('fast_gain', fast_gain_sl.val)
-        prefs.set('cycles_gain', fast_gain_sl.val)
-        prefs.set('droop_gain', droop_gain_sl.val)
-        prefs.set('pizzrep_gain', pizzrep_gain_sl.val)
-        prefs.set('ending_gain', ending_gain_sl.val)
         prefs.save()
         
 
     def reload_button_handler(rest ignore)
     # handler for Reload button
         display "reload_button_handler", prefs
-        monitor_gain_sl.set_value(prefs.get('monitor_gain', 0))
-        trig_thresh_sl.set_value(prefs.get('trigger_threshold', 1))
-        intro_gain_sl.set_value(prefs.get('intro_gain', 1))
-        points_gain_sl.set_value(prefs.get('points_gain', 1))
-        pizz_gain_sl.set_value(prefs.get('pizz_gain', 1))
-        melo_gain_sl.set_value(prefs.get('melo_gain', 1))
-        fast_gain_sl.set_value(prefs.get('fast_gain', 1))
-        cycles_gain_sl.set_value(prefs.get('cycles_gain', 1))
-        droop_gain_sl.set_value(prefs.get('droop_gain', 1))
-        pizzrep_gain_sl.set_value(prefs.get('pizzrep_gain', 1))
-        ending_gain_sl.set_value(prefs.get('ending_gain', 1))
+        prefs.init(prefs.file_name) // reload prefs from file to restore values
+        monitor_gain_sl.set_value(prefs.get('monitor_gain_sl', 0))
+        trig_thresh_sl.set_value(prefs.get('trigger_threshold_sl', 1))
+        intro_gain_sl.set_value(prefs.get('intro_gain_sl', 1))
+        points_gain_sl.set_value(prefs.get('points_gain_sl', 1))
+        pizz_gain_sl.set_value(prefs.get('pizz_gain_sl', 1))
+        melo_gain_sl.set_value(prefs.get('melo_gain_sl', 1))
+        fast_gain_sl.set_value(prefs.get('fast_gain_sl', 1))
+        cycles_gain_sl.set_value(prefs.get('cycles_gain_sl', 1))
+        droop_gain_sl.set_value(prefs.get('droop_gain_sl', 1))
+        pizzrep_gain_sl.set_value(prefs.get('pizzrep_gain_sl', 1))
+        ending_gain_sl.set_value(prefs.get('ending_gain_sl', 1))
 
 main()

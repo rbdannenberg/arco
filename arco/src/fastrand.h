@@ -62,10 +62,10 @@ inline float unifrand2(unsigned &state)
     return  lc_scale*lincongr2_int(state);
 }
 
-const int Maxdice = 8;
 
 class Pink {
   public:
+    static const int Maxdice = 8;
     unsigned counter;
     int dice;
     int shift;

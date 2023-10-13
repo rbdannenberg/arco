@@ -1,0 +1,43 @@
+# fast.srp -- control and implementation of "fast" section of
+#             Separation Logic
+#
+# based on previous implementation in Aura
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+def gated_foo(swap):
+    var mix = Mix(2)
+    var left = 0.3 * fast_gain
+    var right = 0.7 * fast_gain
+
+    // pan pitch shift and delay left and right...
+    if swap:  // ...unless swap, in which case pan the opposite directions:
+        var tmp = left
+        left = right
+        right = tmp
+    mix.ins('ps', ola_pitch_shift(input_ugen, RATIO, XFADE, WINDIR, 1),
+                  [left, right])
+    mix.ins('del', delay(input_ugen, DUR, FB, MAXDUR, 1),
+                   [right, left])
+    var gate = dualslewlin(lowpassb(powerb(input_ugen), CUTOFF, 1))
+    return mult(mix, gate)
+    
+    
+class Fast (Instrument):
+    var mix, gated_foo
+
+    def init():
+
+
+        var gf1 = Gated_foo(input_ugen, 0.5, 0.15, 0.6, 100, 1, 1, 0.05, 1)
+        mix.ins('gf1', gf1, [1 * fast_gain, 0.75 * fast_gain])
+
+        var gf2 = Gated_foo(input_ugen, 0.3, 0.2, 0.6, 100, 1, 1, 0.05, 1)
+        mix.ins('gf2', gf2, [1.2 * fast_gain, 1.6 * fast_gain])
+
+        gated_foo = [gf1, gf2]
+        super.init("Fast", mix)
+        
+
+

@@ -958,9 +958,9 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
     methods = ""
     ## Generate repl_* methods to set inputs
     for p in parameters:
-        methods += "    void repl_" + p + "(Ugen_ptr inp) {\n"
+        methods += "    void repl_" + p + "(Ugen_ptr ugen) {\n"
         methods += "        " + p + "->unref();\n"
-        methods += "        init_" + p + "(inp);\n"
+        methods += "        init_" + p + "(ugen);\n"
         if rate == 'a':
             methods += "        update_run_channel();\n"
         methods += "    }\n\n"

@@ -33,9 +33,9 @@ public:
     Vec<Alpass_state> states;
     void (Alpass::*run_channel)(Alpass_state *state);
 
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     Ugen_ptr dur;
     int dur_stride;
@@ -45,9 +45,9 @@ public:
     int fb_stride;
     Sample_ptr fb_samps;
 
-    Alpass(int id, int nchans, Ugen_ptr inp_, Ugen_ptr dur_,
+    Alpass(int id, int nchans, Ugen_ptr input_, Ugen_ptr dur_,
 	  Ugen_ptr fb_, float maxdur) : Ugen(id, 'a', nchans) {
-        inp = inp_;
+        input = input_;
         dur = dur_;
         fb = fb_;
         states.set_size(nchans, false);
@@ -60,14 +60,14 @@ public:
             alpass.set_fifo_len(alpass.mask, true);
             states[i].fb_prev = 0;
         }
-        init_inp(inp);
+        init_input(input);
         init_dur(dur);
         init_fb(fb);
         update_run_channel();
     }
 
     ~Alpass() {
-        inp->unref();
+        input->unref();
         dur->unref();
         fb->unref();
         for (int i = 0; i < chans; i++) {
@@ -102,15 +102,15 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print) {
-        inp->print_tree(indent, print, "inp");
-        dur->print_tree(indent, print, "dur");
-        fb->print_tree(indent, print, "fb");
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
+        dur->print_tree(indent, print_flag, "dur");
+        fb->print_tree(indent, print_flag, "fb");
     }
 
-    void repl_inp(Ugen_ptr ugen) {
-        inp->unref();
-        init_inp(ugen);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
         update_run_channel();
     }
 
@@ -134,12 +134,12 @@ public:
         fb->const_set(chan, f, "Alpass::set_fb");
     }
 
-    void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
     void init_dur(Ugen_ptr ugen) { init_param(ugen, dur, dur_stride); }
     void init_fb(Ugen_ptr ugen) { init_param(ugen, fb, fb_stride); }
         
     void chan_aaa_a(Alpass_state *state) {
-        Sample_ptr inp = inp_samps;
+        Sample_ptr input = input_samps;
         Sample_ptr dur = dur_samps;
         Sample_ptr fb = fb_samps;
         Ringbuf &alpass = state->samps;
@@ -152,7 +152,7 @@ public:
             }
             Sample y = alpass.get_nth(len);
             Sample feedback = fb[i];
-            Sample z = feedback * y + inp[i];
+            Sample z = feedback * y + input[i];
             alpass.toss(1);
             *out_samps++ = y - feedback * z;
             
@@ -162,7 +162,7 @@ public:
     }
 
     void chan_aab_a(Alpass_state *state) {
-        Sample_ptr inp = inp_samps;
+        Sample_ptr input = input_samps;
         Sample_ptr dur = dur_samps;
         Sample fb = *fb_samps;
         Sample fb_prev = state->fb_prev;
@@ -179,7 +179,7 @@ public:
                 set_state_max(state, len);
             }
             Sample y = alpass.get_nth(len);
-            Sample z = fb_prev * y + inp[i];
+            Sample z = fb_prev * y + input[i];
             *out_samps++ = y - fb_prev * z;
 
             // insert input with feedback
@@ -188,7 +188,7 @@ public:
     }
 
     void chan_aba_a(Alpass_state *state) {
-        Sample_ptr inp = inp_samps;
+        Sample_ptr input = input_samps;
         int len = round(*dur_samps * AR);
         Sample_ptr fb = fb_samps;
         Ringbuf &alpass = state->samps;
@@ -200,7 +200,7 @@ public:
             // get from alpass line
             Sample feedback = fb[i];
             Sample y = alpass.get_nth(len);
-            Sample z = feedback * y + inp[i];
+            Sample z = feedback * y + input[i];
             *out_samps++ = y - feedback * z;
             
             // insert input with feedback
@@ -209,7 +209,7 @@ public:
     }
 
     void chan_abb_a(Alpass_state *state) {
-        Sample_ptr inp = inp_samps;
+        Sample_ptr input = input_samps;
         int len = round(*dur_samps * AR);
         Sample fb = *fb_samps;
         Sample fb_prev = state->fb_prev;
@@ -223,7 +223,7 @@ public:
         for (int i = 0; i < BL; i++) {
             fb_prev += fb_incr;
             Sample y = alpass.get_nth(len);
-            Sample z = fb_prev * y + inp[i];
+            Sample z = fb_prev * y + input[i];
             *out_samps++ = y - fb_prev * z;
 
             // insert input with feedback
@@ -232,14 +232,14 @@ public:
     }
 
     void real_run() {
-        inp_samps = inp->run(current_block);
+        input_samps = input->run(current_block);
         dur_samps = dur->run(current_block);
         fb_samps = fb->run(current_block);
         Alpass_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
             state++;
-            inp_samps += inp_stride;
+            input_samps += input_stride;
             dur_samps += dur_stride;
             fb_samps += fb_stride;
         }

@@ -144,9 +144,9 @@ public:
     Dcblock dcblock;  // used to block DC in feedback
 
 
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
     
     float high;     // the upper limit on ratio
     float low;      // the lower limit on ratio
@@ -161,12 +161,12 @@ public:
     bool stop_request;  // waiting for last grain to finish before setting
                         // enable to false.
     
-    Granstream(int id, int nchans, Ugen_ptr inp, int polyphony_,
+    Granstream(int id, int nchans, Ugen_ptr input, int polyphony_,
                     float dur_, bool enable_) : Ugen(id, 'a', nchans) {
     /* polyphony - number of grains per channel
      * dur - the duration (s) of the sample buffer per channel
      */
-        init_inp(inp);
+        init_input(input);
         polyphony = polyphony_;
         dur = dur_;
         enable = enable_;
@@ -208,6 +208,17 @@ public:
     const char *classname() { return Granstream_name; }
     
 
+    void print_details(int indent) {
+        arco_print("polyphony %d dur %g enable %s delay %g",
+                   polyphony, dur, enable ? "true" : "false", delay);
+        indent_spaces(indent + 2);
+        arco_print("highdur %g lowdur %g density %g attack %g release %g",
+                   highdur, lowdur, density, attack, release);
+        indent_spaces(indent + 2);
+        arco_print("feedback %g", feedback);
+    }
+
+    
     void reset_gens() {  // initialize generators
         // set delay = 1 so that other parameters will be computed
         // on the next call to real_run():
@@ -217,12 +228,12 @@ public:
     }
     
     
-    void init_inp(Ugen_ptr ugen) { init_param(ugen, inp, inp_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
 
     
-    void repl_inp(Ugen_ptr ugen) {
-        inp->unref();
-        init_inp(ugen);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
     }
 
 
@@ -291,7 +302,7 @@ public:
     }
 
     void real_run() {
-        inp_samps = inp->run(current_block);
+        input_samps = input->run(current_block);
         Granstream_state *state = &states[0];
         bool active = false;
         // clear all output here because each channel (state) can sum grains
@@ -301,7 +312,7 @@ public:
         for (int i = 0; i < states.size(); i++) {
             active |= chan_a(state);
             state++;
-            inp_samps += inp_stride;
+            input_samps += input_stride;
         }
 
         Sample fb[BL];

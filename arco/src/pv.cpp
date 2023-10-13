@@ -67,18 +67,18 @@ void arco_pv_ratio(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/pv/repl_inp int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/pv/repl_input int32 id, int32 input_id;
  */
-void arco_pv_repl_inp(O2SM_HANDLER_ARGS)
+void arco_pv_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Pv, pv, id, "arco_pv_repl_inp");
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_pv_repl_inp");
-    pv->repl_inp(inp);
+    UGEN_FROM_ID(Pv, pv, id, "arco_pv_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_pv_repl_input");
+    pv->repl_input(input);
 }    
 
 
@@ -87,10 +87,10 @@ static void pv_init()
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/pv/new", "iiifiiii", arco_pv_new, NULL, true, true);
     o2sm_method_new("/arco/pv/stretch", "if", arco_pv_stretch, NULL, true,
-                     true);
+                    true);
     o2sm_method_new("/arco/pv/ratio", "if", arco_pv_ratio, NULL, true, true);
-    o2sm_method_new("/arco/pv/repl_inp", "ii", arco_pv_repl_inp, NULL, true,
-                     true);
+    o2sm_method_new("/arco/pv/repl_input", "ii", arco_pv_repl_input, NULL,
+                    true, true);
     // END INTERFACE INITIALIZATION
 }
 

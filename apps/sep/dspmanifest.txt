@@ -1,3 +1,5 @@
+smoothb
+route
 vu
 probe
 pwl*
@@ -15,3 +17,5 @@ alpass
 olapitchshift
 feedback
 trig
+dnsampleb
+dualslewb
