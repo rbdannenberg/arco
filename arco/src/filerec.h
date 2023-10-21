@@ -46,7 +46,7 @@ public:
         block_on_deck = 0; 
         frame_in_block = 0;
         next_block = 0;
-        action_id = 0;
+        action_id = 0;  // no action
         num_ready_to_send = 0;
         num_free = 1;
         block_to_send = 0;
@@ -117,9 +117,7 @@ public:
         }
         if (ready_flag) {
             isready = true;
-            if (action_id) {
-                send_action_id(action_id, 0);  // successful open
-            }
+            send_action_id(action_id, 0);  // successful open
             if (recording) {  // do we need to send block(s)?
                 while (num_ready_to_send > 0) {
                     send_a_block();
@@ -127,9 +125,7 @@ public:
             }
         } else {
             arco_warn("Filerec - failure to open file");
-            if (action_id) {
-                send_action_id(action_id, -1);
-            }
+            send_action_id(action_id, -1);
             finished = true;
         }
     }

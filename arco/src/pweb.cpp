@@ -33,7 +33,6 @@ void arco_pweb_act(O2SM_HANDLER_ARGS)
 
     UGEN_FROM_ID(Pweb, pweb, id, "arco_pweb_act");
     pweb->action_id = action_id;
-    printf("arco_pweb_act: set ugen %d action_id %d\n", id, action_id);
 }
 
 

@@ -548,9 +548,9 @@ int pv_get_input_count(Phase_vocoder x)
                        pv->frame_next + pv->fftsize, pv->frame_next);
                 printf("output_buffer from %p to %p\n", pv->output_buffer,
                        pv->output_buffer + pv->output_buffer_len);
-                float *start = pv->frame_next + pv->fftsize - pv->syn_hopsize;
-                ZERO(start, pv->output_buffer + pv->output_buffer_len - start);
             }
+            float *start = pv->frame_next + pv->fftsize - pv->syn_hopsize;
+            ZERO(start, pv->output_buffer + pv->output_buffer_len - start);
         }
     } else {
         frames = 0;

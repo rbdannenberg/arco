@@ -1,0 +1,88 @@
+# windowmgr - window manager for Arco
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+# A Window_manager object allows you to open and close a control panel
+# or interface of some kind. The control panel is subclassed from
+# Arco_window. A Window menu item is created to open/close the window.
+# The control panel must override init() to set up controls and
+# delete() to clean up if necessary when the window is closed.
+# The control panel should not install an event handler for
+# WXS_CLOSE_WINDOW because Window_manager will handle the event and
+# delete the window if it exists (is bound to varname).
+#
+# A global variable refers to the control panel object and only one
+# instance of a given control panel class is allowed to exist.
+
+
+class Window_manager:
+    var title, x, y, w, h
+    var varname
+    var control_class
+    var color
+    var prefs
+    var item_id  // menu item identifier
+
+    def init(title_, x_, y_, w_, h_, varname_, control_class_,
+             keyword menu_item, help_string, open_now, color, prefs):
+    # title, x, y, w, h, varname -- all passed to control_class.init()
+    # control_class is the class (subclass of Arco_window) that will be
+    #     instantiated when the user selects the menu item
+    # menu_item is the string name for the menu item (defaults to title)
+    # help_string is the pop-up documentation string displayed by the menu
+    #     system; defaults to "create control panel"
+    # open_now says to start with panel opened
+    #
+    # The control_class keeps the window rectangle in prefs. This object
+    # keeps '<varname>_open' in prefs to signify whether the window is
+    # open or closed. If the pref is true, the window is opened as if
+    # open_now were true.
+        title = title_
+        x = x_
+        y = y_
+        w = w_
+        h = h_
+        varname = varname_
+        set_symbol_value(varname, nil)
+        control_class = control_class_
+        this.color = color
+        this.prefs = prefs
+
+        var menu = default_window.get_menu("Window")
+        menu_item = menu_item or title
+        help_string = help_string or "create control panel"
+        item_id = menu.item(menu_item, help_string, t,
+                            this, 'menu_item_selected')
+        // open now if requested by caller or if preference is true
+        var open_pref = intern(str(varname) + "_open")
+        if open_now or (prefs and prefs.get(open_pref)):
+            menu.set_and_act(item_id, true)
+            if prefs and not prefs.get(open_pref):
+                prefs.set(open_pref, true)
+
+
+    def menu_item_selected(obj, event, item_id, check_mark):
+        var win = symbol_value(varname)
+        if (check_mark == 0):
+            if not win:
+                print "WARNING: Window", title, "already closed"
+                return
+            win.delete()
+        elif (check_mark == 1):
+            if win:
+                print "WARNING: Window", title, "already open"
+                return
+            win = funcall(control_class, title, x, y, w, h, varname, prefs)
+            if color:
+                win.set_color(color)
+            win.add_target_method(this, 'win_handler')
+        if prefs:
+            prefs.set(intern(str(varname) + "_open"), check_mark == 1)
+
+
+    def win_handler(obj, event, x, y):
+        if event == WXS_CLOSE_WINDOW:
+            default_window.get_menu("Window").set_and_act(item_id, false)
+        wxs_event_not_handled()    // allow window to close
+        

@@ -123,9 +123,7 @@ public:
     void ready(bool is_ready) {
         if (!is_ready && !started) {
             arco_warn("Fileplay - failure to start reading from file");
-            if (action_id) {
-                send_action_id(action_id, -1);  // send error code
-            }
+            send_action_id(action_id, -1);  // send error code
         }
         if (!is_ready) {  // there is nothing more to read
             stopped = true;
@@ -177,7 +175,7 @@ public:
         Audioblock *block = blocks[block_on_deck];
         if (!started || stopped || !block) {
             block_zero_n(out_samps, chans);
-            if (stopped && action_id) {
+            if (stopped) {
                 send_action_id(action_id);
             }
             return;

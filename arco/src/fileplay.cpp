@@ -115,8 +115,7 @@ void arco_fileplay_act(O2SM_HANDLER_ARGS)
     // end unpack message
 
     UGEN_FROM_ID(Fileplay, fileplay, id, "arco_fileplay_act");
-    fileplay->set_action_id(action_id);
-    printf("arco_fileplay_act: set ugen %d action_id %d\n", id, action_id);
+    fileplay->action_id = action_id;
 }
 
 

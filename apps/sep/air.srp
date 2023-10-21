@@ -5,7 +5,6 @@
 # Roger B. Dannenberg
 # Oct 2023
 
-FIRST_NOTE_DELAY = 0.3  // sec
 AIR_TRANS = [ step_to_ratio(x) for x in [-2, -5, -8, -11, -16, -19, -22, -26,
                                          -29, -34, -34, -34, -34, -34] ]
 AIR_DELS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7.5, 15.7, 27.9, 33]
@@ -24,7 +23,7 @@ class Air_mgr:
     def trigger():
     # start the air section in response to detecting first sound
         sched_select(rtsched)
-        sched_cause(FIRST_NOTE_DELAY, air_mgr, 'air', t)
+        sched_cause(capture_dly_sl.val, air_mgr, 'air', t)
         sched_cause(5, this, 'stop_recording')
         sched_cause(70, this, 'air', false)
         
@@ -76,6 +75,7 @@ class Air_mgr:
         var rp = recplay(zero_ugen, 1, 1, 2)
         rp.borrow(air_rp)
         rp.set_speed(tran)
+        rp.start(0)
         if pulse:
             print "PULSE ****"
             var osc = sine(3, 1)

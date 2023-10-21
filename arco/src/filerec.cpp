@@ -108,8 +108,7 @@ void arco_filerec_act(O2SM_HANDLER_ARGS)
     // end unpack message
 
     UGEN_FROM_ID(Filerec, filerec, id, "arco_filerec_act");
-    filerec->send_action_id(action_id);
-    printf("arco_filerec_act: set ugen %d action_id %d\n", id, action_id);
+    filerec->action_id = action_id;
 }
 
 

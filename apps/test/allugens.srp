@@ -533,7 +533,7 @@ class Recplay (Ugen):
         o2_send_cmd("/arco/recplay/speed", 0, "Uf", id, x)
 
     def borrow(u):
-        o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u)
+        o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u.id)
 
 # delay.srp -- feedback delay unit generator
 #

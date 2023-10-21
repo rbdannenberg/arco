@@ -44,7 +44,7 @@ class Points:
             // time is approximately delay:
             var start_time = pr_unif(min(10, delay + 0.1))
             sched_cause(delay, this, 'echo', i, start_time, rate, gain)
-        outgain = gain_control(mix, points_gain_sl)
+        outgain = gain_control(mix, points_gain_sl, Db_constraint())
         outgain.play()  // initially no inputs and silence -- see echo()
 
 

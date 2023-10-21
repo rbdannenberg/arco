@@ -156,14 +156,17 @@ def create_ugen_id():
     uid
 
 
-# Ugen.action_id is an integer key. Arco sends /actl/act with the key
-# when the Ugen finishes.
-# action_dict[key] is a list of actions of the form
-# [ugen, object, method, params], where ugen is the holder of the
-# action_id, which equals key, and the remaining [object, method, params]
-# is the method or function to invoke to perform the action.
-#
 def create_action(ugen, object, method, rest parameters):
+# Assign an object, method and parameters to be invoked when
+# a unit generator (ugen) sends an action message.
+// ugen.action_id is an integer key. Arco sends /actl/act with
+//     the key when the Ugen finishes.
+// action_dict[key] is a list of actions of the form
+//     [ugen, object, method, params], where ugen is the holder of the
+//     action_id, which equals key, and the remaining [object, method, params]
+//     is the method or function to invoke to perform the action.
+// See also atend(), which conveniently invokes 'mute' or 'finish' methods
+//     of a unit generator when the ugen's behavior ends.
     var action_list
     var action = [ugen, object, method, parameters]
     if ugen.action_id:
@@ -182,6 +185,8 @@ def create_action(ugen, object, method, rest parameters):
 
 
 def actl_act(timestamp, address, types, rest parameters):
+# This is an internal handler for actions, which are "callbacks" to notify
+# the client of some event (like ending an envelope) in the server.
     display "actl_act", types, parameters
     var key = parameters[0]
     var action_list = action_dict.get(key)
@@ -196,10 +201,13 @@ def actl_act(timestamp, address, types, rest parameters):
     action_dict.remove(key)  // allow garbage collection
 
 
-# assign default_window.method = 'arco_main_win_handler' to quit Arco
-# before quitting your main program. default_window is defined by
-# require "wxserpent" -- works with wxserpent64 only (not serpent64)
+# call default_window.method.add_target_method(nil, 'arco_main_win_handler')
+# to shut down Arco before your main program exits. default_window is defined
+# by require "wxserpent" -- works with wxserpent64 only (not serpent64)
+#
 def arco_main_win_handler(obj, event, x, y):
+# custom main window event handler to catch CLOSE event and (maybe)
+# save prefs and then cleanly shut down Arco's audio thread
     if event == WXS_CLOSE_WINDOW:
         display "arco_main_win_handler", event, x, y
         // ask for confirmation:
@@ -210,6 +218,85 @@ def arco_main_win_handler(obj, event, x, y):
         // request Arco to shut down
         arco_quit()
         // event is handled, so we do not actually quit yet
+    else:
+        display "arco_main_win_handler", event,
+        display     default_window.get_left(), default_window.get_top()
+
+
+
+class Arco_window (Window):
+# A substitute for Window class that updates preferences when the window
+# moves. After instantiating an Arco_window, use set_prefs() to attach
+# the window to preferences -- this will move and size the window to values
+# stored in prefs, if any.
+# Note that Arco_window keeps the window rectangle (position, size) in
+# prefs, but not whether the window is open or closed. Window_manager,
+# if there is one, does that.
+    var prefs
+
+    def init(title, x, y, w, h, optional varname, prefs):
+    # init's main function is to apply optional prefs early so any subclass
+    # can override prefs width and height by calling fit_to_children()
+        super.init(title, x, y, w, h, varname)
+        set_prefs(prefs)
+
+
+    def set_prefs(p):
+        if not varname:
+            print "WARNING: Arco_window.set_prefs expected varname to be set"
+        else:
+            prefs = p
+            var rect = prefs.get(varname)
+            display "Arco_window got prefs", varname, rect
+            if rect:  // restore the window coordinates and size
+                set_position(rect[0], rect[1])
+                set_size(rect[2], rect[3])
+            else:  // store the current coordinates
+                prefs.set(varname,
+                          [get_left(), get_top(), get_width(), get_height()])
+                display "Arco_window set prefs", varname, prefs.get(varname)
+
+
+    def on_size(width, height, optional x, y):
+    # record new rectangle in preferences, optional params come from on_move()
+        if prefs:
+            x = x or get_left()
+            y = y or get_top()
+            prefs.set(varname, [x, y, width, height])
+            display "Arco_window on_size", varname, prefs.get(varname)
+
+
+    def on_move(x, y):
+    # record new rectangle in preferences
+        display "on_move", x, y, get_width(), get_height()
+        on_size(get_width(), get_height(), x, y)
+
+
+
+# Capturing movement in the main window requires some tricky code since
+# the window is already created using Default_window which ignores on_size()
+# and on_move(). Default_window is already a "shadow" for the underlying main
+# window which is created directly in wxserpent initialization. Here, we just
+# replace control_map[0] so that it "thinks" the default window is now an
+# object of type Default_arco_window. Previously, the variable default_window
+# was listed in control_names, a list of global control names, so we can just
+# leave it there. The original default_window object will be garbage collected
+# since the only reference was from default_window. (Actually, if someone has
+# copied the reference, say to 'app_window', the only problem is if someone
+# also called app_window.add_method_target(), so we'll copy the handlers from
+# the original object to our new one.)
+#
+class Default_arco_window (Arco_window):
+    def init():
+        id = 0
+        nesting = 0
+        varname = 'default_window'
+        control_map[0] = this
+        // in case any handlers are already attached to the old window:
+        target = default_window.target
+        method = default_window.method
+
+default_window = Default_arco_window()
 
 
 def file_quit_handler(rest ignore):
@@ -253,7 +340,9 @@ if get_os() == 'linux':
                    "device(s)."
 
 def actl_devinf(timestamp, address, types, info):
-    if info == "":
+# callback to address /actl/devinf from arco's /arco/devinf.
+# info is a string describing an audio device, or "" at end of list.
+    if info == "":  // we now have all the audio device info so we can proceed
         display "actl_devinf", repr(info), arco_state
         if arco_state == 'devinf':
             // auto-open in discovery->initializing->devinf->opening->running
@@ -325,6 +414,8 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
 #           File:"Arco Ugen GC Info"
 
     prefs = Prefs(appname)
+    display "arco_init setting default window prefs", default_window, prefs
+    default_window.set_prefs(prefs)
     audiomaster_gain = prefs.get('master_gain', -12.0)
 
     if not set_arco_state('discovery'):
@@ -336,7 +427,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
         if not color:
             color = [160, 210, 210]
         default_window.set_rgb(color[0], color[1], color[2])
-        default_window.method = 'arco_main_win_handler'
+//        default_window.add_target_method(nil, 'arco_main_win_handler')
         display "####### arco_init GETTING File MENU FROM", default_window
         var file_menu = default_window.get_menu("File")
         if dbgmenu:
@@ -524,9 +615,15 @@ def actl_starting(timestamp, address, types, rest args):
         return
     prefs.set('audio_open_success', true, true)  // audio did not crash
     arco_ready()
+
+    // delayed until now when we have audio input and output
+    monitor_audio_manager = Window_manager("Monitor Audio",
+            520, 400, 300, 30, 'mon_win', 'Monitor_audio',
+            color = MONITOR_COLOR, prefs = prefs,
+            help_string = "open a window to monitor and control audio")
+        
     sched_select(rtsched)
-    poll_for_status_id = poll_for_status_id + 1
-    poll_for_status(poll_for_status_id)
+    start_poll_for_status()
 
 
 class Ugen:

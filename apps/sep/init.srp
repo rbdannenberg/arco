@@ -19,9 +19,10 @@ require "melo"
 require "fast"
 require "pan"
 
+MUSIC_PATH = "/Users/rbd/Music/separation-logic/"
 
-SHOWTRIG_X = 330
-SHOWTRIG_Y = 320
+SHOWTRIG_X = 280
+SHOWTRIG_Y = 360
 
 
 # Sound files for testing:
@@ -49,6 +50,11 @@ audioinput_files = [
 
 arco_set_input_files(audioinput_files)
 
+def play_into_input_from(name):
+    var fullname = MUSIC_PATH + name
+    display "play_into_input_from", name, fullname
+    simulate_input_from_file(fullname)
+
 def main():
     arco_init(latency = 10, network = false, title = "Separation Logic",
               appname = "sep")
@@ -60,6 +66,10 @@ ui_initialized = false
 class Center_constraint (Simple_constraint):
 # constraint that adjusts overall gain for [left, right] that pans to center:
     def compute(): return pan_45(0.5, db_to_linear(x))
+
+
+class Db_constraint (Simple_constraint):
+    def compute(): return db_to_linear(x)
 
 
 def arco_ready():
@@ -110,6 +120,8 @@ cycle_transpose = 0
 ugen_to_constraint = {}  // mapping from ugen to constraint
 
 def gain_control(input, slider, optional constraint):
+# multiply input by gain determined by slider; the result is
+# the multiplier that implements gain, so it represents the output
     if not constraint:
         constraint = Ident_constraint()
     constraint.connect(slider)
@@ -118,6 +130,27 @@ def gain_control(input, slider, optional constraint):
     return mult(input, ugen)
 
 def constrained_ugen_finish(ugen):
+# To free some objects (ugen and constraint), call this to shut down
+# a gain created by gain_control. ugen is the result of gain_control().
+# This is especially important to call if you repeatedly call gain_control.
+# E.g. suppose over time you create a 1000 notes, each with a gain_control'd
+# output, and the gain_control results (all mult ugens representing the note
+# outputs) are all sent the .mute() message. The result will be that you
+# still have 1000 constraints attached to and activated by the slider, and
+# each constraint change will update an associated const or smoothb ugen.
+# Not good! You can solve this by calling constrained_ugen_finish(ugen)
+# before calling ugen.mute(). This will detach the constraint from the
+# slider, allowing garbage collection to reclaim the mult and const
+# (or smoothb).  Alternatively, you could make one gain control, sum *all*
+# the notes and apply the gain to the sum. You would then need to detach
+# each note output from the mix ugen input when the note ends. Another
+# option is do not use gain_control. Instead make and keep one constraint,
+# say constraint_1, and apply gain control by
+#     output = mult(input, constraint_1.get_const())
+# This works because get_const() (or get_smoothb) will return a cached
+# const ugen (or smoothb ugen) which will then be shared by all mult ugens.
+# To get rid of the single constraint and const, if needed, you can call
+# slider.remove_target_method(constraint_1) and then constraint_1 = nil.
     var constraint = ugen_to_constraint.get(ugen)
     if constraint:
         constraint.finish()
@@ -126,7 +159,7 @@ def constrained_ugen_finish(ugen):
 // make a trigger indicator
 
 def actl_trig(timestamp, address, types, idnum, rms)
-    display "TRIG ONSET DETECTED:", idnum, rms
+    // display "TRIG ONSET DETECTED:", idnum, rms
     trigger_mgr.trigger()
 
 
@@ -149,7 +182,7 @@ class Trigger_mgr:
 
     def trigger():
         showtrig_light.blink()
-        display "Trigger_mgr.trigger", trigger_mode
+        // display "Trigger_mgr.trigger", trigger_mode
         if trigger_mode == 'start':
             air_mgr.trigger()
             trigger_mode = nil
@@ -187,15 +220,38 @@ class Sep_cue:
 
     def init():
         cue_num = 0
-        Statictext(default_window, " ", 245, 230, 80, 100, 'sepcue_text')
+        x = 265
+        y = 230
+        Statictext(default_window, " ", x, y, 80, 100, 'sepcue_text')
         sepcue_text.set_color("YELLOW")
         sepcue_text.set_font(95, WXS_FONT_SWISS, WXS_FONT_NORMAL, WXS_FONT_BOLD,
                              false, "")
-        Button(default_window, "Next Cue", 350, 260, 85, 50, 'sepcue_btn')
+        wxs_space = WXS_DEFAULT_SPACE + 10
+        Button(default_window, "Skip Cue", x + 85, y, 85, 'H', 'sepskip_btn')
+        sepskip_btn.add_target_method(this, 'sep_skip')
+        // wxs_y = wxs_y + 20
+        Button(default_window, "Sim Cue", 'S', 'D', 'S', 'H', 'sepsim_btn')
+        sepsim_btn.add_target_method(this, 'sep_sim')
+        // wxs_y = wxs_y + 20
+        Button(default_window, "Next Cue", 'S', 'D', 'S', 'H', 'sepcue_btn')
         sepcue_btn.add_target_method(this, 'sep_advance')
+        wxs_space = WXS_DEFAULT_SPACE
         advance_last_time = -10
         cue_num = 0
 
+
+    def sep_skip(rest ignore):
+        cue_num = cue_num + 1;
+        print "**** sep_skip", cue_to_string(cue_num)
+        sepcue_text.set_string(cue_to_string(cue_num))
+
+
+    def sep_sim(rest ignore):
+        print "**** sep_sim", cue_to_string(cue_num)
+        if cue_num == CUE_START:
+            play_into_input_from("1-air.wav")
+        if cue_num == CUE_POINTS:
+            play_into_input_from("2-points.wav")
 
     def sep_advance(rest ignore):
 //        print "*** sep_advance turning on trace ***"
@@ -299,8 +355,18 @@ class Pizz_rec:
 //declare_msg_type('set_droop_gain', "d")
 //declare_msg_type('set_ending_gain', "d")
 
+SLIDER_NAMES = ["0 - Intro", "A - Points", "B - Pizz",
+                "C - Melody", "D - Riffs", "D - Extra", "E - Droop",
+                "Pizz-rep", "Ending"]
+
+SLIDER_SYMBOLS = ['intro_gain_sl', 'points_gain_sl',
+                  'pizz_gain_sl', 'melo_gain_sl', 'fast_gain_sl',
+                  'cycles_gain_sl', 'droop_gain_sl', 'pizzrep_gain_sl',
+                  'ending_gain_sl']
+
+
+
 class Sep_mixer:
-    var win
     var trigger_threshold
 
 
@@ -310,108 +376,25 @@ class Sep_mixer:
         trigger_mgr.trig_ugen.set_threshold(x)
 
 
-    def set_intro_gain(obj, x):
-    # handler for intro_gain_sl
-        air_mgr.set_gain(x)
-
-
-    def set_points_gain(obj, x):
-    # handler for points_gain_sl
-        points.set_gain(x)
-
-
-    def set_pizz_gain(obj, x):
-    # handler for pizz_gain_sl
-        pizz.set_gain(x)
-
-
-//    def set_melo_gain(obj, x):
-//    # handler for melo_gain_sl
-//        ??
-
-
-//    def set_fast_gain(obj, x):
-//    # handler for fast_gain_sl
-//        ??
-
-
-//    def set_cycles_gain(obj, x):
-//    # handler for cycles_gain_sl
-//        ??
-
-
-//    def set_droop_gain(obj, x):
-//    # handler for droop_gain_sl
-//        ??
-
-
-//    def set_pizzrep_gain(obj, x):
-//    # handler for pizzrep_gain_sl
-//        pizzrep_gain = x
-
-
-//    def set_ending_gain(obj, x):
-//    # handler for pizzrep_gain_sl
-//        ??
-
-
     def init()
-        win = Window("Separation Logic", 550, 40, 280, 100)
+        win = default_window // Arco_window("Mixer", 550, 40, 280, 100)
+        // win.set_prefs(prefs)
 
         Labeled_slider(win, "Flute thru", 10, 5, 250, 'H',
                        80, -60, 20, 0, 'db', 'monitor_gain_sl', prefs = prefs)
-        display "init", monitor_gain_sl.val, prefs.get('monitor_gain_sl')
 
         Labeled_slider(win, "Threshold", 'S', 'D', 'S', 'S',
                        80, 0, 2, 0.1, 'linear', 'trig_thresh_sl', prefs = prefs)
         trig_thresh_sl.add_target_method(this, 'set_trig_thresh')
 
-        Labeled_slider(win, "0 - Intro", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'intro_gain_sl', prefs = prefs)
-        // intro_gain_sl.add_target_method(this, 'set_intro_gain')
-        //                          'set_intro_gain', 0, 2, 1)
+        Labeled_slider(win, "Capture Dly", 'S', 'D', 'S', 'S', 80, 0, 0.5,
+                       0.3, 'linear', 'capture_dly_sl', prefs = prefs)
 
-        Labeled_slider(win, "A - Points", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'points_gain_sl', prefs = prefs)
-        // points_gain_sl.add_target_method(this, 'set_points_gain')
-        //                           'set_points_gain', 0, 2, 1)
+        for name at i in SLIDER_NAMES:
+            Labeled_slider(win, name, 'S', 'D', 'S', 'S', 80, -60, 20, 0,
+                           'db', SLIDER_SYMBOLS[i], prefs = prefs)
 
-        Labeled_slider(win, "B - Pizz", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'pizz_gain_sl', prefs = prefs)
-        // pizz_gain_sl.add_target_method(this, 'set_pizz_gain')
-        //                         'set_pizz_gain', 0, 2, 1)
-
-        Labeled_slider(win, "C - Melody", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'melo_gain_sl', prefs = prefs)
-        // melo_gain_sl.add_target_method(this, 'set_melo_gain')
-        //                         'set_melo_gain', 0, 2, 1)
-
-        Labeled_slider(win, "D - Riffs", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'fast_gain_sl', prefs = prefs)
-        // fast_gain_sl.add_target_method(this, 'set_fast_gain')
-        //                         'set_fast_gain', 0, 2, 1)
-
-        Labeled_slider(win, "D - Extra", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'cycles_gain_sl', prefs = prefs)
-        // cycles_gain_sl.add_target_method(this, 'set_cycles_gain')
-        //                           'set_cycles_gain', 0, 2, 1)
-
-        Labeled_slider(win, "E - Droop", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'droop_gain_sl', prefs = prefs)
-        // droop_gain_sl.add_target_method(this, 'set_droop_gain')
-        //                          'set_droop_gain', 0, 2, 1)
-
-        Labeled_slider(win, "Pizz-rep", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'pizzrep_gain_sl', prefs = prefs)
-        // pizzrep_gain_sl.add_target_method(this, 'set_pizzrep_gain')
-        //                            'set_pizzrep_gain', 0, 2, 1)
-
-        Labeled_slider(win, "Ending", 'S', 'D', 'S', 'S',
-                       80, 0, 2, 1, 'linear', 'ending_gain_sl', prefs = prefs)
-        // ending_gain_sl.add_target_method(this, 'set_ending_gain')
-        //                           'set_ending_gain', 0, 2, 1)
-
-        Button(win, "Save", 80, 'D', 'S', 'S', 'save_bt')
+        Button(win, "Save", 'S', 'D', 'S', 'S', 'save_bt')
         save_bt.add_target_method(this, 'save_button_handler')
         
         Button(win, "Reload", 'S', 'D', 'S', 'S', 'reload_bt')

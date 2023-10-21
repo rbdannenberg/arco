@@ -6,27 +6,56 @@
 # Do not load this directly. It is loaded automatically by arco when
 # running in wxserpent.
 
+require "windowmgr"
 require "arcoslider"
 require "vumeter"
 require "evlight"
 
+CONFIGURE_COLOR = Wxs_color(200, 230, 200)
 MONITOR_COLOR = Wxs_color(0xC6, 0xCF, 0xFF)
 require "arcoscope"
 
 
 fileinput_files = nil
 
+
+def audio_file_exists(path):
+    var rslt = open(path, "rb")
+    var name
+    if rslt:
+        rslt.close()
+    return rslt != nil
+         
+
+def simulate_input_from_file(path):
+# send audio from file named by path to Arco main audio input
+# if path cannot be opened, restore input to live (microphone) input
+    if arco_state != 'running':
+        display "WARNING: simulate_input_from_file", path, arco_state
+        return
+    var fileinput_player
+    if audio_file_exists(path):
+        fileinput_player = fileplay(path, arco_input_chans,
+                                    0, 0, false, true, true)
+        input_ugen.set_alternate(fileinput_player)
+        fileinput_player.go()
+    else:
+        input_ugen.set_alternate(zero_ugen)
+
+
 def arco_set_input_files(files):
     fileinput_files = files
 
 
 def audiodev_init()
-    audio_devices_menu.item("Configure Audio",
-                            "open a window to select audio devices", nil, nil,
-                            'configure_audio_handler')
-    audio_devices_menu.item("Monitor Audio",
-                            "open a window to monitor and control audio", 
-                            nil, nil, 'monitor_audio_handler')
+    configure_audio_manager = Window_manager("Configure Audio",
+            520, 20, 850, 360, 'config_win', 'Configure_audio',
+            color = CONFIGURE_COLOR, prefs = prefs,
+            help_string = "open a window to monitor and control audio")
+//    monitor_audio_manager = Window_manager("Monitor Audio",
+//            520, 400, 300, 30, 'mon_win', 'Monitor_audio',
+//            color = MONITOR_COLOR, prefs = prefs,
+//            help_string = "open a window to monitor and control audio")
     audio_devices_menu.item("Print O2 Messages",
                             "set o2_debug_flags to print O2 messages",
                             true, nil, 'print_o2_msgs_handler')
@@ -55,24 +84,20 @@ def actl_probe(timestamp, address, types, rest data):
 
 
 def auto_open_audio():
-# this is called when the application starts. If devices are selected, we can
-# open them. Otherwise, we open the Audio Configuration window for the user.
-    var ca = configure_audio
+# this is called when the application starts. It ensures config_win is open
+# so it can call invoke the open_audio_handler to run the "Open" action.
+# Then, if the window was initially closed, we close it as if we just
+# opened based on defaults without using the Configuration window.
+    var ca = config_win
+    var menu = default_window.get_menu("Window")
+    var item_id = configure_audio_manager.item_id
+    if not config_win:
+        menu.set_and_act(item_id, true)
+    else:
+        create_device_selections()  // make sure selection is refreshed
+    config_win.open_audio_handler()
     if not ca
-        configure_audio_handler()
-    configure_audio.open_audio_handler()
-    if not ca
-        config_win.delete()
-        display "auto_open_audio - deleting config_win", gccyclesst, maxugenst
-        configure_audio = nil
-
-
-def configure_audio_handler(rest ignore):
-# open window to select audio devices
-    if not configure_audio:
-        configure_audio = Configure_audio()
-        poll_for_status_id = poll_for_status_id + 1
-        poll_for_status(poll_for_status_id)
+        menu.set_and_act(item_id, false)
 
 
 def monitor_audio_handler(rest ignore):
@@ -122,8 +147,8 @@ def find_devices(devs, dir):
 
 // references to controls. These are tested to 
 // see if controls exist yet, so must be initialized:
-config_win = nil
-audio_input_rb = nil
+//config_win = nil
+audio_input_rb = nil  // auto_open_audio indirectly depends on this
 
 def select_preference(rb, items, attr):
     var pref = prefs.get(attr, "Default")
@@ -157,70 +182,82 @@ def create_device_selections():
     bottom = max(bottom, wxs_y + wxs_h) + 10
     display "after output", bottom
     select_preference(audio_output_rb, output_items, 'audio_out_dev')
-
-
-poll_for_status_id = 0
-
-def poll_for_status(id):
-    if id != poll_for_status_id or not config_win:
-        return  // quit this "process"
-    display "poll_for_status", gccyclesst, maxugenst
-    if gccyclesst:
-        gccyclesst.set_string("GC cycles: " + str(gc_cycles()))
-        maxugenst.set_string("Max Ugen ID: " + str(max_ugen_id_used))
-        arco_get_cpu_load('show_cpu_load')
-    sched_cause(1.0, nil, 'poll_for_status', id)
+    config_win.fit_to_children()
 
 
 def show_cpu_load(cpu):
+# callback/continuation from actl_cpu (in arco.srp) - must be function
     if cpuloadst:  // caution: Static_text control may have been deleted
         cpuloadst.set_string("CPU Load: " + str(round(cpu, 2)))
         cpuloadgauge.set_value(int(100 * cpu))
 
 
-gccyclesst = nil // text boxes are created after Arco audio is started
-cpuloadst = nil
+// gccyclesst = nil // text boxes are created after Arco audio is started
+// cpuloadst = nil
 
-class Configure_audio:
-    def init():
-        Window("Configure Audio", 520, 20, 850, 360, 'config_win')
-        config_win.set_rgb(200, 230, 200)
-        config_win.add_target_method(this, 'win_handler')
 
-        Button(config_win, "Open Audio", 10, 10, 120, 'H', 
+def start_poll_for_status():
+# when audio is opened, this should be called to start updating config_win
+    if config_win:
+       config_win.poll_for_status_id = config_win.poll_for_status_id + 1
+       config_win.poll_for_status(config_win.poll_for_status_id)
+
+
+
+class Configure_audio (Arco_window):
+    var poll_for_status_id
+
+    def init(title, x, y, w, h, varname, prefs, keyword color):
+        poll_for_status_id = 0
+        super.init(title, x, y, w, h, varname, prefs)
+//        config_win.add_target_method(this, 'win_handler')
+
+        Button(this, "Open Audio", 10, 10, 120, 'H', 
                'open_audio_button')
         open_audio_button.add_target_method(this, 'open_audio_handler')
 
-        Button(config_win, "Close Audio", 'R', 'S', 'S', 'H', 
+        Button(this, "Close Audio", 'R', 'S', 'S', 'H', 
                'close_audio_button')
         close_audio_button.add_target_method(this, 'close_audio_handler')
 
-        Button(config_win, "Rescan Audio", 'R', 'S', 'S', 'H', 
+        Button(this, "Rescan Audio", 'R', 'S', 'S', 'H', 
                'rescan_audio_button')
         rescan_audio_button.add_target_method(this, 'rescan_audio_handler')
 
-        Button(config_win, "Reset Audio", 'R', 'S', 'S', 'H', 
+        Button(this, "Reset Audio", 'R', 'S', 'S', 'H', 
                'reset_audio_button')
         reset_audio_button.add_target_method(this, 'reset_audio_handler')
 
-        Statictext(config_win, "Cpu Load:", 10, 'D', 110, 20, 'cpuloadst')
-        var y = wxs_y  // save y offset
-        Gauge(config_win, 100, 'R', y - 3, 120, 20, 'cpuloadgauge')
+        Statictext(this, "Cpu Load:", 10, 'D', 110, 20, 'cpuloadst')
+        y = wxs_y  // save y offset
+        Gauge(this, 100, 'R', y - 3, 120, 20, 'cpuloadgauge')
         wxs_w = 140  // give extra space before GC cycles
-        Statictext(config_win, "GC cycles: 0", 'R', y, 100, 20, 'gccyclesst')
-        Statictext(config_win, "Max Ugen ID: 0", 'R', y, 130, 20, 'maxugenst')
+        Statictext(this, "GC cycles: 0", 'R', y, 100, 20, 'gccyclesst')
+        Statictext(this, "Max Ugen ID: 0", 'R', y, 130, 20, 'maxugenst')
 
         wxs_compute_coordinates('S', 'D', 'S', 'S')  // compute Y below maxugens
         device_selections_y = wxs_y  // save coordinate for future layout
         create_device_selections()
-        config_win.fit_to_children()
+        display "Configure Audio fit to children"
+        fit_to_children()
+        start_poll_for_status()
 
 
-    def win_handler(obj, event, x, y):
-        if event == WXS_CLOSE_WINDOW:
-            config_win.delete()    // destroy the window and components
-            configure_audio = nil  // destroy reference to this object
-        wxs_event_not_handled()    // allow window to close
+    def poll_for_status(id):
+        if not varname or id != poll_for_status_id:
+            return  // quit this "process"
+        display "poll_for_status", gccyclesst, maxugenst
+        gccyclesst.set_string("GC cycles: " + str(gc_cycles()))
+        maxugenst.set_string("Max Ugen ID: " + str(max_ugen_id_used))
+        arco_get_cpu_load('show_cpu_load')
+        sched_cause(1.0, this, 'poll_for_status', id)
+
+
+//    def win_handler(obj, event, x, y):
+//        if event == WXS_CLOSE_WINDOW:
+//            config_win.delete()    // destroy the window and components
+//            configure_audio = nil  // destroy reference to this object
+//        wxs_event_not_handled()    // allow window to close
 
 
     def device_id(rb, attr):  // compute device id, given radio button
@@ -251,8 +288,8 @@ class Configure_audio:
             return
         saved_vtsched_bps = vtsched.bps
         vtsched.set_bps(STOPPED_BPS)
+        poll_for_status_id = poll_for_status_id + 1  // kill updates
         o2_send_cmd("/arco/close", 0, "")
-        poll_for_status_id = poll_for_status_id + 1
 
 
     def rescan_audio_handler(rest ignore):
@@ -308,7 +345,7 @@ class Audio_monitor:
 // we want to remember what input is selected:
 current_input = "Audio Input"
 
-class Monitor_audio:
+class Monitor_audio (Arco_window):
     var input_vu
     var output_vu
     var monitoring_input
@@ -319,14 +356,13 @@ class Monitor_audio:
     var scope_y
     var scope_h
 
-    def init():
+    def init(title, x, y, w, h, varname, prefs, keyword color):
         scope_x = 425
         scope_y = 5
         scope_h = 200 
         var left = 5
-        Window("Monitor Audio", 520, 400, 300, 30, 'mon_win')
-        mon_win.set_color(MONITOR_COLOR) // rgb(200, 200, 230)
-        mon_win.add_target_method(this, 'win_handler')
+        super.init(title, x, y, w, h, varname, prefs)
+//        mon_win.add_target_method(this, 'win_handler')
 
         var in_out_y = 45
 
@@ -351,14 +387,11 @@ class Monitor_audio:
             if fileinput_files:
                 for file in fileinput_files:
                     // only add files that actually exist:
-                    rslt = open(file, "rb")
-                    if rslt:
+                    if audio_file_exists(file):
                         var name = file
                         if len(name) > 28:
                             name = "..." + subseq(name, -25)
                         audioin_lb.append(name)
-                        rslt.close()
-            rslt = nil // just to be tidy
             audioin_lb.set_value(current_input)
             audioin_lb.add_target_method(this, 'audioin_select')
 
@@ -470,10 +503,10 @@ class Monitor_audio:
         master_scope = nil
 
 
-    def win_handler(obj, event, x, y):
-        if event == WXS_CLOSE_WINDOW:
-            monitor_audio.delete()  // destroy this object and window
-        wxs_event_not_handled()    // allow window to close
+//    def win_handler(obj, event, x, y):
+//        if event == WXS_CLOSE_WINDOW:
+//            delete()  // destroy this object and window
+//        wxs_event_not_handled()    // allow window to close
 
 
     def enable_scope(obj, event, x, y):
@@ -534,9 +567,9 @@ class Monitor_audio:
             return
         current_input = x
         if x == "Mute Input":
-            // we need a unique Zero object to provide input:
-            var silence = Zero()
-            input_ugen.set_alternate(silence)
+            // we need a unique Zero object to provide input because the
+            // system shared zero_ugen means "do not use alternate"
+            input_ugen.set_alternate(Zero())
             // The Zero will be freed when the input is unmuted.
         elif x == "Audio Input":
             input_ugen.set_alternate(zero_ugen)  // clears alternate input
@@ -545,10 +578,8 @@ class Monitor_audio:
             for name in fileinput_files:
                 if (len(name) <= 28 and name == x) or
                    (len(name) > 28 and subseq(name, -25) == subseq(x, -25)):
-                    var fileinput_player = fileplay(name, arco_input_chans,
-                                                    0, 0, false, true, true)
-                input_ugen.set_alternate(fileinput_player)
-                fileinput_player.go()
+                   simulate_input_from(name)
+                   return
 
 
     def scope_input_handler(obj, event, x, y):

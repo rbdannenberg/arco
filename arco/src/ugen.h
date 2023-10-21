@@ -155,6 +155,7 @@ class Ugen : public O2obj {
     void const_set(int chan, Sample x, const char *from);
 
     void send_action_id(int &action_id, int status = 0) {
+        if (action_id == 0) return;
         o2sm_send_start();
         o2sm_add_int32(action_id);
         o2sm_add_int32(status);

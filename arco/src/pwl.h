@@ -28,7 +28,7 @@ public:
         points.init(0);        // initially empty, so size = 0
     }
     
-    ~Pwl() { if (action_id) send_action_id(action_id); }
+    ~Pwl() { send_action_id(action_id); }
 
     const char *classname() { return Pwl_name; }
 
@@ -45,9 +45,7 @@ public:
                 if (next_point_index >= points.size()) {
                     seg_togo = INT_MAX;
                     seg_incr = 0.0f;
-                    if (action_id) {
-                        send_action_id(action_id);
-                    }
+                    send_action_id(action_id);
                 } else {
                     seg_togo = (int) points[next_point_index++];
                     final_value = points[next_point_index++];

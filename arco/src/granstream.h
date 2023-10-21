@@ -190,8 +190,7 @@ public:
         warning_block = 0;
         stop_request = false;
 
-        states.set_size(chans);
-        states.set_size(chans, false);
+        states.set_size(chans, false);  // no zero because of following loop:
         for (int i = 0; i < chans; i++) {
             states[i].init(dur, polyphony);
         }

@@ -6,13 +6,9 @@
  */
 
 #include <cmath>
-void test() { int x = std::ceil(1.2); }
 #include "arcougen.h"
-void test2() { int x = std::ceil(1.2); }
 #include "cmupv.h"
-void test3() { int x = std::ceil(1.2); }
 #include "resamp.h"
-void test4() { int x = std::ceil(1.2); }
 #include "pv.h"
 
 const char *Pv_name = "Pv";
