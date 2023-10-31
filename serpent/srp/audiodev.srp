@@ -246,11 +246,14 @@ class Configure_audio (Arco_window):
     def poll_for_status(id):
         if not varname or id != poll_for_status_id:
             return  // quit this "process"
-        display "poll_for_status", gccyclesst, maxugenst
+        // display "poll_for_status", gccyclesst, maxugenst
         gccyclesst.set_string("GC cycles: " + str(gc_cycles()))
         maxugenst.set_string("Max Ugen ID: " + str(max_ugen_id_used))
         arco_get_cpu_load('show_cpu_load')
-        sched_cause(1.0, this, 'poll_for_status', id)
+        // schedule relative to current time rather than virtual time because
+        // polling could be held up by a dialog box interaction or something:
+        sched_cause(absolute(sched_time_get() + 1.0), this, 'poll_for_status',
+                             id)
 
 
 //    def win_handler(obj, event, x, y):
@@ -304,7 +307,6 @@ class Configure_audio (Arco_window):
         reset_arco()
 
 ##################################################################
-
 
 // clipping light
 class Clip_light (Eventlight):
@@ -376,8 +378,9 @@ class Monitor_audio (Arco_window):
                                      left + 5, in_out_y + 26, 'input_vu_meter')
             audioin_monitor = Audio_monitor(inclip_light, input_vu_meter)
             input_vu = vu("/actl/inpks", 0.05)
-            input_vu.set('inp', input_ugen)
+            input_vu.set('input', input_ugen)
             input_vu.run()  // add to run_set to make it compute peaks
+            print "********* Created input VU meter ***********"
 
             # Audio Input Selection
             Listbox(mon_win, 'S', 'D', 250, 100, nil, 'audioin_lb')
@@ -435,8 +438,9 @@ class Monitor_audio (Arco_window):
                     left, in_out_y + 26, 'output_vu_meter')
             audioout_monitor = Audio_monitor(outclip_light, output_vu_meter)
             output_vu = vu("/actl/outpks", 0.05)
-            output_vu.set('inp', prev_output_ugen)
+            output_vu.set('input', prev_output_ugen)
             output_vu.run()  // add to run_set to make it compute peaks
+            print "********* Created output VU meter ***********"
 
         ## probe and scope to monitor input
         var probe_what, probe_name
@@ -483,7 +487,7 @@ class Monitor_audio (Arco_window):
 
 
     def delete():
-        mon_win.delete()
+        print "****** monitor_audio delete called **********"
         if audioin_monitor:
             audioin_monitor.delete()
             audioin_monitor = nil
@@ -491,16 +495,17 @@ class Monitor_audio (Arco_window):
             audioout_monitor.delete()
             audioout_monitor = nil
         if input_vu:
-            input_vu.set('inp', zero_ugen)  // disconnect from input
+            input_vu.set('input', zero_ugen)  // disconnect from input
             input_vu.unrun()                //      to stop it
         if output_vu:
-            output_vu.set('inp', zero_ugen)  // disconnect from prev_output
+            output_vu.set('input', zero_ugen)  // disconnect from prev_output
             output_vu.unrun()                //     to stop it
         test_tone(nil, nil, false, nil);
         audio_login(nil, nil, false, nil);
         audio_logout(nil, nil, false, nil);
         monitor_audio = nil  // remove global reference to this object
         master_scope = nil
+        super.delete()
 
 
 //    def win_handler(obj, event, x, y):
@@ -578,7 +583,7 @@ class Monitor_audio (Arco_window):
             for name in fileinput_files:
                 if (len(name) <= 28 and name == x) or
                    (len(name) > 28 and subseq(name, -25) == subseq(x, -25)):
-                   simulate_input_from(name)
+                   simulate_input_from_file(name)
                    return
 
 
@@ -595,7 +600,7 @@ class Monitor_audio (Arco_window):
         make_channel_selector(probe_what.chans)
         // new channel selector now selects channel 0, so tell oscilloscope:
         scope_channel_select(scope_channel_sp,  WXS_SPINCTRL_UPDATED, 0, nil)
-        master_probe.set('inp', probe_what)
+        master_probe.set('input', probe_what)
 
 
     def scope_channel_select(obj, event, x, y):

@@ -20,7 +20,7 @@ class Pizz (Instrument):
         instr_begin()
         mix = mix(2)
 
-        # launch some echos. Each recplayer will be restarted at random
+        # launch some echos. Each recplay(er) will be restarted at random
         # times until off; then we stop each one, keeping track with
         # count how many players are acive.
         sched_select(rtsched)  // for scheduling below
@@ -30,11 +30,11 @@ class Pizz (Instrument):
             var delay = i * delay_spread + random()  # spread out the delays
             // for the first pizz section, rates will be 3, 1.5, 0, -1.5:
             var rate = step_to_ratio(rate_origin + i * rate_slope)
-            var rp = recplayer(zero_ugen, 1, 1)
-            rp.set('speed', rate)
+            var rp = recplay(zero_ugen, 1, 1)
+            rp.set_speed(rate)
             rp.borrow(recplay)
-            mix.ins(mix_name(i), rp, pan_45(unif(0.3, 0.7), gain))
-            sched_cause(delay, 'echo', rp, rate)
+            mix.ins(mix_name(i), rp, pan_45(pr_unif(0.3, 0.7), gain))
+            sched_cause(delay, this, 'echo', rp, rate)
         sched_cause(dur, this, 'end_all')
         outgain = gain_control(mix, pizz_gain_sl)
         super.init("Pizz", outgain)
@@ -47,11 +47,12 @@ class Pizz (Instrument):
             rp.start(0)
             sched_cause(6.7 / rate + random(), this, 'echo', rp, rate)
 
+
     def end_all():
         display "stopping Pizz", count
         off = true
         if count > 0:
-            cause(3, 'end_all')
+            sched_cause(3, this, 'end_all')
         else:
             outgain.mute()
             constrained_ugen_finish(outgain)

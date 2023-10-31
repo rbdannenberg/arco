@@ -23,11 +23,11 @@ void arco_alpass_new(O2SM_HANDLER_ARGS)
     float maxdur = argv[5]->f;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp_ugen, input, "arco_alpass_new");
+    ANY_UGEN_FROM_ID(input_ugen, input, "arco_alpass_new");
     ANY_UGEN_FROM_ID(dur_ugen, dur, "arco_alpass_new");
     ANY_UGEN_FROM_ID(fb_ugen, fb, "arco_alpass_new");
 
-    new Alpass(id, chans, inp_ugen, dur_ugen, fb_ugen, maxdur);
+    new Alpass(id, chans, input_ugen, dur_ugen, fb_ugen, maxdur);
 }
 
 

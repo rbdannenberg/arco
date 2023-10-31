@@ -4,9 +4,9 @@
 # August 2023
 
 class Trig(Ugen):
-    def init(inp, reply_addr, window, threshold, pause):
+    def init(input, reply_addr, window, threshold, pause):
         super.init(create_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
-                   'inp', inp, 'reply_addr', reply_addr, 'window', window,
+                   'input', input, 'reply_addr', reply_addr, 'window', window,
                    'threshold', threshold, 'pause', pause)
 
     def set_window(window):
@@ -23,5 +23,5 @@ class Trig(Ugen):
                     id, reply_addr, threshold, runlen)
 
 
-def trig(inp, reply_addr, window, threshold, pause):
-    Trig(inp, reply_addr, window, threshold, pause)  # trig as a function
+def trig(input, reply_addr, window, threshold, pause):
+    Trig(input, reply_addr, window, threshold, pause)  # trig as a function

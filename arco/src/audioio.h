@@ -40,7 +40,7 @@ extern int aud_state;
 extern int aud_quit_request;
 
 extern int64_t arco_frames_done;
-extern int64_t arco_blocks_done;
+extern int arco_blocks_done;
 
 void audioio_initialize();
 void audioio_finish(Bridge_info *bridge);

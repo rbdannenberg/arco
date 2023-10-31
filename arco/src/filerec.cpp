@@ -40,19 +40,19 @@ void arco_filerec_new(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/filerec/repl_input int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/filerec/repl_input int32 id, int32 input_id;
  */
 void arco_filerec_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
     UGEN_FROM_ID(Filerec, filerec, id, "arco_filerec_repl_input");
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_filerec_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_filerec_repl_input");
 
-    filerec->repl_input(inp);
+    filerec->repl_input(input);
 }
 
 

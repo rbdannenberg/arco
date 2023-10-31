@@ -69,9 +69,9 @@ void Probe::real_run()
     }
  collect:
     while (next < BL) {
-        // copy the next frame from inp_samps. Since we claimed we have one
-        // channel, inp_stride will be zero and not helpful, so we need to
-        // use inp_len, a local variable computed above.
+        // copy the next frame from input_samps. Since we claimed we have one
+        // channel, input_stride will be zero and not helpful, so we need to
+        // use input_len, a local variable computed above.
         for (int c = channel_offset; c < channel_offset + channels; c++) {
             *sample_ptr++ = input_samps[next + input_len * c];
         }

@@ -64,7 +64,8 @@ def main():
 ui_initialized = false
 
 class Center_constraint (Simple_constraint):
-# constraint that adjusts overall gain for [left, right] that pans to center:
+# constraint that adjusts overall gain for [left, right] that pans to center.
+# converts slider value from dB to linear:
     def compute(): return pan_45(0.5, db_to_linear(x))
 
 
@@ -90,7 +91,6 @@ def arco_ready():
     air_mgr = Air_mgr()
     sep_cue = Sep_cue()
     trigger_mgr = Trigger_mgr(default_window, SHOWTRIG_X, SHOWTRIG_Y)
-    sep_cue = Sep_cue
     win.fit_to_children()
 
     // -------- input to output ----------
@@ -122,8 +122,9 @@ ugen_to_constraint = {}  // mapping from ugen to constraint
 def gain_control(input, slider, optional constraint):
 # multiply input by gain determined by slider; the result is
 # the multiplier that implements gain, so it represents the output
+    display "gain_control", input, slider, slider.val, constraint
     if not constraint:
-        constraint = Ident_constraint()
+        constraint = Db_constraint()
     constraint.connect(slider)
     var ugen = constraint.get_const()
     ugen_to_constraint[ugen] = constraint
@@ -213,6 +214,35 @@ CUE_END = 12       // K
 sep_cue_to_string = ["  ", "0", "A", "B", "C", "D", "E",
                      "F", "G", "H", "I", "J", "K"]
 
+cue_to_file_name = { CUE_START: "1-air.wav",
+                     CUE_POINTS: "2-points.wav",
+                     CUE_PIZZ: "3-pizz.wav" }
+
+class Cue_buttons:
+    def init(x, y):
+        Button(default_window, "0", x, y, 20, 20, 'cue_0_btn')
+        cue_0_btn.add_target_method(this, 'cue_0')
+        Button(default_window, "A", 'S', 'D', 'S', 'S', 'cue_a_btn')
+        cue_a_btn.add_target_method(this, 'cue_a')
+        Button(default_window, "B", 'S', 'D', 'S', 'S', 'cue_b_btn')
+        cue_b_btn.add_target_method(this, 'cue_b')
+        Button(default_window, "C", 'S', 'D', 'S', 'S', 'cue_c_btn')
+        cue_c_btn.add_target_method(this, 'cue_c')
+        Button(default_window, "D", 'S', 'D', 'S', 'S', 'cue_d_btn')
+        cue_d_btn.add_target_method(this, 'cue_d')
+
+    def cue_0(rest ignore):
+        print "cue_0"
+        sep_cue.set_cue_num(CUE_START)
+
+    def cue_a(rest ignore):
+        sep_cue.set_cue_num(CUE_POINTS)
+
+    def cue_b(rest ignore):
+        sep_cue.set_cue_num(CUE_PIZZ)
+
+
+
 class Sep_cue:
     var cue_num
     var advance_last_time
@@ -238,20 +268,41 @@ class Sep_cue:
         wxs_space = WXS_DEFAULT_SPACE
         advance_last_time = -10
         cue_num = 0
+        cue_buttons = Cue_buttons(x + 10, 7)
+
 
 
     def sep_skip(rest ignore):
-        cue_num = cue_num + 1;
-        print "**** sep_skip", cue_to_string(cue_num)
-        sepcue_text.set_string(cue_to_string(cue_num))
+        set_cue_num(cue_num + 1, "sep_skip")
 
 
     def sep_sim(rest ignore):
+    # "sim" means play a recording to simulate input. The recording corresponds
+    # to the current cue_num.
         print "**** sep_sim", cue_to_string(cue_num)
+        var file_name = cue_to_file_name.get(cue_num)
+        if file_name:
+            play_into_input_from(file_name)
+        else:
+            print "********* NO INPUT SIMULATION FILE FOR THIS CUE ************"
+
+
+    def set_cue_num(num, optional source = "set_cue_num"):
+        cue_num = num
+        sepcue_text.set_string(cue_to_string(cue_num))
+        print "****", source, "to", cue_to_string(cue_num)
+        // ------- these changes are installed regardless of how we get to the cue:
         if cue_num == CUE_START:
-            play_into_input_from("1-air.wav")
-        if cue_num == CUE_POINTS:
-            play_into_input_from("2-points.wav")
+            print "Setting up trigger for CUE_START cue"
+            trigger_mgr.enable()  // runs unit generator
+            trigger_mgr.start()   // enables "air" section
+        elif cue_num == CUE_POINTS:
+            points_obj = Points()
+        elif cue_num == CUE_PIZZ:
+            pizz_rec_obj = Pizz_rec()
+            pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5, 75)
+            pizz_instr.play()
+
 
     def sep_advance(rest ignore):
 //        print "*** sep_advance turning on trace ***"
@@ -262,16 +313,14 @@ class Sep_cue:
             print "**** sep_advance: TOO SOON, IGNORING THIS INPUT ****"
             return
         advance_last_time = rtsched.time
-        cue_num = cue_num + 1
+        set_cue_num(cue_num + 1, "sep_advance")
+
         if cue_num == CUE_START:
-            trigger_mgr.enable()  // runs unit generator
-            trigger_mgr.start()   // enables "air" section
+            nil
         elif cue_num == CUE_POINTS:
-            points_obj = Points()
+            nil
         elif cue_num == CUE_PIZZ:
-            pizz_rec_obj = Pizz_rec()
-            pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5, 75)
-            pizz_instr.play()
+            nil
         elif cue_num == CUE_MELO:
             melo_instr = Melo()
             melo_instr.play()
@@ -303,9 +352,8 @@ class Sep_cue:
             audio_server <- endit()
         else:
             simulator.cycles_control(false, true)
-            print "sep_advace: unknown cue"
-        print "**** sep_advance", cue_to_string(cue_num)
-        sepcue_text.set_string(cue_to_string(cue_num))
+            print "WARNING: sep_advace: unknown cue"
+
 
 
     def cue_to_string(n):

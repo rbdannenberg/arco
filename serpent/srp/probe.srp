@@ -3,18 +3,18 @@
 # Roger B. Dannenberg
 # May 2023
 
-def probe(inp, reply_addr)
-    Probe(inp, reply_addr)
+def probe(input, reply_addr)
+    Probe(input, reply_addr)
 
 
 
 class Probe (Ugen):
     var action_id
 
-    def init(inp, reply_addr):
+    def init(input, reply_addr):
         super.init(create_ugen_id(), "Probe", 0, '', "Us",
                    omit_chans = t,
-                   'inp', inp, 'reply_addr', reply_addr)
+                   'input', input, 'reply_addr', reply_addr)
 
     def probe(period, frames, chan, nchans, stride):
         o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,

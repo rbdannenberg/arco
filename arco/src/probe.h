@@ -7,7 +7,7 @@
    another object using a set_vector message. You can capture 
    every Nth sample using stride. 
 
-   Usage: Initialize with /arco/probe/new id chans inp_id reply_to, where
+   Usage: Initialize with /arco/probe/new id chans input_id reply_to, where
        reply_to is a full O2 address to receive messages consisting
        of probe id and zero to 64 floats.
 
@@ -134,6 +134,7 @@ class Probe : public Ugen {
 
 
     ~Probe() {
+        printf("~Probe destructor called, id %d; does nothing.\n", id);
     }
 
     const char *classname() { return Probe_name; }

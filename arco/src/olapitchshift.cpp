@@ -72,18 +72,18 @@ void arco_olaps_windur(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/olaps/repl_inp int32 id, int32 input_id;
+/* O2SM INTERFACE: /arco/olaps/repl_input int32 id, int32 input_id;
  */
-void arco_olaps_repl_inp(O2SM_HANDLER_ARGS)
+void arco_olaps_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Ola_pitch_shift, olaps, id, "arco_olaps_repl_inp");
-    ANY_UGEN_FROM_ID(input, input_id, "arco_olaps_repl_inp");
-    olaps->repl_inp(input);
+    UGEN_FROM_ID(Ola_pitch_shift, olaps, id, "arco_olaps_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_olaps_repl_input");
+    olaps->repl_input(input);
 }    
 
 
@@ -98,7 +98,7 @@ static void olaps_init()
                     true);
     o2sm_method_new("/arco/olaps/windur", "if", arco_olaps_windur, NULL, true,
                     true);
-    o2sm_method_new("/arco/olaps/repl_inp", "ii", arco_olaps_repl_inp, NULL,
+    o2sm_method_new("/arco/olaps/repl_input", "ii", arco_olaps_repl_input, NULL,
                     true, true);
     // END INTERFACE INITIALIZATION
 }

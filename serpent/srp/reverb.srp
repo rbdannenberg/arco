@@ -19,13 +19,13 @@ class Reverb (Instrument):
     var alpasses
     var out
 
-    def init(inp, rt60):
+    def init(input, rt60):
         combs = array(len(REVERB_COMBDELAY))
         alpasses = array(len(REVERB_ALPASSDELAY))
         instr_begin()
         var acomball = mix(1)
         for delay at i in REVERB_COMBDELAY:
-            combs[i] = delay(inp, delay,
+            combs[i] = delay(input, delay,
                              exp(-6.9087 * delay / (rt60 * REVERB_DECAY[i])),
                              delay + 0.001)
             acomball.ins(intern("comb" + str(i)), combs[i], 1.0)
@@ -39,9 +39,9 @@ class Reverb (Instrument):
         super.init("Reverb", out)
 
 
-    def set_inp(inp):
+    def set_input(input):
         for cb in combs:
-            cb.set('inp', inp)
+            cb.set('input', input)
         
 
     def set_rt60(rt60):
@@ -56,7 +56,7 @@ class Reverb (Instrument):
 
 
 
-def reverb(inp, rt60): return Reverb(inp, rt60)
+def reverb(input, rt60): return Reverb(input, rt60)
 
 
 class Stereo_reverb(Instrument):
@@ -69,18 +69,18 @@ class Stereo_reverb(Instrument):
 
     var left, right, mix
     
-    def init(inp, wet, rt60):
-        left = Reverb(inp, rt60)
-        right = Reverb(inp, rt60)
+    def init(input, wet, rt60):
+        left = Reverb(input, rt60)
+        right = Reverb(input, rt60)
         mix = mix(2)
         mix.ins('left', left, [wet, 0])
         mix.ins('right', right, [0, wet])
-        mix.ins('inp', inp, [1, 1])
+        mix.ins('input', input, [1, 1])
         super.init("Stereo_reverb",  mix)
 
-    def set_inp(inp):
-        left.set_inp(inp)
-        right.set_inp(inp)
+    def set_input(input):
+        left.set_input(input)
+        right.set_input(input)
 
     def set_rt60(rt60)
         left.set_rt60(rt60)

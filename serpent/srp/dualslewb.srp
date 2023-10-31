@@ -4,10 +4,10 @@
 # Oct 2023
 
 class Dualslewb(Ugen):
-    def init(chans, inp, attack, release, optional current = 0,
+    def init(chans, input, attack, release, optional current = 0,
              attack_linear = 1, release_linear = 1):
         super.init(create_ugen_id(), "Dualslewb", chans, 'a', "UUfffii",
-	           'inp', inp, 'attack', attack, 'release', release,
+	           'input', input, 'attack', attack, 'release', release,
                    'current', current, 'attack_linear', attack_linear,
                    'release_linear', release_linear)
 
@@ -22,6 +22,6 @@ class Dualslewb(Ugen):
                          id, release, release_linear)
 
 
-def dualslewb(inp, mode, optional chans = 1):
-    Dualslewb(chans, inp, mode)  # dualslewb as a function
+def dualslewb(input, mode, optional chans = 1):
+    Dualslewb(chans, input, mode)  # dualslewb as a function
 

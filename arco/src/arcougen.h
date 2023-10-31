@@ -2,6 +2,7 @@
 
 #include "o2internal.h"
 #include "sharedmemclient.h"
+#include <limits.h>
 #include "arcotypes.h"
 #include "arcoutil.h"
 #include "ugenid.h"

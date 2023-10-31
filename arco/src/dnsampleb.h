@@ -24,7 +24,7 @@ extern Dnsampleb_method dnsampleb_methods[];
     
 
 // Notes: -3dB cutoff frequencies are derived from:
-//    y = alpha * inp + one_minus_alpha * prev; prev = y;
+//    y = alpha * input + one_minus_alpha * prev; prev = y;
 //    where alpha = -k + sqrt(k*k + 2k), k = 1 - cos(cutoff),
 //          cutoff = 2*Pi*f/r, f = cutoff frequency, r = sample rate
 // For audio rate = AR = 44100, attenuation at the block-rate Nyquist
@@ -78,7 +78,7 @@ public:
     }
 
 
-    void repl_inp(Ugen_ptr input) {
+    void repl_input(Ugen_ptr input) {
         input->unref();
         init_input(input);
     }

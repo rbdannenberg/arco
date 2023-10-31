@@ -16,7 +16,7 @@ class Vu (Ugen):
         o2_send_cmd("/arco/vu/start", 0, "Usf", id, reply_addr, period)
 
     def set(input, value):  // patterned after Ugen.set()
-        // Note that the only thing you can set is 'inp'
-        inputs['inp'] = value
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
         display "Vu set", id, value.id
-        o2_send_cmd("/arco/vu/repl_inp", 0, "UU", id, value.id)
+        o2_send_cmd("/arco/vu/repl_input", 0, "UU", id, value.id)

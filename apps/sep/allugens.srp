@@ -99,28 +99,28 @@ class Vu (Ugen):
         o2_send_cmd("/arco/vu/start", 0, "Usf", id, reply_addr, period)
 
     def set(input, value):  // patterned after Ugen.set()
-        // Note that the only thing you can set is 'inp'
-        inputs['inp'] = value
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
         display "Vu set", id, value.id
-        o2_send_cmd("/arco/vu/repl_inp", 0, "UU", id, value.id)
+        o2_send_cmd("/arco/vu/repl_input", 0, "UU", id, value.id)
 
 # probe.srp -- stream audio from file
 #
 # Roger B. Dannenberg
 # May 2023
 
-def probe(inp, reply_addr)
-    Probe(inp, reply_addr)
+def probe(input, reply_addr)
+    Probe(input, reply_addr)
 
 
 
 class Probe (Ugen):
     var action_id
 
-    def init(inp, reply_addr):
+    def init(input, reply_addr):
         super.init(create_ugen_id(), "Probe", 0, '', "Us",
                    omit_chans = t,
-                   'inp', inp, 'reply_addr', reply_addr)
+                   'input', input, 'reply_addr', reply_addr)
 
     def probe(period, frames, chan, nchans, stride):
         o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
@@ -566,17 +566,17 @@ class Fileplay (Ugen):
 # Roger B. Dannenberg
 # May 2023
 
-def filerec(filename, inp, optional chans = 2)
-    Filerec(chans, filename, inp)
+def filerec(filename, input, optional chans = 2)
+    Filerec(chans, filename, input)
 
 
 
 class Filerec (Ugen):
     var action_id
 
-    def init(chans, filename, inp):
+    def init(chans, filename, input):
         super.init(create_ugen_id(), "Filerec", chans, '', "sU",
-                   'filename', filename, 'inp', inp)
+                   'filename', filename, 'input', input)
 
     def go(optional rec_flag = true):
         o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
@@ -640,13 +640,13 @@ def delay(inp, dur, fb, maxdur, optional chans = 1):
 # June 2023
 
 class Alpass (Ugen):
-    def init(chans, inp, dur, fb, maxdur):
+    def init(chans, input, dur, fb, maxdur):
         super.init(create_ugen_id(), "Alpass", chans, 'a', "UUUf",
-	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+	           'input', input, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
 
 
-def alpass(inp, dur, fb, maxdur, optional chans = 1):
-    Alpass(chans, inp, dur, fb, maxdur)  # alpass as a function
+def alpass(input, dur, fb, maxdur, optional chans = 1):
+    Alpass(chans, input, dur, fb, maxdur)  # alpass as a function
 
 
 
@@ -692,9 +692,9 @@ def feedback(input, from, gain, optional chans = 1):
 # August 2023
 
 class Trig(Ugen):
-    def init(inp, reply_addr, window, threshold, pause):
+    def init(input, reply_addr, window, threshold, pause):
         super.init(create_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
-                   'inp', inp, 'reply_addr', reply_addr, 'window', window,
+                   'input', input, 'reply_addr', reply_addr, 'window', window,
                    'threshold', threshold, 'pause', pause)
 
     def set_window(window):
@@ -711,8 +711,8 @@ class Trig(Ugen):
                     id, reply_addr, threshold, runlen)
 
 
-def trig(inp, reply_addr, window, threshold, pause):
-    Trig(inp, reply_addr, window, threshold, pause)  # trig as a function
+def trig(input, reply_addr, window, threshold, pause):
+    Trig(input, reply_addr, window, threshold, pause)  # trig as a function
 
 # dnsampleb.srp -- feedback dnsampleb unit generator
 #
@@ -720,9 +720,9 @@ def trig(inp, reply_addr, window, threshold, pause):
 # June 2023
 
 class Dnsampleb(Ugen):
-    def init(chans, inp, mode):
+    def init(chans, input, mode):
         super.init(create_ugen_id(), "Dnsampleb", chans, 'a', "UUf",
-	           'inp', inp, 'mode', mode)
+	           'input', input, 'mode', mode)
 
     def set_cutoff(hz):
         o2_send_cmd("/arco/dnsampleb/cutoff", 0, "Uf", id, hz)
@@ -731,8 +731,8 @@ class Dnsampleb(Ugen):
         o2_send_cmd("/arco/dnsampleb/mode", 0, "Ui", id, mode)
 
 
-def dnsampleb(inp, mode, optional chans = 1):
-    Dnsampleb(chans, inp, mode)  # dnsampleb as a function
+def dnsampleb(input, mode, optional chans = 1):
+    Dnsampleb(chans, input, mode)  # dnsampleb as a function
 
 DNSAMPLE_BASIC = 0
 DNSAMPLE_AVG = 1
@@ -748,10 +748,10 @@ DNSAMPLE_LOWPASS100 = 6
 # Oct 2023
 
 class Dualslewb(Ugen):
-    def init(chans, inp, attack, release, optional current = 0,
+    def init(chans, input, attack, release, optional current = 0,
              attack_linear = 1, release_linear = 1):
         super.init(create_ugen_id(), "Dualslewb", chans, 'a', "UUfffii",
-	           'inp', inp, 'attack', attack, 'release', release,
+	           'input', input, 'attack', attack, 'release', release,
                    'current', current, 'attack_linear', attack_linear,
                    'release_linear', release_linear)
 
@@ -766,8 +766,8 @@ class Dualslewb(Ugen):
                          id, release, release_linear)
 
 
-def dualslewb(inp, mode, optional chans = 1):
-    Dualslewb(chans, inp, mode)  # dualslewb as a function
+def dualslewb(input, mode, optional chans = 1):
+    Dualslewb(chans, input, mode)  # dualslewb as a function
 
 
 # thru.srp -- audio pass-through
@@ -777,22 +777,22 @@ def dualslewb(inp, mode, optional chans = 1):
 
 class Thru (Ugen):
 
-    def init(inp, optional chans = 1, id_num):
+    def init(input, optional chans = 1, id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Thru", chans, 'a', "U", 'inp', inp)
+                   "Thru", chans, 'a', "U", 'input', input)
 
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
 
-def thru(inp, optional chans = 1):
-    Thru(inp, chans)
+def thru(input, optional chans = 1):
+    Thru(input, chans)
 
 
-def fanout(inp, chans)
+def fanout(input, chans)
 # When thru is used for fanout, the preferred constructor is "fanout",
 # which requires the number of channels you are expanding to. You should
-# only use this if inp is mono.
-    Thru(inp, chans)
+# only use this if input is mono.
+    Thru(input, chans)
 # zero.srp -- audio zero
 #
 # Roger B. Dannenberg

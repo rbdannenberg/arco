@@ -12,15 +12,12 @@
 #include "sys/timeb.h"
 #include "pthread.h"
 #include "sndfile.h"
-#include "o2internal.h"  // need internal to offer bridge
 #include "o2atomic.h"
+#include "arcougen.h"
+#include "sharedmemclient.h"
 #include "sharedmem.h"
-#include "sharedmemclient.h"   // o2_shmem_inst_new()
-#include "arcotypes.h"
-#include "arcoutil.h"
 #include "audioio.h"
 #include "audioblock.h"
-#include "ugen.h"
 #include "fileio.h"
 
 #define D if (0)

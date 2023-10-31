@@ -10,7 +10,7 @@
 const char *Dualslewb_name = "Dualslewb";
 
 /* O2SM INTERFACE: /arco/dualslewb/new int32 id, int32 chans, 
-            int32 inp, float attack, float release, float current,
+            int32 input, float attack, float release, float current,
             int32 attack_linear, int32 release_linear;
  */
 void arco_dualslewb_new(O2SM_HANDLER_ARGS)
@@ -18,7 +18,7 @@ void arco_dualslewb_new(O2SM_HANDLER_ARGS)
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
-    int32_t inp = argv[2]->i;
+    int32_t input = argv[2]->i;
     float attack = argv[3]->f;
     float release = argv[4]->f;
     float current = argv[5]->f;
@@ -26,25 +26,25 @@ void arco_dualslewb_new(O2SM_HANDLER_ARGS)
     int32_t release_linear = argv[7]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp_ugen, inp, "arco_dualslewb_new");
+    ANY_UGEN_FROM_ID(input_ugen, input, "arco_dualslewb_new");
 
-    new Dualslewb(id, chans, inp_ugen, attack, release, current,
+    new Dualslewb(id, chans, input_ugen, attack, release, current,
                   attack_linear, release_linear);
 }
 
 
-/* O2SM INTERFACE: /arco/dualslewb/repl_inp int32 id, int32 inp_id;
+/* O2SM INTERFACE: /arco/dualslewb/repl_input int32 id, int32 input_id;
  */
-static void arco_dualslewb_repl_inp(O2SM_HANDLER_ARGS)
+static void arco_dualslewb_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Dualslewb, dualslewb, id, "arco_dualslewb_repl_inp");
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_dualslewb_repl_inp");
-    dualslewb->repl_inp(inp);
+    UGEN_FROM_ID(Dualslewb, dualslewb, id, "arco_dualslewb_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_dualslewb_repl_input");
+    dualslewb->repl_input(input);
 }
 
 
@@ -103,8 +103,8 @@ static void dualslewb_init()
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/dualslewb/new", "iiifffii", arco_dualslewb_new,
                     NULL, true, true);
-    o2sm_method_new("/arco/dualslewb/repl_inp", "ii", arco_dualslewb_repl_inp,
-                    NULL, true, true);
+    o2sm_method_new("/arco/dualslewb/repl_input", "ii",
+                    arco_dualslewb_repl_input, NULL, true, true);
     o2sm_method_new("/arco/dualslewb/attack", "ifi", arco_dualslewb_attack,
                     NULL, true, true);
     o2sm_method_new("/arco/dualslewb/release", "ifi", arco_dualslewb_release,

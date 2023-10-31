@@ -4,12 +4,7 @@
  * Dec 2021
  */
 
-#include "o2internal.h"
-#include "sharedmemclient.h"
-#include "arcoutil.h"
-#include "arcotypes.h"
-#include "ugenid.h"
-#include "ugen.h"
+#include "arcougen.h"
 #include "const.h"
 #include "audioio.h"
 
@@ -61,6 +56,8 @@ void Initializer::init()
 
 void Ugen::unref() {
     refcount--;
+    printf("Ugen::unref id %d %s new refcount %d\n",
+           id, classname(), refcount);
     if (refcount == 0) {
         delete this;
     }
@@ -137,8 +134,8 @@ void arco_free(O2SM_HANDLER_ARGS)
             if (ugen->flags & (IN_RUN_SET | IN_OUTPUT_SET)) {
                 aud_forget(id);
             }
-            // printf("arco_free %d (%s)\n", id, ugen->classname());
-           ugen->unref();
+            printf("arco_free %d (%s)\n", id, ugen->classname());
+            ugen->unref();
         }
     }
 }
@@ -165,7 +162,7 @@ Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation)
     Ugen_ptr ugen = ugen_table[id];
     if (!ugen) {
         arco_error("%s uninitialized id %d, ignored\n", operation, id);
-    } else if (classname && ugen->classname() != classname) {
+    } else if (classname && (ugen->classname() != classname)) {
         arco_error("%s id %d found a %s Ugen instead of %s, ignored\n",
                    operation, id, ugen->classname(), classname);
         ugen = NULL;

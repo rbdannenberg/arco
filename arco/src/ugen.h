@@ -58,7 +58,7 @@ class Ugen : public O2obj {
     int chans;
     Vec<Sample> output;
     Sample_ptr out_samps;  // pointer to actual sample memory
-    int64_t current_block;
+    int current_block;
 
     // to initialize a Ugen without installing in table, pass id = -1
     Ugen(int id, char ab, int nchans) {
@@ -100,7 +100,8 @@ class Ugen : public O2obj {
     }
 
     // subclasses should override to unref inputs
-    virtual ~Ugen() { /* printf("Ugen delete %d\n", id) */ ; }
+    virtual ~Ugen() {
+        printf("Ugen delete %d\n", id); }
 
     virtual const char *classname() = 0;
     
@@ -140,7 +141,7 @@ class Ugen : public O2obj {
     
     virtual void real_run() = 0;
 
-    virtual Sample_ptr run(int64_t block_count) {
+    virtual Sample_ptr run(int block_count) {
         Sample_ptr save_out_samps = out_samps;
         if (block_count > current_block) {
             current_block = block_count;
@@ -150,7 +151,7 @@ class Ugen : public O2obj {
         return save_out_samps;
     }
 
-    void set_current_block(int64_t n) { current_block = n; }
+    void set_current_block(int n) { current_block = n; }
 
     void const_set(int chan, Sample x, const char *from);
 

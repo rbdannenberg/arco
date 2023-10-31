@@ -15,22 +15,22 @@
 const char *Trig_name = "Trig";
 
 
-/* O2SM INTERFACE: /arco/trig/new int32 id, int32 inp_id, string reply_addr,
+/* O2SM INTERFACE: /arco/trig/new int32 id, int32 input_id, string reply_addr,
       int32 window_size, float threshold, float pause;
  */
 void arco_trig_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t inp_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     char *reply_addr = argv[2]->s;
     int32_t window_size = argv[3]->i;
     float threshold = argv[4]->f;
     float pause = argv[5]->f;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(inp, inp_id, "arco_trig_new");
-    new Trig(id, inp, reply_addr, window_size, threshold, pause);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_trig_new");
+    new Trig(id, input, reply_addr, window_size, threshold, pause);
 }
 
 

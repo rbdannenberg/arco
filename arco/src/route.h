@@ -55,7 +55,7 @@ public:
     }
 
 
-    void repl_inp(Ugen_ptr ugen) {
+    void repl_input(Ugen_ptr ugen) {
         input->unref();
         init_input(ugen);
     }

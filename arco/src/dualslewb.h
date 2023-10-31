@@ -29,11 +29,11 @@ public:
     Vec<Dualslewb_state> states;
     void (Dualslewb::*run_channel)(Dualslewb_state *state);
 
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
-    Dualslewb(int id, int nchans, Ugen_ptr inp_, float attack, float release,
+    Dualslewb(int id, int nchans, Ugen_ptr input_, float attack, float release,
             Sample current, bool attack_linear, bool release_linear) :
 	  Ugen(id, 'b', nchans) {
         set_attack(attack, attack_linear);
@@ -41,12 +41,12 @@ public:
         for (int i = 0; i < chans; i++) {
             set_current(current, i);
         }
-        inp = NULL;
-        init_inp(inp_);
+        input = NULL;
+        init_input(input_);
     }
 
     ~Dualslewb() {
-        inp->unref();
+        input->unref();
     }
 
     const char *classname() { return Dualslewb_name; }
@@ -85,17 +85,17 @@ public:
     }
 
     void print_sources(int indent, bool print_flag) {
-        inp->print_tree(indent, print_flag, "inp");
+        input->print_tree(indent, print_flag, "inp");
     }
 
-    void repl_inp(Ugen_ptr ugen) {
-        inp->unref();
-        init_inp(ugen);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
     }
 
-    void init_inp(Ugen_ptr ugen) {
+    void init_input(Ugen_ptr ugen) {
         if (ugen->rate == 'a') {
-            if (!inp) {
+            if (!input) {
                 ugen = ugen_table[ZEROB_ID];
                 arco_warn("Dualslewb does not allow audio-rate input. "
                           "Initializing input to zerob.");
@@ -105,27 +105,27 @@ public:
                 return;
             }
         }
-        init_param(ugen, inp, inp_stride);
+        init_param(ugen, input, input_stride);
     }
 
         
     void chan_b_b(Dualslewb_state *state) {
-        Sample inp = MAX(*inp_samps, 0) + BIAS;
+        Sample input = MAX(*input_samps, 0) + BIAS;
         Sample current = state->current;
-        if (inp > current) {  // slew up
+        if (input > current) {  // slew up
             if (attack_linear) {
                 current += attincr;
             } else {
                 current *= attincr;
             }
-            current = MIN(inp, current);
+            current = MIN(input, current);
         } else {
             if (attack_linear) {
                 current += reldecr;
             } else {
                 current *= reldecr;
             }
-            current = MAX(inp, current);
+            current = MAX(input, current);
         }
         state->current = current;
         *out_samps = current - BIAS;
@@ -133,12 +133,12 @@ public:
 
 
     void real_run() {
-        inp_samps = inp->run(current_block);
+        input_samps = input->run(current_block);
         Dualslewb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             chan_b_b(state);
             state++;
-            inp_samps += inp_stride;
+            input_samps += input_stride;
         }
     }
 };

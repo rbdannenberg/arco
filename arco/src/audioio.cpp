@@ -101,15 +101,11 @@ See doc/design.md
 #include <inttypes.h>
 #include "sndfile.h"
 #include "portaudio.h"
-#include "o2internal.h"
-#include "o2atomic.h"
-#include "sharedmem.h"
-#include "sharedmemclient.h"
 #include "prefs.h"
 #include "arcoinit.h"
-#include "arcotypes.h"
-#include "arcoutil.h"
-#include "ugen.h"
+#include "arcougen.h"
+#include "o2atomic.h"
+#include "sharedmem.h"
 #if defined(__APPLE__)
 #include "recperm.h"
 #endif
@@ -142,7 +138,7 @@ int aud_state = UNINITIALIZED;
 int aud_quit_request = false;  // request to o2sm_finish() at a clean spot
 bool aud_reset_request = false;
 int64_t aud_frames_done = 0;
-int64_t aud_blocks_done = 0;
+int aud_blocks_done = 0;
 bool aud_heartbeat = true;
 O2sm_info *audio_bridge = NULL;
 
@@ -740,7 +736,7 @@ static int pa_callback(const void *input, void *output,
     float *in = (float *) input;
     float *out = (float *) output;
     if (aud_heartbeat && aud_blocks_done && aud_blocks_done % 1000 == 0) {
-        printf("%" PRId64 " blocks\n", aud_blocks_done);
+        printf("%d blocks\n", aud_blocks_done);
     }
     if (status_flags) {
         // only report this once per 100 callbacks
@@ -1046,11 +1042,14 @@ static void arco_open(O2SM_HANDLER_ARGS)
     err = Pa_OpenStream(&audio_stream, input_params_ptr, output_params_ptr,
                         AR, actual_buffer_size, paClipOff | paDitherOff, 
                         pa_callback, NULL);
-    if (err != paNoError) goto done;
-    
-    aud_state = STARTING;
-    
-    // notify control service that audio is finally starting
+  done:
+    if (err != paNoError) {    // failure is indicated by both 
+        actual_in_chans = 0;   // actual_in_chans == 0 and 
+        actual_out_chans = 0;  // actual_out_chans == 0
+    } else {
+        aud_state = STARTING;
+    }
+    // notify control service that audio is finally starting (or failed)
     o2sm_send_start();
     strcpy(control_service_addr + control_service_addr_len, "starting");
     o2sm_add_int32(actual_in_id);
@@ -1061,13 +1060,13 @@ static void arco_open(O2SM_HANDLER_ARGS)
     o2sm_add_int32(actual_buffer_size);
     o2sm_send_finish(0.0, control_service_addr, true);
 
-    err = Pa_StartStream(audio_stream);
-    if (err != paNoError) {
+    if (err == paNoError &&
+        (err = Pa_StartStream(audio_stream)) != paNoError) {
         Pa_CloseStream(&audio_stream);  // ignore any close error
-        goto done;  // report the error starting the stream
+    } else {
+        arco_print("audioio open completed\n");
     }
-    arco_print("audioio open completed\n");
-done:
+
     arco_print("Requested input chans: %d\n", req_in_chans(in_chans));
     arco_print("Requested output chans: %d\n", req_out_chans(out_chans));
     arco_print("Actual device input chans: %d\n", actual_in_chans);

@@ -110,7 +110,7 @@ public:
         fb->print_tree(indent, print_flag, "fb");
     }
 
-    void repl_inp(Ugen_ptr ugen) {
+    void repl_input(Ugen_ptr ugen) {
         input->unref();
         init_input(ugen);
         update_run_channel();

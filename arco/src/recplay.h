@@ -178,7 +178,7 @@ public:
         gain->print_tree(indent, print_flag, "gain");
     }
 
-    void repl_inp(Ugen_ptr ugen) {
+    void repl_input(Ugen_ptr ugen) {
         input->unref();
         init_input(ugen);
     }

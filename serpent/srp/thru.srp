@@ -5,19 +5,19 @@
 
 class Thru (Ugen):
 
-    def init(inp, optional chans = 1, id_num):
+    def init(input, optional chans = 1, id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Thru", chans, 'a', "U", 'inp', inp)
+                   "Thru", chans, 'a', "U", 'input', input)
 
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
 
-def thru(inp, optional chans = 1):
-    Thru(inp, chans)
+def thru(input, optional chans = 1):
+    Thru(input, chans)
 
 
-def fanout(inp, chans)
+def fanout(input, chans)
 # When thru is used for fanout, the preferred constructor is "fanout",
 # which requires the number of channels you are expanding to. You should
-# only use this if inp is mono.
-    Thru(inp, chans)
+# only use this if input is mono.
+    Thru(input, chans)

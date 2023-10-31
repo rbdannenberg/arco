@@ -61,7 +61,7 @@ public:
             Ugen(id, 'a', nchans) {
         x1 = x1_;
         x2 = x2_;
-        states.set_size(chans);
+        states.set_size(chans);  // fill with zeros
 
         init_x1(x1);
         init_x2(x2);

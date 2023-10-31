@@ -57,13 +57,17 @@ saved_vtsched_bps = 1.0  // default "tempo"
 #    'initializing': waiting for Arco to reset, will open audio
 #        Action: reset_arco_handler() sends to /arco/reset
 #        -> 'devinf' when receive /actl/reset
-#    'devinf': waiting for device info, will open audio
+#    'devinf': waiting for device info, will normally open audio
 #        Action: actl_reset() sends to /arco/devinf, open_audio_handler()
 #                is called when last devinf message is received
 #        -> 'opening' when open_audio_handler() calls arco_open()
-#        -> 'stopped' when open_audio_handler() has nothing to open
+#        -> 'stopped' when device in prefs is not found or if in the previous
+#                time the program opened, no audio was opened -- maybe it
+#                crashed, so let's stop and let the user see what was in
+#                prferences, see other devices, and proceed manually
 #    'opening': waiting for Arco audio streaming to start
 #        Action: call arco_open(), sends /arco/open
+#        -> 'stopped' when /actl/starting called with 0 in and 0 out chans
 #        -> 'running' when /actl/starting called
 #    'running': computing and streaming audio
 #        Action: actl_starting()
@@ -102,7 +106,7 @@ arco_allowed_state_transitions = {  // maps new state to allowed current states
     'devinf': 'initializing',
     'opening': ['devinf', 'stopped'],
     'running': 'opening',
-    'stopped': ['opening', 'running', 'devinf2'],
+    'stopped': ['opening', 'running', 'devinf', 'devinf2'],
     'devinf2': ['initializing2', 'stopped'],
     'initializing2': 'stopped'}
 
@@ -244,7 +248,7 @@ class Arco_window (Window):
     def set_prefs(p):
         if not varname:
             print "WARNING: Arco_window.set_prefs expected varname to be set"
-        else:
+        elif p:
             prefs = p
             var rect = prefs.get(varname)
             display "Arco_window got prefs", varname, rect
@@ -357,6 +361,9 @@ def actl_devinf(timestamp, address, types, info):
                 print "************** WRONG!!! FIX ME!! *******************"
                 sched_select(rtsched)
                 sched_cause(0.05, nil, 'auto_open_audio')
+            else:
+                print "No automatic open, switching to 'stopped' state"
+                set_arco_state('stopped')  // did not try to open yet
             return
         // else user just asked to rescan devices (state is 'devinf2'):
         set_arco_state('stopped')
@@ -460,6 +467,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     sched_cause(0.1, nil, 'poll_for_arco')
     if IS_WXSERPENT:
         audiodev_init()
+
 
 def arco_run():
     sched_poll_function = 'arco_thread_poll'
@@ -576,6 +584,8 @@ def actl_reset(rest ignore):
     create_standard_ugens()  // restore basic ugens
     audio_devices.clear()
     o2_send_cmd("/arco/devinf", 0, "s", "/actl/devinf")
+    arco_ready()
+
 
 
 def create_standard_ugens():
@@ -602,25 +612,35 @@ def poll_for_arco():
         reset_arco()
 
 
+// This should be created at most one time:
+monitor_audio_manager = nil
+
+
 # this is an O2 message handler for message sent by audio thread
 # when the audio stream is started:
 #
 def actl_starting(timestamp, address, types, rest args):
     vtsched.set_bps(saved_vtsched_bps)  // continue advancing time
-    print "Audio stream is starting: in", args[0], "("; args[2], "chan),",
-    print "out", args[1], "("; args[3], "chan),", "latency", args[4], 
+    var in_chans = args[2]
+    var out_chans = args[3]
+    print "Audio stream is starting: in", args[0], "("; in_chans, "chan),",
+    print "out", args[1], "("; out_chans, "chan),", "latency", args[4], 
     print "ms, block size", args[5]
     display "actl_starting", arco_state
+    if in_chans == 0 and out_chans == 0:
+        print "WARNING: failed to open audio device"
+        set_arco_state('stopped')
+        return;
     if not set_arco_state('running'):
         return
     prefs.set('audio_open_success', true, true)  // audio did not crash
-    arco_ready()
 
     // delayed until now when we have audio input and output
-    monitor_audio_manager = Window_manager("Monitor Audio",
-            520, 400, 300, 30, 'mon_win', 'Monitor_audio',
-            color = MONITOR_COLOR, prefs = prefs,
-            help_string = "open a window to monitor and control audio")
+    if not monitor_audio_manager:
+        monitor_audio_manager = Window_manager("Monitor Audio",
+                520, 400, 300, 30, 'mon_win', 'Monitor_audio',
+                color = MONITOR_COLOR, prefs = prefs,
+                help_string = "open a window to monitor and control audio")
         
     sched_select(rtsched)
     start_poll_for_status()
@@ -709,6 +729,11 @@ class Ugen:
             // print inputs_[i], inp.id,
         o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
         // print
+
+
+    def to_str():
+        "<" + str(classname) + " Ugen, id " +
+        str(arco_ugen_id(id) if id else nil) + " chans " + str(chans) + ">"
 
 
     def play(optional quiet):  # connect this Ugen to audio output

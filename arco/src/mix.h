@@ -106,9 +106,11 @@ public:
                 gain_ugen->unref();
                 init_param(new Const(-1, 1, gain), input_desc->gain,
                            input_desc->gain_stride);
-                input_desc->prev_gain.set_size(input_desc->input->chans,
-                    // zero prev_gain if number of channels changes:
-                    input_desc->input->chans != input_desc->prev_gain.size());
+                input_desc->prev_gain.set_size(input_desc->input->chans, true);
+                // zero prev_gain if number of channels changes:
+                if (input_desc->input->chans != input_desc->prev_gain.size()) {
+                    input_desc->prev_gain.zero();
+                }
             } else {
                 printf("WARNING: In Mix::set_gain, current gain is not Const"
                        " and chan to set is not zero, mix %d, name %s,"
@@ -131,9 +133,11 @@ public:
             input_desc->gain->unref();
             init_param(gain, input_desc->gain, input_desc->gain_stride);
             int new_chans = MAX(input_desc->input->chans, gain->chans);
-            input_desc->prev_gain.set_size(new_chans,
-                    // reinit. gains to zero if mismatch in gain channel count:
-                    new_chans != input_desc->prev_gain.size());
+            input_desc->prev_gain.set_size(new_chans, true);
+            // zero prev_gain if number of channels changes:
+            if (input_desc->input->chans != input_desc->prev_gain.size()) {
+                input_desc->prev_gain.zero();
+            }
         }
     }
 

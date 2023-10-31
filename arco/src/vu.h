@@ -23,6 +23,7 @@ public:
 
     // setting output type to 0 because there is no output. chans is ignored.
     Vu(int id, int chans, char *reply_addr, float period) : Ugen(id, 0, 0) {
+        printf("Vu constructor id %d classname %s\n", id, classname());
         vu_reply_addr = NULL;
         input = NULL;
         running = false;
@@ -32,21 +33,24 @@ public:
     }
 
     ~Vu() {
+        printf("~Vu called. id %d input->id %d\n", id, input->id);
         if (input) {
             input->unref();
         }
         if (vu_reply_addr) {
             O2_FREE(vu_reply_addr);
         }
-        running = false;  // just in case run_set still has a reference
     }
 
     
-    const char *classname() { return Vu_name; }
+    const char *classname() {
+        return Vu_name;
+    }
 
     
     void print_details(int indent) {
-        arco_print("running %s window %d", running, peak_window);
+        arco_print("running %s window %d",
+                   (running ? "true" : "false"), peak_window);
     }
     
     

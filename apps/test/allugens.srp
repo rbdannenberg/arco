@@ -16,28 +16,28 @@ class Vu (Ugen):
         o2_send_cmd("/arco/vu/start", 0, "Usf", id, reply_addr, period)
 
     def set(input, value):  // patterned after Ugen.set()
-        // Note that the only thing you can set is 'inp'
-        inputs['inp'] = value
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
         display "Vu set", id, value.id
-        o2_send_cmd("/arco/vu/repl_inp", 0, "UU", id, value.id)
+        o2_send_cmd("/arco/vu/repl_input", 0, "UU", id, value.id)
 
 # probe.srp -- stream audio from file
 #
 # Roger B. Dannenberg
 # May 2023
 
-def probe(inp, reply_addr)
-    Probe(inp, reply_addr)
+def probe(input, reply_addr)
+    Probe(input, reply_addr)
 
 
 
 class Probe (Ugen):
     var action_id
 
-    def init(inp, reply_addr):
+    def init(input, reply_addr):
         super.init(create_ugen_id(), "Probe", 0, '', "Us",
                    omit_chans = t,
-                   'inp', inp, 'reply_addr', reply_addr)
+                   'input', input, 'reply_addr', reply_addr)
 
     def probe(period, frames, chan, nchans, stride):
         o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
@@ -483,17 +483,17 @@ class Fileplay (Ugen):
 # Roger B. Dannenberg
 # May 2023
 
-def filerec(filename, inp, optional chans = 2)
-    Filerec(chans, filename, inp)
+def filerec(filename, input, optional chans = 2)
+    Filerec(chans, filename, input)
 
 
 
 class Filerec (Ugen):
     var action_id
 
-    def init(chans, filename, inp):
+    def init(chans, filename, input):
         super.init(create_ugen_id(), "Filerec", chans, '', "sU",
-                   'filename', filename, 'inp', inp)
+                   'filename', filename, 'input', input)
 
     def go(optional rec_flag = true):
         o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
@@ -557,13 +557,13 @@ def delay(inp, dur, fb, maxdur, optional chans = 1):
 # June 2023
 
 class Alpass (Ugen):
-    def init(chans, inp, dur, fb, maxdur):
+    def init(chans, input, dur, fb, maxdur):
         super.init(create_ugen_id(), "Alpass", chans, 'a', "UUUf",
-	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+	           'input', input, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
 
 
-def alpass(inp, dur, fb, maxdur, optional chans = 1):
-    Alpass(chans, inp, dur, fb, maxdur)  # alpass as a function
+def alpass(input, dur, fb, maxdur, optional chans = 1):
+    Alpass(chans, input, dur, fb, maxdur)  # alpass as a function
 
 
 
@@ -718,14 +718,14 @@ def pv(input, ratio, fftsize, hopsize, points, mode, optional chans = 1):
 # August 2023
 
 class Yin(Ugen):
-    def init(chans, inp, minstep, maxstep, hopsize, address):
-        super.init(create_ugen_id(), "Yin", chans, 'a', "Uiiis", 'inp', inp,
+    def init(chans, input, minstep, maxstep, hopsize, address):
+        super.init(create_ugen_id(), "Yin", chans, 'a', "Uiiis", 'inpur', input,
                    'minstep', minstep, 'maxstep', maxstep, 'hopsize', hopsize,
                    'address', address)
 
 
-def yin(inp, minstep, maxstep, hopsize, address, optional chans = 1):
-    Yin(chans, inp, minstep, maxstep, hopsize, address)  # yin as a function
+def yin(input, minstep, maxstep, hopsize, address, optional chans = 1):
+    Yin(chans, input, minstep, maxstep, hopsize, address)  # yin as a function
 
 # trig.srp -- sound event detection
 #
@@ -733,9 +733,9 @@ def yin(inp, minstep, maxstep, hopsize, address, optional chans = 1):
 # August 2023
 
 class Trig(Ugen):
-    def init(inp, reply_addr, window, threshold, pause):
+    def init(input, reply_addr, window, threshold, pause):
         super.init(create_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
-                   'inp', inp, 'reply_addr', reply_addr, 'window', window,
+                   'input', input, 'reply_addr', reply_addr, 'window', window,
                    'threshold', threshold, 'pause', pause)
 
     def set_window(window):
@@ -752,8 +752,8 @@ class Trig(Ugen):
                     id, reply_addr, threshold, runlen)
 
 
-def trig(inp, reply_addr, window, threshold, pause):
-    Trig(inp, reply_addr, window, threshold, pause)  # trig as a function
+def trig(input, reply_addr, window, threshold, pause):
+    Trig(input, reply_addr, window, threshold, pause)  # trig as a function
 
 # thru.srp -- audio pass-through
 #
@@ -762,22 +762,22 @@ def trig(inp, reply_addr, window, threshold, pause):
 
 class Thru (Ugen):
 
-    def init(inp, optional chans = 1, id_num):
+    def init(input, optional chans = 1, id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Thru", chans, 'a', "U", 'inp', inp)
+                   "Thru", chans, 'a', "U", 'input', input)
 
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
 
-def thru(inp, optional chans = 1):
-    Thru(inp, chans)
+def thru(input, optional chans = 1):
+    Thru(input, chans)
 
 
-def fanout(inp, chans)
+def fanout(input, chans)
 # When thru is used for fanout, the preferred constructor is "fanout",
 # which requires the number of channels you are expanding to. You should
-# only use this if inp is mono.
-    Thru(inp, chans)
+# only use this if input is mono.
+    Thru(input, chans)
 # zero.srp -- audio zero
 #
 # Roger B. Dannenberg

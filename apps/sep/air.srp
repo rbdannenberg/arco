@@ -40,6 +40,7 @@ class Air_mgr:
             air_rp = recplay(input_ugen, 1, 1, 2)  // chans, gain, fade_time
             air_rp.run()
             air_rp.record(t)
+            print "air_rp.record(t) -- started recording first gesture"
 
             airmix = Mix(2)
             for tran at i in AIR_TRANS:

@@ -113,11 +113,11 @@ class Ringbuf : public Vec<Sample> {
     // the queue does not change.
         int old_len = length;
         int fifo_len = get_fifo_len();
-        int n = length - old_len;  // how much did we grow?
         if (len >= length) {  // we need at least len + 1
             set_size(vec_len(len));
             mask = size() - 1;
         }
+        int n = length - old_len;  // how much did we grow?
         if (len > fifo_len) {
             // now queue looks like [tuvwxT...Hpqrs?????], where Hpqrs is
             // the head of the queue and tuvwxT is the tail. We want to

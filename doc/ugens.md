@@ -172,7 +172,7 @@ printed.
 
 ### ugen.get(name)
 Unit generators have named inputs. E.g. the `alpass` ugen has
-inputs named `'inp'`, `'dur'`, and `'fb'`. You can retrieve the
+inputs named `'input'`, `'dur'`, and `'fb'`. You can retrieve the
 input with this method. Note that for c-rate (`Const`) inputs, this
 method will return the Const object, not the constant value(s).
 
@@ -212,10 +212,10 @@ In each section, Serpent constructor and methods are listed in
 
 ### alpass
 ```
-alpass(inp, dur, fb, maxdur [, chans])
+alpass(input, dur, fb, maxdur [, chans])
 ```
 
-`/arco/alpass/new id chans inp dur fb maxdur` - Create a new alpass
+`/arco/alpass/new id chans input dur fb maxdur` - Create a new alpass
 unit generator with audio input and output. All channels have the same
 maximum duration (`maxdur`), but each channel can have a different
 delay (`dur`) and feedback (`fb`). `id` is the object id. This is
@@ -262,10 +262,10 @@ least one float (channel) is required.
 
 ### delay
 ```
-delay(inp, dur, fb, maxdur [, chans])
+delay(input, dur, fb, maxdur [, chans])
 ```
 
-`/arco/delay/new id chans inp dur fb maxdur` - Create a new feedback
+`/arco/delay/new id chans input dur fb maxdur` - Create a new feedback
 delay generator with audio input and output. All channels have the
 same maximum duration (`maxdur`), but each channel can have a
 different delay (`dur`) and feedback (`fb`). `id` is the object id.
@@ -274,7 +274,7 @@ different delay (`dur`) and feedback (`fb`). `id` is the object id.
 duration of `dur`.
 
 `/arco/delay/repl_dur id dur_id` - Set input to object with
-id `inp_id`.
+id `input_id`.
 
 `/arco/delay/repl_dur id dur_id` - Set duration input to object with
 id `dur_id`.
@@ -287,11 +287,11 @@ id `dur_id`.
 
 ### dualslewb
 ```
-dualslewb(inp, attack, [, decay] [, attack_linear] [, release_linear]
+dualslewb(input, attack, [, decay] [, attack_linear] [, release_linear]
           [, chans])
 ```
 
-`/arco/dualslewb/new id chans inp attack release attack_linear`
+`/arco/dualslewb/new id chans input attack release attack_linear`
 `    release_linear` - create a slew-rate limiter that smooths the
 input by limiting the slope. There are separate parameters for upward
 and downward slopes, specified by attack (time in seconds) and
@@ -311,20 +311,20 @@ to be zero and output is strictly non-negative.
 
 ### feedback
 ```
-feedback(inp, from, gain [, chans])
+feedback(input, from, gain [, chans])
 ```
 
-`/arco/feedback/new id chans inp from gain` - Create a cycle in the
+`/arco/feedback/new id chans input from gain` - Create a cycle in the
 graph of unit generators. Output from the unit generator specified
 by `from` (an id for another ugen) will be scaled by `gain` and mixed
-with `inp` to form the output. The signal from `from` will be delayed
+with `input` to form the output. The signal from `from` will be delayed
 by one block (default size is 32 samples) because up-to-date output
 from `from` may depend on our output, creating a circular dependency.
 
 The detailed operation is this: A buffer is initialized to zero. To
-compute output from this feedback ugen, both `inp` and `gain`, but
+compute output from this feedback ugen, both `input` and `gain`, but
 not `from`, are updated so they hold current values. The buffer is
-scaled by `gain` and added to the input (`inp`) to form the output.
+scaled by `gain` and added to the input (`input`) to form the output.
 Then, `from` is updated to hold current values (it may in fact
 depend directly or indirectly on our output, which is now up-to-date).
 The output of `from` is copied to our buffer to prepare for the next
@@ -396,16 +396,16 @@ when file playback completes (or reaches `end`).
 
 ##filerec
 ```
-filerec(filename, inp [, chans])
+filerec(filename, input [, chans])
 .go(rec_flag)
 .stop()
 ```
 
 The filerec unit generator writes its input to a file.
 
-`/arco/filerec/new id chans filename inp` - Create an audiofile writer
+`/arco/filerec/new id chans filename input` - Create an audiofile writer
 that writes `chans` channels to `filename`. The source of audio is
-`inp`.
+`input`.
 
 `/arco/filerec/repl_input id input_id` - Set the input to the object
 with id `input_id`.
@@ -491,7 +491,7 @@ int32).
 ### granstream
 
 ```
-granstream(inp, polyphony, dur, enable [, chans])
+granstream(input, polyphony, dur, enable [, chans])
 .set_gain(gain)
 .set_dur(dur)
 .set_polyphony(p)
@@ -504,10 +504,10 @@ granstream(inp, polyphony, dur, enable [, chans])
 .set_feedback(feedback)
 ```
 
-`/arco/granstream/new id chans inp polyphony dur enable` - Create a
+`/arco/granstream/new id chans input polyphony dur enable` - Create a
 new granular synthesis from input audio unit generator with the given
 `id` number and `chans` channels. The input is initially given by
-`inp` and each output channel will be the sum of `polyphony`
+`input` and each output channel will be the sum of `polyphony`
 independently generated grain sequences. Grains are taken from recent
 input with a buffer length of `dur` seconds, and grains are produced
 when `enable` (Boolean) is true. Each grain is written to a different
@@ -675,13 +675,13 @@ The `multb` messages begin with `/arco/multb` and output is b-rate.
 ### olapitchshift
 
 ```
-olapitchshift(inp, ratio, xfade, windur [, chans])
+olapitchshift(input, ratio, xfade, windur [, chans])
 .set_ratio(value)
 ```
 
-`/arco/olaps/new id chans inp ratio xfade windur` - Create a new
+`/arco/olaps/new id chans input ratio xfade windur` - Create a new
 overlap-add pitch shifter with id given by `id`, `chans` channels, and
-input with id `inp`, a pitch shift ratio of `ratio`, a cross-fade time
+input with id `input`, a pitch shift ratio of `ratio`, a cross-fade time
 of `xfade`, and a window size of `windur`. The algorithm constructs
 grains from the input of duration `windur` and resampled by `ratio`
 using linear interpolation, and which overlap by `xfade`, with linear
@@ -705,7 +705,7 @@ with id `input_id`.
 
 ## probe
 ```
-probe(inp, reply_addr)
+probe(input, reply_addr)
 .probe(period, frames, chan, nchans, stride)
 .thrsh(threshold, direction, max_wait)
 .stop()
@@ -781,7 +781,7 @@ samples (up to 64 of them).
 ## pv
 
 ```
-pv(inp, ratio, fftsize, hopsize, points, mode [, chans])
+pv(input, ratio, fftsize, hopsize, points, mode [, chans])
 .set_ratio(value)
 .set_stretch(value)
 ```
@@ -801,9 +801,9 @@ sound faster than real time. However, you can obtain samples from
 work, it is imperative that the only consumer of samples is a `pv`
 unit generator.
 
-`/arco/pv/new id chans inp ratio fftsize hopsize points mode` - Create
+`/arco/pv/new id chans input ratio fftsize hopsize points mode` - Create
 a phase vocoder unit generator with `chans` channels and input
-`inp`. All channels use the same control parameters so processing is
+`input`. All channels use the same control parameters so processing is
 synchronous across all channels. Pitch is shifted by `ratio` (use a
 ratio greater than 1.0 to shift higher). The `fftsize` should be a
 power of 2. 2048 is a good choice. The `hopsize` refers to the overlap
@@ -900,7 +900,7 @@ except the address begins with `/arco/pwlb/`.
 
 ### recplay
 ```
-recplay(inp, [chans], [gain], [fade_time], [loop])
+recplay(input, [chans], [gain], [fade_time], [loop])
 .record(record_flag)
 .start(start_time)
 .stop()
@@ -912,7 +912,7 @@ recplay(inp, [chans], [gain], [fade_time], [loop])
 back. It applies a smooth envelope when the playback starts and stops,
 and it can automatically loop the recorded sound.
 
-`/arco/recplay/new id chans inp_id gain_id fade loop` - Create a
+`/arco/recplay/new id chans input_id gain_id fade loop` - Create a
 `recplay` ugen. `chans` is the number of channels recorded and played
 (the channels are all synchronous). `gain_id` is normally a c-rate
 ugen. Each channel has independent gain, but gain must be c-rate or
@@ -962,7 +962,7 @@ reference.
 
 ### reson
 ```
-reson(inp, center, q [, chans])
+reson(input, center, q [, chans])
 ```
 
 `/arco/reson/new id chans center bandwidth` - Create a new reson filter
@@ -1061,9 +1061,9 @@ smoothly.)
 
 ### thru, fanout
 ```
-Thru(inp [, chans] [, id_num])
-thru(inp [, chans])
-fanout(inp, chans)
+Thru(input [, chans] [, id_num])
+thru(input [, chans])
+fanout(input, chans)
 .set_alternate(alt)
 ```
 
@@ -1078,14 +1078,14 @@ that if you play n channels which is fewer than exist in the output,
 only the first n output channels will receive a signal.)
 
 Thru objects are also used for audio input (the audio input is written
-directly into the thru object's outputs and `inp_id` is ignored) and
+directly into the thru object's outputs and `input_id` is ignored) and
 to make the audio output available with a one-block delay (after
 computing the output, it is written to the thru object's outputs and
-`inp_id` is ignored.) These special thru objects have index `INPUT_ID`
+`input_id` is ignored.) These special thru objects have index `INPUT_ID`
 (= 2) and `PREV_OUTPUT_ID` (= 3).
 
-`/arco/thru/new id chans inp_id` - Create a pass-through object with
-input `inp_id`. Audio is copied from `inp_id` to the output without
+`/arco/thru/new id chans input_id` - Create a pass-through object with
+input `input_id`. Audio is copied from `input_id` to the output without
 modification except that 1-channel inputs are expanded to `chans`.
 
 `/arco/thru/alt id alt_id` - When a unit generator requests output
@@ -1100,8 +1100,8 @@ to be redirected to obtain input from a file or test signal.
 
 ## trig
 ```
-trig(inp, reply_addr, window, threshold, pause)
-.set('inp', ugen)
+trig(input, reply_addr, window, threshold, pause)
+.set('input', ugen)
 .set_window(window)
 .set_threshold(threshold)
 .set_pause(pause)
@@ -1111,8 +1111,8 @@ trig(inp, reply_addr, window, threshold, pause)
 The `trig` unit generator detects audio onsets and the presence of
 audio.
 
-`/arco/trig/new id repl_addr inp window threshold pause` - Create
-`trig` object which takes input from `inp` and computes RMS in 50%
+`/arco/trig/new id repl_addr input window threshold pause` - Create
+`trig` object which takes input from `input` and computes RMS in 50%
 overlapping frames with square windows. The frame size is `window` (in
 samples, rounded up to a  multiple of BL). It the input is
 multi-channel, the channels are summed before taking the RMS. When the
@@ -1157,7 +1157,7 @@ representing a complete O2 address). No messages are sent until input
 is set with `repl_input`.
 
 `/arco/vu/repl_input id input_id` - Set the input to be analyzed to
-`inp_id`. If `inp_id` names a unit generator of class Zero, analysis
+`input_id`. If `input_id` names a unit generator of class Zero, analysis
 is stopped; otherwise, processing will start or resume, sending a peak
 every period.
 
@@ -1166,15 +1166,15 @@ every period.
 
 ## yin
 ```
-yin(inp, minstep, maxstep, hopsize, address, [chans]))
+yin(input, minstep, maxstep, hopsize, address, [chans]))
 .thresh(x)
-.set('inp', ugen)
+.set('input', ugen)
 ```
 
 The `yin` unit generator implements the YIN algorithm for pitch
 estimation.
 
-`/arco/yin/new id chans inp_id minstep maxstep hopsize address` -
+`/arco/yin/new id chans input_id minstep maxstep hopsize address` -
 Creates a YIN pitch estimating unit generator that processes `chans`
 channels of input audio. The algorithm searches for a fundamental
 frequency between `minstep` and `maxstep` (both integers expressed as

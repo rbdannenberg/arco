@@ -49,11 +49,16 @@ class Atone (Instrument):
 
 
 ui_initialized = false
+ready_count = 0
 
 def arco_ready():
-    # called when arco is intialized and ready to make sound or when
-    # arco audio stream has been reopened
-    print "**** arco audio is running! ****"
+# called when arco is intialized and ready to make sound or when
+# arco audio stream has been reopened
+    display "**** arco audio is running! ****", ready_count
+    ready_count = ready_count + 1
+    if ready_count > 1:
+        display "arco_ready called again", ready_count
+        breakpoint()
     var win = default_window
     if ui_initialized:
         return

@@ -70,9 +70,9 @@ void arco_route_routes(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/route/repl_inp int32 id, int32 input_id;
+/* O2SM INTERFACE: /arco/route/repl_input int32 id, int32 input_id;
  */
-void arco_route_repl_inp(O2SM_HANDLER_ARGS)
+void arco_route_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -81,14 +81,14 @@ void arco_route_repl_inp(O2SM_HANDLER_ARGS)
 
     UGEN_FROM_ID(Route, route, id, "arco_route_repl_inp")
     ANY_UGEN_FROM_ID(input, input_id, "arco_route_repl_inp");
-    route->repl_inp(input);
+    route->repl_input(input);
 }
 
 
 static void route_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/route/repl_inp", "ii", arco_route_repl_inp, NULL,
+    o2sm_method_new("/arco/route/repl_input", "ii", arco_route_repl_input, NULL,
                     true, true);
     // END INTERFACE INITIALIZATION
     o2sm_method_new("/arco/route/new", NULL, arco_route_new, NULL, true, true);

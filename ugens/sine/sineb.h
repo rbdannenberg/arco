@@ -73,7 +73,7 @@ public:
             Ugen(id, 'b', nchans) {
         freq = freq_;
         amp = amp_;
-        states.set_size(chans);
+        states.set_size(chans);  // zero fill
         fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_freq(freq);
         init_amp(amp);

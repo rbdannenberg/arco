@@ -3,17 +3,17 @@
 # Roger B. Dannenberg
 # May 2023
 
-def filerec(filename, inp, optional chans = 2)
-    Filerec(chans, filename, inp)
+def filerec(filename, input, optional chans = 2)
+    Filerec(chans, filename, input)
 
 
 
 class Filerec (Ugen):
     var action_id
 
-    def init(chans, filename, inp):
+    def init(chans, filename, input):
         super.init(create_ugen_id(), "Filerec", chans, '', "sU",
-                   'filename', filename, 'inp', inp)
+                   'filename', filename, 'input', input)
 
     def go(optional rec_flag = true):
         o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
