@@ -118,97 +118,88 @@ passed into the open operation.
 
 **Synchronization and Threads**
 
-Audio runs off a callback, so we should be careful with threads.
-All communication is through O2, with preferences handled on the
-main thread side. Actual values are sent from the audioio module
-via O2 so either a shared-memory server or a remote application
-can work the same way.
+Audio runs off a callback, so we should be careful with threads.  All
+communication is through O2, with preferences handled on the main
+thread side. Actual values are sent from the audioio module via O2 so
+either a shared-memory server or a remote application can work the
+same way.
 
 ## Unit Generator Design
-Unit generators are subclasses of Ugen (ugen.h). A Ugen has a
-rate (either 'A' for audio or 'B' for block rate) and a Vec of
-outputs. To make it easier to resolve types and perhaps to
-make code readable, the output rate is determined by the choice
-of unit generator, e.g., use `mult` for an audio-rate multiplier
-and `multb` for a block-rate multiplier.
 
-Inputs are more variable. The Ugen class does not specify any
-inputs, but any subclass with inputs adds instance variables
-for: (pointer to) input unit generator, stride for that unit
-generator (described below), and pointer to input samples.
+Unit generators are subclasses of Ugen (ugen.h). A Ugen has a rate
+(either 'A' for audio or 'B' for block rate) and a Vec of outputs. To
+make it easier to resolve types and perhaps to make code readable, the
+output rate is determined by the choice of unit generator, e.g., use
+`mult` for an audio-rate multiplier and `multb` for a block-rate
+multiplier.
 
-Ugen objects have a method `run` that is called on each input
-before accessing input. The causes each input unit generator to
-compute its output and may result in `run` calls to inputs of
-the inputs, etc.  The `run` method is inherited from `Ugen`
-and checks to see if output is already up-to-date, which happens
-if the same output fans out to multiple inputs -- only the first
-input calling `run` computes anything, and other inputs reuse
-the output samples. If the output samples are not up-to-date,
-`run` calls `real_run`, which each unit generator overrides
-with its own DSP algorithm.
+Inputs are more variable. The Ugen class does not specify any inputs,
+but any subclass with inputs adds instance variables for: (pointer to)
+input unit generator, stride for that unit generator (described
+below), and pointer to input samples.
+
+Ugen objects have a method `run` that is called on each input before
+accessing input. The causes each input unit generator to compute its
+output and may result in `run` calls to inputs of the inputs, etc.
+The `run` method is inherited from `Ugen` and checks to see if output
+is already up-to-date, which happens if the same output fans out to
+multiple inputs -- only the first input calling `run` computes
+anything, and other inputs reuse the output samples. If the output
+samples are not up-to-date, `run` calls `real_run`, which each unit
+generator overrides with its own DSP algorithm.
 
 The trick is that there can be many different sorts of input
-signals. With constant-, block-, and audio-rate inputs, and
-single- vs. multi-channel signals, there are potentially 6
-different types. With N inputs, there are potentially 6^N
-variants of `real_run`, which quickly gets out of hand, even
-with automatic code generation.
+signals. With constant-, block-, and audio-rate inputs, and single-
+vs. multi-channel signals, there are potentially 6 different
+types. With N inputs, there are potentially 6^N variants of
+`real_run`, which quickly gets out of hand, even with automatic code
+generation.
 
-To solve this problem, we use two main strategies. First,
-code to iterate over multiple channels of input and output
-signals is implemented in a single `real_run` method, but
-the processing of different types of inputs is specialized
-by making an indirect method call through `run_channel`,
-which points to a method.  E.g., in `mult`, there are
-`run_channel` methods `chan_aa_a`, which multiplies two
-audio-rate channels (each a vector of 32 floats) to
-produce an audio-rate channel, and `chan_ab_a`, which
-mutiplies an audio-rate channel by a block-rate channel
-(a single float). The variable `run_channel`
-is set to the proper method whenever inputs change so that
-the correct specialized DSP computation is run.
+To solve this problem, we use two main strategies. First, code to
+iterate over multiple channels of input and output signals is
+implemented in a single `real_run` method, but the processing of
+different types of inputs is specialized by making an indirect method
+call through `run_channel`, which points to a method.  E.g., in
+`mult`, there are `run_channel` methods `chan_aa_a`, which multiplies
+two audio-rate channels (each a vector of 32 floats) to produce an
+audio-rate channel, and `chan_ab_a`, which mutiplies an audio-rate
+channel by a block-rate channel (a single float). The variable
+`run_channel` is set to the proper method whenever inputs change so
+that the correct specialized DSP computation is run.
 
-The second strategy reduces the logic to iterate over
-input channels to a single add instruction for
-each input before calling `run_channel`, so the overhead
-is the number of output channels x the number of input
-signals. This is very small compared to the total
+The second strategy reduces the logic to iterate over input channels
+to a single add instruction for each input before calling
+`run_channel`, so the overhead is the number of output channels x the
+number of input signals. This is very small compared to the total
 amount of data accessed and computed.
 
-Each `run_channel` method expects input to start
-at the address in per-input sample pointers. The
-pointers are not changed by `run_channel`, but
-when it returns, sample pointers are incremented by
-per-input stride quantities. For single-channel
-inputs, we want to reuse the same input for each
-channel, so stride is 0. For multi-channel audio
-inputs, we want to advance to the next channel of
-the input. Input and output are consecutive in
-memory, so the stride is the block length (BL = 32).
-For multi-channel block-rate inputs, there is only
-one sample per block, so the stride is 1. Finally,
-constant inputs (values that can be updated by
-messages) are treated the same as block-rate signals.
-Constants can be single- or multi-channel with strides
-of 0 or 1, respectively.
+Each `run_channel` method expects input to start at the address in
+per-input sample pointers. The pointers are not changed by
+`run_channel`, but when it returns, sample pointers are incremented by
+per-input stride quantities. For single-channel inputs, we want to
+reuse the same input for each channel, so stride is 0. For
+multi-channel audio inputs, we want to advance to the next channel of
+the input. Input and output are consecutive in memory, so the stride
+is the block length (BL = 32).  For multi-channel block-rate inputs,
+there is only one sample per block, so the stride is 1. Finally,
+constant inputs (values that can be updated by messages) are treated
+the same as block-rate signals.  Constants can be single- or
+multi-channel with strides of 0 or 1, respectively.
 
-With these strategies, the combinatorics reduces from
-6^N versions of the inner computation loop to 2^N versions,
-because we need different code for audio-rate and block-rate
-input. It is possible to restrict this further by insisting
-that some inputs must be audio-rate, e.g. it does not make
-much sense to apply an audio low-pass filter to a block rate
-signal.
+With these strategies, the combinatorics reduces from 6^N versions of
+the inner computation loop to 2^N versions, because we need different
+code for audio-rate and block-rate input. It is possible to restrict
+this further by insisting that some inputs must be audio-rate, e.g. it
+does not make much sense to apply an audio low-pass filter to a block
+rate signal.
 
-FAUST is used mainly to create the inner loops for
-`run_channel` methods. A code generator, written in Python,
-extracts the inner loops from FAUST code, does some rewriting,
-and generates code for Arco. To generate all the variants of
-`run_channel`, FAUST is actually called once for each
-variant, with source code generated from specification file
-that includes both FAUST code and some annotations about
-which variant are required. (link to details should go here.)
+FAUST is used mainly to create the inner loops for `run_channel`
+methods. A code generator, written in Python, extracts the inner loops
+from FAUST code, does some rewriting, and generates code for Arco. To
+generate all the variants of `run_channel`, FAUST is actually called
+once for each variant, with source code generated from specification
+file that includes both FAUST code and some annotations about which
+variant are required. (link to details should go here.)
 
 ### The Ugen Abstract Class
 
@@ -223,8 +214,8 @@ Every Ugen has:
    the state for one channel of the unit generator
 - `inputs`: for each input, there is a source pointer of type `Ugen *` and a pointer to the Ugen's output vector and a stride.
 
-Computation basically involves a loop to compute each channel while updating input
-and output pointers.
+Computation basically involves a loop to compute each channel while
+updating input and output pointers.
 
 Inputs must have either 1 channel or the same number of channels as the Ugen. If 1 channel, the same channel is used for each channel of the Ugen.
 - audio rate input
@@ -239,90 +230,134 @@ Inputs must have either 1 channel or the same number of channels as the Ugen. If
 
 
 ## Memory Management
-Arco allows unit generators to be allocated on-the-fly so
-that signal processing can be reconfigured. An entire graph
-of unit generators can be instantiated to make a sound and
-freed when the sound ends. Arco uses reference counting to
-free unused unit generators.
+
+Arco allows unit generators to be allocated on-the-fly so that signal
+processing can be reconfigured. An entire graph of unit generators can
+be instantiated to make a sound and freed when the sound ends. Arco
+uses reference counting to free unused unit generators.
 
 Clients (applications) name unit generators with small
-integers. Normally, the integer will index arrays on both
-the client and Arco sides. The Arco side has an array of
-pointers to unit generators, the `ugen_table`. Unit
-generators are referenced by this table as well as by
-any unit generator that they are connected to. Reference
-counts are decremented when a unit generator is
-disconnected from an input. You can also free the integer
-index, which clears the pointer from the `ugen_table` to
-the unit generator. When the last reference is removed,
-the reference count becomes zero and the unit generator
-is deleted.
+integers. Normally, the integer will index arrays on both the client
+and Arco sides. The Arco side has an array of pointers to unit
+generators, the `ugen_table`. Unit generators are referenced by this
+table as well as by any unit generator that they are connected
+to. Reference counts are decremented when a unit generator is
+disconnected from an input. The reference from the `ugen_table` also
+counts as one reference. You can free the integer index, which clears
+the pointer from the `ugen_table` to the unit generator and decrements
+the reference count. When the last reference is removed, the reference
+count becomes zero and the unit generator is deleted.
 
-In the simplest case, a tree of unit generators is
-created by the client, which frees all but its reference
-ID to the output (Ugen at the root of the tree). The
-output is connected to Arco's audio output object, so
-the reference count there is 2.
-Later, the client can disconnect the output and it
-will become dormant, but could be reconnected in the
-future. Ultimately, the client can free the ID
-using the message address `/arco/free`. If the object
-is not connected to any inputs, it will be freed. The
-reference counts will propagate up the tree, freeing
-all the unit generators in the tree.
+In the simplest case, a tree of unit generators is created by the
+client, which frees all but its reference ID to the output (Ugen at
+the root of the tree). To produce audio output, the `/arco/output`
+message inserts the output ugen into the `output_set`, which is a list
+of ID's of unit generators whose outputs should be mixed to form the
+audio output.
 
-On the client side, the integer "handles" or ID's for
-unit generators can be managed in any way that is
-convenient. For small and mostly static configurations,
-every unit generator ID can be stored in a different
-variable for easy reference. The programmer must explicitly
-free the ID by sending a message to `/arco/free` to delete
-the object. In Serpent, I have created shadow classes and
-objects for unit generators, so the entire unit generator
-graph in Arco is mirrored in the client side control program.
-These objects encapsulate and manage reference counts so
-that the client code is written in terms of methods on the
-mirror objects. The client works as this level of abstraction
-and there are no direct messages to Arco. Languages with
-garbage collectors that call "cleanup code" when objects
-are freed could use this to free Arco IDs.
+Eventually, the client can remove the ugen from the `output_set` using
+`/arco/mute` and free the ID using the message address
+`/arco/free`. If the object is not connected to any inputs, it will be
+freed. The reference counts will propagate up the tree, freeing all
+the unit generators in the tree.
+
+You can also use `/arco/run` to insert a ugen ID into `run_set`, which
+is a list of unit generators to "run" before computing each block of
+audio output. Typically, unit generators in the `run_set` analyze
+input audio (Arco's Vu meters are an example). Note that if a member
+of the `output_set` depends directly or indirectly on another ugen,
+that ugen will be run automatically (the tree of unit generators is
+traversed in a depth-first manager, running all input-providers before
+computing output). Therefore, anything that an output depends on does
+*not* need to be added to the `run_set`.
+
+### IDs as Cross-Thread References
+
+On the client side, the integer "handles" or ID's for unit generators
+can be managed in any way that is convenient. For small and mostly
+static configurations, every unit generator ID can be stored in a
+different variable for easy reference. The programmer must explicitly
+free the ID by sending a message to `/arco/free` to delete the
+object.
+
+In Serpent, I have created shadow classes and objects for unit
+generators, so the entire unit generator graph in Arco is mirrored in
+the client side control program.  These objects encapsulate and manage
+reference counts so that the client code is written in terms of
+methods on the mirror objects. The client works as this level of
+abstraction and there are no direct messages to Arco. Languages with
+garbage collectors that call "cleanup code" when objects are freed
+could use this to free Arco IDs.
+
+In this more elaborate scheme, the ID on the client side is actually
+an object, not a simple integer. When all references to the object
+(and thus all ability to referene the acutal Arco ugen) are deleted
+and the object is garbage colleted, we can `/arco/free` the ID, which
+decrements the reference count and possibly deletes the ugen. (It could
+still have other references within Arco and survive longer.)
+
+Arco does not count `output_set` items as references, so reference
+counts cna go to zero even while an object is being output. This
+allows for implicit disconnection from output when an object no
+longer has an id. Similarly, in Serpent, we do not keep a list of
+playing objects, so object IDs are garbage collected and the
+corresponding Arco object is deleted when there are no more
+references to the shadow object in Serpent.
+
+
+### Output and Run Sets
+
+The `output_set` and `run_set` are lists of ugen IDs, not direct
+references to ugens, so they do not affect reference counts. This
+could create a sort of "dangling reference" via ID, so every ugen
+has flag bits `IN_OUTPUT_SET` and `IN_RUN_SET` indicating membership.
+When a ugen is deleted, we check the flags and if either or both are
+set, the ugen is removed from `output_set` and/or `run_set`.
+
+Notice that if a ugen is producing non-zero samples, deleting it and
+removing it from the `output_set` can create pops or clicks and
+indicate a programming error. By convention, any playing or running
+ugen should be removed from `output_set` or `run_set` using
+`/arco/mute` or `/arco/unrun` before the ugen ID is freed. Failure to
+do this will print a warning.
 
 ## Unit Generator References in Serpent
-Serpent could use the basic integer-as-reference interface as is,
-but this means that Serpent users have to manage reference counts
-if they want to dynamically create and destroy unit generators in
+
+Serpent could use the basic integer-as-reference interface as is, but
+this means that Serpent users have to manage reference counts if they
+want to dynamically create and destroy unit generators in
 Arco. Serpent has garbage collection, so why not tie GC to Unit
 Generators?
 
-Unfortunately, Serpent does not have programmable actions when
-Serpent objects are freed. This would require objects about to
-be freed to execute an "about to be freed" method, which would
-essentially create a new reference to the object and possibly
-create additional references to the object, making it unsafe to
-actually free it. Rather than solving this problem, we can make
-"external" objects that run C++ code when they are freed. This
-does not require entering the Serpent interpreter and as long as
-we require that the C++ code does not create new references, the
-object can be freed immediately after running the code.
+Unfortunately, Serpent does not have programmable actions when Serpent
+objects are freed. This would require objects about to be freed to
+execute an "about to be freed" method, which would essentially create
+a new reference to the object and possibly create additional
+references to the object, making it unsafe to actually free it. Rather
+than solving this problem, we can make "external" objects that run C++
+code when they are freed. This does not require entering the Serpent
+interpreter and as long as we require that the C++ code does not
+create new references, the object can be freed immediately after
+running the code.
 
-For Ugens, we will create an external object called Ugen_id that
-holds a 32-bit Arco id and a 32-bit epoch number. The epoch is
-incremented whenever Arco is reset, clearing all unit generators.
-After a reset, all references are invalid, so we need a way of
-invalidating them.
+For Ugens, we have an external object called Ugen_id that holds a
+32-bit Arco id and a 32-bit epoch number. The epoch is incremented
+whenever Arco is reset, clearing all unit generators.  After a reset,
+all references are invalid, so incrementing the epoch number is a 
+way of invalidating them.
 
 How safe should this be? Since users can construct arbitrary O2
-message and send to Arco, it's always possible to circumvent any
-Ugen management mechanism, e.g. we can send a message like
-`/arco/free 25`. Since this loophole is available, we can be
-relaxed about other loopholes, e.g. we can allow Serpent programs
-to extract integer id's from Ugen_id objects, but we want to
-automate things for users as much as possible to avoid mistakes.
+message and send to Arco, it's always possible to circumvent any Ugen
+management mechanism, e.g. we can send a message like `/arco/free
+25`. Since this loophole is available, we can be relaxed about other
+loopholes, e.g. we can allow Serpent programs to extract integer id's
+from Ugen_id objects, but we want to automate things for users as much
+as possible to avoid mistakes.
 
 Currently, users normally send O2 messages from Serpent using
-`o2_send_cmd` with a type string to specify types in the message.
-We will add a special type character code "U" for Ugen that expects
-a Ugen_id object, checks the epoch number to make sure it is valid,
+`o2_send_cmd` with a type string to specify types in the message.  We
+will add a special type character code "U" for Ugen that expects a
+Ugen_id object, checks the epoch number to make sure it is valid,
 extracts the Ugen_id, and adds it to the message using `o2_add_int32`.
 
 Ugen_id objects are created by consulting an array of integers. The
@@ -342,10 +377,10 @@ primitives beginning with `o2_msg_start` and ending with
 `o2_msg_finish` are *not* reentrant, which means we cannot send a
 message from within the garbage collector, which can be invoked
 between Serpent instructions. To solve this, we'll have the GC keep
-another list of freed id's and provide a C++-level function that
-once called runs without invoking GC and sends `/arco/free` messages
-for all freed ids. We might optimize `/arco/free` by allowing it to
-carry an arbitrary number of id's so we can free them in a batch.
+another list of freed id's and provide a C++-level function that once
+called runs without invoking GC and sends `/arco/free` messages for
+all freed ids. We might optimize `/arco/free` by allowing it to carry
+an arbitrary number of id's so we can free them in a batch.
 
 Since Serpent will have to periodically call a function to check for
 freed id's and send `/arco/free` there will be some delay between
@@ -354,17 +389,17 @@ id and Ugen on the Arco (server) side. There might be cases where we
 want to release a Ugen immediately. We can add a `delete` method to
 the Serpent Ugen class that makes the Ugen invalid. The method will
 call a function that immediately sends `/arco/free` and marks the ugen
-array entry with -id. Later, GC will actually free
-the reference, and the -id will indicate that the `/arco/free` message
-has been sent and the id can be moved to the free list (not the
-to-be-freed list). (If the array entry is id, it means the id is
-allocated. We put the array entry in the to-be-freed list which will
-give the array entry the value to another index or -1 (end of
-list). We want to delay moving the id to the free list for 
-two reasons: (1) we need to keep the array entry -1 to tell GC that
-the id is already free, and (2) if we immediately put the id back on
-the free list, another object could be created for the id, leaving
-twoand a second object would then have the same id number.
+array entry with -id. Later, GC will actually free the reference, and
+the -id will indicate that the `/arco/free` message has been sent and
+the id can be moved to the free list (not the to-be-freed list). (If
+the array entry is id, it means the id is allocated. We put the array
+entry in the to-be-freed list which will give the array entry the
+value to another index or -1 (end of list). We want to delay moving
+the id to the free list for two reasons: (1) we need to keep the array
+entry -1 to tell GC that the id is already free, and (2) if we
+immediately put the id back on the free list, another object could be
+created for the id, so a second object would then have the
+same id number.
 
 Functions available to Serpent are:
 - `arco_ugen_new()` -- allocate an id and construct a new Ugen_id
@@ -412,6 +447,7 @@ Functions available to Serpent are:
 
 
 ## Instruments in Serpent
+
 A client-side library for Arco is written in Serpent. You can use Arco
 directly, but the approach with Serpent is to create classes and
 objects that "shadow" the Arco objects and make it easier to allocate,
@@ -471,10 +507,10 @@ that is a little awkward. Consider implementing a settable frequency:
 ```
 Then, you can change frequency by calling: `instrument.set_freq(440.0)`.
 
-Alternatively, there is a special `set` method in
-Instrument that avoids defining a method for every parameter.
-To make this work, call `param` in `init`. For example, consider this
-from the instrument `init` function:
+Alternatively, there is a special `set` method in Instrument that
+avoids defining a method for every parameter.  To make this work, call
+`param` in `init`. For example, consider this from the instrument
+`init` function:
 ```
     def init():
         ...
@@ -488,36 +524,34 @@ will name the sine's `'freq'` parameter. Then, you can call
 
 
 ## End-of-Sound Actions
-A general problem is: once you launch a collection of
-Ugens to make a sound, how do you reclaim them when
-the sound event completes?
 
-A good example is the Pwlb subclass of Ugen, which is
-a general-purpose piece-wise linear function generator
-with output at the block rate, and typically used as
-an amplitude envelope. We want to get a notice when
-an instance of Pwlb reaches the last breakpoint
+A general problem is: once you launch a collection of Ugens to make a
+sound, how do you reclaim them when the sound event completes?
+
+A good example is the Pwlb subclass of Ugen, which is a
+general-purpose piece-wise linear function generator with output at
+the block rate, and typically used as an amplitude envelope. We want
+to get a notice when an instance of Pwlb reaches the last breakpoint
 (typically with amplitude zero) in its list of breakpoints.
 
-The mechanism is an O2 message to any designated service
-with an ID number representing the end-of-envelope event.
-To request a message, send `/arco/pwlb/act id action_id` to
-the Pwlb instance (indicated by the `id` parameter). The
-`action_id` is an arbitrary `int32` integer other than 0,
-which means "no action notice." When the pwlb envelope ends,
-a message is sent: `/actl/act action_id`, where `actl` is
-the control service (`ctrlservice`) parameter passed in
-the `/arco/open` message to initialize the Arco server.
+The mechanism is an O2 message to any designated service with an ID
+number representing the end-of-envelope event.  To request a message,
+send `/arco/pwlb/act id action_id` to the Pwlb instance (indicated by
+the `id` parameter). The `action_id` is an arbitrary `int32` integer
+other than 0, which means "no action notice." When the pwlb envelope
+ends, a message is sent: `/actl/act action_id`, where `actl` is the
+control service (`ctrlservice`) parameter passed in the `/arco/open`
+message to initialize the Arco server.
 
 ### Serpent Implementaton
+
 In Serpent, this mechanism is used to implement end-of-sound
-actions. The most important is muting an instrument when an
-envelope ends. To do this for an envelope `env`, we call
-`env.atend(MUTE, this)`, where `atend` should be read
-"at end," MUTE is the action to take, and `this` is an
-optional parameter, which in this case refers to the
-Instrument or Ugen we want to mute. (MUTE is the only implemented
-action at this point.)
+actions. The most important is muting an instrument when an envelope
+ends. To do this for an envelope `env`, we call `env.atend(MUTE,
+this)`, where `atend` should be read "at end," MUTE is the action to
+take, and `this` is an optional parameter, which in this case refers
+to the Instrument or Ugen we want to mute. (MUTE is the only
+implemented action at this point.)
 
 `atend` calls `create_action` which makes a unique new `action_id` and
 sends `/arco/pwlb/act id action_id`. It also adds an action
@@ -525,16 +559,16 @@ description to a dictionary mapping action ids to action descriptions.
 
 When the envelope ends, the handler for `/actl/act action_id`
 retrieves the action from the dictionary and calls it, invoking
-`instrument.mute()`, where `instrument` is the argument that was
-the Instrument (`this`) passed to `atend`.  The `mute` method removes
-the instrument from the Arco output collection and unreferences the
+`instrument.mute()`, where `instrument` is the argument that was the
+Instrument (`this`) passed to `atend`.  The `mute` method removes the
+instrument from the Arco output collection and unreferences the
 instrument, which normally frees the instrument and all its component
 Ugens.
 
 The `MUTE` action is only good for removing an Instrument or Ugen from
-the output list in Arco, but the `create_action` method can specify any
-object, method and parameters to invoke, and you can even tie multiple
-method invocations to a single end-of-envelope action.
+the output list in Arco, but the `create_action` method can specify
+any object, method and parameters to invoke, and you can even tie
+multiple method invocations to a single end-of-envelope action.
 
 The `FINISH` action is a more general action that invokes the `finish`
 method of the instrument, where "the instrument" means the `this`
@@ -556,22 +590,23 @@ can be one of:
 
 ## Phase Vocoder and Pitch Shifting
 
-These are notes on the `pv` unit generator. For pitch shifting, we need
-to stretch by ratio and then downsample by ratio. Should we stretch first
-or resample first? One reason to stretch first is that the pitch can be
-changed instantly by changing resampling, as opposed to resampling first
-and then adding the latency and uncertainty of the FFTs used for stretching.
+These are notes on the `pv` unit generator. For pitch shifting, we
+need to stretch by ratio and then downsample by ratio. Should we
+stretch first or resample first? One reason to stretch first is that
+the pitch can be changed instantly by changing resampling, as opposed
+to resampling first and then adding the latency and uncertainty of the
+FFTs used for stretching.
 
-In the CMUPV library, `ratio` is the reciprocal of stretch, so `ratio > 1` means
-the output sound will be shorter than the input sound.
+In the CMUPV library, `ratio` is the reciprocal of stretch, so `ratio > 1`
+means the output sound will be shorter than the input sound.
 
-For the Pv Unit Generator, `ratio` is the stretch factor *and* the pitch
-shift ratio, so `ratio > 1` means we stretch the input to get a longer
-intermediate CMUPV output. Then we resample this output to be shorter,
-causing the pitch to be higher.
+For the Pv Unit Generator, `ratio` is the stretch factor *and* the
+pitch shift ratio, so `ratio > 1` means we stretch the input to get a
+longer intermediate CMUPV output. Then we resample this output to be
+shorter, causing the pitch to be higher.
 
-In this description we use the Pv UG definition of `ratio`, and may refer
-to the CMUPV library ratio as `pvratio`.
+In this description we use the Pv UG definition of `ratio`, and may
+refer to the CMUPV library ratio as `pvratio`.
 
 Let the stretch ratio and pitch shift ratio be R, so resampling ratio is 1/R.
 To stretch, we need N samples in a buffer, where N is the FFT size. The
@@ -653,11 +688,12 @@ we deliver from sample 0 to N-1.
 
 We remember `prev_input_end` as the location of the end of the
 previous input to the phase vocoder (passed in by `pv_put_input()`).
-We want the next input to consume all the samples from `prev_input_end`
-to the end of the input buffer, which we can call `available`. Therefore,
-we set ratio such that `available == lroundf(H * ratio)`, or
-`ratio = available / H`, or given that CMUPV uses the reciprocal of this,
-`pvratio = H / available`.
+We want the next input to consume all the samples from
+`prev_input_end` to the end of the input buffer, which we can call
+`available`. Therefore, we set ratio such that 
+`available == lroundf(H * ratio)`, or `ratio = available / H`, or
+given that CMUPV uses the reciprocal of this, `pvratio = H /
+available`.
 
 There is a limit to `ana_hopsize`, so `ratio` cannot be too small.
 Setting  `ratio` too low can cause the input buffer to overflow.

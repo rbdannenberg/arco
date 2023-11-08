@@ -33,7 +33,7 @@ NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
             "alpass", "mix", "fileplay", "filerec", "fileio", "nofileio", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
-            "smoothb", "route"]
+            "smoothb", "route", "multx"]
 
 
 def make_makefile(arco_path, manifest, outf):
@@ -55,15 +55,22 @@ def make_makefile(arco_path, manifest, outf):
         manifest.append("thru")
     if "zero*" not in manifest:
         manifest.append("zero*")
+    if "multx" not in manifest:
+        manifest.append("multx")
     for ugen in manifest:
         basename = ugen
         if ugen[-1 : ] == "*":
             basename = ugen[0 : -1]
         if basename in NONFAUST:
+            # special case: mult.srp selects to instantiate either Mult or Multx,
+            # and the Serpent code is in srp_path, but named mult.srp:
+            if basename == "multx":
+                basename = "mult"
             srp_srcs.append(srp_path + basename + ".srp")
         else:
             sources.append(ugens_path + basename + "/" + basename + ".cpp")
-            srp_srcs.append(ugens_path + basename + "/" + basename + ".srp")
+            if basename != "mult":  # exclude auto-generated "mult" code
+                srp_srcs.append(ugens_path + basename + "/" + basename + ".srp")
 
     print("all:  ", end="", file=outf)
     for source in sources:

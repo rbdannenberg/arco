@@ -16,6 +16,7 @@ set(ARCO_SRC
     thru.cpp thru.h
     zero.cpp zero.h 
     zerob.cpp zerob.h 
+    multx.cpp multx.h
     const.cpp const.h 
     upsample.cpp upsample.h 
     audioblock.cpp audioblock.h

@@ -100,8 +100,7 @@ class Ugen : public O2obj {
     }
 
     // subclasses should override to unref inputs
-    virtual ~Ugen() {
-        printf("Ugen delete %d\n", id); }
+    virtual ~Ugen();
 
     virtual const char *classname() = 0;
     

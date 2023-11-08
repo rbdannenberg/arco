@@ -129,8 +129,9 @@ class Constraint:
         var controls = control_to_var_map.get_keys()
         for control in controls:
             disconnect(control)
-        const_ugen = nil
-        non_updating_set.clear()
+        const_ugen = nil  // in case we were controlling a Const ugen
+        non_updating_set.clear()  // even if this is not freed,
+                                  // we'll release this array
 
 
     def add_target_method(tar, met):

@@ -234,7 +234,17 @@ static bool forget_ugen_id(int id, Vec<int> &set)
 {
     for (int i = 0; i < set.size(); i++) {
         if (set[i] == id) {
+            printf("forget_ugen_id: removing %d at %i from %p\n",
+                   id, i, &set);
+            printf("    size %d contains", set.size());
+            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]);
             set.remove(i);
+            printf("    after remove, size %d contains", set.size());
+            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]);
+            printf("\n");
+            if (id == 21) {
+                printf("forget_ugen_id 21\n");
+            }
             return true;
         }
     }
@@ -793,6 +803,7 @@ static void arco_output(O2SM_HANDLER_ARGS)
         }
         ugen->flags |= IN_OUTPUT_SET;
         output_set.push_back(id);
+        printf("added %d to output_set\n", id);
     } else {
         arco_warn("arco_output %d not audio rate, ignored\n", id);
     }
@@ -845,7 +856,8 @@ static void arco_swap(O2SM_HANDLER_ARGS)
     forget_ugen_id(id, output_set);
     ugen->flags &= ~IN_OUTPUT_SET;
     replacement->flags |= IN_OUTPUT_SET;
-    output_set.push_back(id);
+    printf("arco_swap: removed %d, inserting %d in output set\n", id, id2);
+    output_set.push_back(id2);
 }
 
 
@@ -1341,13 +1353,16 @@ void audioio_initialize()
 //
 void aud_forget(int id)
 {
+    printf("aud_forget %d\n", id);
     ANY_UGEN_FROM_ID(ugen, id, "aud_forget");
     if (ugen->flags & IN_OUTPUT_SET) {
         ugen->flags &= ~IN_OUTPUT_SET;
         forget_ugen_id(id, output_set);
+        printf("aud_forget remove %d from output set\n", id);
     }
     if (ugen->flags & IN_RUN_SET) {
         ugen->flags &= ~IN_RUN_SET;
         forget_ugen_id(id, run_set);
+        printf("aud_forget remove %d from run set\n", id);
     }
 }

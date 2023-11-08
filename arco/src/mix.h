@@ -62,6 +62,7 @@ public:
         // initialize Vec of per-channel prev_gain value(s) and zero them:
         input_desc->prev_gain.set_size(MAX(input_desc->input->chans,
                                            input_desc->gain->chans), true);
+        printf("mix prev_gain.size %d\n", input_desc->prev_gain.size());
     }
 
 
@@ -161,19 +162,16 @@ public:
             
                 if (gincr < 1e-6) {  // gain is constant, no interpolation
                     for (int j = 0; j < BL; j++) {
-                        *out++ += gain * *input_ptr++;
+                        *out++ += gain * input_ptr[j];
                     }
                 } else {  // gain is changing; do interpolation
                     float g = *gprev_ptr;
                     for (int j = 0; j < BL; j++) {
                         g += gincr;
-                        *out++ += g * *input_ptr++;
+                        *out++ += g * input_ptr[j];
                     }
                     *gprev_ptr = g;
                 }
-                // stride is relative to starting point for this channel,
-                // so subtract BL to get back to starting point:
-                input_ptr -= BL;
                 input_ptr += input_desc->input_stride;
                 if (out >= out_samps + BL * chans) {   // wrap to output
                     out = out_samps;

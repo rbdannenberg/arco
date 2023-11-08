@@ -136,12 +136,11 @@ and "constant-rate" (class Const) signals.
 
 These are common methods for unit generator objects in Serpent:
 
-### ugen.play([quiet])
+### ugen.play()
 Mix the output of `ugen` into the overall audio output. If `ugen`
-is already playing no action is taken, and if `quiet` is false
-(the default), a warning is printed.
+is already playing no action is taken.
 
-### ugen.mute([status], [quiet])
+### ugen.mute([status])
 Remove `ugen` from the audio output mix. This will also stop
 computing `ugen` unless some other ugen is still using its output.
 The opposite of `play`. If `ugen` is not already playing no action
@@ -150,25 +149,23 @@ printed. `status` is always ignored. It is an optional parameter
 because "atend" actions always pass a status (you can access the
 status by overriding `mute` in a `Ugen` subclass).
 
-### ugen.run([quiet])
+### ugen.run()
 Run `ugen`. Use this method instead of `play` when `ugen` does not 
 produce any output, e.g. see `recplay` (when recording), `trig`,
 `vu`, etc. If if `ugen` is already running, no action is taken, and
 if `quiet` is false (the default), a warning is printed
 .
 
-### ugen.unrun([quiet])
+### ugen.unrun()
 Stop running `ugen` in the audio processing loop. The opposite of
 `run`. If `ugen` is not running, no actions is taken, and if `quiet`
 is false (the default), a warning is printed.
 
-### ugen.fade(dur, [quiet])
+### ugen.fade(dur)
 Fade the output of `ugen` to zero. `dur` is the fade time. This
 method inserts a fader between `ugen` and the audio output, so it
 does not affect other uses, such as connecting `ugen` to a mixer
-(see `mix()`). If `ugen` is not playing (via `play()`), no action
-is taken, and if `quiet` is false (the default), a warning is
-printed.
+(see `mix()`).
 
 ### ugen.get(name)
 Unit generators have named inputs. E.g. the `alpass` ugen has
@@ -656,6 +653,8 @@ channel `chan` to the float value `gain`.
 ```
 mult(x1, x2 [, chans])
 ```
+The `mult` function also takes an `x2_init` keyword parameter, in which
+case a `Multx` is created (see **multx** below).
 
 `/arco/mult/new id chans x1 x2` - Create a new multiplier.
 
@@ -670,6 +669,41 @@ value `x1`.
 value `x2`.
 
 The `multb` messages begin with `/arco/multb` and output is b-rate.
+
+### multx
+```
+mult(x1, x2, init = x2_init [, chans])
+```
+Multx is an audio-rate only unit generator intended mainly to multiply
+an audio-rate input by a block-rate envelope that starts at a non-zero
+value. Consider the problem of smoothly attenuating a signal that is
+already running. One way is to create a multiplier (Mult) that
+multiplies the signal by an envelope that decays from one to zero.
+Assuming the signal is an input to some other unit generator, we can
+replace it by the newly created multiplier. This will then start to
+compute the envelope, reducing the signal to zero. However, if the
+envelope has block rate, the Mult must upsample the envelope to audio
+rate. Upsampling linearly interpolates from the previous sample to
+the current sample. In Mult, the previous sample is initalized to
+zero, so the upsampled envelope will begin with a block that ramps
+from zero to nearly one, creating a momentary but drastic attenuation
+of the audio input. In Multx, the initial value can be specified as
+1.0, eliminating the glitch. See the implementation of `fade()` in
+Ugen (in arco.srp).
+
+`/arco/multx/new id chans x1 x2 x2_init` - Create a new multiplier.
+The previous value of x2, used to upsample b-rate input to a-rate, is
+initialized to x2_init. See above for the rationale.
+
+`/arco/multx/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`.
+
+`/arco/multx/set_x1 id chan x1` - Set channel `chan` of input to float
+value `x1`.
+
+`/arco/multx/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
+
+`/arco/multx/set_x2 id chan x2` - Set channel `chan` of input to float
+value `x2`.
 
 
 ### olapitchshift
@@ -844,6 +878,11 @@ are increased by 0.01. The exponential interpolation occurs between
 these biased breakpoints. Then, 0.01 is subtracted to obtain the
 output. This allows envelopes to decay all the way to zero, but for
 very small breakpoint values, the curves are close to linear.
+
+The starting value can be given by the `init` keyword.
+
+Note that the default for `start` is true. When false, the output
+will remain at the initial value until the `.start()` method is called.
 
 `/arco/pwe/new id` - Create a new piece-wise linear generator with
 audio output. `id` is the object id. Envelope does not start until

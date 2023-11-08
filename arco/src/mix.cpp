@@ -25,7 +25,7 @@ Mix::~Mix()
 void Mix::print_sources(int indent, bool print_flag)
 {
     char name[80];
-    Input *input = &inputs[0];
+    Input *input = inputs.get_array();
     for (int i = 0; i < inputs.size(); i++) {
         snprintf(name, 80, "input %d", i);
         input->input->print_tree(indent, print_flag, name);

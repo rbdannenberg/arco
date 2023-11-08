@@ -54,6 +54,16 @@ void Initializer::init()
 }
 
 
+Ugen::~Ugen() {
+    // special case: check for run set or output set references
+    if (flags & (IN_RUN_SET | IN_OUTPUT_SET)) {
+        aud_forget(id);
+        arco_warn("Deleting unit generator %d in run or output set", id);
+    }
+    printf("Ugen delete %d\n", id);
+}
+
+
 void Ugen::unref() {
     refcount--;
     printf("Ugen::unref id %d %s new refcount %d\n",
@@ -129,13 +139,9 @@ void arco_free(O2SM_HANDLER_ARGS)
         ANY_UGEN_FROM_ID(ugen, id, "arco_free");
         if (ugen) {
             // printf("arco_free handler freeing %d #%d\n", id, ugen->refcount);
-            ugen_table[id] = NULL;
-            // special case: check for run set or output set references
-            if (ugen->flags & (IN_RUN_SET | IN_OUTPUT_SET)) {
-                aud_forget(id);
-            }
             printf("arco_free %d (%s)\n", id, ugen->classname());
             ugen->unref();
+            ugen_table[id] = NULL;  // must happen *after* destructor
         }
     }
 }

@@ -61,7 +61,7 @@ public:
             Ugen(id, 'a', nchans) {
         x1 = x1_;
         x2 = x2_;
-        states.set_size(chans);  // fill with zeros
+        states.set_size(chans);
 
         init_x1(x1);
         init_x2(x2);
@@ -109,20 +109,20 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print_flag) {
-        x1->print_tree(indent, print_flag, "x1");
-        x2->print_tree(indent, print_flag, "x2");
+    void print_sources(int indent, bool print) {
+        x1->print_tree(indent, print, "x1");
+        x2->print_tree(indent, print, "x2");
     }
 
-    void repl_x1(Ugen_ptr inp) {
+    void repl_x1(Ugen_ptr ugen) {
         x1->unref();
-        init_x1(inp);
+        init_x1(ugen);
         update_run_channel();
     }
 
-    void repl_x2(Ugen_ptr inp) {
+    void repl_x2(Ugen_ptr ugen) {
         x2->unref();
-        init_x2(inp);
+        init_x2(ugen);
         update_run_channel();
     }
 

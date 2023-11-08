@@ -223,8 +223,8 @@ def play_mixer_test(obj, event, x, y):
         sched_select(rtsched)
         sched_cause(1.0, nil, 'mixer_gain_change_1')
         sched_cause(2.0, nil, 'mixer_gain_change_2')
-    else
-        m1.mute()
+    else:
+        m1.fade(1) // test for stereo fade output to silence:
         m1 = nil  // delete references
         ms1 = nil
         ms2 = nil

@@ -73,7 +73,7 @@ public:
             Ugen(id, 'b', nchans) {
         freq = freq_;
         amp = amp_;
-        states.set_size(chans);  // zero fill
+        states.set_size(chans);
         fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_freq(freq);
         init_amp(amp);
@@ -97,19 +97,19 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print_flag) {
-        freq->print_tree(indent, print_flag, "freq");
-        amp->print_tree(indent, print_flag, "amp");
+    void print_sources(int indent, bool print) {
+        freq->print_tree(indent, print, "freq");
+        amp->print_tree(indent, print, "amp");
     }
 
-    void repl_freq(Ugen_ptr inp) {
+    void repl_freq(Ugen_ptr ugen) {
         freq->unref();
-        init_freq(inp);
+        init_freq(ugen);
     }
 
-    void repl_amp(Ugen_ptr inp) {
+    void repl_amp(Ugen_ptr ugen) {
         amp->unref();
-        init_amp(inp);
+        init_amp(ugen);
     }
 
     void set_freq(int chan, float f) {

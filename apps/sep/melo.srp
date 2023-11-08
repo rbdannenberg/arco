@@ -29,16 +29,20 @@ class Melo:
 
 
     def echo(name):
-        var rp = recplayer(zero_ugen, 1, 1)
+        var rp = recplay(zero_ugen, 1, 1)
+        rp.borrow(recplay)
+        mix.ins(name, rp, pan_45(random()))
         rp.start(0)
-        mix.ins(name, rp, pan45(random()))
+
+
+    def stop_recording():
+        recplay.record(false)
+        recplay.unrun()
 
 
     def stop():
-        recplay.record(false)
-        recplay.unrun()
         recplay = nil
         mix = nil
         outgain.fade(1)
         constrained_ugen_finish(outgain)
-        outgain = nil
+        outgain = nil  // free the constraint

@@ -100,6 +100,7 @@ def arco_ready():
     monitor_gain.play()
 
 
+
 def create_debug_controls(rest ignore)
     controls = Sep_controls("Separation Logic - Test")
 
@@ -214,22 +215,30 @@ CUE_END = 12       // K
 sep_cue_to_string = ["  ", "0", "A", "B", "C", "D", "E",
                      "F", "G", "H", "I", "J", "K"]
 
+sep_cue_to_descr = ["  ", "Start", "Point", "Pizz", "Melo", "Riffs", "Riffs2",
+                    "Droop", "Up", "Norm", "Whistl", "Air", "End"] 
+
 cue_to_file_name = { CUE_START: "1-air.wav",
                      CUE_POINTS: "2-points.wav",
-                     CUE_PIZZ: "3-pizz.wav" }
+                     CUE_PIZZ: "3-pizz.wav",
+                     CUE_MELO: "4-melody.wav" }
 
 class Cue_buttons:
     def init(x, y):
-        Button(default_window, "0", x, y, 20, 20, 'cue_0_btn')
-        cue_0_btn.add_target_method(this, 'cue_0')
-        Button(default_window, "A", 'S', 'D', 'S', 'S', 'cue_a_btn')
-        cue_a_btn.add_target_method(this, 'cue_a')
-        Button(default_window, "B", 'S', 'D', 'S', 'S', 'cue_b_btn')
-        cue_b_btn.add_target_method(this, 'cue_b')
-        Button(default_window, "C", 'S', 'D', 'S', 'S', 'cue_c_btn')
-        cue_c_btn.add_target_method(this, 'cue_c')
-        Button(default_window, "D", 'S', 'D', 'S', 'S', 'cue_d_btn')
-        cue_d_btn.add_target_method(this, 'cue_d')
+        make_button(CUE_START, 'cue_0_btn', 'cue_0', x = x, y = y)
+        make_button(CUE_POINTS, 'cue_a_btn', 'cue_a')
+        make_button(CUE_PIZZ, 'cue_b_btn', 'cue_b')
+        make_button(CUE_MELO, 'cue_c_btn', 'cue_c')
+        make_button(CUE_FAST, 'cue_d_btn', 'cue_d')
+
+
+    def make_button(i, varname, method, keyword x = 'S', y = 'D'):
+        Button(default_window, sep_cue_to_string[i], x, y, 20, 20, varname).
+                add_target_method(this, method)
+        wxs_x = wxs_x + 25  // move right for descriptive text
+        Statictext(default_window, sep_cue_to_descr[i], 'S', 'S', 50, 20)
+        wxs_x = wxs_x - 25  // move back to button position
+        
 
     def cue_0(rest ignore):
         print "cue_0"
@@ -240,6 +249,12 @@ class Cue_buttons:
 
     def cue_b(rest ignore):
         sep_cue.set_cue_num(CUE_PIZZ)
+
+    def cue_c(rest ignore):
+        sep_cue.set_cue_num(CUE_MELO)
+
+    def cue_d(rest ignore):
+        sep_cue.set_cue_num(CUE_FAST)
 
 
 
@@ -302,6 +317,14 @@ class Sep_cue:
             pizz_rec_obj = Pizz_rec()
             pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5, 75)
             pizz_instr.play()
+        elif cue_num == CUE_MELO:
+            melo_obj = Melo()
+        elif cue_num == CUE_FAST:
+            fast_obj = Fast()
+            YOU ARE HERE see aura4/apps/sep/init.srp for def cycles_control
+            simulator.cycles_control(true, false)
+            start_fast
+
 
 
     def sep_advance(rest ignore):
@@ -322,8 +345,7 @@ class Sep_cue:
         elif cue_num == CUE_PIZZ:
             nil
         elif cue_num == CUE_MELO:
-            melo_instr = Melo()
-            melo_instr.play()
+            nil
         elif cue_num == CUE_FAST:
             simulator.cycles_control(true, false)
         elif cue_num == CUE_ENABLE2:

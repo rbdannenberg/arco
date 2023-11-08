@@ -106,9 +106,11 @@ def main():
                 decl += (p + ", ")
                 paramlist += ", '" + p + "', " + p
                 typestring += "U"
-            decl += "optional chans = 1):"
+            decl += "optional chans):"
             print(decl, file=srpf)
-            # Generate valid parameter rate tests and error messages:
+            # Generate valid parameter rate tests and error messages
+            # Also generate list of channels for max function
+            chans_list = "1"
             for (p, r) in zip(params, param_rates):
                 if r == 'a':
                     print("    if", p + ".rate != 'a':", file=srpf)
@@ -122,6 +124,9 @@ def main():
                           "' input to Ugen '" + c + "'",
                           'must be block rate"', file=srpf)
                     print("        return nil", file=srpf)
+                chans_list = "max_chans(" + chans_list + ", " + p + ")"
+            print("    if not chans:", file=srpf)
+            print("        chans = " + chans_list, file=srpf)
             print("    Ugen(create_ugen_id(),", '"' + c + \
                   '", chans,', "'" + rate + "', " + '"' + typestring + \
                   '"' + paramlist + ")\n", file=srpf)

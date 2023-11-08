@@ -144,7 +144,6 @@ INPUT_ID = 2
 PREV_OUTPUT_ID = 3
 
 // shadow the sets of Ugens maintained by audio server:
-arco_output_set = []
 arco_run_set = []
 
 // manage action callbacks
@@ -646,6 +645,12 @@ def actl_starting(timestamp, address, types, rest args):
     start_poll_for_status()
 
 
+def max_chans(chans, ugen):
+# compute the maximum of chans and the channels implied by ugen, where
+# ugen may be a number (Const) or Ugen
+    max(chans, 1 if isnumber(ugen) else ugen.chans)
+
+
 class Ugen:
     var id  // ugen_id object: our encapsulated Arco id
     var classname  // name of Arco Unit Generator Class
@@ -737,58 +742,36 @@ class Ugen:
 
 
     def play(optional quiet):  # connect this Ugen to audio output
-        if this not in arco_output_set:
-            arco_output_set.append(this)
-            // display "Ugen play", id
-            o2_send_cmd("/arco/output", 0, "U", id)
-        elif not quiet:
-            print "WARNING: in play(), Ugen already in output set", this
+        // display "Ugen play", id
+        o2_send_cmd("/arco/output", 0, "U", id)
         this
 
 
-    def mute(optional status, optional quiet):
+    def mute(optional status):
     # disconnect this Ugen from audio output
     # since "atend" actions always have a status, we accept a status
     # but ignore it.
-        if this in arco_output_set:
-            // display "Ugen mute", id
-            arco_output_set.remove(this)
-            o2_send_cmd("/arco/mute", 0, "U", id)
-        elif not quiet:
-            print "WARNING: in mute(), Ugen is not in output set", this
+        o2_send_cmd("/arco/mute", 0, "U", id)
         this
 
 
     def fade(dur, optional quiet):
-    # fade to nothing, then disconnect from audio output
-        if this in arco_output_set:
-            // display "Ugen fade", id, dur
-            var faded = mult(id, pweb(0, 1, dur, 0))
-            o2_send_cmd("/arco/swap", 0, "UU", id, faded.id)
-            sched_select(rtsched)
-            sched_cause(dur + 0.1, this, 'mute', faded)
-        elif not quiet:
-            print "WARNING: in fade(), Ugen is not in output set", this
+    # fade to nothing, then disconnect from audio output. If not already
+    # connected to audio output, this will cause Arco to print a warning.
+        var faded = mult(this, pweb(dur, 0, init = 1), x2_init = 1)
+        o2_send_cmd("/arco/swap", 0, "UU", id, faded.id)
+        sched_select(rtsched)
+        display "fade", faded, faded.id, arco_ugen_id(faded.id)
+        sched_cause(dur + 0.1, faded, 'mute')
 
 
-    def run(optional quiet):  # add this Ugen to the run set
-        if this not in arco_run_set:
-            arco_run_set.append(this)
-            // display "Ugen run", id
-            o2_send_cmd("/arco/run", 0, "U", id)
-        elif not quiet:
-            print "WARNING: in run(), Ugen already in run set", this
-        this
+    def run():  # add this Ugen to the run set
+        // display "Ugen run", id
+        o2_send_cmd("/arco/run", 0, "U", id)
 
 
-    def unrun(optional quiet):  # remove this Ugen from the run set
-        if this in arco_run_set:
-            // display "Ugen unrun", id
-            arco_run_set.remove(this)
-            o2_send_cmd("/arco/unrun", 0, "U", id)
-        elif not quiet:
-            print "WARNING: in unrun(), Ugen is not in run set", this 
-        this
+    def unrun():  # remove this Ugen from the run set
+        o2_send_cmd("/arco/unrun", 0, "U", id)
 
 
     def get(ugen_name):
@@ -918,16 +901,6 @@ def zero(): zero_ugen
 
 def zerob(): zerob_ugen
 
-//def sine(freq, amp, optional chans = 1):
-//    Ugen(create_ugen_id(), "Sine", chans, A_RATE, "UU", 'freq', freq, 'amp', amp)
-//
-//def sineb(freq, amp, optional chans = 1):
-//    if freq.rate == A_RATE or amp.rate == A_RATE:
-//        print "ERROR: passing audio rate Ugen to block rate sineb"
-//        return nil
-//    else:
-//        return Ugen(create_ugen_id(), "Sineb", chans, B_RATE, "UU", 
-//                    'freq', freq, 'amp', amp)
 
 class Const_like (Ugen):
 # abstract superclass for Const and Smoothb, which are similar

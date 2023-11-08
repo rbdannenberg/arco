@@ -101,25 +101,25 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print_flag) {
-        snd->print_tree(indent, print_flag, "snd");
-        center->print_tree(indent, print_flag, "center");
-        q->print_tree(indent, print_flag, "q");
+    void print_sources(int indent, bool print) {
+        snd->print_tree(indent, print, "snd");
+        center->print_tree(indent, print, "center");
+        q->print_tree(indent, print, "q");
     }
 
-    void repl_snd(Ugen_ptr inp) {
+    void repl_snd(Ugen_ptr ugen) {
         snd->unref();
-        init_snd(inp);
+        init_snd(ugen);
     }
 
-    void repl_center(Ugen_ptr inp) {
+    void repl_center(Ugen_ptr ugen) {
         center->unref();
-        init_center(inp);
+        init_center(ugen);
     }
 
-    void repl_q(Ugen_ptr inp) {
+    void repl_q(Ugen_ptr ugen) {
         q->unref();
-        init_q(inp);
+        init_q(ugen);
     }
 
     void set_snd(int chan, float f) {

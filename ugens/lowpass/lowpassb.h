@@ -94,19 +94,19 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print_flag) {
-        snd->print_tree(indent, print_flag, "snd");
-        cutoff->print_tree(indent, print_flag, "cutoff");
+    void print_sources(int indent, bool print) {
+        snd->print_tree(indent, print, "snd");
+        cutoff->print_tree(indent, print, "cutoff");
     }
 
-    void repl_snd(Ugen_ptr inp) {
+    void repl_snd(Ugen_ptr ugen) {
         snd->unref();
-        init_snd(inp);
+        init_snd(ugen);
     }
 
-    void repl_cutoff(Ugen_ptr inp) {
+    void repl_cutoff(Ugen_ptr ugen) {
         cutoff->unref();
-        init_cutoff(inp);
+        init_cutoff(ugen);
     }
 
     void set_snd(int chan, float f) {
