@@ -543,6 +543,91 @@ ends, a message is sent: `/actl/act action_id`, where `actl` is the
 control service (`ctrlservice`) parameter passed in the `/arco/open`
 message to initialize the Arco server.
 
+### Sounds that End
+
+Setting up end-of-sound actions is not trivial. Consider playing a
+sound from a file into a mixer input. When the sound (from a Recplay
+object) finishes, we want to remove the sound from the mixer, but
+that means (1) remember a name for the mixer input, (2) schedule an
+end-of-sound action that takes the name and mixer as parameters,
+(3) write the end-of-sound method to uninsert the named ugen from
+the mixer. Simply invoking a built-in action like MUTE or FINISH
+is not sufficient.
+
+Alternatively, in Nyquist, the file playback sound would simply
+end. The "mixer" would consist of a gain multiplier and an adder.
+The gain multiplier would detect a terminated input, and because
+multiplication by zero is zero, the product sound would terminate.
+Then, addition by zero is the identity, to the adder would
+be replaced by the other adder input (add are always binary, so
+a mixer would have a chain or tree of adders).
+
+We can have something similar in Arco. Termination could be a bit
+maintained by every Ugen. The run method, before calling real_run(),
+can check for termination. If terminated, it can just return out_samps
+without further evaluation. The caller can also check the terminate
+bit and invoke some action; e.g. Mix and Add should remove inputs that
+terminate, and filters should terminate *their* output when their
+input terminates, but possibly after a delay or detecting the output
+had decayed to near zero.
+
+However, we need to make termination an option; e.g. even envelopes
+in Arco can be re-started, so automatically terminating everything
+that *seems* to stop is not workable. That also means that when a
+unit generator is created, the default should be that it runs forever
+and an option is for it to report termination.
+
+What would a filter look like in this scheme? Instead of
+```
+    void real_run() {
+        snd_samps = snd->run(current_block); // update input
+        cutoff_samps = cutoff->run(current_block); // update input
+        ...
+```
+we could write
+```
+    void real_run() {
+        snd_samps = snd->run(current_block); // update input
+        cutoff_samps = cutoff->run(current_block); // update input
+        if ((snd_samps->flags & cutoff_samps->flags & TERMINATED) &&
+            flags & CAN_TERMINATE) {
+            flags |= TERMINATED;  // propagate terminated input to output
+        }
+        ...
+```
+Note that termination will propagate without delay. What if we need to
+delay propagating termination until the output decays to zero? We do
+not have timed events within the audio thread, so we have to use a
+counter. Overhead is only incurred after an input terminates:
+```
+    void real_run() {
+        snd_samps = snd->run(current_block); // update input
+        cutoff_samps = cutoff->run(current_block); // update input
+        if ((snd_samps->flags & cutoff_samps->flags & TERMINATED) &&
+            flags & CAN_TERMINATE) {
+            terminate();
+        }    
+        ...
+    }
+    
+    // this is inherited from Ugen. tail_blocks is a new member
+    // variable of Ugens that is initialized to zero, but set by
+    // the method that sets CAN_TERMINATE.
+    void terminate() { // this Ugen will terminate after tail_blocks
+        if (!(flags & TERMINATING)) {
+            terminate_count = tail_blocks;
+            flags |= TERMINATING;  // start the count
+        }
+        if (terminate_count-- == 0) {
+            flags |= TERMINATED;
+            on_terminate();  // a virtual method to be general; called at most once
+        }
+    }
+    
+```
+
+
+
 ### Serpent Implementaton
 
 In Serpent, this mechanism is used to implement end-of-sound

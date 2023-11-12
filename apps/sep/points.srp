@@ -53,8 +53,14 @@ class Points:
         rp.borrow(recplay)
         rp.set_speed(rate)
         // randomly choose pan for each delay:
-        mix.ins(mix_name(i), rp, pan_45(random()))
+        var rpname = mix_name(i)
+        mix.ins(rp_name, rp, pan_45(random()))
         rp.start(start_time)
+        create_action(rp, this, 'player_finished', rp_name)
+
+
+    def player_finished(rp_name):
+        YOU ARE HERE
 
 
     def stop_recording():

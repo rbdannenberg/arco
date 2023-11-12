@@ -306,6 +306,40 @@ to be zero and output is strictly non-negative.
 `/arco/dualslewb/set_release id release release_linear` - Change the
 `release` and `release_linear` control parameters.
 
+### fader
+```
+fader(input, current [, dur] [, goal] [, mode] [, chans])
+.set_current(val [,chan]) // val can be an array of numbers
+.set_dur(dur)  // if not set, default is 0.1 seconds
+.set_mode(mode)
+.set_goal(goal [, chan])  // goal can be an array of numbers
+// omitting chan sends to all channels, setting last channel
+// causes the fade to start.
+```
+
+**Fader** is used as a smoothly varying gain control. See also
+**Smooth**.
+
+`/arco/fader/new id chans input current mode` - Create an
+envelope-controlled multiplier. The initial gain is `current`
+(replicated if there are more than one channel). The `mode`
+is either 0 (linear), 1 (exponential), or 2 (relaxation),
+where exponential has a bias of 0.01, and relaxation uses
+a first-order low-pass filter that converges 99% in `dur`.
+
+`/arco/fader/cur id chan val` - Set the current gain
+for the given channel (`chan`) to `val` (float). Setting
+a gain terminates any envelope in progress on that channel.
+
+`/arco/fader/dur id dur` - Set the fade duration (fora all
+channels) to `dur`.
+
+`/arco/fader/mode id mode` - Change the mode to `mode`.
+
+`/arco/fader/goal id chan goal` - Set the goal for channel
+`chan` to `goal`. If `chan` is the *last* channel, the
+fade is started on all channels.
+
 ### feedback
 ```
 feedback(input, from, gain [, chans])
@@ -598,7 +632,7 @@ but attenuates feedback to be almost inaudible.
 ### mix
 ```
 mix([chans])
-.ins(name, ugen, gain [, at_end])`** (name is a symb
+.ins(name, ugen, gain [, at_end]) // name is a symbol
 .rem(name)
 .find_name_of(ugen)
 .set_gain(name, gain [, chan])
@@ -1078,6 +1112,9 @@ smoothb(x, [cutoff = 10], [chans])
 .set(x)             // x is a number or an array
 .set_chan(chan, x)  // x is a number
 ```
+
+**Smooth** is similar to **Const**, but updates are smoothed with a
+simple filter to avoid abrupt step functions. See also **Fader**.
 
 `/arco/smoothb/new id chans cutoff` - Create a b-rate ugen. This behaves
 like `const` except that the output values are low-pass filtered with a

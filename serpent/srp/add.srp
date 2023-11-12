@@ -1,0 +1,31 @@
+# add.srp -- feedback add unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Add(Ugen):
+    def init(chans):
+        super.init(create_ugen_id(), "Add", chans)
+
+    def ins(ugen):
+        o2_send_cmd("/arco/add/ins", 0, "UU", id, ugen.id)
+
+    def rem(ugen):
+        o2_send_cmd("/arco/rem/ins", 0, "UU", id, ugen.id)
+
+
+def add(optional chans = 1): Add(chans)
+
+
+class Addb(Ugen):
+    def init(chans):
+        super.init(create_ugen_id(), "Addb", chans)
+
+    def ins(ugen):
+        o2_send_cmd("/arco/addb/ins", 0, "UU", id, ugen.id)
+
+    def rem(ugen):
+        o2_send_cmd("/arco/rem/ins", 0, "UU", id, ugen.id)
+
+
+def addb(optional chans = 1): Addb(chans)

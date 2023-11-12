@@ -758,11 +758,21 @@ class Ugen:
     def fade(dur, optional quiet):
     # fade to nothing, then disconnect from audio output. If not already
     # connected to audio output, this will cause Arco to print a warning.
-        var faded = mult(this, pweb(dur, 0, init = 1), x2_init = 1)
+        var faded = fader(this, 1, 1).set_dur(dur).set_goal(0)
         o2_send_cmd("/arco/swap", 0, "UU", id, faded.id)
         sched_select(rtsched)
         display "fade", faded, faded.id, arco_ugen_id(faded.id)
         sched_cause(dur + 0.1, faded, 'mute')
+        faded   // return the new fader ugen
+
+
+    def smooth_disconnect(input_name, ugen, fade_time):
+    # fade to nothing over fade_time (seconds); then disconnect from
+    # some unit generator at fade_time + 0.1.
+        var faded = fader(this, 1, 1).set_dur(fade_time).set_goal(0)
+        ugen.set(input_name, faded)
+        sched_select(rtsched)
+        sched_cause(fade_time + 0.1, ugen, 'set', input_name, zero_ugen)
 
 
     def run():  # add this Ugen to the run set

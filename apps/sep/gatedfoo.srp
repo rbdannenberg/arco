@@ -1,0 +1,28 @@
+// gatedfoo.srp -- effect with pitch shift, delay, some gain control
+//
+// Roger B. Dannenberg
+// Nov, 2023
+
+class Gated_foo (Instrument):
+    var faded  // ugen representing input fader
+
+    def init(input, ratio, delay, regen, smooth,
+             psgain, delgain, attack, decay):
+        instr_begin()
+        var faded = fader(input, 0, 0.1, 1)
+        var pshift = ola_pitch_shift(input, ratio, 0.01, 0.1)
+        // set max delay dur to 0.21 because application uses delays
+        // of 0.15 and 0.2; 0.21 allows for rounding error
+        var del = delay(input, delay, regen, 0.21)
+        var mix = mix()
+        mix.ins('pshift', pshift, psgain)
+        mix.ins('delay', del, delgain)
+        var power = dnsampleb(input, DNSAMPLE_POWER)
+        var gate = dualslewb(lowpassb(power, smooth), attack, decay)
+        var ds20 = mult(dualslew, 20)
+        var out = mult(mix, ds20)
+        super.init("Gated_foo", out)
+
+    def mute_input():
+        faded.set_goal(0)
+

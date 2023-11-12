@@ -77,7 +77,17 @@ execute_process(COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmake
                     ${ARCO_PATH}
                     ${CMAKE_SOURCE_DIR}/dspmanifest.txt
                     ${CMAKE_SOURCE_DIR}/dspmakefile
-                    ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude)
+                    ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude
+                OUTPUT_VARIABLE makedspmakefile_out
+                ERROR_VARIABLE makedspmakefile_err)
+if(makedspmakefile_out) 
+    message(STATUS "makedspmakefile.py output: " ${makedspmakefile_out}) 
+endif() 
+if(makedspmakefile_err) 
+    message(FATAL_ERROR "makedspmakefile.py error output: " ${makedspmakefile_err}) 
+endif() 
+
+
 #
 # run the dspmakefile at CMake Configure time to make sure there are
 # source files in place when CMake looks to add them to the project.

@@ -152,6 +152,11 @@ class Probe : public Ugen {
                    threshold, direction, max_wait);
     }
 
+    
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
+    }
+
 
     void init_input(Ugen_ptr ugen) {
         init_param(ugen, input, input_stride);

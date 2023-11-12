@@ -29,15 +29,41 @@ files corresponding to classes in the manifest. allugens.srp is
 written to the same folder as dspmanifest.txt.
 """
 
-NONFAUST = ["thru", "zero", "vu", "probe", "pwl", "pwlb", "delay", \
+NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "alpass", "mix", "fileplay", "filerec", "fileio", "nofileio", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
-            "smoothb", "route", "multx"]
+            "smoothb", "route", "multx", "fader", "add", "addb"]
+
+# compute all names for which there is an a-rate or b-rate version, but not
+# both. Put the "missing" name in NONEXIST:
+NONEXIST = []
+
+for ugclass in NONFAUST:
+    # case 1: ugclass b-rate is specified, but not ugclass a-rate
+    if ugclass[-1 : ] == "b":
+        arate_name = ugclass[ : -1]
+        if arate_name not in NONFAUST:
+            NONEXIST.append(arate_name)
+    # case 2: ugclass a-rate is specified, but not ugclass b-rate
+    elif (ugclass + "b") not in NONFAUST:
+        NONEXIST.append(ugclass + "b")
+
+print(NONEXIST)
+
+def append_to_srp_srcs(spec, path):
+    """add a Serpent source file to be included in allugens.srp"""
+    global srp_srcs
+    if not os.path.isfile(path):
+        print('ERROR: dspmanifest.txt specifies "', spec, '" but "', \
+              path, '" does not exist.', sep = "", file=sys.stderr)
+    else:
+        srp_srcs.append(path)
 
 
 def make_makefile(arco_path, manifest, outf):
     """make the makefile for faust-based dsp .cpp and .h files"""
+    global srp_srcs
 
     print("# dspmakefile - a makefile for Arco unit generator dsp sources", \
           file=outf)
@@ -55,22 +81,31 @@ def make_makefile(arco_path, manifest, outf):
         manifest.append("thru")
     if "zero*" not in manifest:
         manifest.append("zero*")
-    if "multx" not in manifest:
-        manifest.append("multx")
+    if "fader" not in manifest:
+        manifest.append("fader")
     for ugen in manifest:
         basename = ugen
         if ugen[-1 : ] == "*":
             basename = ugen[0 : -1]
         if basename in NONFAUST:
-            # special case: mult.srp selects to instantiate either Mult or Multx,
-            # and the Serpent code is in srp_path, but named mult.srp:
+            # special case: mult.srp selects to instantiate either Mult or
+            # Multx, and the Serpent code is in srp_path, but named mult.srp:
             if basename == "multx":
-                basename = "mult"
-            srp_srcs.append(srp_path + basename + ".srp")
+                if "mult" in manifest or "multb" in manifest or \
+                   "mult*" in manifest:
+                    continue  # multx is handled by mult, already in list
+                else:
+                    basename = "mult"
+            source = srp_path + basename + ".srp"
+            append_to_srp_srcs(ugen, source)
         else:
             sources.append(ugens_path + basename + "/" + basename + ".cpp")
-            if basename != "mult":  # exclude auto-generated "mult" code
-                srp_srcs.append(ugens_path + basename + "/" + basename + ".srp")
+            if basename == "mult":  # get "mult" code from srp_path,
+                                    # not ugens_path:
+                append_to_srp_srcs(ugen, srp_path + "mult.srp")
+            else:
+                append_to_srp_srcs(ugen, ugens_path + basename + "/" + \
+                                         basename + ".srp")
 
     print("all:  ", end="", file=outf)
     for source in sources:
@@ -174,6 +209,7 @@ def make_inclfile(arco_path, manifest, outf):
 
 
     ## Add source files for specified ugens
+    print("Adding these unit generator implementations to the executable:")
     for ugen in manifest:
         both = False
         basename = ugen
@@ -181,21 +217,27 @@ def make_inclfile(arco_path, manifest, outf):
             both = True
             basename = ugen[0 : -1]
         if basename in NONFAUST:
-            # if manifest had ugen*, include both ugen and ugenb. Otherwise,
-            # just include the specified ugen.
-            if both or basename == ugen:
-                print("    src/" + basename + ".cpp src/" + basename + ".h", \
-                      file=outf)
-            if both:
-                print("    src/" + basename + "b.cpp src/" + basename + "b.h", \
-                      file=outf)
-        elif both:
-            src = arco_path + "/ugens/" + basename + "/" + basename
-            print("    " + src + ".cpp " + src + ".h", file=outf)
-            print("    " + src + "b.cpp " + src + "b.h", file=outf)
+            src = "src/"
+            if basename in NONEXIST:
+                print('ERROR: dspmanifest.txt specifies "', ugen, \
+                      '" but "',  basename, '.cpp" does not exist.', \
+                     sep = "", file=sys.stderr)
+            if both and (basename + "b") in NONEXIST:
+                print('ERROR: dspmanifest.txt specifies "', ugen, \
+                      '" but "', basename, 'b.cpp" does not exist.', \
+                      sep = "", file=sys.stderr)
         else:
-            src = arco_path + "/ugens/" + basename + "/" + ugen
-            print("    " + src + ".cpp " + src + ".h", file=outf)
+            src = arco_path + "/ugens/" + basename + "/"
+
+        # if manifest had ugen*, include both ugen and ugenb. Otherwise,
+        # just include the specified ugen.
+        sources = "    " + src + basename + ".cpp " + src + basename + ".h"
+        print(sources, file=outf)
+        print(sources)
+        if both:
+            sources = "    " + src + basename + "b.cpp " + src + basename + "b.h"
+            print(sources, file=outf)
+            print(sources)
         if basename == "flsyn":
             need_flsyn_lib = True
 
@@ -256,6 +298,8 @@ def main():
         make_makefile(arco_path, manifest, outf)
     with open(inclfile_name, "w") as outf:
         make_inclfile(arco_path, manifest, outf)
-
+    print("Merged the following files to form allugens.srp: ")
+    for src in srp_srcs:
+        print("   ", src)
 
 main()

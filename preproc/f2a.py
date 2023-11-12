@@ -194,7 +194,7 @@ def generate_arco_cpp(classname, param_info, rate, initializer_code, outf):
         print("    // begin unpack message (machine-generated):", file=outf)
         print("    // end unpack message\n", file=outf)
         print("    UGEN_FROM_ID(" + classname + ",", cnlc + ", id,",
-              '"arco_' + cnlc + '_repl_' + p[0] + '");', file=outf)
+              '"arco_' + cnlc + '_set_' + p[0] + '");', file=outf)
         print("    " + cnlc + "->set_" + p[0] + "(chan, val);\n}\n\n",
               file=outf)
 
@@ -949,9 +949,9 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
 
     pr_sources = ""
     if len(parameters) > 0:
-        pr_sources += "    void print_sources(int indent, bool print) {\n"
+        pr_sources += "    void print_sources(int indent, bool print_flag) {\n"
         for p in parameters:
-            pr_sources += "        " + p + '->print_tree(indent, print, "' + \
+            pr_sources += "        " + p + '->print_tree(indent, print_flag, "' + \
                           p + '");\n'
         pr_sources += "    }\n\n"
 

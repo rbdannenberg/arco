@@ -109,9 +109,9 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print) {
-        x1->print_tree(indent, print, "x1");
-        x2->print_tree(indent, print, "x2");
+    void print_sources(int indent, bool print_flag) {
+        x1->print_tree(indent, print_flag, "x1");
+        x2->print_tree(indent, print_flag, "x2");
     }
 
     void repl_x1(Ugen_ptr ugen) {

@@ -39,15 +39,15 @@ class Pv: public Ugen {
     };
     Vec<Pv_state> states;
 
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
     Resamp resamp;  // resampler for pitch shift -- shared by all states
 
 
-    Pv(int id, int nchans, Ugen_ptr inp, float ratio, int fftsize_,
+    Pv(int id, int nchans, Ugen_ptr input, float ratio, int fftsize_,
        int hopsize_, int points_, int mode_) : Ugen(id, 'a', nchans) {
-        init_inp(inp);
+        init_input(input);
         points = points_;
         fftsize = fftsize_;
         hopsize = hopsize_;
@@ -85,7 +85,7 @@ class Pv: public Ugen {
     }
 
     ~Pv() {
-        inp->unref();
+        input->unref();
         for (int i = 0; i < chans; i++) {
             states[i].inputbuf.finish();
             states[i].outputbuf.finish();
@@ -104,9 +104,14 @@ class Pv: public Ugen {
     }
 
 
-    void init_inp(Ugen_ptr ugen) {
-        init_param(ugen, inp, inp_stride);
-        use_stretch = (inp->classname() == Fileplay_name);
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
+    }
+
+
+    void init_input(Ugen_ptr ugen) {
+        init_param(ugen, input, input_stride);
+        use_stretch = (input->classname() == Fileplay_name);
     }
 
 
@@ -143,19 +148,19 @@ class Pv: public Ugen {
 
 
     void repl_input(Ugen_ptr ugen) {
-        inp->unref();
-        init_inp(ugen);
+        input->unref();
+        init_input(ugen);
     }
 
 
     // get need samples from input, which must be a Fileplay Ugen
     void get_samples(int need) {
         while (need > 0) {  // get BL samples per iteration
-            inp_samps = inp->run(inp->current_block + BL);
-            // move inp_samps to inputbuf's
+            input_samps = input->run(input->current_block + BL);
+            // move input_samps to inputbuf's
             for (int i = 0; i < chans; i++) {
-                states[i].inputbuf.append(inp_samps, BL);
-                inp_samps += inp_stride;
+                states[i].inputbuf.append(input_samps, BL);
+                input_samps += input_stride;
             }
             need -= BL;
         }
@@ -173,11 +178,12 @@ class Pv: public Ugen {
             inputbuf.drop_front(fftsize);
             state->prev_input_end -= fftsize;
         }
-        // append inp_samps to inputbuf if input is synchronous (not stretched)
-        // E.g. we have !use_stretch when input is real-time audio (not stored)
+        // append input_samps to inpututbuf if input is synchronous
+        // (not stretched). E.g. we have !use_stretch when input is
+        // real-time audio (not stored)
         if (!use_stretch) {
             assert(inputbuf.get_allocated() >= inputbuf.size() + BL);
-            inputbuf.append(inp_samps, BL);
+            inputbuf.append(input_samps, BL);
         }  // otherwise, we fetch input on demand
         int done = 0;
         while (done < BL) {
@@ -261,11 +267,11 @@ class Pv: public Ugen {
     
     void real_run() {
         if (!use_stretch) {
-            inp_samps = inp->run(current_block);
+            input_samps = input->run(current_block);
         }
         for (int i = 0; i < chans; i++) {
             chan_a(&states[i]);
-            inp_samps += inp_stride;
+            input_samps += input_stride;
         }
     }
 

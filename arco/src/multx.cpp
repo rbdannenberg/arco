@@ -60,7 +60,7 @@ static void arco_multx_set_x1(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Multx, multx, id, "arco_multx_repl_x1");
+    UGEN_FROM_ID(Multx, multx, id, "arco_multx_set_x1");
     multx->set_x1(chan, val);
 }
 
@@ -90,7 +90,7 @@ static void arco_multx_set_x2(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Multx, multx, id, "arco_multx_repl_x2");
+    UGEN_FROM_ID(Multx, multx, id, "arco_multx_set_x2");
     multx->set_x2(chan, val);
 }
 
@@ -109,8 +109,6 @@ static void multx_init()
     o2sm_method_new("/arco/multx/set_x2", "iif", arco_multx_set_x2, NULL, true,
                     true);
     // END INTERFACE INITIALIZATION
-
-    // class initialization code from faust:
 }
 
 Initializer multx_init_obj(multx_init);

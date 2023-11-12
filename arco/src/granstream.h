@@ -226,6 +226,11 @@ public:
     }
 
     
+    void print_sources(int indent, bool print_flag) {
+        input->print_tree(indent, print_flag, "input");
+    }
+
+
     void reset_gens() {  // initialize generators
         // set delay = 1 so that other parameters will be computed
         // on the next call to real_run():

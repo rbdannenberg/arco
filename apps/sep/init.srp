@@ -131,6 +131,7 @@ def gain_control(input, slider, optional constraint):
     ugen_to_constraint[ugen] = constraint
     return mult(input, ugen)
 
+
 def constrained_ugen_finish(ugen):
 # To free some objects (ugen and constraint), call this to shut down
 # a gain created by gain_control. ugen is the result of gain_control().
@@ -321,10 +322,10 @@ class Sep_cue:
             melo_obj = Melo()
         elif cue_num == CUE_FAST:
             fast_obj = Fast()
-            YOU ARE HERE see aura4/apps/sep/init.srp for def cycles_control
-            simulator.cycles_control(true, false)
-            start_fast
-
+            fast_obj.cycles_control(true, false)
+            // shut down air, points, pizz, melo if running
+            YOU ARE HERE
+            points_obj
 
 
     def sep_advance(rest ignore):

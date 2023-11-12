@@ -1,0 +1,48 @@
+# fader.srp - constructor implementation
+#
+
+def fader(input, current, optional dur, goal, mode = 1, chans):
+# Create a Fader, with optional intialization. Example:
+#     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
+#     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
+    var fader = Fader(input, current, mode, chans)
+    if dur:
+        fader.set_dur(dur)
+    if goal:
+        fader.set_goal(goal)
+
+
+class Fader (Ugen):
+    def init(input, current, optional mode = 1, chans):
+        if not chans:
+            chans = max_chans(max_chans(1, x1), x2)
+        super.init(create_ugen_id(), "fader", chans, 'a', "Ufi",
+                   'input', input, 'current', current, 'mode', mode)
+
+
+    def set_current(current, optional chan):
+        if chan:
+            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, chan, current)
+        for i = 0 to chans:
+            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, i,
+                        current if isnumber(current) else current[i])
+        this
+
+
+    def set_dur(dur):
+        o2_send_cmd("/arco/fader/dur", 0, "Uf", id, dur)
+        this
+
+
+    def set_mode(mode):
+        o2_send_cmd("/arco/fader/mode", 0, "Ui", id, mode)
+        this
+
+
+    def set_goal(goal, optional chan):
+        if chan:
+            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, chan, goal)
+        for i = 0 to chans:
+            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, i,
+                        goal if isnumber(goal) else goal[i])
+        this

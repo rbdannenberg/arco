@@ -94,9 +94,9 @@ public:
         }
     }
 
-    void print_sources(int indent, bool print) {
-        snd->print_tree(indent, print, "snd");
-        cutoff->print_tree(indent, print, "cutoff");
+    void print_sources(int indent, bool print_flag) {
+        snd->print_tree(indent, print_flag, "snd");
+        cutoff->print_tree(indent, print_flag, "cutoff");
     }
 
     void repl_snd(Ugen_ptr ugen) {

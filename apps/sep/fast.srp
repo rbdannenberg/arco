@@ -6,26 +6,40 @@
 # Roger B. Dannenberg
 # Oct 2023
 
-def gated_foo(swap):
-    var mix = Mix(2)
-    var left = 0.3 * fast_gain
-    var right = 0.7 * fast_gain
+require "gatedfoo"
+require "pitchdly"
 
-    // pan pitch shift and delay left and right...
-    if swap:  // ...unless swap, in which case pan the opposite directions:
-        var tmp = left
-        left = right
-        right = tmp
-    mix.ins('ps', ola_pitch_shift(input_ugen, RATIO, XFADE, WINDIR, 1),
-                  [left, right])
-    mix.ins('del', delay(input_ugen, DUR, FB, MAXDUR, 1),
-                   [right, left])
-    var gate = dualslewlin(lowpassb(powerb(input_ugen), CUTOFF, 1))
-    return mult(mix, gate)
+// def gated_foo(swap):
+//    var mix = Mix(2)
+//    var left = 0.3 * fast_gain
+//    var right = 0.7 * fast_gain
+//
+//    // pan pitch shift and delay left and right...
+//    if swap:  // ...unless swap, in which case pan the opposite directions:
+//        var tmp = left
+//        left = right
+//        right = tmp
+//    mix.ins('ps', ola_pitch_shift(input_ugen, RATIO, XFADE, WINDIR, 1),
+//                  [left, right])
+//    mix.ins('del', delay(input_ugen, DUR, FB, MAXDUR, 1),
+//                   [right, left])
+//    var gate = dualslewlin(lowpassb(powerb(input_ugen), CUTOFF, 1))
+//    return mult(mix, gate)
     
     
 class Fast (Instrument):
     var mix, gated_foo
+    var cycles_index
+    var shift2, shift3    // pitch shifts
+    var cycle_period      // how often we update pitch shifts
+    var cycle_transpose   // overall transposition of pitch shifts
+    var pattern_x         // every period, we update shift1 to 0 to 11
+            // and every other period, we update shift2 to -12 to -1
+            // and in a pattern of 1-period, 3-periods, 1-period, 3-periods ...
+            // we update shift3 to -24 to -13 (probably this was a mistake
+            // and we intended to update every 2 periods).
+    var reverb
+
 
     def init():
         var gf1 = Gated_foo(input_ugen, 0.5, 0.15, 0.6, 100, 1, 1, 0.05, 1)
@@ -35,7 +49,51 @@ class Fast (Instrument):
         mix.ins('gf2', gf2, [1.2 * fast_gain, 1.6 * fast_gain])
 
         gated_foo = [gf1, gf2]
-        super.init("Fast", mix)
-        
+        shift2 = 0
+        shift3 = 0
+        cycle_period = 0.1
+        cycle_transpose = 0
 
+        super.init("Fast", mix)
+
+
+    def cycles(x):
+        var shift1 = irandom(12)
+        if pattern_x & 1 == 1:
+            shift2 = irandom(12) - 12
+        if pattern_x & 2 == 2:
+            shift3 = irandom(12) - 24
+        pattern_x = pattern_x + 1
+        pitdly1.set_ratio(step_to_ratio(shift1 + cycle_transpose))
+        pitdly2.set_ratio(step_to_ratio(shift2 + cycle_transpose))
+        pitdly3.set_ratio(step_to_ratio(shift3 + cycle_transpose))
+
+
+    def cycles_control(x, ending):
+        if x:
+            if not reverb:
+                pitdly1 = Pitchdly(input_ugen, 1, 0, 1.0, 0.03, 0.03, 0,
+                                   name = "pitchdly1")
+                pitdly2 = Pitchdly(audioin, 1, 0, 1.0, 0.03, 0.03, 0,
+                                   name = "pitchdly2")
+                pitdly3 = Pitchdly(audioin, 1, 0, 1.0, 0.03, 0.03, 0,
+                                   name = "pitchdly3")
+                psum = Sum(1, name = "ipsum")
+                psum.add(pitdly).add(pitdly2).add(pitdly3)
+                psum = mono_to_stereo(psum, 1.0, name = "ipsum-to-stereo")
+                reverb = Reverb(psum, 0.007, 12.0, name = "iprev")
+                if ending:
+                    set_cycles_gain(ending_gain)
+                else
+                    set_cycles_gain(cycles_gain)
+                reverb.play()
+
+            pattern_x = 0
+            Periodic(cycle_period, this, 'cycles', unique = 'fast_cycles')
+            fast_cycles.start()
+        else:
+            fast_cycles.stop()
+            if reverb:
+                reverb.mute_input()
+                sched_cause(20, 'cycles_fade')
 
