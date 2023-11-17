@@ -35,16 +35,17 @@ void Mix::print_sources(int indent, bool print_flag)
     }
 }
 
-/* O2SM INTERFACE: /arco/mix/new int32 id, int32 chans;
+/* O2SM INTERFACE: /arco/mix/new int32 id, int32 chans, int32 wrap;
  */
 void arco_mix_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
+    int32_t wrap = argv[2]->i;
     // end unpack message
 
-    new Mix(id, chans);
+    new Mix(id, chans, wrap);
 }
 
 
@@ -115,7 +116,7 @@ void arco_mix_repl_gain(O2SM_HANDLER_ARGS)
 static void mix_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/mix/new", "ii", arco_mix_new, NULL, true, true);
+    o2sm_method_new("/arco/mix/new", "iii", arco_mix_new, NULL, true, true);
     o2sm_method_new("/arco/mix/ins", "isii", arco_mix_ins, NULL, true, true);
     o2sm_method_new("/arco/mix/rem", "is", arco_mix_rem, NULL, true, true);
     o2sm_method_new("/arco/mix/set_gain", "isif", arco_mix_set_gain, NULL, true, true);

@@ -915,6 +915,9 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
     for p in parameters:
         constructor += "        " + p + " = " + p + "_;\n"
 
+    if len(parameters) > 0:
+        constructor += "        flags = CAN_TERMINATE;\n"
+
     # initialize states
     constructor += "        states.set_size(chans);\n"
     constants = initialize_constants(classname, instvars)
@@ -1010,6 +1013,19 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
     for p in parameters:
         real_run += "        " + p + "_samps = " + \
                     p + "->run(current_block); // update input\n"
+
+    # add tests for termination
+    if len(terminate_info) > 0:
+        real_run += "        if ((("
+        join_with_or = ""
+        for p in terminate_info:
+            real_run += join_with_or + p + "->flags"
+            join_with_or = " | "
+        real_run += ") & TERMINATED) &&\n" + \
+                    "            (flags & CAN_TERMINATE)) {\n" + \
+                    "            terminate();\n        }\n"
+
+    # do the signal computation
     real_run += "        " + classname + "_state *state = &states[0];\n"
     real_run += "        for (int i = 0; i < chans; i++) {\n"
     if rate == 'a':
@@ -1145,7 +1161,7 @@ def run_faust(classname, file, outfile):
 
 
 def main():
-    global fsrc, fimpl
+    global fsrc, fimpl, terminate_info
     # find files
     source = sys.argv[1]  # can pass "sine_aa_a.dsp" or just "sine"
     classname = source.split("_")[0] 
@@ -1192,12 +1208,26 @@ def main():
         outfile = str(path.with_suffix(".fh"))
         fhfiles.append([file, signature, outfile])
         if run_faust(classname, file, outfile): return
+    print("main file: ", main_file, "top signature", top_signature)
             
     # find param_info
-    print("main file: ", main_file, "top signature", top_signature)
     param_info = get_param_info(main_file, output_rate)
     if param_info == True: return
     print("Param_info:", param_info)
+
+    # find terminate_info
+    loc = fsrc.find("declare terminate")
+    print("terminate declare at", loc)
+    terminate_info = []
+    if loc >= 0:
+        loc = fsrc.find('"', loc)  # first quote
+        if loc < 0:
+            print("Error: could not find string after declare terminate")
+            return
+        loc2 = fsrc.find('"', loc + 1)
+        print("terminate loc", loc, "loc2", loc2)
+        terminate_info = fsrc[loc + 1 : loc2].replace(",", " ").split()
+    print("terminate_info", terminate_info)
 
     # read main faust output file for use by translators:
     path = Path(main_file)

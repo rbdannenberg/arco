@@ -798,8 +798,15 @@ def dualslewb(input, mode, optional chans = 1):
 # fader.srp - constructor implementation
 #
 
-def fader(input, current, optional mode = 1, chans):
-    Fader(input, current, mode, chans)
+def fader(input, current, optional dur, goal, mode = 1, chans):
+# Create a Fader, with optional intialization. Example:
+#     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
+#     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
+    var fader = Fader(input, current, mode, chans)
+    if dur:
+        fader.set_dur(dur)
+    if goal:
+        fader.set_goal(goal)
 
 
 class Fader (Ugen):
@@ -843,31 +850,39 @@ class Fader (Ugen):
 # June 2023
 
 class Add(Ugen):
-    def init(chans):
-        super.init(create_ugen_id(), "Add", chans)
+    def init(optional chans = 1, wrap = true, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
+                   "Add", chans, A_RATE, "i", 'wrap', 1 if wrap else 0)
 
     def ins(ugen):
         o2_send_cmd("/arco/add/ins", 0, "UU", id, ugen.id)
 
     def rem(ugen):
-        o2_send_cmd("/arco/rem/ins", 0, "UU", id, ugen.id)
+        o2_send_cmd("/arco/add/rem", 0, "UU", id, ugen.id)
+
+    def swap(ugen, replacement):
+        o2_send_cmd("/arco/add/swap", 0, "UUU", id, ugen.id, replacement.id)
 
 
-def add(optional chans = 1): Add(chans)
+def add(optional wrap = true, chans = 1): Add(chans, wrap)
 
 
 class Addb(Ugen):
-    def init(chans):
-        super.init(create_ugen_id(), "Addb", chans)
+    def init(optional chans = 1, wrap = true, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
+                   "Addb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
 
     def ins(ugen):
         o2_send_cmd("/arco/addb/ins", 0, "UU", id, ugen.id)
 
     def rem(ugen):
-        o2_send_cmd("/arco/rem/ins", 0, "UU", id, ugen.id)
+        o2_send_cmd("/arco/addb/rem", 0, "UU", id, ugen.id)
+
+    def swap(ugen, replacement):
+        o2_send_cmd("/arco/addb/swap", 0, "UUU", id, ugen.id, replacement.id)
 
 
-def addb(optional chans = 1): Addb(chans)
+def addb(optional wrap = true, chans = 1): Addb(chans, wrap)
 
 # thru.srp -- audio pass-through
 #

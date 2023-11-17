@@ -78,6 +78,7 @@ public:
         snd = snd_;
         center = center_;
         q = q_;
+        flags = CAN_TERMINATE;
         states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_snd(snd);
@@ -144,6 +145,10 @@ public:
         snd_samps = snd->run(current_block); // update input
         center_samps = center->run(current_block); // update input
         q_samps = q->run(current_block); // update input
+        if (((snd->flags) & TERMINATED) &&
+            (flags & CAN_TERMINATE)) {
+            terminate();
+        }
         Resonb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             FAUSTFLOAT tmp_0 = 1.0f / std::max<float>(float(*q_samps), 0.1f);

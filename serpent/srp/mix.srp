@@ -5,8 +5,9 @@
 
 class Mix (Ugen):
     
-    def init(chans_):
-        super.init(create_ugen_id(), "Mix", chans_, A_RATE, "")
+    def init(chans_, wrap):
+        super.init(create_ugen_id(), "Mix", chans_, A_RATE,
+                   "i", 'wrap', 1 if wrap else 0)
 
         
     def set(input, value, optional chan = 0):
@@ -67,10 +68,11 @@ class Mix (Ugen):
             inputs[name][2] = gain
             // display "mix set_gain, calling /repl_gain", id, name, gain.id
             o2_send_cmd("/arco/mix/repl_gain", 0, "UsU", id, str(name), gain.id)
+        this
     
 
-def mix(optional chans = 1):
-    Mix(chans)
+def mix(optional chans = 1, keyword wrap = true):
+    Mix(chans, wrap)
 
 
 def mix_name(i):

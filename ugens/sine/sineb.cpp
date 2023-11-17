@@ -51,7 +51,7 @@ static void arco_sineb_set_freq(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Sineb, sineb, id, "arco_sineb_repl_freq");
+    UGEN_FROM_ID(Sineb, sineb, id, "arco_sineb_set_freq");
     sineb->set_freq(chan, val);
 }
 
@@ -81,7 +81,7 @@ static void arco_sineb_set_amp(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Sineb, sineb, id, "arco_sineb_repl_amp");
+    UGEN_FROM_ID(Sineb, sineb, id, "arco_sineb_set_amp");
     sineb->set_amp(chan, val);
 }
 
@@ -91,10 +91,10 @@ static void sineb_init()
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/sineb/new", "iiii", arco_sineb_new, NULL, true,
                     true);
-    o2sm_method_new("/arco/sineb/repl_freq", "ii", arco_sineb_repl_freq, NULL,
-                    true, true);
-    o2sm_method_new("/arco/sineb/set_freq", "iif", arco_sineb_set_freq, NULL,
-                    true, true);
+    o2sm_method_new("/arco/sineb/repl_freq", "ii", arco_sineb_repl_freq,
+                    NULL, true, true);
+    o2sm_method_new("/arco/sineb/set_freq", "iif", arco_sineb_set_freq,
+                    NULL, true, true);
     o2sm_method_new("/arco/sineb/repl_amp", "ii", arco_sineb_repl_amp, NULL,
                     true, true);
     o2sm_method_new("/arco/sineb/set_amp", "iif", arco_sineb_set_amp, NULL,

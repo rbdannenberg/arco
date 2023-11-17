@@ -51,7 +51,7 @@ static void arco_sine_set_freq(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Sine, sine, id, "arco_sine_repl_freq");
+    UGEN_FROM_ID(Sine, sine, id, "arco_sine_set_freq");
     sine->set_freq(chan, val);
 }
 
@@ -81,7 +81,7 @@ static void arco_sine_set_amp(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Sine, sine, id, "arco_sine_repl_amp");
+    UGEN_FROM_ID(Sine, sine, id, "arco_sine_set_amp");
     sine->set_amp(chan, val);
 }
 
@@ -89,7 +89,8 @@ static void arco_sine_set_amp(O2SM_HANDLER_ARGS)
 static void sine_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/sine/new", "iiii", arco_sine_new, NULL, true, true);
+    o2sm_method_new("/arco/sine/new", "iiii", arco_sine_new, NULL, true,
+                    true);
     o2sm_method_new("/arco/sine/repl_freq", "ii", arco_sine_repl_freq, NULL,
                     true, true);
     o2sm_method_new("/arco/sine/set_freq", "iif", arco_sine_set_freq, NULL,

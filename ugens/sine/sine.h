@@ -108,6 +108,7 @@ public:
             Ugen(id, 'a', nchans) {
         freq = freq_;
         amp = amp_;
+        flags = CAN_TERMINATE;
         states.set_size(chans);
         fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_freq(freq);

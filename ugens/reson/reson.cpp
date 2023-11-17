@@ -53,7 +53,7 @@ static void arco_reson_set_snd(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Reson, reson, id, "arco_reson_repl_snd");
+    UGEN_FROM_ID(Reson, reson, id, "arco_reson_set_snd");
     reson->set_snd(chan, val);
 }
 
@@ -83,7 +83,7 @@ static void arco_reson_set_center(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Reson, reson, id, "arco_reson_repl_center");
+    UGEN_FROM_ID(Reson, reson, id, "arco_reson_set_center");
     reson->set_center(chan, val);
 }
 
@@ -113,7 +113,7 @@ static void arco_reson_set_q(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Reson, reson, id, "arco_reson_repl_q");
+    UGEN_FROM_ID(Reson, reson, id, "arco_reson_set_q");
     reson->set_q(chan, val);
 }
 
@@ -131,10 +131,10 @@ static void reson_init()
                     NULL, true, true);
     o2sm_method_new("/arco/reson/set_center", "iif", arco_reson_set_center,
                     NULL, true, true);
-    o2sm_method_new("/arco/reson/repl_q", "ii", arco_reson_repl_q, NULL, true,
-                    true);
-    o2sm_method_new("/arco/reson/set_q", "iif", arco_reson_set_q, NULL, true,
-                    true);
+    o2sm_method_new("/arco/reson/repl_q", "ii", arco_reson_repl_q, NULL,
+                    true, true);
+    o2sm_method_new("/arco/reson/set_q", "iif", arco_reson_set_q, NULL,
+                    true, true);
     // END INTERFACE INITIALIZATION
 
     // class initialization code from faust:

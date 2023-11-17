@@ -10,6 +10,7 @@ class Pwe (Ugen):
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -37,10 +38,12 @@ class Pwe (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwe/decay", 0, "Uf", id, dur * AR)
+        this
 
     def set(y):
     # set current value to y
         o2_snd_cmd("/arco/pwe/set", 0, "Uf", id, y)
+        this
 
 
 def pwe(keyword init, start = true, rest points):
@@ -59,9 +62,11 @@ class Pweb (Ugen):
     def init(points):
         super.init(create_ugen_id(), "Pweb", 1, 'b', "", omit_chans = true)
         set_point_array(points)
+        this
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -103,11 +108,13 @@ class Pweb (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_send_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
+        this
 
 
     def set(y):
     # set current value to y
         o2_send_cmd("/arco/pweb/set", 0, "Uf", id, y)
+        this
 
 
 def pweb(keyword init, start = true, rest points):

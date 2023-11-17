@@ -6,5 +6,6 @@
 #include "arcotypes.h"
 #include "arcoutil.h"
 #include "ugenid.h"
+#include <cmath>
 #include "ugen.h"
 #include "upsample.h"

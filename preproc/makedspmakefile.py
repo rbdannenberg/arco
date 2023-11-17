@@ -83,6 +83,8 @@ def make_makefile(arco_path, manifest, outf):
         manifest.append("zero*")
     if "fader" not in manifest:
         manifest.append("fader")
+    if "add" not in manifest and "add*" not in manifest:
+        manifest.append("add")
     for ugen in manifest:
         basename = ugen
         if ugen[-1 : ] == "*":
@@ -103,7 +105,7 @@ def make_makefile(arco_path, manifest, outf):
             if basename == "mult":  # get "mult" code from srp_path,
                                     # not ugens_path:
                 append_to_srp_srcs(ugen, srp_path + "mult.srp")
-            else:
+            elif basename != "fader":  # fader is included by arco.srp
                 append_to_srp_srcs(ugen, ugens_path + basename + "/" + \
                                          basename + ".srp")
 

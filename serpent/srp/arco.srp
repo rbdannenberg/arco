@@ -13,6 +13,11 @@ require "o2util"
 require "utils"
 require "prefs"
 
+FADE_LINEAR = 0
+FADE_EXPONENTIAL = 1
+FADE_LOWPASS = 2
+FADE_SMOOTH = 3
+
 PI = 3.1415926535898
 PI_recip = 1/PI
 PI2 = 6.2831853071794
@@ -141,7 +146,7 @@ FINISH = 'finish'  // custom behavior - the target should implement finish()
 ZERO_ID = 0
 ZEROB_ID = 1
 INPUT_ID = 2
-PREV_OUTPUT_ID = 3
+OUTPUT_ID = 3
 
 // shadow the sets of Ugens maintained by audio server:
 arco_run_set = []
@@ -552,7 +557,7 @@ def reset_arco():
     zero_ugen = nil
     zerob_ugen = nil
     input_ugen = nil
-    prev_output_ugen = nil
+    output_ugen = nil
 
 
 last_gc_cycles = 0
@@ -594,8 +599,7 @@ def create_standard_ugens():
     zero_ugen = Zero(ZERO_ID)
     zerob_ugen = Zerob(ZEROB_ID)
     input_ugen = Thru(zero_ugen, arco_input_chans, INPUT_ID)
-    // previous output can be read here on the next block:
-    prev_output_ugen = Thru(zero_ugen, arco_output_chans, PREV_OUTPUT_ID)
+    output_ugen = Add(arco_output_chans, true, OUTPUT_ID)
 
 
 # internal function: wait for arco service, then reset Arco server
@@ -647,8 +651,9 @@ def actl_starting(timestamp, address, types, rest args):
 
 def max_chans(chans, ugen):
 # compute the maximum of chans and the channels implied by ugen, where
-# ugen may be a number (Const) or Ugen
-    max(chans, 1 if isnumber(ugen) else ugen.chans)
+# ugen may be a number (Const), array (Const) or Ugen
+    max(chans, 1 if isnumber(ugen) else
+               (len(ugen) if isarray(ugen) else ugen.chans))
 
 
 class Ugen:
@@ -741,9 +746,9 @@ class Ugen:
         str(arco_ugen_id(id) if id else nil) + " chans " + str(chans) + ">"
 
 
-    def play(optional quiet):  # connect this Ugen to audio output
+    def play():  # connect this Ugen to audio output
         // display "Ugen play", id
-        o2_send_cmd("/arco/output", 0, "U", id)
+        output_ugen.ins(this)
         this
 
 
@@ -751,19 +756,34 @@ class Ugen:
     # disconnect this Ugen from audio output
     # since "atend" actions always have a status, we accept a status
     # but ignore it.
-        o2_send_cmd("/arco/mute", 0, "U", id)
+        output_ugen.rem(this)
         this
 
 
-    def fade(dur, optional quiet):
+    def fade(dur, keyword mode = FADE_SMOOTH):
     # fade to nothing, then disconnect from audio output. If not already
     # connected to audio output, this will cause Arco to print a warning.
-        var faded = fader(this, 1, 1).set_dur(dur).set_goal(0)
-        o2_send_cmd("/arco/swap", 0, "UU", id, faded.id)
+        var fader = fade_in_lookup.get(this)
+        if fader:  // fade_in is in progress; convert to fade out
+            fade_in_lookup.remove(this)
+            fader.set_mode(mode)
+            fader.set_dur(dur)
+            fader.set_goal(0)
+            return fader
+        else:
+            var faded = fader(this, 1, dur, 0, mode = mode).term()
+            output_ugen.swap(this, faded)
+            return faded   // return the new fader ugen
+
+
+    def fade_in(dur, keyword mode = FADE_SMOOTH, term = true):
+    # fade from 0 to 1, then disconnect fader
+        var fader = fader(this, 0, dur, 1, mode = mode)
+        if term: fader.term()
+        fade_in_lookup[this] = fader
         sched_select(rtsched)
-        display "fade", faded, faded.id, arco_ugen_id(faded.id)
-        sched_cause(dur + 0.1, faded, 'mute')
-        faded   // return the new fader ugen
+        sched_cause(dur + 0.1, fader, 'fade_in_complete', this)
+        fader.play()
 
 
     def smooth_disconnect(input_name, ugen, fade_time):
@@ -827,6 +847,10 @@ class Ugen:
             create_action(this, arg if arg else this, action)
         else:
             print "ERROR: Ugen atend - unknown action", repr(action)
+
+    def term(optional dur = 0):
+        o2_send_cmd("/arco/term", 0, "Uf", id, dur)
+        this
 
 
 instr_stack = []
@@ -952,3 +976,5 @@ class Const (Const_like):
 
 def const(x, optional chans):
     return Const(x, chans)
+
+

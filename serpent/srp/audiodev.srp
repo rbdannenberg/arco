@@ -438,7 +438,7 @@ class Monitor_audio (Arco_window):
                     left, in_out_y + 26, 'output_vu_meter')
             audioout_monitor = Audio_monitor(outclip_light, output_vu_meter)
             output_vu = vu("/actl/outpks", 0.05)
-            output_vu.set('input', prev_output_ugen)
+            output_vu.set('input', output_ugen)
             output_vu.run()  // add to run_set to make it compute peaks
             print "********* Created output VU meter ***********"
 
@@ -448,7 +448,7 @@ class Monitor_audio (Arco_window):
             probe_what = input_ugen
             probe_name = "Input"
         else:
-            probe_what = prev_output_ugen
+            probe_what = output_ugen
             print "** Note: no input, Oscilloscope shows nothing **"
             probe_name = "Output"
         master_probe = probe(probe_what, "/actl/probe")
@@ -498,7 +498,7 @@ class Monitor_audio (Arco_window):
             input_vu.set('input', zero_ugen)  // disconnect from input
             input_vu.unrun()                //      to stop it
         if output_vu:
-            output_vu.set('input', zero_ugen)  // disconnect from prev_output
+            output_vu.set('input', zero_ugen)  // disconnect from output_ugen
             output_vu.unrun()                //     to stop it
         test_tone(nil, nil, false, nil);
         audio_login(nil, nil, false, nil);
@@ -555,7 +555,7 @@ class Monitor_audio (Arco_window):
 
     def audio_logout(obj, event, x, y):
         if x and not output_logger:
-            output_logger = filerec("output.wav", prev_output_ugen,
+            output_logger = filerec("output.wav", output_ugen,
                                     arco_output_chans)
             output_logger.run()
             output_logger.go()
@@ -593,7 +593,7 @@ class Monitor_audio (Arco_window):
         if arco_input_chans > 0 and x == "Input":
             probe_what = input_ugen
         else:
-            probe_what = prev_output_ugen
+            probe_what = output_ugen
             if x == "Input":
                 print "There is no audio input, showing Output"
                 scope_input_choice.set_value("Output")

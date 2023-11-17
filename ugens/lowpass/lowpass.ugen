@@ -10,6 +10,7 @@ lowpassb(b, b): b
 FAUST
 
 declare description "Lowpass Unit Generator for Arco";
+declare terminate "snd";
 
 import("stdfaust.lib");
 import("filters.lib");

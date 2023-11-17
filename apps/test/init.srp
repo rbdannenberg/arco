@@ -14,6 +14,7 @@ require "arco"
 require "allugens"
 require "reverb"
 require "soundfont"
+require "pan"
 
 SIMPLE = false
 
@@ -23,7 +24,10 @@ class Atone (Instrument):
         instr_begin()
         var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
         display "In Atone", env, env.id, id(env.id)
-        env.atend(MUTE, this)  # target to mute is this, not env!
+        env.term()  // allow envelope to terminate; termination
+        // will propagate all the way to the output, which will
+        // remove and free the instrument (assuming there are no
+        // other references to it, which we will avoid).
         var mix = mix(1)
         for i = 0 to nharm:
             // we need a symbol for each mixer input but since the
@@ -65,8 +69,9 @@ def arco_ready():
 
     display "arco_ready", wxs_h, wxs_space,
     display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
+    var WIDTH = 170
 
-    Checkbox(win, "Simple test", 5, 5, 170, 20, 'stcheckbox')
+    Checkbox(win, "Simple test", 5, 5, WIDTH, 20, 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
 
     Checkbox(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtcheckbox')
@@ -112,6 +117,7 @@ def arco_ready():
     # start a 2nd column
     COLUMN_TWO = 200
     wxs_x = COLUMN_TWO
+
     wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
 
     Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
@@ -146,6 +152,10 @@ def arco_ready():
     ONOFF_OFF_TEXT = "◻ On/Off"
     Statictext(win, ONOFF_OFF_TEXT, 'R', 'S', 'S', 'S', 'onofftext')
 
+    wxs_x = COLUMN_TWO
+    Checkbox(win, "Fade", 'S', 'D', WIDTH, 'S', 'fadecheckbox')
+    fadecheckbox.add_target_method(nil, 'fadetest')
+
     ui_initialized = true
     default_window.fit_to_children()
 
@@ -157,8 +167,14 @@ def atone_sequence():
     var nharm = 1 if SIMPLE else irandom(15) + 2 
     display "atone_sequence", freq, dur, nharm, sched_current, 
     display     vtsched, sched_vtime
-    var atone = Atone(freq, dur, nharm).play().start()
-    // sched_cause(dur + 0.2, atone, 'mute')
+    // careful here: start() is a method of Atone, but we must "play"
+    // the Ugen returned by stereoize. (We could have put stereoize
+    // inside Atone, but we didn't.)  There's no race condition where
+    // envelopes could start before we're connected to output because
+    // until we are connected to some sink (like audio output), there
+    // will be no calls to compute samples, so envelopes will sit and
+    // wait even if we get connected to output long after .start().
+    stereoize(Atone(freq, dur, nharm).start()).play()
     var ioi = pr_unif(0.25, 2.0) ** 2
     if atone_running:
         sched_cause(ioi, nil, 'atone_sequence')
@@ -212,17 +228,18 @@ def play_mixer_test(obj, event, x, y):
         m1.ins('inp1', ms1, [1, 0])
 
         ms2 = sine(880.0, 0.01)
-        m1.ins('inp2', ms2, [0, 1])
+        sched_select(rtsched)
+        sched_cause(0.2, m1, 'ins', 'inp2', ms2, [0, 1])
 
-        m1.ins('inp3', sine(1320.0, 0.007), 1)
+        sched_cause(0.4, m1, 'ins', 'inp3', sine(1320.0, 0.007), 1)
 
-        m1.ins('inp4', sine(1760.0, 0.005), 1)
+        sched_cause(0.6, m1, 'ins', 'inp4', sine(1760.0, 0.005), 1)
 
         m1.play()
 
         sched_select(rtsched)
-        sched_cause(1.0, nil, 'mixer_gain_change_1')
-        sched_cause(2.0, nil, 'mixer_gain_change_2')
+        sched_cause(1.6, nil, 'mixer_gain_change_1')
+        sched_cause(2.6, nil, 'mixer_gain_change_2')
     else:
         m1.fade(1) // test for stereo fade output to silence:
         m1 = nil  // delete references
@@ -231,11 +248,11 @@ def play_mixer_test(obj, event, x, y):
 
 def mixer_gain_change_1():
     if m1:  // user has not stopped test yet
-        m1.set_gain('inp1', 10, 0)  // left channel
+        m1.set_gain('inp1', 5, 0)  // left channel
 
 def mixer_gain_change_2():
     if m1:  // user has not stopped test yet
-        m1.set_gain('inp2', 10, 1)  // right channel
+        m1.set_gain('inp2', 5, 1)  // right channel
 
 
 ########## RECPLAY TESTS ##################
@@ -252,7 +269,7 @@ def record_output(obj, event, x, y, optional chans = 1):
                 recplay1.record(false)
                 recplay1.unrun()
             // long fade time to test this feature
-            recplay1 = recplay(prev_output_ugen, chans, 0.5, 3.0, false)
+            recplay1 = recplay(output_ugen, chans, 0.5, 3.0, false)
         recplay1.run()  # needs be in run set to make active
         recplay1.record(true)
     elif not recplay1:
@@ -487,7 +504,7 @@ def rvbsweep2()
 # set reverb time to 5s and send in another sine sweep
     var swsine = sweeper()
     rvb.set_rt60(5.0)
-    rvb.set_inp(swsine)
+    rvb.set_input(swsine)
     sched_cause(6, nil, 'rvbfinish')
 
 def rvbfinish():
@@ -504,6 +521,7 @@ def flstest(obj, event, x, y):
         flsyn_ugen = Flsyn(SOUNDFONT)
         print "Created Flsyn unit generator with sound font"
         print "    ", SOUNDFONT
+        print "**** CLICK Flsyn Test BUTTON AGAIN TO PLAY *****"
         flsyn_ugen.play()
         return
     sched_select(rtsched)
@@ -625,6 +643,7 @@ class File_play_record:
         frec.go()
 
     def finish(optional status):  // stop recording and clean up
+        print "File_play_record.finish called via .atend() processing"
         frec.stop()
         frec.unrun()
         frec = nil
@@ -636,6 +655,21 @@ def file_play_record(obj, event, x, y):
     display "file_play_record", x
     File_play_record()
 
+
+########## Fade Test ################
+
+to_be_faded = nil
+
+def fadetest(obj, event, x, y):
+    display "fadetest", x
+    if x:
+        if to_be_faded:
+            to_be_faded.fade(1.0)
+        to_be_faded = sine(880, [0.3, 0.3])
+        to_be_faded.fade_in(0.9)  // starts playing
+    else:
+        to_be_faded.fade(0.9)
+        to_be_faded = nil
 
 
 ########## Main Initialization ################

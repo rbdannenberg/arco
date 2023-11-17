@@ -202,10 +202,44 @@ which is currently handled by `Pwlb` and `Fileplay` classes. Allowed
 actions are currently `MUTE`, which invokes `mute`, and `FINISH`,
 which should be implemented by the receiving object (`this` or `arg`).
 
+### ugen.term([tail])
+Sets the `CAN_TERMINATE` flag true and sets `tail_blocks` to a count
+corresponding to `tail` seconds (unless the `TERMINATING` flag is true).
+When this unit generator ends, it will set `TERMINATING` and after
+running for `tail_blocks` more blocks, it will set its `TERMINATED`
+flag. Typically, this is applied to signal generators such as `pwl`,
+`pwe` and `recplay` (when playing). The `TERMINATED` flag propagates
+through filters, multipliers, etc., to 
+
+
 ## Unit Generators and Messages
 
 In each section, Serpent constructor and methods are listed in
 **`bold`** followed by `O2 message formats`.
+
+### add, addb
+```
+add([chans], wrap = true)
+.ins(ugen)
+.rem(ugen)
+.set_gain(gain)
+```
+
+`/arco/add/new id chans wrap` -- Create a new add unit generator.
+If `wrap` is zero, extra input channels are deleted. Otherwise,
+input channels are "wrapped" around output channels as in `mix`.
+If there is one input channel, it is added to the first output
+channel only, not duplicated to all output channels.
+
+`/arco/add/ins id ugen_id` -- Insert unit generator with id
+`ugen_id` into this adder.
+
+`/arco/add/rem id ugen_id` -- Remove unit generator with id
+`ugen_id` from this adder.
+
+`/arco/add/set_gain id gain` -- Set an overall gain applied to
+the sum of inputs. Changes to gain are smoothed.
+
 
 ### alpass
 ```
@@ -281,6 +315,33 @@ id `dur_id`.
 `/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
 `/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
+
+### dnsampleb
+```
+dnsampleb(input, mode [, chans])
+```
+
+`/arco/dnsampleb/new id chans input mode` - Create a new dnsampleb
+unit generator with audio input and block-rate output. Mode controls
+the downsampling algorithm: Modes are BASIC = 0, AVG = 1, PEAK = 2,
+RMS = 3, POWER = 4, LOWPASS500 = 5, LOWPASS100 = 6.
+- BASIC means take one out of every 32 (block-length) samples.
+- AVG means take the average value of each block of 32 samples.
+- PEAK menas take the peak of the absolute values of each block.
+- RMS means take the RMS of each block.
+- POWER means take the mean of the squares in each block.
+- LOWPASS500 means apply a first order filter with 500 Hz cutoff
+  to the audio and then take the final filter value after each block.
+- LOWPASS100 is similar, but use a 100 Hz cutoff frequency.
+
+`/arco/dnsampleb/repl_input id input_id` - Set the input to object
+with id `input_id`.
+
+`/arco/dnsampleb/cutoff id cutoff` - Set the cutoff frequency to an
+alternate value after selecting mode LOWPASS500 or LOWPASS100.
+
+`/arco/dnsampleb/mode id mode` - Change the mode.
+
 
 ### dualslewb
 ```
@@ -631,7 +692,7 @@ but attenuates feedback to be almost inaudible.
 
 ### mix
 ```
-mix([chans])
+mix([chans], wrap = true)
 .ins(name, ugen, gain [, at_end]) // name is a symbol
 .rem(name)
 .find_name_of(ugen)
@@ -656,8 +717,11 @@ A single channel input signal will be duplicated n times if the gain
 has n channels, and a single gain channel will be duplicated n times
 if the input signal has n channels, forming n audio channels as the
 input signal. These n channels are added to mixer output channels
-starting at channel 0 and wrapping around if n is greater than the
-number of output channels.
+starting at channel 0 and, if `wrap` is non-zero and n is greater
+than the number of output channels, input channel i is added to
+output channel i mod m, where m is the number of output channels,
+i.e. inputs channels are "wrapped." If `wrap` is zero, extra
+input channels are dropped.
 
 Note that the number of channels in any given input does not need to
 match the number of mixer output channels. Also note that a single
@@ -666,8 +730,8 @@ channels. E.g., mono input is routed to stereo left (only). To place a
 mono channel in the middle of a stereo field, use a 2-channel gain,
 which could be as simple as a Const Ugen with values [0.7, 0.7].
 
-`/arco/mix/new id chans` - Create a new mixer with `chans` output
-channels.
+`/arco/mix/new id chans wrap` - Create a new mixer with `chans` output
+channels. The mixer will "wrap" extra channels if wrap (integer) is non-zero.
 
 `/arco/mix/ins id name input gain` - Insert an input to the mixer. The
 `name` must not match the name of another input, or the existing input

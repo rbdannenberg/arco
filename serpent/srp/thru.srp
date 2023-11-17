@@ -11,6 +11,7 @@ class Thru (Ugen):
 
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
+        this
 
 def thru(input, optional chans = 1):
     Thru(input, chans)

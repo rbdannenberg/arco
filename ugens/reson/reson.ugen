@@ -10,6 +10,7 @@ resonb(b, b, b): b
 FAUST
 
 declare description "Reson Unit Generator for Arco";
+declare terminate "snd";
 
 import("stdfaust.lib");
 import("filters.lib");

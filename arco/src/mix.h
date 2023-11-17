@@ -17,9 +17,12 @@ public:
         Vec<float> prev_gain;
     };
     Vec<Input> inputs;
+    bool wrap;
     
 
-    Mix(int id, int nchans) : Ugen(id, 'a', nchans) {
+    Mix(int id, int nchans, int wrap_) : Ugen(id, 'a', nchans) {
+        tail_blocks = 1;  // because gain inputs are b-rate
+        wrap = (wrap_ != 0);
     };
 
     ~Mix();
@@ -85,16 +88,21 @@ public:
     void rem(char *name) {
         int i = find(name);
         if (i >= 0) {
-            Input *input_desc = &inputs[i];
-            O2_FREE((void *) input_desc->name);
-            input_desc->name = NULL;
-            input_desc->input->unref();
-            input_desc->input = NULL;
-            input_desc->gain->unref();
-            input_desc->gain = NULL;
-            inputs.remove(i);
+            remove_input(i, &inputs[i]);
         }
     }
+
+
+    void remove_input(int i, Input *input_desc) {
+        O2_FREE((void *) input_desc->name);
+        input_desc->name = NULL;
+        input_desc->input->unref();
+        input_desc->input = NULL;
+        input_desc->gain->unref();
+        input_desc->gain = NULL;
+        inputs.remove(i);
+    }
+
 
     void set_gain(const char *name, int chan, float gain) {
         int i = find(name);
@@ -144,44 +152,64 @@ public:
 
 
     void real_run() {
+        int starting_size = inputs.size();
+        int i = 0;
+
         // zero the outputs
         block_zero_n(out_samps, chans);
-        // add inputs with wrap-around; note that input might be NULL if
-        // inputs.size() == 0, but in that case we will not actually use input.
-        Input *input_desc = inputs.get_array();
-        for (int i = 0; i < inputs.size(); i++) {
+
+        while (i < inputs.size()) {
+            Input *input_desc = &inputs[i];
             float *gain_ptr = input_desc->gain->run(current_block);
             float *gprev_ptr = &(input_desc->prev_gain[0]);
             Sample_ptr input_ptr = input_desc->input->run(current_block);
             float *out = out_samps;
+
+            if ((input_desc->input->flags & TERMINATED) ||
+                (input_desc->gain->flags & TERMINATED)) {
+                remove_input(i, input_desc);
+                continue;
+            }
+            i++;
             assert(input_desc->prev_gain.size() ==
                    MAX(input_desc->input->chans, input_desc->gain->chans));
             for (int ch = 0; ch < input_desc->prev_gain.size(); ch++) {
-                float gain = *gain_ptr;
-                float gincr = (gain - *gprev_ptr) * BL_RECIP;
+                float gain = *gprev_ptr;
+                float gincr = (*gain_ptr - gain) * BL_RECIP;
             
-                if (gincr < 1e-6) {  // gain is constant, no interpolation
+                if (gincr > -1e-6 && gincr < 1e-6) {
+                    // gain is constant, no interpolation:
                     for (int j = 0; j < BL; j++) {
                         *out++ += gain * input_ptr[j];
                     }
                 } else {  // gain is changing; do interpolation
-                    float g = *gprev_ptr;
                     for (int j = 0; j < BL; j++) {
-                        g += gincr;
-                        *out++ += g * input_ptr[j];
+                        gain += gincr;
+                        *out++ += gain * input_ptr[j];
                     }
-                    *gprev_ptr = g;
+                    *gprev_ptr = gain;
                 }
-                input_ptr += input_desc->input_stride;
-                if (out >= out_samps + BL * chans) {   // wrap to output
-                    out = out_samps;
+
+                if (out >= out_samps + BL * chans) {  // wrap to output
+                    if (wrap) {
+                        out = out_samps;
+                    } else {
+                        break;
+                    }
                 }
                 // advance to the next channel of this input:
+                input_ptr += input_desc->input_stride;
+                gain_ptr += input_desc->gain_stride;
                 gprev_ptr++;  // we have a prev_gain for each generated channel
                         // even if gain is single channel (gain_stride == 0)
-                gain_ptr += input_desc->gain_stride;
             }
-            input_desc++; // each iteration, sum next input to mixer outputs
+        }
+        if (inputs.size() == 0 && starting_size > 0 &&
+            (flags & CAN_TERMINATE)) {
+            terminate();
         }
     }
 };
+
+
+    

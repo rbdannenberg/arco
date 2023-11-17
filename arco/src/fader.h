@@ -16,6 +16,11 @@
 #endif 
 
 extern const char *Fader_name;
+const int FADE_LINEAR = 0;
+const int FADE_EXPONENTIAL = 1;
+const int FADE_LOWPASS = 2;
+const int FADE_SMOOTH = 3;
+
 
 class Fader : public Ugen {
 public:
@@ -25,7 +30,7 @@ public:
         Sample step;
         Sample delta;
         Sample factor;
-        Sample new_goal;
+        Sample phase;
     };
     Vec<Fader_state> states;
 
@@ -75,8 +80,9 @@ public:
     void set_mode(int m) {
         mode = m;
         run_channel = &Fader::chan_linear;
-        if (m == 1) run_channel = &Fader::chan_exponential;
-        else if (m == 2) run_channel = &Fader::chan_relaxation;
+        if (m == FADE_EXPONENTIAL) run_channel = &Fader::chan_exponential;
+        else if (m == FADE_LOWPASS) run_channel = &Fader::chan_relaxation;
+        else if (m == FADE_SMOOTH) run_channel = &Fader::chan_smooth_br;
         count = 0;
     }
     
@@ -133,21 +139,34 @@ public:
 
 
     void set_goal(int chan, Sample goal) {
-        states[chan].new_goal = goal;
+        states[chan].goal = goal;
         if (chan == states.size() - 1) {  // set last channel, activate fade:
             count = dur_samps;
             for (int i = 0; i < chans; i++) {
-                Fader_state &state = states[chan];
-                if (mode == 1) {
+                Fader_state &state = states[i];
+                if (mode == FADE_EXPONENTIAL) {
                     state.factor = pow((double) (state.goal + 0.01) /
                                        (double) (state.current + 0.01),
                                               (double) 1.0 / dur_samps);
-                } else if (mode == 2) {
+                } else if (mode == FADE_LOWPASS) {
                     state.factor = pow((double) 0.01,
                                        (double) 1.0 / dur_samps);
                     // make the delta 1% too big so that when we relax 99%
                     // of delta, we'll actually close the full gap to goal:
                     state.delta = (state.goal - state.current) * 1.01;
+                } else if (mode == FADE_SMOOTH) {
+                    // start where cos table is 1 and read it backwards
+                    // to get a signal that diminishes to zero:
+                    state.delta = float(-COS_TABLE_SIZE) / dur_samps;
+                    state.factor = state.goal - state.current;
+                    state.phase = 2 + COS_TABLE_SIZE;
+                    if (dur_samps > 0.01 * BR) {  // longer than 10 msec
+                        run_channel = &Fader::chan_smooth_br;
+                    } else {
+                        run_channel = &Fader::chan_smooth_ar;
+                        // adding delta at audio rate, so it must be smaller:
+                        state.delta *= BL_RECIP;
+                    }
                 } else {  // linear is the default
                     state.step = (state.goal - state.current) / dur_samps;
                 }
@@ -189,6 +208,45 @@ public:
     }
 
 
+    // use delta to represent the phase increment
+    // use factor for the scale factor (similar to delta in relaxation)
+    // use phase as value from 2 to 102 (COS_TABLE_SIZE + 2)
+    void chan_smooth_br(Fader_state *state) {
+        Sample prev = state->current;
+        state->phase += state->delta;
+        int phasei = (int) state->phase;
+        float rc = raised_cosine[phasei];
+        // linear interpolation:
+        rc += (raised_cosine[phasei] - rc) * (state->phase - phasei);
+        state->current = state->goal - state->factor * rc;
+        Sample incr = (state->current - prev) * BL_RECIP;
+        for (int i = 0; i < BL; i++) {
+            prev += incr;
+            *out_samps++ = input_samps[i] * prev;
+        }
+    }
+
+
+    // For very short (< 10 msec) duration, interpolate sample-by-sample:
+    void chan_smooth_ar(Fader_state *state) {
+        Sample cur = state->current;
+        Sample goal = state->goal;
+        float factor = state->factor;
+        float phase = state->phase;
+        for (int i = 0; i < BL; i++) {
+            phase += state->delta;
+            int phasei = (int) state->phase;
+            float rc = raised_cosine[phasei];
+            // linear interpolation:
+            rc += (raised_cosine[phasei] - rc) * (phase - phasei);
+            cur = goal - factor * rc;
+            *out_samps++ = input_samps[i] * cur;
+        }
+        state->current = cur;
+        state->phase = phase;
+    }
+
+
     // when fade has ended, install this 
     void chan_static(Fader_state *state) {
         Sample gain = state->current;
@@ -203,6 +261,16 @@ public:
         Fader_state *state = &states[0];
         if (count == 0) {
             run_channel = &Fader::chan_static;
+            // if all goals are zero, we might terminate
+            if (flags & CAN_TERMINATE) {
+                bool all_zeros = true;
+                for (int i = 0; i < chans; i++) {
+                    all_zeros &= (state[i].goal == 0);
+                }
+                if (all_zeros) {
+                    terminate();
+                }
+            }
         }
         count--;
         for (int i = 0; i < chans; i++) {

@@ -235,6 +235,7 @@ public:
         input_samps = input->run(current_block);
         dur_samps = dur->run(current_block);
         fb_samps = fb->run(current_block);
+        // alpass does not terminate due to unknown tail_blocks
         Alpass_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);

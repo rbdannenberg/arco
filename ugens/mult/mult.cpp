@@ -51,7 +51,7 @@ static void arco_mult_set_x1(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Mult, mult, id, "arco_mult_repl_x1");
+    UGEN_FROM_ID(Mult, mult, id, "arco_mult_set_x1");
     mult->set_x1(chan, val);
 }
 
@@ -81,7 +81,7 @@ static void arco_mult_set_x2(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Mult, mult, id, "arco_mult_repl_x2");
+    UGEN_FROM_ID(Mult, mult, id, "arco_mult_set_x2");
     mult->set_x2(chan, val);
 }
 
@@ -89,15 +89,16 @@ static void arco_mult_set_x2(O2SM_HANDLER_ARGS)
 static void mult_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/mult/new", "iiii", arco_mult_new, NULL, true, true);
-    o2sm_method_new("/arco/mult/repl_x1", "ii", arco_mult_repl_x1, NULL, true,
+    o2sm_method_new("/arco/mult/new", "iiii", arco_mult_new, NULL, true,
                     true);
-    o2sm_method_new("/arco/mult/set_x1", "iif", arco_mult_set_x1, NULL, true,
-                    true);
-    o2sm_method_new("/arco/mult/repl_x2", "ii", arco_mult_repl_x2, NULL, true,
-                    true);
-    o2sm_method_new("/arco/mult/set_x2", "iif", arco_mult_set_x2, NULL, true,
-                    true);
+    o2sm_method_new("/arco/mult/repl_x1", "ii", arco_mult_repl_x1, NULL,
+                    true, true);
+    o2sm_method_new("/arco/mult/set_x1", "iif", arco_mult_set_x1, NULL,
+                    true, true);
+    o2sm_method_new("/arco/mult/repl_x2", "ii", arco_mult_repl_x2, NULL,
+                    true, true);
+    o2sm_method_new("/arco/mult/set_x2", "iif", arco_mult_set_x2, NULL,
+                    true, true);
     // END INTERFACE INITIALIZATION
 
     // class initialization code from faust:

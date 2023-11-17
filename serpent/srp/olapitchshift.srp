@@ -11,6 +11,7 @@ class Ola_pitch_shift (Ugen):
     
     def set_ratio(value):
         o2_send_cmd("/arco/olaps/ratio", 0, "Uf", id, value)
+        this
         
 
 def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):

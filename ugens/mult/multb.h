@@ -66,6 +66,7 @@ public:
             Ugen(id, 'b', nchans) {
         x1 = x1_;
         x2 = x2_;
+        flags = CAN_TERMINATE;
         states.set_size(chans);
 
         init_x1(x1);
@@ -115,6 +116,10 @@ public:
     void real_run() {
         x1_samps = x1->run(current_block); // update input
         x2_samps = x2->run(current_block); // update input
+        if (((x1->flags | x2->flags) & TERMINATED) &&
+            (flags & CAN_TERMINATE)) {
+            terminate();
+        }
         Multb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             FAUSTFLOAT tmp_0 = float(*x1_samps) * float(*x2_samps);

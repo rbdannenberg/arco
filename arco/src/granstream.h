@@ -43,6 +43,12 @@
  * by setting feedback to -90dB or at least 0.00003 instead of zero.)
  */
 
+// Normally, I don't like to have "hidden" includes, putting all includes
+// to top-level .cpp files so you can see what they depend on, and all
+// include files are just included once, but I'm pretty sure no other
+// file needs this:
+#include <new>
+
 extern const char *Granstream_name;
 
 class Granstream;
@@ -71,10 +77,12 @@ public:
     float env_inc;  // increment to next envelope value
     float gain;     // gain applied to the current grain
 
-    void reset() {
+    Gran_gen() {
         state = GS_FALL;
         delay = 1;  // so next time we run, we'll reinitialize
     }
+
+    ~Gran_gen() { ; }
 
     // returns true if grain is active
     bool run(Granstream *gs, Granstream_state *perchannel,
@@ -106,7 +114,8 @@ public:
 
     void reset_gens(int oldp, int newp) {
         for (int i = oldp; i < newp; i++) {
-            gens[i].reset();
+            // the so-called "placement new" runs constructor given an address:
+            new(&gens[i]) Gran_gen;
         }
     }
 

@@ -46,8 +46,6 @@
 
 #include <climits>
 
-#define COS_TABLE_SIZE 100
-extern float raised_cosine[COS_TABLE_SIZE + 5];
 
 
 extern const char *Recplay_name;
@@ -113,6 +111,8 @@ public:
     Recplay(int id, int nchans, Ugen_ptr input, Ugen_ptr gain,
             float fade_, bool loop_) : Ugen(id, 'a', nchans) {
         action_id = 0;
+        tail_blocks = 1;  // (I think) we terminate when last samples are
+                          // output, so on the *next* block, output will be zero
         fade = fade_;
         loop = loop_;
         sample_count = 0;

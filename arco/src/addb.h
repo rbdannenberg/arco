@@ -69,6 +69,19 @@ public:
     }
 
 
+    void swap(Ugen_ptr ugen, Ugen_ptr replacement) {
+        int loc = find(ugen, false);
+        if (loc == -1) {
+            arco_warn("/arco/addb/swap id (%d) not in output set, ignored\n",
+                      id);
+            return;
+        }
+        ugen->unref();
+        inputs[i] = replacement;
+        replacement->ref();
+    }
+
+
     void real_run() {
         int n = inputs.size();
         if (n == 0) { // zero the outputs

@@ -51,7 +51,7 @@ static void arco_lowpassb_set_snd(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Lowpassb, lowpassb, id, "arco_lowpassb_repl_snd");
+    UGEN_FROM_ID(Lowpassb, lowpassb, id, "arco_lowpassb_set_snd");
     lowpassb->set_snd(chan, val);
 }
 
@@ -81,7 +81,7 @@ static void arco_lowpassb_set_cutoff(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Lowpassb, lowpassb, id, "arco_lowpassb_repl_cutoff");
+    UGEN_FROM_ID(Lowpassb, lowpassb, id, "arco_lowpassb_set_cutoff");
     lowpassb->set_cutoff(chan, val);
 }
 

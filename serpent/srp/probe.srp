@@ -23,14 +23,17 @@ class Probe (Ugen):
         if not running:
             run() // suppress warning if we're already in run setx
             running = true
+        this
 
     def thresh(threshold, direction, max_wait):
         o2_send_cmd("/arco/probe/thresh", 0, "Ufif", id,
                     threshold, direction, max_wait)
+        this
         
     def stop():
         o2_send_cmd("/arco/probe/stop", 0, "U", id)
         if running:
             unrun()
             running = false
+        this
         

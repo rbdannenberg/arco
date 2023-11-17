@@ -8,10 +8,33 @@
 #include "const.h"
 #include "audioio.h"
 
+
 Vec<Ugen_ptr> ugen_table;
 int ugen_table_free_list = 1;
 char control_service_addr[64] = "";
 int control_service_addr_len = 0;
+
+// note table really goes from 0 to 1 over index range 2 to 102
+// there are 2 extra samples at either end to allow for interpolation and
+// off-by-one errors
+float raised_cosine[COS_TABLE_SIZE + 5] = { 
+    0, 0, 0, 0.00024672, 0.000986636, 0.00221902,
+    0.00394265, 0.00615583, 0.00885637, 0.0120416, 0.0157084,
+    0.0198532, 0.0244717, 0.0295596, 0.0351118, 0.0411227, 0.0475865,
+    0.0544967, 0.0618467, 0.069629, 0.077836, 0.0864597, 0.0954915,
+    0.104922, 0.114743, 0.124944, 0.135516, 0.146447, 0.157726,
+    0.169344, 0.181288, 0.193546, 0.206107, 0.218958, 0.232087,
+    0.245479, 0.259123, 0.273005, 0.28711, 0.301426, 0.315938,
+    0.330631, 0.345492, 0.360504, 0.375655, 0.390928, 0.406309,
+    0.421783, 0.437333, 0.452946, 0.468605, 0.484295, 0.5, 0.515705,
+    0.531395, 0.547054, 0.562667, 0.578217, 0.593691, 0.609072,
+    0.624345, 0.639496, 0.654508, 0.669369, 0.684062, 0.698574,
+    0.71289, 0.726995, 0.740877, 0.754521, 0.767913, 0.781042,
+    0.793893, 0.806454, 0.818712, 0.830656, 0.842274, 0.853553,
+    0.864484, 0.875056, 0.885257, 0.895078, 0.904508, 0.91354,
+    0.922164, 0.930371, 0.938153, 0.945503, 0.952414, 0.958877,
+    0.964888, 0.97044, 0.975528, 0.980147, 0.984292, 0.987958,
+    0.991144, 0.993844, 0.996057, 0.997781, 0.999013, 0.999753, 1, 1, 1};
 
 // safely copy ctrlservice to control_service_addr -- this is who we
 //   send action messages to.  Allow 20 bytes for the rest of the address,
@@ -56,10 +79,7 @@ void Initializer::init()
 
 Ugen::~Ugen() {
     // special case: check for run set or output set references
-    if (flags & (IN_RUN_SET | IN_OUTPUT_SET)) {
-        aud_forget(id);
-        arco_warn("Deleting unit generator %d in run or output set", id);
-    }
+    assert((flags & IN_RUN_SET) == 0);
     printf("Ugen delete %d\n", id);
 }
 
@@ -71,6 +91,20 @@ void Ugen::unref() {
     if (refcount == 0) {
         delete this;
     }
+}
+
+// Note: since this is the only handler in this file, we register
+// the handler in audioio.cpp and do not use machine-generated
+// interfaces:
+void arco_term(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float dur = argv[1]->f;
+    // end unpack message
+
+    ANY_UGEN_FROM_ID(ugen, id, "arco_term");
+    ugen->term(dur);
 }
 
 
@@ -174,4 +208,14 @@ Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation)
         ugen = NULL;
     }
     return ugen;
+}
+
+
+// float vector x += y
+void block_add_n(Sample_ptr x, Sample_ptr y, int n)
+{
+    n *= BL;
+    for (int i = 0; i < n; i++) {
+        *x++ += *y++;
+    }
 }

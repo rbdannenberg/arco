@@ -164,6 +164,9 @@ class Pv: public Ugen {
             }
             need -= BL;
         }
+        if ((input->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
+            terminate();
+        }
     }
 
 
@@ -268,6 +271,9 @@ class Pv: public Ugen {
     void real_run() {
         if (!use_stretch) {
             input_samps = input->run(current_block);
+            if ((input->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
+                terminate();
+            }
         }
         for (int i = 0; i < chans; i++) {
             chan_a(&states[i]);

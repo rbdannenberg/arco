@@ -1,7 +1,25 @@
 # fader.srp - constructor implementation
 #
+# Roger B. Dannenberg
+# Nov 2023
 
-def fader(input, current, optional dur, goal, mode = 1, chans):
+# Support for fade_in: In the simple case, where we faded in ugen,
+# we could just swap in the ugen and swap out the fader using a
+# scheduled call. But what if the user says to fade() before the
+# fade_in() is complete? What we need to do is cancel the pending
+# end-of-fade-in, and use the fader to fade to zero. We'll use a
+# dictionary for keeping track of everything fading in, mapping
+# the ugen being faded in to the fader. Either fade_in_complete
+# will remove the fader, or fade() will remove the fader from
+# the dictionary.
+
+print "INCLUDING fader.srp"
+
+fade_in_lookup = {}  // maps ugen to its fader
+
+
+def fader(input, current,  optional dur, goal, chans,
+          keyword mode = FADE_SMOOTH):
 # Create a Fader, with optional intialization. Example:
 #     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
 #     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
@@ -10,12 +28,13 @@ def fader(input, current, optional dur, goal, mode = 1, chans):
         fader.set_dur(dur)
     if goal:
         fader.set_goal(goal)
+    fader
 
 
 class Fader (Ugen):
-    def init(input, current, optional mode = 1, chans):
+    def init(input, current, optional mode = FADE_SMOOTH, chans):
         if not chans:
-            chans = max_chans(max_chans(1, x1), x2)
+            chans = max_chans(1, input)
         super.init(create_ugen_id(), "fader", chans, 'a', "Ufi",
                    'input', input, 'current', current, 'mode', mode)
 
@@ -41,8 +60,16 @@ class Fader (Ugen):
 
     def set_goal(goal, optional chan):
         if chan:
-            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, chan, goal)
+            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, chan, goal)
         for i = 0 to chans:
-            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, i,
+            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, i,
                         goal if isnumber(goal) else goal[i])
         this
+
+
+    def fade_in_complete(ugen):
+        var fader = fade_in_lookup.get(ugen)
+        if fader:  // fade in was not cancelled, so end it now
+            output_ugen.swap(this, ugen)  // remove fader from ugen
+            fade_in_lookup.remove(ugen)
+        // otherwise, fade_in was cancelled by a fade()

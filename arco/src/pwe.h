@@ -63,6 +63,9 @@ public:
                     seg_togo = INT_MAX;
                     seg_factor = 1.0f;
                     send_action_id(action_id);
+                    if (current == 0 && (flags & CAN_TERMINATE)) {
+                        terminate();
+                    }
                 } else {
                     seg_togo = (int) points[next_point_index++];
                     final_value = points[next_point_index++] + bias;

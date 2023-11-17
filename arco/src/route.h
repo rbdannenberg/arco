@@ -66,6 +66,9 @@ public:
 
     void real_run() {
         Sample_ptr src = input->run(current_block);  // bring input up-to-date
+        if ((input->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
+            terminate();
+        }
         int input_chans = input->chans;
         for (int i = 0; i < chans; i++) {
             int input_chan = routes[i];

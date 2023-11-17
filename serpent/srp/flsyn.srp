@@ -10,30 +10,39 @@ class Flsyn (Ugen):
 
     def alloff(chan):
         o2_send_cmd("/arco/flsyn/off", 0, "Ui", id, chan)
+        this
 
     def control_change(chan, num, val):
         o2_send_cmd("/arco/flsyn/cc", 0, "Uiii", id, chan, num, val)
+        this
 
     def channel_pressure(chan, val):
         o2_send_cmd("/arco/flsyn/cp", 0, "Uii", id, chan, val)
+        this
 
     def key_pressure(chan, key, val):
         o2_send_cmd("/arco/flsyn/kp", 0, "Uiii", id, chan, key, val)
+        this
 
     def noteoff(chan, key):
         o2_send_cmd("/arco/flsyn/noteoff", 0, "Uii" , id, chan, key)
+        this
 
     def noteon(chan, key, vel):
         o2_send_cmd("/arco/flsyn/noteon", 0, "Uiii", id, chan, key, vel)
+        this
 
     def pitch_bend(chan, bend):
         o2_send_cmd("/arco/flsyn/pbend", 0, "Uif", id, chan, bend)
+        this
 
     def pitch_sens(chan, val):
         o2_send_cmd("/arco/flsyn/psens", 0, "Uii", id, chan, val)
+        this
 
     def program_change(chan, program):
         o2_send_cmd("/arco/flsyn/prog", 0, "Uii", id, chan, program)
+        this
 
 
 

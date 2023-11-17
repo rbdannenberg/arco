@@ -11,16 +11,20 @@ class Trig(Ugen):
 
     def set_window(window):
         o2_send_cmd("/arco/trig/window", 0, "Ui", id, window)
+        this
 
     def set_threshold(threshold):
         o2_send_cmd("/arco/trig/threshold", 0, "Uf", id, threshold)
+        this
 
     def set_threshold(pause):
         o2_send_cmd("/arco/trig/pause", 0, "Uf", id, pause)
+        this
 
     def onoff(reply_addr, threshold, runlen):
         o2_send_cmd("/arco/trig/onoff", 0, "Usff",
                     id, reply_addr, threshold, runlen)
+        this
 
 
 def trig(input, reply_addr, window, threshold, pause):

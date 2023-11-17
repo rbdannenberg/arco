@@ -13,6 +13,7 @@
 
 const char *Fader_name = "Fader";
 
+
 /* O2SM INTERFACE: /arco/fader/new int32 id, int32 chans, int32 input,
                                    float current, int32 mode;
  */
@@ -75,6 +76,21 @@ static void arco_fader_dur(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/fader/goal int32 id, int chan, float goal;
+ */
+static void arco_fader_goal(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t chan = argv[1]->i;
+    float goal = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Fader, fader, id, "arco_fader_goal");
+    fader->set_goal(chan, goal);
+}
+
+
 /* O2SM INTERFACE: /arco/fader/mode int32 id, int32 mode;
  */
 static void arco_fader_mode(O2SM_HANDLER_ARGS)
@@ -99,6 +115,8 @@ static void fader_init()
     o2sm_method_new("/arco/fader/cur", "iif", arco_fader_cur, NULL,
                     true, true);
     o2sm_method_new("/arco/fader/dur", "if", arco_fader_dur, NULL,
+                    true, true);
+    o2sm_method_new("/arco/fader/goal", "iif", arco_fader_goal, NULL,
                     true, true);
     o2sm_method_new("/arco/fader/mode", "ii", arco_fader_mode, NULL,
                     true, true);

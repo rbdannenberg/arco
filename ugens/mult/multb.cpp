@@ -51,7 +51,7 @@ static void arco_multb_set_x1(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Multb, multb, id, "arco_multb_repl_x1");
+    UGEN_FROM_ID(Multb, multb, id, "arco_multb_set_x1");
     multb->set_x1(chan, val);
 }
 
@@ -81,7 +81,7 @@ static void arco_multb_set_x2(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Multb, multb, id, "arco_multb_repl_x2");
+    UGEN_FROM_ID(Multb, multb, id, "arco_multb_set_x2");
     multb->set_x2(chan, val);
 }
 

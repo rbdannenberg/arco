@@ -64,6 +64,7 @@ public:
             Ugen(id, 'a', nchans) {
         snd = snd_;
         cutoff = cutoff_;
+        flags = CAN_TERMINATE;
         states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_snd(snd);
@@ -173,6 +174,10 @@ public:
     void real_run() {
         snd_samps = snd->run(current_block); // update input
         cutoff_samps = cutoff->run(current_block); // update input
+        if (((snd->flags) & TERMINATED) &&
+            (flags & CAN_TERMINATE)) {
+            terminate();
+        }
         Lowpass_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);

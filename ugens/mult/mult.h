@@ -61,6 +61,7 @@ public:
             Ugen(id, 'a', nchans) {
         x1 = x1_;
         x2 = x2_;
+        flags = CAN_TERMINATE;
         states.set_size(chans);
 
         init_x1(x1);
@@ -184,6 +185,10 @@ public:
     void real_run() {
         x1_samps = x1->run(current_block); // update input
         x2_samps = x2->run(current_block); // update input
+        if (((x1->flags | x2->flags) & TERMINATED) &&
+            (flags & CAN_TERMINATE)) {
+            terminate();
+        }
         Mult_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);

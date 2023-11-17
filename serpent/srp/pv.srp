@@ -11,9 +11,11 @@ class Pv(Ugen):
     
     def set_ratio(value):
         o2_send_cmd("/arco/pv/ratio", 0, "Uf", id, value)
+        this
 
     def set_stretch(value):
         o2_send_cmd("/arco/pv/stretch", 0, "Uf", id, value)
+        this
 
 
 def pv(input, ratio, fftsize, hopsize, points, mode, optional chans = 1):

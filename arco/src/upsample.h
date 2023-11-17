@@ -18,6 +18,7 @@ public:
 
     Upsample(int id, int nchans, Ugen_ptr input_) : Ugen(id, 'a', nchans) {
         input = input_;
+        tail_blocks = 1;  // linear interpolation -> 1 block delay
         states.set_size(chans);
 
         // initialize channel states
@@ -54,6 +55,9 @@ public:
 
     void real_run() {
         Sample_ptr input_samps = input->run(current_block); // update input
+        if ((input->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
+            terminate();
+        }
         Upsample_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             float input_incr = (*input_samps - state->input_prev) * BL_RECIP;

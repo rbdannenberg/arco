@@ -53,6 +53,7 @@ class Multb : public one_sample_dsp<float> {
 		m->declare("filename", "multb_bb_b.dsp");
 		m->declare("interpolated", "x1 x2");
 		m->declare("name", "multb");
+		m->declare("terminate", "x1 x2");
 	}
 
 	virtual int getNumInputs() {

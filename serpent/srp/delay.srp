@@ -4,12 +4,12 @@
 # June 2023
 
 class Delay(Ugen):
-    def init(chans, inp, dur, fb, maxdur):
+    def init(chans, input, dur, fb, maxdur):
         super.init(create_ugen_id(), "Delay", chans, 'a', "UUUf",
-	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+	           'input', input, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
 
 
-def delay(inp, dur, fb, maxdur, optional chans = 1):
-    Delay(chans, inp, dur, fb, maxdur)  # delay as a function
+def delay(input, dur, fb, maxdur, optional chans = 1):
+    Delay(chans, input, dur, fb, maxdur)  # delay as a function
 
 

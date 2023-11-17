@@ -18,16 +18,21 @@ class Recplay (Ugen):
 
     def record(record_flag):
         o2_send_cmd("/arco/recplay/rec", 0, "UB", id, record_flag)
+        this
 
     def start(start_time):
     # start playing recording from offset start_time
         o2_send_cmd("/arco/recplay/start", 0, "Ud", id, start_time)
+        this
 
     def stop():
         o2_send_cmd("/arco/recplay/stop", 0, "U", id)
+        this
 
     def set_speed(x):
         o2_send_cmd("/arco/recplay/speed", 0, "Uf", id, x)
+        this
 
     def borrow(u):
         o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u.id)
+        this

@@ -17,9 +17,12 @@
 #define FLOAT_TO_INT16(x) ((int) ((32767 * (x) + 32768.5)) - 32768)
 
 // flags for Unit generators to cooperate with audioio, etc.
-const int IN_OUTPUT_SET = 1;
-const int IN_RUN_SET = 2;
-const int UGEN_MARK = 4;  // used for graph traversal
+const int IN_RUN_SET = 1;
+const int UGEN_MARK = 2;  // used for graph traversal
+const int CAN_TERMINATE = 4;  // allows end in input to terminate
+const int TERMINATING = 8;  // have we terminated?  After termination,
+const int TERMINATED = 16;  // have we terminated?  After termination,
+// it can be assumed that the output signal in all channels is zero.
 
 // special Unit generator IDs:
 const int ZERO_ID = 0;
@@ -30,6 +33,10 @@ extern char control_service_addr[64];  // where to send messages
         // "!" followed by the service followed by "/" so that you can
         // append the rest of the address in place.
 extern int control_service_addr_len;  // address len including "!" and "/"
+
+// used by recplay and fader Ugens:
+#define COS_TABLE_SIZE 100
+extern float raised_cosine[COS_TABLE_SIZE + 5];
 
 int set_control_service(const char *ctrlservice);
 
@@ -53,6 +60,12 @@ class Ugen : public O2obj {
   public:
     int id;
     int refcount;
+    // tail_blocks tells how many blocks to compute beyond input
+    // termination; initialized to zero, but the subclass constructor
+    // or other method can set it to a higher value.  When an input
+    // terminates, this variable counts down to zero, then this Ugen
+    // terminates:
+    int tail_blocks;
     char flags;
     char rate;
     int chans;
@@ -86,6 +99,7 @@ class Ugen : public O2obj {
             }
         }
         this->id = id;
+        tail_blocks = 0;
         flags = 0;
         rate = ab;
         chans = nchans;
@@ -129,7 +143,17 @@ class Ugen : public O2obj {
         }
         // 0 for mono, BL for multichannel audio, 1 for multichannel block rate
         pstride = (n == 1 ? 0 : (p->rate == 'a' ? BL : 1));
-        p->refcount++;
+        // if an input to an a-rate Ugen is not a-rate, it is probably
+        // interpolated to a-rate, which implies a 1-block "tail" while the
+        // input is linearly interpolated to zero; if so, tail_blocks should be
+        // at least 1. If not, computing an extra block of zeros after
+        // terminating should be fairly harmless. We never try to restore
+        // tail_blocks to zero since we don't know in this call if there are
+        // other b-rate inputs and it seems silly to do more work.
+        if (rate == 'a' && (p->rate != 'a') && tail_blocks == 0) {
+            tail_blocks = 1;
+        }
+        p->ref();
     }
         
     // get the ith block of output samples (for 'a' rate only)
@@ -149,6 +173,31 @@ class Ugen : public O2obj {
         out_samps = save_out_samps;
         return save_out_samps;
     }
+
+
+    virtual void on_terminate() { ; }  // override if needed
+
+
+    // declare that when an input terminates, this ugen should continue
+    // computing for tail_sec (seconds) and then terminate (default is 0)
+    void term(float tail_sec) {
+        if (!(flags & (TERMINATING | TERMINATED))) {
+            tail_blocks = std::ceil(tail_sec * BR);
+            flags |= CAN_TERMINATE;
+        } // else we're already terminating; do not reset the counter.
+    }
+
+
+    virtual void terminate() { // this Ugen will terminate after tail blocks
+        if (!(flags & TERMINATING)) {
+            flags |= TERMINATING;  // start the count
+        }
+        if (tail_blocks-- == 0) {
+            flags |= TERMINATED;
+            on_terminate();  // a virtual method called at most once
+        }
+    }
+ 
 
     void set_current_block(int n) { current_block = n; }
 
@@ -194,3 +243,9 @@ Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation);
 
 // zero n channels of blocks:
 #define block_zero_n(dst, n) memset(dst, 0, BLOCK_BYTES * (n))
+
+void block_add_n(Sample_ptr x, Sample_ptr y, int n);
+
+void arco_term(O2SM_HANDLER_ARGS);  // normally these handlers are local
+// to the compilation unit (.cpp file), but this one is defined in
+// ugen.cpp but registered with o2sm_method_new() in audioio.cpp.

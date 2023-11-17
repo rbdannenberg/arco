@@ -34,3 +34,9 @@ def pan_45(x, optional gain = 1):
     pan[0] = sqrt(pan[0] * sqrt(pan[0])) * gain
     pan[1] = sqrt(pan[1] * sqrt(pan[1])) * gain
     return pan  // pan is geometric mean of pan_linear and pan_eqlpow
+
+
+def stereoize(input, optional gain = 1):
+# apply -4.5dB panning law to a mono signal to produce a stereo signal
+# with optional gain factor
+    return mult(input, pan_45(0.5, gain))

@@ -17,6 +17,8 @@ class Filerec (Ugen):
 
     def go(optional rec_flag = true):
         o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
+        this
     
     def stop():
         go(false)
+        this

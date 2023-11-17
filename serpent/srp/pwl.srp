@@ -10,6 +10,7 @@ class Pwl (Ugen):
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -37,10 +38,12 @@ class Pwl (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
+        this
 
     def set(y):
     # set current value to y
         o2_snd_cmd("/arco/pwl/set", 0, "Uf", id, y)
+        this
 
 
 
@@ -63,6 +66,7 @@ class Pwlb (Ugen):
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -104,11 +108,13 @@ class Pwlb (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
+        this
 
 
     def set(y):
     # set current value to y
         o2_send_cmd("/arco/pwlb/set", 0, "Uf", id, y)
+        this
 
 
 

@@ -96,14 +96,22 @@ public:
         float k = 1 - cos(PI2 * hz * AP);
         alpha = -k + sqrt((2 + k) * k);
         one_minus_alpha = 1 - alpha;
+        // when input goes to zero, nth output sample is just
+        // prev * one_minus_alpha**n. Let's conservatively go for -120 dB.
+        // For tail time n samples, one_minus_alpha**n = log(0.0000001)
+        // -> n * log(one_minus_alpha) = log(0.0000001)
+        // -> n = log(0.0000001) / log(one_minus_alpha)
+        tail_blocks = (int) (log(0.0000001) / (log(one_minus_alpha) * BL));
     }
     
+
     void set_mode(int mode) {
         if (mode < 0 || mode >= DS_MODE_LEN) {
             arco_warn("Dnsampleb set_mode got invalid mode, using BASIC");
             mode = 0;
         }
         dnsample = dnsampleb_methods[mode];
+        tail_blocks = 0;
         if (mode == (int) LOWPASS500) {
             set_cutoff(500.0);
         } else if (mode == (int) LOWPASS100) {
@@ -114,14 +122,13 @@ public:
 
     Sample dnsample_basic(Dnsampleb_state *state) {
         Sample s = *input_samps;
-        input_samps += BL;
         return s;
     }
 
     Sample dnsample_avg(Dnsampleb_state *state) {
         Sample s = 0;
         for (int i = 0; i < BL; i++) {
-            s += *input_samps++;
+            s += input_samps[i];
         }
         return s * BL_RECIP;
     }
@@ -129,7 +136,7 @@ public:
     Sample dnsample_peak(Dnsampleb_state *state) {
         Sample s = fabs(*input_samps++);
         for (int i = 1; i < BL; i++) {
-            s = MAX(fabs(*input_samps++), s);
+            s = MAX(fabs(input_samps[i]), s);
         }
         return s;
     }
@@ -137,7 +144,7 @@ public:
     Sample dnsample_power(Dnsampleb_state *state) {
         Sample sum = 0;
         for (int i = 0; i < BL; i++) {
-            Sample s = *input_samps++;
+            Sample s = input_samps[i];
             sum += s * s;
         }
         return sum * BL_RECIP;
@@ -150,7 +157,7 @@ public:
     Sample dnsample_lowpass(Dnsampleb_state *state) {
         Sample sum = 0;
         for (int i = 0; i < BL; i++) {
-            state->prev = alpha * *input_samps++ +
+            state->prev = alpha * input_samps[i] +
                           one_minus_alpha * state->prev;
         }
         return state->prev;
@@ -159,6 +166,9 @@ public:
 
     void real_run() {
         Sample_ptr input_samps = input->run(current_block); // update input
+        if (input->flags & TERMINATED) {
+            terminate();
+        }
         Dnsampleb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             *out_samps++ = (this->*dnsample)(state++);

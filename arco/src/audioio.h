@@ -17,7 +17,7 @@ const int STOPPING = 6;
 //     const int ZERO_ID = 0;   -- now defined in ugen.h
 //     const int ZEROB_ID = 1;  -- now defined in ugen.h
 const int INPUT_ID = 2;
-const int PREV_OUTPUT_ID = 3;
+const int OUTPUT_ID = 3;
 const int UGEN_BASE_ID = 4;
 
 
@@ -52,6 +52,6 @@ void transpose(Sample *dst, Sample *src, int r, int c);
 void arco_thread_poll();
 /*SER void arco_thread_poll() PENT*/
 
-void aud_forget(int id);
+
 
 

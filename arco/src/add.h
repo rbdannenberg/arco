@@ -8,9 +8,16 @@ extern const char *Add_name;
 
 class Add : public Ugen {
 public:
+    float gain;
+    float prev_gain;
+    bool wrap;
+
     Vec<Ugen_ptr> inputs;
 
-    Add(int id, int nchans) : Ugen(id, 'a', nchans) { ; };
+    Add(int id, int nchans, int wrap_) : Ugen(id, 'a', nchans) {
+        gain = 1;
+        prev_gain = 1;
+        wrap = (wrap_ != 0); };
 
     ~Add() {
         for (int i = 0; i < inputs.size(); i++) {
@@ -40,6 +47,7 @@ public:
         int i = find(input, false);
         if (i < 0) {  // input is not already in sum; append it
             inputs.push_back(input);
+            input->ref();
         }
     }
 
@@ -68,43 +76,96 @@ public:
     }
 
 
+    void swap(Ugen_ptr ugen, Ugen_ptr replacement) {
+        int loc = find(ugen, false);
+        if (loc == -1) {
+            arco_warn("/arco/add/swap id (%d) not in output set, ignored\n",
+                      id);
+            return;
+        }
+        ugen->unref();
+        inputs[loc] = replacement;
+        replacement->ref();
+    }
+
+
     void real_run() {
-        int n = inputs.size();
-        if (n == 0) { // zero the outputs
-            block_zero_n(out_samps, chans);
-        } else {
-            Ugen_ptr input = inputs[0];
+        int starting_size = inputs.size();
+        int i = 0;
+        bool copy_first_input = true;
+        while (i < inputs.size()) {
+            Ugen_ptr input = inputs[i];
             Sample_ptr input_ptr = input->run(current_block);
-            // if more input channels than output channels, drop some input:
-            int ch = MIN(input->chans, chans);
-            block_copy_n(out_samps, input_ptr, ch);
-            // if more output channels than input channels, zero fill; except
-            // if there is only one input channel, copy it to all outputs
-            if (ch < chans) {
-                if (ch == 1) {
-                    for (int i = 1; i < n; i++) {
-                        block_copy(out_samps + BL * i, input_ptr);
-                    }
-                } else {
+            if (input->flags & TERMINATED) {
+                input->unref();
+                inputs.remove(i);
+                continue;
+            }
+            i++;
+            int ch = input->chans;
+            if (copy_first_input) {
+                block_copy_n(out_samps, input_ptr, MIN(ch, chans));
+                if (ch < chans) {  // if more output channels than
+                    // input channels, zero fill; but if there is only one
+                    // input channel, copy it to all outputs
+                    //if (ch == 1) {
+                    //    for (int i = 1; i < n; i++) {
+                    //        block_copy(out_samps + BL * i, input_ptr);
+                    //    }
+                    //} else {
                     block_zero_n(out_samps + BL * ch, chans - ch);
+                    //}
+                }
+                copy_first_input = false;  // from now on, need to add input
+            } else {
+                block_add_n(out_samps, input_ptr, MIN(ch, chans));
+            }
+            // whether we copied or added the first chans channels of input,
+            // there could be extra channels to "wrap" and now we have to add
+            if (ch > chans && wrap) {
+                for (int c = chans; c < ch; c += chans) {
+                    block_add_n(out_samps, input_ptr + c * BL,
+                                MIN(ch - c, chans));
                 }
             }
-            // now add remaining inputs
-            for (int i = 1; i < n; i++) {
-                input = inputs[i];
-                input_ptr = input->run(current_block);
-                int samps = MIN(input->chans, chans) * BL;
-                for (int j = 0; j < samps; j++) {
-                    *out_samps++ += *input_ptr++;
+        }
+        if (copy_first_input) {  // did not find even first input to copy
+            block_zero_n(out_samps, chans);  // zero the outputs
+            // Check starting_size so that if we entered real_run() with no
+            // inputs, we will not terminate. Only terminate if there was at
+            // least one input that terminated and now there are none:
+            if (starting_size > 0 && (flags & CAN_TERMINATE)) {
+                terminate();
+            }
+        }
+        // scale output by gain. Gain change is limited to at least 50 msec
+        // for a full-scale (0 to 1) change, and special cases of constant
+        // gain and unity gain are implemented:
+        float gincr = (gain - prev_gain) * BL_RECIP;
+        float abs_gincr = fabs(gincr);
+        if (abs_gincr < 1e-6) {
+            if (gain != 1) {
+                for (int i = 0; i < chans * BL; i++) {
+                    *out_samps++ *= gain;
                 }
-                if (samps == BL && chans > 1) {  // add single channel to all
-                    for (int ch = 1; ch < chans; ch++) {
-                        input_ptr -= BL;  // back up top beginning of input
-                        for (int j = 0; j < BL; j++) {
-                            *out_samps++ = *input_ptr++;
-                        }
+                prev_gain = gain;
+            }
+        } else {
+            // we want abs_gincr * 0.050 * AR < 1, so abs_gincr < AP / 0.050
+            if (abs_gincr > AP / 0.050) {
+                gincr = copysignf(AP / 0.050, gincr);  // copysign(mag, sgn)
+                // apply ramp to each channel:
+                float g;
+                for (int ch = 0; ch < chans; ch++) {
+                    g = prev_gain;
+                    for (int i = 0; i < BL; i++) {
+                        g += gincr;
+                        *out_samps++ *= g;
                     }
                 }
+                // due to rate limiting, the end of the ramp over BL
+                // samples may not reach gain, so prev_gain is set to g
+                prev_gain = g;
             }
         }
     }

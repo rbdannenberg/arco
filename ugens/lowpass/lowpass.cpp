@@ -51,7 +51,7 @@ static void arco_lowpass_set_snd(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Lowpass, lowpass, id, "arco_lowpass_repl_snd");
+    UGEN_FROM_ID(Lowpass, lowpass, id, "arco_lowpass_set_snd");
     lowpass->set_snd(chan, val);
 }
 
@@ -81,7 +81,7 @@ static void arco_lowpass_set_cutoff(O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Lowpass, lowpass, id, "arco_lowpass_repl_cutoff");
+    UGEN_FROM_ID(Lowpass, lowpass, id, "arco_lowpass_set_cutoff");
     lowpass->set_cutoff(chan, val);
 }
 
@@ -89,8 +89,8 @@ static void arco_lowpass_set_cutoff(O2SM_HANDLER_ARGS)
 static void lowpass_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/lowpass/new", "iiii", arco_lowpass_new, NULL, true,
-                    true);
+    o2sm_method_new("/arco/lowpass/new", "iiii", arco_lowpass_new, NULL,
+                    true, true);
     o2sm_method_new("/arco/lowpass/repl_snd", "ii", arco_lowpass_repl_snd,
                     NULL, true, true);
     o2sm_method_new("/arco/lowpass/set_snd", "iif", arco_lowpass_set_snd,

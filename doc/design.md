@@ -307,19 +307,11 @@ references to the shadow object in Serpent.
 
 ### Output and Run Sets
 
-The `output_set` and `run_set` are lists of ugen IDs, not direct
-references to ugens, so they do not affect reference counts. This
-could create a sort of "dangling reference" via ID, so every ugen
-has flag bits `IN_OUTPUT_SET` and `IN_RUN_SET` indicating membership.
-When a ugen is deleted, we check the flags and if either or both are
-set, the ugen is removed from `output_set` and/or `run_set`.
+The `output_set` and `run_set` are lists of ugens and affect
+reference counts. Every ugen also has flag bits `IN_OUTPUT_SET`
+and `IN_RUN_SET` indicating membership. A ugen can only be in
+either set once.
 
-Notice that if a ugen is producing non-zero samples, deleting it and
-removing it from the `output_set` can create pops or clicks and
-indicate a programming error. By convention, any playing or running
-ugen should be removed from `output_set` or `run_set` using
-`/arco/mute` or `/arco/unrun` before the ugen ID is freed. Failure to
-do this will print a warning.
 
 ## Unit Generator References in Serpent
 
@@ -590,7 +582,7 @@ we could write
         snd_samps = snd->run(current_block); // update input
         cutoff_samps = cutoff->run(current_block); // update input
         if ((snd_samps->flags & cutoff_samps->flags & TERMINATED) &&
-            flags & CAN_TERMINATE) {
+            (flags & CAN_TERMINATE)) {
             flags |= TERMINATED;  // propagate terminated input to output
         }
         ...
@@ -604,9 +596,9 @@ counter. Overhead is only incurred after an input terminates:
         snd_samps = snd->run(current_block); // update input
         cutoff_samps = cutoff->run(current_block); // update input
         if ((snd_samps->flags & cutoff_samps->flags & TERMINATED) &&
-            flags & CAN_TERMINATE) {
+            (flags & CAN_TERMINATE)) {
             terminate();
-        }    
+        }
         ...
     }
     
@@ -620,7 +612,7 @@ counter. Overhead is only incurred after an input terminates:
         }
         if (terminate_count-- == 0) {
             flags |= TERMINATED;
-            on_terminate();  // a virtual method to be general; called at most once
+            on_terminate();  // a virtual method called at most once
         }
     }
     

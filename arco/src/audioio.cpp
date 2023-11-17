@@ -51,40 +51,23 @@ source, to get samples.
 not producing audio output, e.g., an audio feature computation. These
 are computed after input is available.
 
-5. output_set contains a set of unit generators whose output should be
-summed to form audio output.  Each is run to compute audio written to
-an output buffer. If the actual number of output channels (the number
-of channels sent to the PortAudio output stream) is as large as the
-number of computed channels, we use the PortAudio output area as the
-buffer because it is already allocated. Otherwise, we allocate enough
-space on the stack for the buffer.  Either way, the buffer is a vector
-of channels (not interleaved). This is the wrong format for PortAudio,
-but at this point the PortAudio output area is just serving as a
-temporary buffer area to sum channels.
+5. output is taken from ugen_table[OUTPUT_ID], an Add unit generator,
+which sums an arbitrary number of inputs and provides a master gain
+control. Unfortunately, we need an extra copy to get the samples into
+PortAudio, but since PortAudio expects interleaved samples and may
+have a different number of channels, we need to do a copy anyway.
 
-6. After all output is summed, the buffer is copied to the outputs of
-ugen_table[PREV_OUTPUT_ID]. (These outputs can be accessed in the next
-block, allowing feedback with a 1-block delay. Until the run_set and 
-output_set are computed, ugen_table[PREV_OUTPUT_ID] has valid samples
-from the previous block, so we cannot write current output directly.)
+7. The output is then interleaved to form true audio output. If the
+output has a different number of channels, the following adaptation is
+used:
 
-7. ugen_table[PREV_OUTPUT_ID] output is then interleaved to form true
-audio output. If the output has a different number of channels, the
-following adaptation is used:
-
-8. Let aud_out_chans = prev_output->chans. If aud_out_chans >
+8. Let aud_out_chans = arco_output->chans. If aud_out_chans >
 actual_out_chans, the extra output channels are "wrapped" and summed
 into the first aud_out_chans. E.g. if there are 6 output channels but
 only 2 actual channels, channels 2 and 4 are added to 0, and channels
 3 and 5 are added to 1, so everything is routed to channels 0 or 1. If
 aud_out_chans < actual_out_chans, the extra channels are filled with
 zeros.
-
-9. The buffer is copied to the output samples area passed in by the
-callback. If aud_out_chans <= aud_out_chans, there is no
-wrapping, and the output samples memory block is used as the buffer to
-avoid an extra copy. If necessary extra actual output channels are
-filled with zero.
 
 External Control
 
@@ -110,6 +93,7 @@ See doc/design.md
 #include "recperm.h"
 #endif
 #include "prefs.h"
+#include "add.h"
 #include "audioio.h"
 #include "thru.h"
 
@@ -142,12 +126,14 @@ int aud_blocks_done = 0;
 bool aud_heartbeat = true;
 O2sm_info *audio_bridge = NULL;
 
+/*
 // slew-rate limited master gain control:
 float aud_gain = 1.0;
 float aud_target_gain = 1.0;
 // max slew rate is full-scale 0 to 1 in 20 msec at 48kHz.
 // (It will change with sample rate, but exact value does not matter.)
 const float aud_max_gain_incr = 1.0 / (0.02 * 48000);
+*/
 
 static bool arco_thread_exited = false;  // stop processing after o2sm_finish()
 static int actual_in_chans = -1;     // number of channels in callback
@@ -161,17 +147,10 @@ static int aud_close_request;
 static int aud_zero_fill_count = 0;
 static PaStream *audio_stream;
 
-static Vec<int> run_set;  // UG ID's to refresh every block
-static Vec<int> output_set;  // list of UG ID's to sum to form output
+static Vec<Ugen_ptr> run_set;  // UG ID's to refresh every block
+static Vec<Ugen_ptr> output_set;  // list of UG ID's to sum to form output
 
 static int cpuload = 0;
-static char audioinlogfilename[ARCO_STRINGMAX];
-static char audiooutlogfilename[ARCO_STRINGMAX];
-static SNDFILE *audioinlogfile = NULL;
-static SNDFILE *audiooutlogfile = NULL;
-static int log_input = false;
-static int log_output = false;
-
 
 static int underflow_count = 0;
 
@@ -230,21 +209,23 @@ void transpose(Sample_ptr dst, Sample_ptr src, int r, int c)
 }
 
 
-static bool forget_ugen_id(int id, Vec<int> &set)
+static bool forget_ugen(Ugen_ptr ugen, Vec<Ugen_ptr> &set)
 {
     for (int i = 0; i < set.size(); i++) {
-        if (set[i] == id) {
-            printf("forget_ugen_id: removing %d at %i from %p\n",
-                   id, i, &set);
+        if (set[i] == ugen) {
+            /*
+            printf("forget_ugen: removing %p (%i) at %i from %p\n",
+                   ugen, ugen->id, i, &set);
             printf("    size %d contains", set.size());
-            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]);
+            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]->id);
+            */
             set.remove(i);
+            ugen->unref();
+            /*
             printf("    after remove, size %d contains", set.size());
-            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]);
+            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]->id);
             printf("\n");
-            if (id == 21) {
-                printf("forget_ugen_id 21\n");
-            }
+            */
             return true;
         }
     }
@@ -284,15 +265,16 @@ static void arco_test1(O2SM_HANDLER_ARGS)
 static void arco_prtree(O2SM_HANDLER_ARGS)
 {
     arco_print("------------ Ugen Tree ----------------\n");
-    for (int i = 0; i < output_set.size(); i++) {
-        Ugen_ptr ugen = ugen_table[output_set[i]];
+    UGEN_FROM_ID(Add, add, OUTPUT_ID, "arco_prtree");
+    for (int i = 0; i < add->inputs.size(); i++) {
+        Ugen_ptr ugen = add->inputs[i];
         if (ugen->flags & UGEN_MARK) { // special case: print again
             ugen->flags &= ~UGEN_MARK;
         }
         ugen->print_tree(0, true, "member of output_set");
     }
     for (int i = 0; i < run_set.size(); i++) {
-        Ugen_ptr ugen = ugen_table[run_set[i]];
+        Ugen_ptr ugen = run_set[i];
         if (ugen->flags & UGEN_MARK) { // special case: print again
             ugen->flags &= ~UGEN_MARK;
         }
@@ -300,12 +282,12 @@ static void arco_prtree(O2SM_HANDLER_ARGS)
     }
 
     // clear the marks by traversing tree again
-    for (int i = 0; i < output_set.size(); i++) {
-        Ugen_ptr ugen = ugen_table[output_set[i]];
+    for (int i = 0; i < add->inputs.size(); i++) {
+        Ugen_ptr ugen = add->inputs[i];
         ugen->print_tree(0, false, "");
     }
     for (int i = 0; i < run_set.size(); i++) {
-        Ugen_ptr ugen = ugen_table[run_set[i]];
+        Ugen_ptr ugen = run_set[i];
         ugen->print_tree(0, false, "");
     }
     arco_print("---------------------------------------\n");
@@ -384,8 +366,8 @@ int req_in_chans(int in_chans)
 int req_out_chans(int out_chans)
 {
     return (out_chans >= 0 ? out_chans :
-            (ugen_table[PREV_OUTPUT_ID] ?
-             ugen_table[PREV_OUTPUT_ID]->chans : 0));
+            (ugen_table[OUTPUT_ID] ?
+             ugen_table[OUTPUT_ID]->chans : 0));
 }
 
 
@@ -451,51 +433,46 @@ void copy_deinterleave(Sample_ptr dest, int dest_chans,
 }
 
 
-// float vector x += y
-void sum_from_into(Sample_ptr x, Sample_ptr y, int n)
-{
-    for (int i = 0; i < n; i++) {
-        *x++ += *y++;
-    }
-}
-
-// mix from buffer to output. Output channels are sum of input
-// channels mod actual_out_chans, e.g. 0+2->0, 1+3->1
+// mix from arco output to PortAudio output. Output channels are sum
+// of input channels mod actual_out_chans, e.g. 0+2->0, 1+3->1
 //
-void mix_down_interleaved(Sample_ptr output, int actual_out_chans,
-                          Sample_ptr buffer, int aud_out_chans)
+void mix_down_interleaved(Sample_ptr dst, int actual_out_chans,
+                          Sample_ptr src, int arco_out_chans)
 {
     if (actual_out_chans == 0) {
         return;  // if no real output, no place or need to mix any samples
     }
-    // Note: aud_out_chans > actual_out_chans > 0, and
-    //       buffer is bigger than output
-    // Begin by copying the first actual_out_chans of each frame:
-    Sample_ptr src = buffer;
-    Sample_ptr dst = output;
-    for (int i = 0; i < BL; i++) {
+    // Note: arco_out_chans > actual_out_chans > 0, and
+    //       src is bigger than dst
+    // Begin by interleaving the first actual_out_chans:
+    Sample_ptr dst_ptr = dst;
+    for (int i = 0; i < BL; i++) {  // outer loop is over output frames
+        Sample_ptr src_ptr = src + i;
         // copy actual_out_chans frames
-        for (int j = 0; j < actual_out_chans; j++) {
-            *dst++ = src[j];
+        for (int j = 0; j < actual_out_chans; j++) {  // within each frame
+            *dst_ptr++ = *src_ptr;
+            src_ptr += BL;  // skip to next channel
         }
-        src += aud_out_chans;  // skip to next frame
     }
     // Add the rest, actual_out_chans at a time, until all channels are output
-    for (int c = actual_out_chans; c < aud_out_chans;
+    for (int c = actual_out_chans; c < arco_out_chans;
          c += actual_out_chans) {
         // mix up to next actual_out_chans into first actual_out_chans
         // but if there are not actual_out_chans left, mix how many
         // are left:
-        int howmany = min(actual_out_chans, aud_out_chans - c);
-        Sample_ptr src = buffer + c;
-        Sample_ptr dst = output;
-            for (int i = 0; i < BL; i++) {
-                // copy howmany frames
-                for (int j = 0; j < howmany; j++) {
-                    *dst++ += src[j];
-                }   
-                src += aud_out_chans;
+        int howmany = min(actual_out_chans, arco_out_chans - c);
+        Sample_ptr src_base_ptr = src + c * BL;
+        Sample_ptr dst_frame_ptr = dst;
+        for (int i = 0; i < BL; i++) {  // loop over output frames
+            Sample_ptr src_ptr = src_base_ptr + i;
+            // copy howmany frames
+            Sample_ptr dst_ptr = dst_frame_ptr;
+            for (int j = 0; j < howmany; j++) { // first howmany channels
+                *dst_ptr++ += *src_ptr;         // in each frame
+                src_ptr += BL;
             }
+            dst_frame_ptr += actual_out_chans;  // skip to next frame
+        }
     }
 }
     
@@ -503,31 +480,31 @@ void mix_down_interleaved(Sample_ptr output, int actual_out_chans,
 // add channels to buffer while copying to output. Output is to be
 // interleaved, but source is not
 //
-void copy_interleaved_with_zero_fill(Sample_ptr output, int actual_out_chans,
-                                     Sample_ptr source, int aud_out_chans)
+void copy_interleaved_with_zero_fill(Sample_ptr dst, int actual_out_chans,
+                                     Sample_ptr src, int arco_out_chans)
 {
     for (int i = 0; i < BL; i++) {  // copy BL frames
         int c;
-        Sample_ptr src = source + i;  // offset by frame, stride is BL
-        for (c = 0; c < aud_out_chans; c++) {  // copy existing channels
-            *output++ = *src;
-            src += BL;
+        Sample_ptr src_ptr = src + i;  // offset by frame, stride is BL
+        for (c = 0; c < arco_out_chans; c++) {  // copy existing channels
+            *dst++ = *src_ptr;
+            src_ptr += BL;
         }
         while (c++ < actual_out_chans) {  // zero fill 
-            *output++ = 0.0F;
+            *dst++ = 0.0F;
         }
     }
 }
 
 
-// called for each block of BL * actual_in_chans samples
-// input is interleaved, output is computed with interleaving
-// But input is de-interleaved and copied to the first actual_in_chans
-// of aud_input_ug. For output, we compute BL * aud_out_chans. If we
-// have enough actual channels, then we interleave to output and maybe
-// write output to the log file. If we don't have enough actual samples,
-// we allocate a buffer and interleave there in a separate interleave step.
-// Then to form output, we have to mix channels.
+// called for each block of BL * actual_in_chans samples input is
+// interleaved, output is computed with interleaving But input is
+// de-interleaved and copied to the first actual_in_chans of
+// aud_input_ug. For output, we compute BL * arco_out_chans. If we
+// have enough actual channels, then we interleave to output.  If we
+// don't have enough actual samples, we allocate a buffer and
+// interleave there in a separate interleave step.  Then to form
+// output, we have to mix channels.
 //
 static int callback_entry(float *input, float *output,
                           PaStreamCallbackFlags flags)
@@ -566,10 +543,6 @@ static int callback_entry(float *input, float *output,
         for (int i = 0; i < cpuload; i++) busywork(i);
     }
 
-    if (log_input) {
-        sf_writef_float(audioinlogfile, input, BL);
-    }
-    
     /*
     if (blocks_done % 1000 == 0 && actual_in_chans > 0) {
         arco_print("Audio callback %ld input %g\n", blocks_done, *input);
@@ -598,13 +571,13 @@ static int callback_entry(float *input, float *output,
     for (int i = 0; i < run_set.size(); i++) {
         // since our current_block was advanced after input was read
         // it is the number we want
-        Ugen_ptr ug = ugen_table[run_set[i]];
+        Ugen_ptr ug = run_set[i];
         if (ug) {
             ug->run(aud_blocks_done);
         }
     }
 
-    Ugen_ptr prev_output = ugen_table[PREV_OUTPUT_ID];
+    Ugen_ptr arco_output = ugen_table[OUTPUT_ID];
     // The commented conditions will stop computation of audio output
     // when there is no real output stream to write to. It seems
     // reasonable not to compute audio when it is not needed, but maybe
@@ -615,119 +588,32 @@ static int callback_entry(float *input, float *output,
     // of the computed audio. Since failing to output sound could have side
     // effects like this, we always compute output even when there is no
     // stream to send it to.
-    //     Probably, it is a bug not to have prev_output, and it should
-    // be created automatically, and probably it is OK for prev_output
+    //     Probably, it is a bug not to have arco_output, and it should
+    // be created automatically, and probably it is OK for arco_output
     // to have zero channels, but can we specify that? At least there is
     // code below (see else part) to output zeros when Arco produces no
     // output but the audio device expects output.
-    if (!prev_output) {
-        printf("WARNING (Arco audio callback): prev_output is NULL\n");
-    } else if (prev_output->chans > 0) {
-        // Compute the output to be copied to prev_output, then copy,
-        // then interleave and mix down to actual output.
-        // Use the actual output as a buffer for the first step if it
-        // is big enough; otherwise, allocate a buffer on the stack:
-        Sample_ptr buffer = NULL;
-        int aud_out_chans = prev_output->chans;
-        if (actual_out_chans >= aud_out_chans) {
-            buffer = output;  // output is big enough
-        } else {
-            buffer = (Sample_ptr) alloca(aud_out_chans * BLOCK_BYTES);
-        }
-
-        Sample_ptr outptr;
-        bool wrote_buffer = false;
-
-        // compute all outputs, first is copy and zero fill, rest sum to output
-        for (int i = 0; i < output_set.size(); i++) {
-            Ugen_ptr output_ug = ugen_table[output_set[i]];
-            output_ug->run(aud_blocks_done);
-            if (aud_out_chans == 0) {
-                continue;
-            }
-            outptr = &output_ug->output[0];
-            int n = min(output_ug->chans, aud_out_chans);
-            if (!wrote_buffer) {  // copy and fill
-                block_copy_n(buffer, outptr, n);
-                if (n < aud_out_chans) {
-                    block_zero_n(buffer + BL * n, aud_out_chans - n);
-                }
-                wrote_buffer = true;
-            } else {  // 2nd sound: add to buffer, no fill needed
-                sum_from_into(buffer, outptr, n * BL);
-            }
-            // do we need to wrap extra channels in outptr?
-            while (output_ug->chans > n) {
-                int count = min(output_ug->chans - n, aud_out_chans);
-                sum_from_into(buffer, outptr + BL * n, count * BL);
-                n += count;
-            }
-        }
-        if (!wrote_buffer) {  // No sound was written to buffer!
-            block_zero_n(buffer, aud_out_chans);
-        }
-
-        // move computed output to prev_output, multiplying by gain
-        // not sure if it's faster to recompute gain in order to copy
-        // consecutive samples...
-        outptr = &prev_output->output[0];
-
-        float aud_gain_incr = (aud_target_gain - aud_gain) * BL_RECIP;
-        // now limit the rate:
-        if (aud_gain_incr > aud_max_gain_incr) {
-            aud_gain_incr = aud_max_gain_incr;
-        } else if (aud_gain_incr < -aud_max_gain_incr) {
-            aud_gain_incr = -aud_max_gain_incr;
-        }
-        Sample_ptr outp = outptr;
-        Sample_ptr bufp = buffer;
-        for (int i = 0; i < BL; i++) {
-            for (int chan = 0; chan < aud_out_chans; chan++) {
-                outp[chan * BL] = bufp[chan * BL] * aud_gain;
-            }
-            aud_gain += aud_gain_incr;
-            outp++;
-            bufp++;
-        }
-
-        /*
-        // previous code, sans gain control
-        memcpy(outptr, buffer, aud_out_chans * BLOCK_BYTES);
-         */
-
-        // interleave the computed output back to buffer
-        transpose(buffer, outptr, aud_out_chans, BL);
-
-        // now we have interleaved graph output, log it if enabled:
-        if (log_output) {
-            sf_writef_float(audiooutlogfile, buffer, BL);
-        }
-
+    if (!arco_output) {
+        printf("WARNING (Arco audio callback): arco_output is NULL\n");
+    } else if (arco_output->chans > 0) {    // Compute the output:
+        Sample_ptr arco_out_samps = arco_output->run(aud_blocks_done);
+        int arco_out_chans = arco_output->chans;
         // now we need actual_out_chans of interleaved samples in output
-        // case 1: buffer != output means we have to mix down because
-        //    audio graph output chans > actual output chans.
-        // case 2: the channel counts do not match, and actual output is
-        //    bigger than graph output, so interleave with zero fill
-        // case 3: we've already computed output because the graph
-        //    channel count matches actual output chans
-
+        // case 1: arco_output chans > actual output chans.
+        // case 2: actual output chans is bigger than graph output,
+        //    so interleave with zero fill
+        // case 3: arco_output chans = actual output chans; just interleave.
         // do we need to mix down channels for output?
-        if (buffer != output) { // yes - case 1
+        if (arco_out_chans > actual_out_chans) { // yes - case 1
             mix_down_interleaved(output, actual_out_chans,
-                                 buffer, aud_out_chans);
-        } else if (actual_out_chans != aud_out_chans) {  // case 2
-            assert(actual_out_chans > aud_out_chans);
+                                 arco_out_samps, arco_out_chans);
+        } else if (arco_out_chans < actual_out_chans) {  // case 2
             copy_interleaved_with_zero_fill(output, actual_out_chans,
-                                            outptr, aud_out_chans);
-        }  // else output *is* buffer and samples are ready to go
-            
-        // audio_out has a one-block (32-sample == BL) delay; otherwise
-        // (for example) Ivu runs to compute clipping before we copy
-        // output to audio_out, so audio_out will need to be refreshed,
-        // but that would invoke Audioio::real_run() which is not allowed.
-        // (We could have real_run() run synthesize(), but what if
-        // synthesize tries to access Ivu's output? It's recursive.
-        prev_output->set_current_block(aud_blocks_done + 1);
+                                            arco_out_samps, arco_out_chans);
+        } else {  // arco_out_chans == actual_out_chans
+            // interleave the computed output back to buffer
+            transpose(output, arco_output->out_samps, arco_out_chans, BL);
+        }
     } else if (actual_out_chans > 0) {  // no synthesized output, so zero output
         block_zero_n(output, actual_out_chans);
     }
@@ -786,81 +672,6 @@ static int pa_callback(const void *input, void *output,
 }
 
 
-/* O2SM INTERFACE:  /arco/output int32 id; -- add Ugen to output set */
-static void arco_output(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t id = argv[0]->i;
-    // end unpack message
-
-    ANY_UGEN_FROM_ID(ugen, id, "arco_output");
-
-    if (ugen->rate == 'a') {
-        // make sure this is not already in output set
-        if (ugen->flags & IN_OUTPUT_SET) {
-            arco_warn("/arco/output %d already in output set\n", id);
-            return;
-        }
-        ugen->flags |= IN_OUTPUT_SET;
-        output_set.push_back(id);
-        printf("added %d to output_set\n", id);
-    } else {
-        arco_warn("arco_output %d not audio rate, ignored\n", id);
-    }
-}
-
-
-/* O2SM INTERFACE:  /arco/mute int32 id; -- remove output Ugen */
-static void arco_mute(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t id = argv[0]->i;
-    // end unpack message
-
-    ANY_UGEN_FROM_ID(ugen, id, "arco_mute");
-    if (ugen && (ugen->flags & IN_OUTPUT_SET)) {
-        forget_ugen_id(id, output_set);
-        ugen->flags &= ~IN_OUTPUT_SET;
-    } else {
-        arco_warn("/arco/mute %d not in output set, ignored\n", id);
-    }
-}
-
-
-/* O2SM INTERFACE:  /arco/swap int32 id, int32 id2; -- replace first ugen
- *    with the second one. This is an atomic operation to support inserting
- *    a fadeout between a source and the output when the source is already
- *    connected and playing, avoiding any race condition.
- */
-static void arco_swap(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t id = argv[0]->i;
-    int32_t id2 = argv[1]->i;
-    // end unpack message
-
-    ANY_UGEN_FROM_ID(ugen, id, "arco_swap");
-    ANY_UGEN_FROM_ID(replacement, id2, "arco_swap");
-    if (replacement->rate != 'a') {
-        arco_warn("/arco/swap id2 (%d) is not audio rate\n", id2);
-        return;
-    }
-    if (replacement->flags & IN_OUTPUT_SET) {
-        arco_warn("/arco/swap id2 (%d) already in output set\n", id2);
-        return;
-    }
-    if (!ugen || !(ugen->flags & IN_OUTPUT_SET)) {
-        arco_warn("/arco/swap id (%d) not in output set, ignored\n", id);
-        return;
-    }
-    forget_ugen_id(id, output_set);
-    ugen->flags &= ~IN_OUTPUT_SET;
-    replacement->flags |= IN_OUTPUT_SET;
-    printf("arco_swap: removed %d, inserting %d in output set\n", id, id2);
-    output_set.push_back(id2);
-}
-
-
 /* O2SM INTERFACE:  /arco/run int32 id; -- add Ugen to run set */
 static void arco_run(O2SM_HANDLER_ARGS)
 {
@@ -876,7 +687,8 @@ static void arco_run(O2SM_HANDLER_ARGS)
         return;
     }
     ugen->flags |= IN_RUN_SET;
-    run_set.push_back(id);
+    run_set.push_back(ugen);
+    ugen->ref();
     // printf("arco_run %d @ %p inserted, flags %x\n", id, ugen, ugen->flags);
 }
 
@@ -890,7 +702,7 @@ static void arco_unrun(O2SM_HANDLER_ARGS)
 
     ANY_UGEN_FROM_ID(ugen, id, "arco_unrun");
     if (ugen && (ugen->flags & IN_RUN_SET)) {
-        forget_ugen_id(id, run_set);
+        forget_ugen(ugen, run_set);
         ugen->flags &= ~IN_RUN_SET;
         /* printf("arco_unrun %d @ %p removed, flags %x\n",
                   id, ugen, ugen->flags); */
@@ -1110,80 +922,6 @@ static void arco_close(O2SM_HANDLER_ARGS)
 }
 
 
-static void logfile_close(SNDFILE **file, char *name)
-{
-    if (*file) {
-        sf_close(*file);
-        *file = NULL;
-        arco_print("Audio log file closed: %s\n", name);
-    } else {
-        arco_warn("Audio log file is not open: %s\n", name);
-    }
-}
-
-
-// output log captures the intended number of channels (aud_out_chans)
-//    even if the audio output is mixed down to a smaller actual_out_chans
-//
-static bool logfile_open(SNDFILE **file, char *name, char *init, int chans)
-{
-    SF_INFO info;
-    // close if already open
-    if (*file) {
-        logfile_close(file, name);
-    }
-    // save (new) name:
-    strncpy(name, init, ARCO_STRINGMAX);
-    name[ARCO_STRINGMAX - 1] = 0;
-    // open file:
-    info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
-    info.channels = chans;
-    info.samplerate = AR;
-    *file = sf_open(name, SFM_WRITE, &info);
-    if (*file) {
-        arco_print("Audio log file opened: %s\n", name);
-    } else {
-        arco_warn("Audio log file open failed: %s\n", name);
-        return false;
-    }
-    return true;
-}
-
-
-/* O2SM INTERFACE: /arco/logaud
-        int32 enable, int32 out, string filename;
-  Log input or output.  enable is 1 or 0 to start or stop the logging.
-  Starting overwrites the file. out is 0 to log input, 1 to log
-  output. The filename should include a ".wav" extension. If enable is
-  0 (false), filename is ignored, so "" is recommended.
-*/
-void arco_logaud(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t enable = argv[0]->i;
-    int32_t out = argv[1]->i;
-    char *filename = argv[2]->s;
-    // end unpack message
-
-    if (enable) {
-        if (out) {
-            log_output = logfile_open(&audiooutlogfile, audiooutlogfilename,
-                                filename, ugen_table[PREV_OUTPUT_ID]->chans);
-        } else {
-            log_input = logfile_open(&audioinlogfile, audioinlogfilename,
-                                     filename, ugen_table[INPUT_ID]->chans);
-        }
-    } else {
-        if (out) {
-            logfile_close(&audiooutlogfile, audiooutlogfilename);
-            log_output = false;
-        } else {
-            logfile_close(&audioinlogfile, audioinlogfilename);
-            log_input = false;
-        }
-    }
-}
-
 /* O2SM INTERFACE: /arco/cpu; -- get the estimated CPU load */
 void arco_cpu(O2SM_HANDLER_ARGS)
 {
@@ -1213,6 +951,7 @@ void arco_load(O2SM_HANDLER_ARGS)
     cpuload = count;
 }
 
+
 void arco_free_all_ugens()
 {
     output_set.clear();
@@ -1220,7 +959,7 @@ void arco_free_all_ugens()
     for (int i = 0; i < ugen_table.size(); i++) {
         Ugen_ptr ugen = ugen_table[i];
         if (ugen) {
-            ugen->flags &= ~IN_OUTPUT_SET & ~IN_RUN_SET;
+            ugen->flags &= ~IN_RUN_SET;
             ugen_table[i] = NULL;
             ugen->unref();
         }
@@ -1280,20 +1019,6 @@ void arco_thread_poll()
 }
 
 
-/* O2SM INTERFACE: /arco/gain float gain; -- set the master gain */
-void arco_gain(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    float gain = argv[0]->f;
-    // end unpack message
-
-    if (aud_state == IDLE) {
-        aud_gain = gain;  // so we start audio stream with correct gain
-    }
-    aud_target_gain = gain;
-}
-
-
 // to be called from the main thread - creates audio shared memory thread,
 // except the "thread" is provided by both a polling function called from
 // the main thread and PortAudio callbacks (when PortAudio is actually
@@ -1323,18 +1048,16 @@ void audioio_initialize()
     o2sm_method_new("/arco/reset", "s", arco_reset, NULL, true, true);
     o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);
-    o2sm_method_new("/arco/output", "i", arco_output, NULL, true, true);
-    o2sm_method_new("/arco/mute", "i", arco_mute, NULL, true, true);
-    o2sm_method_new("/arco/swap", "ii", arco_swap, NULL, true, true);
     o2sm_method_new("/arco/run", "i", arco_run, NULL, true, true);
     o2sm_method_new("/arco/unrun", "i", arco_unrun, NULL, true, true);
     o2sm_method_new("/arco/open", "iiiiiis", arco_open, NULL, true, true);
     o2sm_method_new("/arco/close", "", arco_close, NULL, true, true);
-    o2sm_method_new("/arco/logaud", "iis", arco_logaud, NULL, true, true);
     o2sm_method_new("/arco/cpu", "", arco_cpu, NULL, true, true);
     o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
-    o2sm_method_new("/arco/gain", "f", arco_gain, NULL, true, true);
     // END INTERFACE INITIALIZATION
+
+    // this one is manually inserted. It is implemented in ugen.cpp:
+    o2sm_method_new("/arco/term", "if", arco_term, NULL, true, true);
 
     Pa_Initialize();
     ugen_initialize();
@@ -1346,23 +1069,3 @@ void audioio_initialize()
     o2_clock_set(arco_time, NULL);
 }
 
-
-// When a unit generator is deleted, we need to take it out of the run_set
-// and/or output_set. Members of these sets have flags set, which cause
-// this function to be called by Ugen::unref().
-//
-void aud_forget(int id)
-{
-    printf("aud_forget %d\n", id);
-    ANY_UGEN_FROM_ID(ugen, id, "aud_forget");
-    if (ugen->flags & IN_OUTPUT_SET) {
-        ugen->flags &= ~IN_OUTPUT_SET;
-        forget_ugen_id(id, output_set);
-        printf("aud_forget remove %d from output set\n", id);
-    }
-    if (ugen->flags & IN_RUN_SET) {
-        ugen->flags &= ~IN_RUN_SET;
-        forget_ugen_id(id, run_set);
-        printf("aud_forget remove %d from run set\n", id);
-    }
-}
