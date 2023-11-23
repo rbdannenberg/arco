@@ -51,7 +51,7 @@ source, to get samples.
 not producing audio output, e.g., an audio feature computation. These
 are computed after input is available.
 
-5. output is taken from ugen_table[OUTPUT_ID], an Add unit generator,
+5. output is taken from ugen_table[OUTPUT_ID], an Sum unit generator,
 which sums an arbitrary number of inputs and provides a master gain
 control. Unfortunately, we need an extra copy to get the samples into
 PortAudio, but since PortAudio expects interleaved samples and may
@@ -93,7 +93,7 @@ See doc/design.md
 #include "recperm.h"
 #endif
 #include "prefs.h"
-#include "add.h"
+#include "sum.h"
 #include "audioio.h"
 #include "thru.h"
 
@@ -126,14 +126,17 @@ int aud_blocks_done = 0;
 bool aud_heartbeat = true;
 O2sm_info *audio_bridge = NULL;
 
-/*
 // slew-rate limited master gain control:
 float aud_gain = 1.0;
 float aud_target_gain = 1.0;
-// max slew rate is full-scale 0 to 1 in 20 msec at 48kHz.
+const float aud_gain_factor = 0.03;
+
+// max slew rate is full-scale 0 to 1 in 100 msec at 48kHz.
+// this seems really slow, but at 20 msec, moving a GUI slider and
+// generating 5 or 10 updates/second created an audible stairstep effect
+// even though an instantaneous jump sounded perfectly smooth.
 // (It will change with sample rate, but exact value does not matter.)
-const float aud_max_gain_incr = 1.0 / (0.02 * 48000);
-*/
+const float aud_max_gain_incr = 1.0 / (0.1 * 48000);
 
 static bool arco_thread_exited = false;  // stop processing after o2sm_finish()
 static int actual_in_chans = -1;     // number of channels in callback
@@ -265,9 +268,9 @@ static void arco_test1(O2SM_HANDLER_ARGS)
 static void arco_prtree(O2SM_HANDLER_ARGS)
 {
     arco_print("------------ Ugen Tree ----------------\n");
-    UGEN_FROM_ID(Add, add, OUTPUT_ID, "arco_prtree");
-    for (int i = 0; i < add->inputs.size(); i++) {
-        Ugen_ptr ugen = add->inputs[i];
+    UGEN_FROM_ID(Sum, sum, OUTPUT_ID, "arco_prtree");
+    for (int i = 0; i < sum->inputs.size(); i++) {
+        Ugen_ptr ugen = sum->inputs[i];
         if (ugen->flags & UGEN_MARK) { // special case: print again
             ugen->flags &= ~UGEN_MARK;
         }
@@ -282,8 +285,8 @@ static void arco_prtree(O2SM_HANDLER_ARGS)
     }
 
     // clear the marks by traversing tree again
-    for (int i = 0; i < add->inputs.size(); i++) {
-        Ugen_ptr ugen = add->inputs[i];
+    for (int i = 0; i < sum->inputs.size(); i++) {
+        Ugen_ptr ugen = sum->inputs[i];
         ugen->print_tree(0, false, "");
     }
     for (int i = 0; i < run_set.size(); i++) {
@@ -454,7 +457,7 @@ void mix_down_interleaved(Sample_ptr dst, int actual_out_chans,
             src_ptr += BL;  // skip to next channel
         }
     }
-    // Add the rest, actual_out_chans at a time, until all channels are output
+    // Sum the rest, actual_out_chans at a time, until all channels are output
     for (int c = actual_out_chans; c < arco_out_chans;
          c += actual_out_chans) {
         // mix up to next actual_out_chans into first actual_out_chans
@@ -613,6 +616,19 @@ static int callback_entry(float *input, float *output,
         } else {  // arco_out_chans == actual_out_chans
             // interleave the computed output back to buffer
             transpose(output, arco_output->out_samps, arco_out_chans, BL);
+        }
+        // apply final gain control. Note that channels are interleaved.
+        // simple lowpass filter computes new gain after BL samples:
+        float gain_next = aud_gain +
+                          (aud_target_gain - aud_gain) * aud_gain_factor;
+        // linear interpolation from one block to the next:
+        float gain_incr = (gain_next - aud_gain) * BL_RECIP;
+        Sample_ptr p = output;
+        for (int i = 0; i < BL; i++) {
+            for (int ch = 0; ch < actual_out_chans; ch++) {
+                *p++ *= aud_gain;
+            }
+            aud_gain += gain_incr;
         }
     } else if (actual_out_chans > 0) {  // no synthesized output, so zero output
         block_zero_n(output, actual_out_chans);
@@ -951,6 +967,19 @@ void arco_load(O2SM_HANDLER_ARGS)
     cpuload = count;
 }
 
+/* O2SM INTERFACE: /arco/gain float gain; -- set the master gain */
+void arco_gain(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    float gain = argv[0]->f;
+    // end unpack message
+
+    if (aud_state == IDLE) {
+        aud_gain = gain;  // so we start audio stream with correct gain
+    }
+    aud_target_gain = gain;
+}
+
 
 void arco_free_all_ugens()
 {
@@ -1054,6 +1083,7 @@ void audioio_initialize()
     o2sm_method_new("/arco/close", "", arco_close, NULL, true, true);
     o2sm_method_new("/arco/cpu", "", arco_cpu, NULL, true, true);
     o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
+    o2sm_method_new("/arco/gain", "f", arco_gain, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     // this one is manually inserted. It is implemented in ugen.cpp:

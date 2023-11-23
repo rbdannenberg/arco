@@ -8,10 +8,10 @@ def sine(freq, amp, optional chans):
     Ugen(create_ugen_id(), "sine", chans, 'a', "UU", 'freq', freq, 'amp', amp)
 
 def sineb(freq, amp, optional chans):
-    if freq.rate != 'b':
+    if not isnumber(freq) and freq.rate != 'b':
         print "ERROR: 'freq' input to Ugen 'sineb' must be block rate"
         return nil
-    if amp.rate != 'b':
+    if not isnumber(amp) and amp.rate != 'b':
         print "ERROR: 'amp' input to Ugen 'sineb' must be block rate"
         return nil
     if not chans:

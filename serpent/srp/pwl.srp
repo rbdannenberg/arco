@@ -50,9 +50,9 @@ class Pwl (Ugen):
 def pwl(keyword init, start = true, rest points):
     var pwl = Pwl(points)
     if init:
-       pwe.set(init)
+       pwl.set(init)
     if start:
-       pwe.start()
+       pwl.start()
     return pwl
 
 

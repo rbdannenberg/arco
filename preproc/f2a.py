@@ -259,7 +259,7 @@ def extract_method(classname, methodname, src):
         return None
     loc = src.find(" " + methodname + "(", loc)
     if loc < 0:
-        print('Error: could not find "' + methodname + '"')
+        print('Note: could not find "' + methodname + '"')
         return None
     loc2 = src.find("{", loc)
     if loc2 < 0:
@@ -276,41 +276,130 @@ def extract_method(classname, methodname, src):
     return src[loc + 1 : loc2]
 
 
-def generate_initializer_code(impl, classname):
+def generate_initializer_code(impl, classname, rate):
     """find classInit in Faust code and use it to create class_init for Arco
     returns True if there is an error, otherwise returns initializer code
     (a string).
     """
 
+    init_code = ""
+    rate_name = "AR" if rate == "a" else "BR"
+
     # find classInit method
     class_init = extract_method(classname, "classInit", impl)
-    if class_init == None: return
-    # print("---------classInit method:\n" + class_init + "-------")
-    loc = class_init.find("(")
-    if loc < 0:
-        print('Error: could not find "static void classInit("')
-        return True
-    loc2 = class_init.find(")", loc)
-    if loc2 < 0:
-        print("Error: could not find ')' after \"static void classInit(\"")
-        return True
+    if class_init != None:
+        # print("---------classInit method:\n" + class_init + "-------")
+        loc = class_init.find("(")
+        if loc < 0:
+            print('Error: could not find "static void classInit("')
+            return True
+        loc2 = class_init.find(")", loc)
+        if loc2 < 0:
+            print("Error: could not find ')' after \"static void classInit(\"")
+            return True
 
-    # remove int sample_rate parameter:
-    class_init = class_init[0 : loc + 1] + class_init[loc2 : ]
+        # remove int sample_rate parameter:
+        class_init = class_init[0 : loc + 1] + class_init[loc2 : ]
 
-    # replace sample_rate with AR
-    class_init = class_init.replace("sample_rate", "AR")
+        # replace sample_rate with AR or BR
+        class_init = class_init.replace("sample_rate", rate_name)
 
-    # remove first line (method declaration) and last line (close brace):
-    class_init = class_init.split("\n")
-    print("class_init", class_init)
-    class_init[0] = "\n    // class initialization code from faust:"
-    # reduce indentation by 4 spaces (except for first line):
-    for i in range(len(class_init)):
-        if class_init[i].find("    ") == 0:  # make sure we only remove spaces
-            class_init[i] = class_init[i][4 : ]
-    init_code = "\n".join(class_init[0 : -2])
-    print("initializer code", init_code)
+        # remove first line (method declaration) and last line (close brace):
+        class_init = class_init.split("\n")
+        print("class_init", class_init)
+        class_init[0] = "\n    // class initialization code from faust:"
+        # reduce indentation by 4 spaces (except for first line):
+        for i in range(len(class_init)):
+            if class_init[i].find("    ") == 0:  # only remove spaces
+                class_init[i] = class_init[i][4 : ]
+        init_code = "\n".join(class_init[0 : -2])
+        print("initializer code", init_code)
+
+    # repeat these steps + local var decls for staticInit method
+    static_init = extract_method(classname, "staticInit", impl)
+    if static_init != None:
+        # print("---------staticInit method:\n" +static_init + "-------")
+        loc = static_init.find("(")
+        if loc < 0:
+            print('Error: could not find "void staticInit("')
+            return True
+        loc2 = static_init.find(")", loc)
+        if loc2 < 0:
+            print("Error: could not find ')' after \"static void classInit(\"")
+            return True
+
+        # remove int sample_rate parameter:
+        static_init = static_init[0 : loc + 1] + static_init[loc2 : ]
+
+        # replace sample_rate with AR or BR
+        static_init = static_init.replace("sample_rate", rate_name)
+
+        # remove first line (method declaration) and last line (close brace):
+        static_init = static_init.split("\n")
+        print("static_init", static_init)
+        static_init = static_init[1 : -2]
+        # reduce indentation by 4 spaces (except for first line):
+        for i in range(len(static_init)):
+            if static_init[i].find("    ") == 0:  # only remove spaces
+                static_init[i] = static_init[i][4 : ]
+
+        # Local Variables: This seems likely to fail in the future on
+        # different cases, but for now, we observe in sineb_bb_b.fh
+        # that the staticInit uses member variables as temporaries.
+        # These are iVec0[] and iRec0[]. We need to declare them here
+        # as locals since we are not defining a method and we want to
+        # run this initialization before any instances even exist.  We
+        # look for every assignment to a variable that starts with
+        # "iVec", "iRec", "fVec" or "fRec" and assume that the size of
+        # the array is determined by the largest integer subscript,
+        # e.g. there is a reference to iRec[1] but not iRec[2], so we
+        # must declare "float iRec[2];."  We ignore iRec[l1_re0]
+        # because the subscript is not an integer constant. Since
+        # these variables all occur to the left of assignments, we can
+        # restrict our search to the first token after space on each
+        # line.
+
+        local_prefixes = ["iVec", "iRec", "fVec", "fRec"]
+        local_vars = {}
+        for line in static_init:
+            # get the first token; there must also be "=" after token
+            token = line.split(maxsplit=1)          # so test len > 1:
+            if len(token) < 2:
+                continue  # nothing like token = expr found
+            token = token[0]
+            has_prefix = None
+            for prefix in local_prefixes:
+                if token.find(prefix) == 0:  # found a "Vec"
+                    has_prefix = prefix
+                    break
+            if not has_prefix:
+                continue  # no iVec or iRec found
+            brk_open = token.find("[")
+            if brk_open == -1:
+                continue  # no open bracket
+            brk_close = token.find("]")
+            if brk_close < brk_open:
+                continue  # no close bracket
+            local_var = token[0 : brk_open]
+            print("## local_var", local_var, "token", token, "brk_open", brk_open)
+            index = token[brk_open + 1 : brk_close]
+            if not index.isdigit():
+                continue  # not a constant index
+            index = int(index)
+            sz = local_vars.get(local_var, 0)
+            if index >= sz:
+                local_vars[local_var] = index + 1  # dim of array
+        # now, we've computed local_vars and dimensions, so declare them:
+        decls = ""
+        for local_var in local_vars.keys():
+            var_type = "float" if local_var[0] == "f" else "int"
+            decls += "    " + var_type + " " + local_var + "[" + \
+                     str(local_vars[local_var]) + "];\n"
+
+        head = "\n    // \"static\" initialization code from faust:\n"
+
+        init_code = head + init_code + decls + "\n".join(static_init)
+        print("initializer code", init_code)
 
     # replace classInit:
     #class_init = class_init.replace("classInit", "class_init")
@@ -775,7 +864,7 @@ def generate_state_init(classname, instvars, slow_vars, param_info):
     return state_init
 
 
-def initialize_constants(classname, instvars):
+def initialize_constants(classname, instvars, rate):
     """
     compute initializers for constants, returns True if error
     """
@@ -795,7 +884,8 @@ def initialize_constants(classname, instvars):
     if foundit != None:
         del const_meth[foundit]
     const_meth = "\n".join(const_meth)
-    const_meth = const_meth.replace("fSampleRate", "AR")
+    rate_name = "AR" if rate == "a" else "BR"
+    const_meth = const_meth.replace("fSampleRate", rate_name)
     return const_meth + "\n"
 
 
@@ -920,7 +1010,7 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
 
     # initialize states
     constructor += "        states.set_size(chans);\n"
-    constants = initialize_constants(classname, instvars)
+    constants = initialize_constants(classname, instvars, rate)
     if constants == True:  # error occurred
         return
     constructor += constants
@@ -1004,7 +1094,7 @@ def generate_arco_h(classname, param_info, rate, fhfiles, outf):
     if constr_init == True: 
         return
 
-    initializer_code = generate_initializer_code(fimpl, classname)
+    initializer_code = generate_initializer_code(fimpl, classname, rate)
     if initializer_code == True:
         return
 

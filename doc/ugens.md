@@ -690,6 +690,88 @@ This keeps the feedback delay buffer full and ready to provide feedback,
 but attenuates feedback to be almost inaudible.
 
 
+### math, mathb 
+```
+math, mathb(op, x1, x2, [x2_init = 0] [, chans])
+mult, multb(x1, x2 [, chans])
+add, addb(x1, x2 [, chans])
+sub[, subb(x1, x2 [, chans])
+ugen_div, ugen_divb(x1, x2 [, chans])
+ugen_max, ugen_maxb(x1, x2 [, chans])
+ugen_min, ugen_minb(x1, x2 [, chans])
+ugen_clip, ugen_clibb(x1, x2 [, chans])
+ugen_less, ugen_lessb(x1, x2 [, chans])
+ugen_greater, ugen_greaterb(x1, x2 [, chans])
+ugen_soft_clip, ugen_soft_clipb(x1, x2 [, chans])
+ugen_powi, ugen_powib(x1, x2 [, chans])
+ugen_rand, ugen_randb(x1, x2 [, chans])
+sample_hold, sample_holdb(x1, x2 [, chans])
+ugen_quantize, ugen_quantizeb(x1, x2 [, chans])
+```
+The `math` function and unit generator is a general binary operation
+used to implement a variety of functions. Although each operation is
+implemented with class `Math` or `Mathb`, there are separate functions
+for each operator. 
+
+The `mult` function also takes an `x2_init` keyword parameter, in which 
+case a `Multx` is created (see **multx** below). 
+
+`/arco/math/new id chans op x1 x2` - Create a new unit generator to
+perform a binary operation. The value of `op` can be:
+ - `MATH_OP_MUL` = 0, for multiply,
+ - `MATH_OP_ADD` = 1, for addition,
+ - `MATH_OP_SUB` = 2, for subtraction,
+ - `MATH_OP_DIV` = 3, for division. When |x2| < 0.01, `x1` is divided
+   by either 0.01 or -0.01, based on the sign of `x2`. This avoids 
+   division by zero. Although 0.01 is arbitrary, you can get the
+   effect of different thresholds; for a threshold T, scale x1 by
+   0.01 / T, run it through `ugen_div` and then scale the output by
+   T / 0.01,
+ - `MATH_OP_MAX` = 4, for the maximum value of the two signals, 
+ - `MATH_OP_MIN` = 5, for the minimum value of the two signals, 
+ - `MATH_OP_CLP` = 6, to clip `x1` to the magnitude of `x2`. In
+   detail, if x1 > max(x2, 0), output max(x2, 0). If x1 < -max(x2, 0),
+   output min(-x2, 0). Otherwise, output x1. Note that when x2 is zero
+   or negative, the output is zero,
+ - `MATH_OP_POW` = 7, to raise x1 to the power x2. If x1 is negative,
+   the output is zero even if the exponent is zero. Note that when
+   raising a negative power, the output goes to infinity as the
+   input (x1) goes to zero,
+ - `MATH_OP_LT` = 8, for less-than, outputs 1 if x1 < x2, otherwise zero,
+ - `MATH_OP_GT` = 9, for greater-than, outputs 1 if x1 > x2, otherwise zero,
+ - `MATH_OP_SCP` = 10, for soft clipping, applies a cubic polynomial
+   f(x1) for x1 in the range -x2 to +x2 when x2 is positive. Outside the
+   range -x2 to +x2, the output is -x2 for negative input and +x2 for
+   positive input, thus the signal is clipped to the magnitude of x2.
+   The slope (first derivative) of f(x1) is continuous, varying from
+   3/2 at x1 = 0 to zero at |x1| = x2, thus there is a gain of 3/2 at
+   low levels of x1. When x2 is negative, the output is zero.
+ - `MATH_OP_PWI` = 11, for raising x1 to an integer power round(x2).
+   A b-rate or c-rate `x2` is not interpolated,
+ - `MATH_OP_RND` = 12, outputs a random number with uniform distribution
+   between x1 and x2, which at b-rate and c-rate are not interpolated,
+ - `MATH_OP_SH` = 13, is a "sample and hold" operation that samples x1
+   at each positive zero crossing of x2. x1 and x2 are not
+   interpolated,
+ - `MATH_OP_QNT` = 14, performs quantization on x1. The number of
+   quantization levels is given by x2 * 2^16, where x2 is between 0
+   and 1. If the number of levels is 1 or less, zero is output. No
+   dithering is performed, but of course dithering noise can be added
+   upstream to x1.
+   
+
+`/arco/math/set_x1 id chan x1` - Set channel `chan` of input to float
+value `x1`.
+
+`/arco/math/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
+
+`/arco/math/set_x2 id chan x2` - Set channel `chan` of input to float
+value `x2`.
+
+The `mathb` messages begin with `/arco/mathb` and output is b-rate.
+
+
+
 ### mix
 ```
 mix([chans], wrap = true)
@@ -746,27 +828,6 @@ object with id `gain_id`.
 `/arco/set_gain id name chan gain` - Set the gain for input `name` on
 channel `chan` to the float value `gain`.
 
-
-### mult, multb
-```
-mult(x1, x2 [, chans])
-```
-The `mult` function also takes an `x2_init` keyword parameter, in which
-case a `Multx` is created (see **multx** below).
-
-`/arco/mult/new id chans x1 x2` - Create a new multiplier.
-
-`/arco/mult/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`.
-
-`/arco/mult/set_x1 id chan x1` - Set channel `chan` of input to float
-value `x1`.
-
-`/arco/mult/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
-
-`/arco/mult/set_x2 id chan x2` - Set channel `chan` of input to float
-value `x2`.
-
-The `multb` messages begin with `/arco/multb` and output is b-rate.
 
 ### multx
 ```

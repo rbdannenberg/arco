@@ -119,7 +119,8 @@ def main():
                           'must be audio rate"', file=srpf)
                     print("        return nil", file=srpf)
                 elif r == 'b':
-                    print("    if", p + ".rate != 'b':", file=srpf)
+                    print("    if not isnumber(" + p + ") and",
+                          p + ".rate != 'b':", file=srpf)
                     print('        print "ERROR:', "'" + p + \
                           "' input to Ugen '" + c + "'",
                           'must be block rate"', file=srpf)

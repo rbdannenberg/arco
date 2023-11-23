@@ -183,7 +183,7 @@ void arco_free(O2SM_HANDLER_ARGS)
 
 void ugen_initialize()
 {
-    ugen_table.init(UGEN_TABLE_SIZE, true);  // fill with zero
+    ugen_table.init(UGEN_TABLE_SIZE, true);  // fill with zero, exact size
     Initializer::init();  // add all message handlers to O2sm
 
     o2sm_method_new("/arco/free", NULL, arco_free, NULL, false, false);

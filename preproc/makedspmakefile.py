@@ -33,11 +33,15 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "alpass", "mix", "fileplay", "filerec", "fileio", "nofileio", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
-            "smoothb", "route", "multx", "fader", "add", "addb"]
+            "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
+            "mathugenb"]
+
+MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
+             "ugen_clip", "ugen_less", "ugen_greater", "ugen_soft_clip"]
 
 # compute all names for which there is an a-rate or b-rate version, but not
 # both. Put the "missing" name in NONEXIST:
-NONEXIST = []
+NONEXIST = []  # names here are computed in the following for-loop:
 
 for ugclass in NONFAUST:
     # case 1: ugclass b-rate is specified, but not ugclass a-rate
@@ -61,6 +65,7 @@ def append_to_srp_srcs(spec, path):
         srp_srcs.append(path)
 
 
+
 def make_makefile(arco_path, manifest, outf):
     """make the makefile for faust-based dsp .cpp and .h files"""
     global srp_srcs
@@ -77,14 +82,7 @@ def make_makefile(arco_path, manifest, outf):
     srp_srcs = []
     srp_path = arco_path + "/serpent/srp/"
     ugens_path = arco_path + "/ugens/"
-    if "thru" not in manifest:
-        manifest.append("thru")
-    if "zero*" not in manifest:
-        manifest.append("zero*")
-    if "fader" not in manifest:
-        manifest.append("fader")
-    if "add" not in manifest and "add*" not in manifest:
-        manifest.append("add")
+
     for ugen in manifest:
         basename = ugen
         if ugen[-1 : ] == "*":
@@ -271,6 +269,44 @@ def is_a_unit_generator(line):
     return len(line) > 1 and line[0] != "#"
 
 
+def need_ugen(manifest, name):
+    """ Take names of the form xxx or xxxb (but not xxx*) and insert them
+    as needed into manifest. If you insert both, in any order, they will
+    be replaced with the form xxx*. If you try to insert a duplicate, it
+    will be ignored.  Also, if the name or name - "b" is in MATHUGENS,
+    use "mathugen" or "mathugenb" in place of name since "mathugen" and
+    "mathugenb" implement all of the names in MATHUGENS. 
+    """
+    base = None
+    if name[-1] == "b":
+        base = name[0 : -1]
+
+    if name in manifest:
+        return
+    if base and ((base + "*") in manifest):
+        return
+    elif (name + "*") in manifest:
+        return
+
+    # check for MATHUGENS:
+    if (base and (base in MATHUGENS)):  # must be xxxb form
+        need_ugen(manifest, "mathugenb")
+        return
+    elif (name in MATHUGENS):  # no base, so must be xxx form
+        need_ugen(manifest, "mathugen")
+        return
+
+    # now we know name is not covered by manifest yet, insert something:
+    if name + "b" in manifest:
+        manifest.remove(name + "b")
+        manifest.append(name + "*")
+    elif base and (base in manifest):
+        manifest.remove(base)
+        manifest.append(base + "*")
+    else:
+        manifest.append(name)
+
+
 def main():
     if len(sys.argv) != 5:
         print("Usage: python3 makedspmakefile.py arco_path " + \
@@ -295,6 +331,26 @@ def main():
     manifest = [ugen[:-1] for ugen in manifest]
     # remove trailing blanks
     manifest = [ugen.strip() for ugen in manifest]
+    # remove duplicates and subsets
+    manifest2 = []
+    # remove duplicates; remove xxx if xxx* exists;
+    # remove xxxb if xxx* exists; replace xxx and xxxb
+    # with xxx* if both xxx and xxxb exist:
+    for ugen in manifest:
+        if ugen[-1] == "*":
+            base = ugen[0 : -1]
+            need_ugen(manifest2, base)
+            need_ugen(manifest2, base + "b")
+        else:
+            need_ugen(manifest2, ugen)
+
+    need_ugen(manifest2, "thru")
+    need_ugen(manifest2, "zero")
+    need_ugen(manifest2, "zerob")
+    need_ugen(manifest2, "fader")
+    need_ugen(manifest2, "sum")
+
+    manifest = manifest2  # use the "cleaned up" and canonical manifest
 
     with open(makefile_name, "w") as outf:
         make_makefile(arco_path, manifest, outf)

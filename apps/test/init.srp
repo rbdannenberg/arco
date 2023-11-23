@@ -156,6 +156,48 @@ def arco_ready():
     Checkbox(win, "Fade", 'S', 'D', WIDTH, 'S', 'fadecheckbox')
     fadecheckbox.add_target_method(nil, 'fadetest')
 
+    Checkbox(win, "Add Test", 'S', 'D', 'S', 'S', 'addcheckbox')
+    addcheckbox.add_target_method(nil, 'addtest')
+
+    Checkbox(win, "Sub Test", 'S', 'D', 'S', 'S', 'subcheckbox')
+    subcheckbox.add_target_method(nil, 'subtest')
+
+    Checkbox(win, "Div Test", 'S', 'D', 'S', 'S', 'divcheckbox')
+    divcheckbox.add_target_method(nil, 'divtest')
+
+    Checkbox(win, "Max Test", 'S', 'D', 'S', 'S', 'maxcheckbox')
+    maxcheckbox.add_target_method(nil, 'maxtest')
+
+    Checkbox(win, "Min Test", 'S', 'D', 'S', 'S', 'mincheckbox')
+    mincheckbox.add_target_method(nil, 'mintest')
+
+    Checkbox(win, "Clip Test", 'S', 'D', 'S', 'S', 'clpcheckbox')
+    clpcheckbox.add_target_method(nil, 'clptest')
+
+    Checkbox(win, "Pow Test", 'S', 'D', 'S', 'S', 'powcheckbox')
+    powcheckbox.add_target_method(nil, 'powtest')
+
+    Checkbox(win, "Lessthan Test", 'S', 'D', 'S', 'S', 'ltcheckbox')
+    ltcheckbox.add_target_method(nil, 'lttest')
+
+    Checkbox(win, "Greaterthan Test", 'S', 'D', 'S', 'S', 'gtcheckbox')
+    gtcheckbox.add_target_method(nil, 'gttest')
+
+    Checkbox(win, "Soft Clip Test", 'S', 'D', 'S', 'S', 'scpcheckbox')
+    scpcheckbox.add_target_method(nil, 'scptest')
+
+    Checkbox(win, "Integer Power Test", 'S', 'D', 'S', 'S', 'pwicheckbox')
+    pwicheckbox.add_target_method(nil, 'pwitest')
+
+    Checkbox(win, "Random Test", 'S', 'D', 'S', 'S', 'rndcheckbox')
+    rndcheckbox.add_target_method(nil, 'rndtest')
+
+    Checkbox(win, "Sample Hold Test", 'S', 'D', 'S', 'S', 'shcheckbox')
+    shcheckbox.add_target_method(nil, 'shtest')
+
+    Checkbox(win, "Quantization Test", 'S', 'D', 'S', 'S', 'qntcheckbox')
+    qntcheckbox.add_target_method(nil, 'qnttest')
+
     ui_initialized = true
     default_window.fit_to_children()
 
@@ -670,6 +712,217 @@ def fadetest(obj, event, x, y):
     else:
         to_be_faded.fade(0.9)
         to_be_faded = nil
+
+
+########## Add Test ################
+# this test just adds a stereo sine to a mono sine and plays it
+
+adder = nil
+
+def addtest(obj, event, x, y):
+    display "addtest", x
+    if x:
+        adder = add(sine(880, [0.3, 0.3]), sine(1000, 0.2)).play()
+    else:
+        adder.mute()
+        adder = nil
+
+
+########## Sub Test ################
+# This test subtracts a linear ramp from 0 to 1 from 0.5, which
+# is the gain of a sine, so the sound intensity should go to zero
+# and back to 0.5 (actually -0.5, so signal will be inverted).
+
+subout = nil
+
+def subtest(obj, event, x, y):
+    display "subtest", x
+    if x:
+        subout = sine(880, subb(0.5, pwlb(4, 1))).play()
+    else:
+        subout.mute()
+        subout = nil
+
+
+########## Div Test ################
+# This test divides by a slow sinusoid offset so as not to cross zero.
+
+divout = nil
+
+def divtest(obj, event, x, y):
+    display "divtest", x
+    if x:  # gain should be from 1/1.9 to 1/0.1, or ~0.5 to 10:
+        divout = ugen_div(sine(880, 0.1), addb(1, sineb(1, 0.9))).play()
+    else:
+        divout.mute()
+        divout = nil
+
+
+########## Max Test ################
+# This test uses ugen max to clip a sinusoid - an lfo is biased to
+# -0.4 to 0.2, so the clipping is to the "bottom" of the audio
+# sine tone.
+
+maxout = nil
+
+def maxtest(obj, event, x, y):
+    display "maxtest", x
+    if x:
+        maxout = ugen_max(sine(440, 0.3), addb(-0.1, sineb(0.5, 0.3))).play()
+    else:
+        maxout.mute()
+        maxout = nil
+
+
+########## Min Test ################
+# This test uses ugen_min to clip a sinusoid - same test as max, but
+# clipping is from above and tone is 1 octave lower.
+
+minout = nil
+
+def mintest(obj, event, x, y):
+    display "mintest", x
+    if x:
+        minout = ugen_min(sine(220, 0.3), addb(0.1, sineb(0.5, 0.3))).play()
+    else:
+        minout.mute()
+        minout = nil
+
+
+########## Clip Test ################
+# This test uses ugen_clip to clip a sinusoid that modulates in amplitude
+
+clipout = nil
+
+def clptest(obj, event, x, y):
+    display "cliptest", x
+    if x:
+        clipout = ugen_clip(sine(220, sineb(0.2, 2)), 0.3).play()
+    else:
+        clipout.mute()
+        clipout = nil
+
+
+########## Pow Test ################
+# This test uses pow to change a wave shape. Both signals are positive.
+
+powout = nil
+
+def powtest(obj, event, x, y):
+    display "powtest", x
+    if x:
+        powout = add(ugen_pow(add( sine(220, 0.5), 0.5),
+                              add(sineb(0.2, 0.5), 0.5)), -0.5).play()
+    else:
+        powout.mute()
+        powout = nil
+
+
+########## Lt Test ################
+# This test uses lt to produce a pulse wave
+
+ltout = nil
+
+def lttest(obj, event, x, y):
+    display "lttest", x
+    if x:
+        ltout = sub(ugen_less(sine(220, 0.5), sineb(0.2, 0.4)), 0.5).play()
+    else:
+        ltout.mute()
+        ltout = nil
+
+
+########## Gt Test ################
+# This test uses gt to produce a square wave used as tone amplitude
+
+gtout = nil
+
+def gttest(obj, event, x, y):
+    display "gttest", x
+    if x:
+        gtout = sine(880, ugen_greaterb(sineb(3, 1), 0)).play()
+    else:
+        gtout.mute()
+        gtout = nil
+
+
+########## Scp Test ################
+# This test uses soft clipping on a variablel amplitude sine
+
+scpout = nil
+
+def scptest(obj, event, x, y):
+    display "scptest", x
+    if x:
+        scpout = ugen_soft_clip(sine(220, addb(1, sineb(0.2, 1))), 0.3).play()
+    else:
+        scpout.mute()
+        scpout = nil
+
+
+########## Pwi Test ################
+# This test uses ugen_powi to raise sine tone to powers from 1 to 5
+
+pwiout = nil
+
+def pwitest(obj, event, x, y):
+    display "pwitest", x
+    if x:
+        pwiout = mult(0.3, ugen_powi(sine(220, 1),
+                                     addb(3, sineb(0.2, 2)))).play()
+    else:
+        pwiout.mute()
+        pwiout = nil
+
+
+########## Rnd Test ################
+# This test generates noise where the upper and lower ranges
+# are controlled by different LFOs
+
+rndout = nil
+
+def rndtest(obj, event, x, y):
+    display "rndtest", x
+    if x:
+        rndout = ugen_rand(addb(-0.5, sineb(0.3, 0.5)),
+                           addb(0.5, sineb(0.4, 0.5))).play()
+    else:
+        rndout.mute()
+        rndout = nil
+
+
+########## Sample/Hold Test ################
+# This test sample/holds noise to control frequency
+
+shout = nil
+
+def shtest(obj, event, x, y):
+    display "shtest", x
+    if x:
+        shout = sine(sample_hold(ugen_rand(220.0, 880.0),
+                                 sineb(8, 1)),
+                     0.3).play()
+    else:
+        shout.mute()
+        shout = nil
+
+
+########## Qnt Test ################
+# This test quantizes a sinusoid using an lfo to vary
+# quantization. Amplitude range of LFO + offset gives
+# from 3 to 16 quantization levels
+
+qntout = nil
+
+def qnttest(obj, event, x, y):
+    display "qnttest", x
+    var q = (13 / 0x10000) * 0.5
+    if x:
+        qntout = ugen_quantize(sine(440, 0.5),
+                               addb(q + 3 / 0x10000, sineb(0.1, q))).play()
+    else:
+        qntout.mute()
+        qntout = nil
 
 
 ########## Main Initialization ################

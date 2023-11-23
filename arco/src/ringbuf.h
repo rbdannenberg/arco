@@ -23,7 +23,7 @@ class Ringbuf : public Vec<Sample> {
     
 
     Ringbuf(int size = 0, bool z = false) :
-            Vec<Sample>(size, z) { init(size, z); }
+            Vec<Sample>(0) { init(size, z); }
 
 
     int vec_len(int size) {
@@ -47,7 +47,7 @@ class Ringbuf : public Vec<Sample> {
         head = 0;
         tail = (z ? size : 0);
         Vec<Sample>::init(0);
-        Vec<Sample>::set_size(vec_len(size));
+        Vec<Sample>::set_size(vec_len(size), z);
         mask = length > 0 ? length - 1 : 0;
     }
 

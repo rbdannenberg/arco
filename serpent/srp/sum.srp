@@ -1,0 +1,45 @@
+# sum.srp -- sum and sumb unit generators
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Sum(Ugen):
+    def init(chans, wrap, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
+                   "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0)
+
+    def ins(ugen):
+        o2_send_cmd("/arco/sum/ins", 0, "UU", id, ugen.id)
+        this
+
+    def rem(ugen):
+        o2_send_cmd("/arco/sum/rem", 0, "UU", id, ugen.id)
+        this
+
+    def swap(ugen, replacement):
+        o2_send_cmd("/arco/sum/swap", 0, "UUU", id, ugen.id, replacement.id)
+        this
+
+
+def sum(optional chans = 1, keyword wrap = true): Sum(chans, wrap)
+
+
+class Sumb(Ugen):
+    def init(chans, wrap):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
+                   "Sumb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
+
+    def ins(ugen):
+        o2_send_cmd("/arco/sumb/ins", 0, "UU", id, ugen.id)
+        this
+
+    def rem(ugen):
+        o2_send_cmd("/arco/sumb/rem", 0, "UU", id, ugen.id)
+        this
+
+    def swap(ugen, replacement):
+        o2_send_cmd("/arco/sumb/swap", 0, "UUU", id, ugen.id, replacement.id)
+        this
+
+
+def sumb(optional chans = 1, keyword wrap = true): Sumb(chans, wrap)

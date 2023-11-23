@@ -38,6 +38,34 @@ extern int control_service_addr_len;  // address len including "!" and "/"
 #define COS_TABLE_SIZE 100
 extern float raised_cosine[COS_TABLE_SIZE + 5];
 
+// used by math and mathb:
+const int MATH_OP_MUL = 0;
+const int MATH_OP_ADD = 1;
+const int MATH_OP_SUB = 2;
+const int MATH_OP_DIV = 3;
+const int MATH_OP_MAX = 4;
+const int MATH_OP_MIN = 5;
+const int MATH_OP_CLP = 6;  // min(max(x, -y), y) i.e. clip if |x| > y
+const int MATH_OP_POW = 7;
+const int MATH_OP_LT = 8;
+const int MATH_OP_GT = 9;
+const int MATH_OP_SCP = 10;
+const int MATH_OP_PWI = 11;
+const int MATH_OP_RND = 12;
+const int MATH_OP_SH = 13;
+const int MATH_OP_QNT = 14;
+#define NUM_MATH_OPS 15
+
+// IMPORTANT: x1 and x2 should be variables, not expressions
+// since they are evaluated multiple times. x1 is modified
+//
+#define SOFTCLIP(x1, x2)  \
+    ((x2 <= 0) ? 0 : \
+     (x1 = copysignf(fminf(fabsf(x1), x2), x1), \
+      x1 /= x2, \
+      (x1 * 3 - x1 * x1 * x1) * 0.5 * x2))
+
+
 int set_control_service(const char *ctrlservice);
 
 class Ugen;

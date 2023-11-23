@@ -99,7 +99,8 @@ public:
     void init(float dur, int polyphony) {
         int len = ((int) (dur * AR) + BL) & ~(BL - 1);  // round up to BL
         input_buf.init(len, true);
-        gens.set_size(polyphony, false);
+        gens.init(polyphony);  // size is now 0
+        gens.set_size(polyphony, false);  // no need to zero fill
         reset_gens(0, polyphony);
         actual_polyphony = polyphony;
     }

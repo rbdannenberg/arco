@@ -209,7 +209,7 @@ public:
             float fTemp0 = std::tan(fConst0 * std::max<float>(float(input1[i0]), 0.1f));
             float fTemp1 = 1.0f / fTemp0;
             float fTemp2 = (fSlow0 + fTemp1) / fTemp0 + 1.0f;
-            state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * (1.0f - (fSlow0 - fTemp1) / fTemp0) + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp2;
+            state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * ((fTemp1 - fSlow0) / fTemp0 + 1.0f) + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp2;
             *out_samps++ = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp2);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];

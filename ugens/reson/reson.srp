@@ -11,13 +11,13 @@ def reson(snd, center, q, optional chans):
     Ugen(create_ugen_id(), "reson", chans, 'a', "UUU", 'snd', snd, 'center', center, 'q', q)
 
 def resonb(snd, center, q, optional chans):
-    if snd.rate != 'b':
+    if not isnumber(snd) and snd.rate != 'b':
         print "ERROR: 'snd' input to Ugen 'resonb' must be block rate"
         return nil
-    if center.rate != 'b':
+    if not isnumber(center) and center.rate != 'b':
         print "ERROR: 'center' input to Ugen 'resonb' must be block rate"
         return nil
-    if q.rate != 'b':
+    if not isnumber(q) and q.rate != 'b':
         print "ERROR: 'q' input to Ugen 'resonb' must be block rate"
         return nil
     if not chans:

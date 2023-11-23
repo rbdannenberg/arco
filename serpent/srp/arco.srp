@@ -599,7 +599,7 @@ def create_standard_ugens():
     zero_ugen = Zero(ZERO_ID)
     zerob_ugen = Zerob(ZEROB_ID)
     input_ugen = Thru(zero_ugen, arco_input_chans, INPUT_ID)
-    output_ugen = Add(arco_output_chans, true, OUTPUT_ID)
+    output_ugen = Sum(arco_output_chans, true, OUTPUT_ID)
 
 
 # internal function: wait for arco service, then reset Arco server

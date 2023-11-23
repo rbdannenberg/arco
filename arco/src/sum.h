@@ -1,12 +1,12 @@
-/* add.h -- unit generator that adds inputs
+/* sum.h -- unit generator that sums inputs
  *
  * Roger B. Dannenberg
  * Nov 2023
  */
 
-extern const char *Add_name;
+extern const char *Sum_name;
 
-class Add : public Ugen {
+class Sum : public Ugen {
 public:
     float gain;
     float prev_gain;
@@ -14,19 +14,19 @@ public:
 
     Vec<Ugen_ptr> inputs;
 
-    Add(int id, int nchans, int wrap_) : Ugen(id, 'a', nchans) {
+    Sum(int id, int nchans, int wrap_) : Ugen(id, 'a', nchans) {
         gain = 1;
         prev_gain = 1;
         wrap = (wrap_ != 0); };
 
-    ~Add() {
+    ~Sum() {
         for (int i = 0; i < inputs.size(); i++) {
             inputs[i]->unref();
         }
         // since inputs is a member, ~Vec will run now and delete it
     }
 
-    const char *classname() { return Add_name; }
+    const char *classname() { return Sum_name; }
 
 
     void print_sources(int indent, bool print_flag) {
@@ -41,7 +41,7 @@ public:
     // insert operation takes a signal and a gain
     void ins(Ugen_ptr input) {
         if (input->rate != 'a') {
-            arco_warn("add_ins: input rate is not 'a', ignore insert");
+            arco_warn("sum_ins: input rate is not 'a', ignore insert");
             return;
         }
         int i = find(input, false);
@@ -60,7 +60,7 @@ public:
             }
         }
         if (expected) {
-            arco_warn("Add::find: %p not found, nothing was changed", input);
+            arco_warn("Sum::find: %p not found, nothing was changed", input);
         }
         return -1;
     }
@@ -79,7 +79,7 @@ public:
     void swap(Ugen_ptr ugen, Ugen_ptr replacement) {
         int loc = find(ugen, false);
         if (loc == -1) {
-            arco_warn("/arco/add/swap id (%d) not in output set, ignored\n",
+            arco_warn("/arco/sum/swap id (%d) not in output set, ignored\n",
                       id);
             return;
         }
@@ -116,12 +116,12 @@ public:
                     block_zero_n(out_samps + BL * ch, chans - ch);
                     //}
                 }
-                copy_first_input = false;  // from now on, need to add input
+                copy_first_input = false;  // from now on, need to sum input
             } else {
                 block_add_n(out_samps, input_ptr, MIN(ch, chans));
             }
-            // whether we copied or added the first chans channels of input,
-            // there could be extra channels to "wrap" and now we have to add
+            // whether we copied or sumed the first chans channels of input,
+            // there could be extra channels to "wrap" and now we have to sum
             if (ch > chans && wrap) {
                 for (int c = chans; c < ch; c += chans) {
                     block_add_n(out_samps, input_ptr + c * BL,

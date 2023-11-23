@@ -11,10 +11,10 @@ def lowpass(snd, cutoff, optional chans):
     Ugen(create_ugen_id(), "lowpass", chans, 'a', "UU", 'snd', snd, 'cutoff', cutoff)
 
 def lowpassb(snd, cutoff, optional chans):
-    if snd.rate != 'b':
+    if not isnumber(snd) and snd.rate != 'b':
         print "ERROR: 'snd' input to Ugen 'lowpassb' must be block rate"
         return nil
-    if cutoff.rate != 'b':
+    if not isnumber(cutoff) and cutoff.rate != 'b':
         print "ERROR: 'cutoff' input to Ugen 'lowpassb' must be block rate"
         return nil
     if not chans:

@@ -97,13 +97,15 @@ class Vu (Ugen):
 
     def start(reply_addr, period):
         o2_send_cmd("/arco/vu/start", 0, "Usf", id, reply_addr, period)
+        this
 
     def set(input, value):  // patterned after Ugen.set()
         // Note that the only thing you can set is 'input'
         inputs['input'] = value
         display "Vu set", id, value.id
         o2_send_cmd("/arco/vu/repl_input", 0, "UU", id, value.id)
-
+        this
+       
 # probe.srp -- stream audio from file
 #
 # Roger B. Dannenberg
@@ -129,16 +131,19 @@ class Probe (Ugen):
         if not running:
             run() // suppress warning if we're already in run setx
             running = true
+        this
 
     def thresh(threshold, direction, max_wait):
         o2_send_cmd("/arco/probe/thresh", 0, "Ufif", id,
                     threshold, direction, max_wait)
+        this
         
     def stop():
         o2_send_cmd("/arco/probe/stop", 0, "U", id)
         if running:
             unrun()
             running = false
+        this
         
 
 # pwl.srp -- piece-wise linear envelope
@@ -153,6 +158,7 @@ class Pwl (Ugen):
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -180,10 +186,12 @@ class Pwl (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
+        this
 
     def set(y):
     # set current value to y
         o2_snd_cmd("/arco/pwl/set", 0, "Uf", id, y)
+        this
 
 
 
@@ -206,6 +214,7 @@ class Pwlb (Ugen):
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -247,11 +256,13 @@ class Pwlb (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
+        this
 
 
     def set(y):
     # set current value to y
         o2_send_cmd("/arco/pwlb/set", 0, "Uf", id, y)
+        this
 
 
 
@@ -275,6 +286,7 @@ class Pwe (Ugen):
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -302,10 +314,12 @@ class Pwe (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwe/decay", 0, "Uf", id, dur * AR)
+        this
 
     def set(y):
     # set current value to y
         o2_snd_cmd("/arco/pwe/set", 0, "Uf", id, y)
+        this
 
 
 def pwe(keyword init, start = true, rest points):
@@ -324,9 +338,11 @@ class Pweb (Ugen):
     def init(points):
         super.init(create_ugen_id(), "Pweb", 1, 'b', "", omit_chans = true)
         set_point_array(points)
+        this
 
     def set_points(rest points):
         set_point_array(points)
+        this
 
     def set_point_array(points):
     # define the shape of the envelope with an array of floats, 
@@ -368,11 +384,13 @@ class Pweb (Ugen):
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_send_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
+        this
 
 
     def set(y):
     # set current value to y
         o2_send_cmd("/arco/pweb/set", 0, "Uf", id, y)
+        this
 
 
 def pweb(keyword init, start = true, rest points):
@@ -390,8 +408,9 @@ def pweb(keyword init, start = true, rest points):
 
 class Mix (Ugen):
     
-    def init(chans_):
-        super.init(create_ugen_id(), "Mix", chans_, A_RATE, "")
+    def init(chans_, wrap):
+        super.init(create_ugen_id(), "Mix", chans_, A_RATE,
+                   "i", 'wrap', 1 if wrap else 0)
 
         
     def set(input, value, optional chan = 0):
@@ -452,10 +471,11 @@ class Mix (Ugen):
             inputs[name][2] = gain
             // display "mix set_gain, calling /repl_gain", id, name, gain.id
             o2_send_cmd("/arco/mix/repl_gain", 0, "UsU", id, str(name), gain.id)
+        this
     
 
-def mix(optional chans = 1):
-    Mix(chans)
+def mix(optional chans = 1, keyword wrap = true):
+    Mix(chans, wrap)
 
 
 def mix_name(i):
@@ -582,9 +602,11 @@ class Fileplay (Ugen):
 
     def go(optional play_flag = true):
         o2_send_cmd("/arco/fileplay/play", 0, "UB", id, play_flag)
+        this
     
     def stop():
         go(false)
+        this
 
 # filerec.srp -- stream audio from file
 #
@@ -605,9 +627,11 @@ class Filerec (Ugen):
 
     def go(optional rec_flag = true):
         o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
+        this
     
     def stop():
         go(false)
+        this
 
 # recplay.srp -- record and play audio in memory
 #
@@ -629,19 +653,24 @@ class Recplay (Ugen):
 
     def record(record_flag):
         o2_send_cmd("/arco/recplay/rec", 0, "UB", id, record_flag)
+        this
 
     def start(start_time):
     # start playing recording from offset start_time
         o2_send_cmd("/arco/recplay/start", 0, "Ud", id, start_time)
+        this
 
     def stop():
         o2_send_cmd("/arco/recplay/stop", 0, "U", id)
+        this
 
     def set_speed(x):
         o2_send_cmd("/arco/recplay/speed", 0, "Uf", id, x)
+        this
 
     def borrow(u):
         o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u.id)
+        this
 
 # delay.srp -- feedback delay unit generator
 #
@@ -649,13 +678,13 @@ class Recplay (Ugen):
 # June 2023
 
 class Delay(Ugen):
-    def init(chans, inp, dur, fb, maxdur):
+    def init(chans, input, dur, fb, maxdur):
         super.init(create_ugen_id(), "Delay", chans, 'a', "UUUf",
-	           'inp', inp, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+	           'input', input, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
 
 
-def delay(inp, dur, fb, maxdur, optional chans = 1):
-    Delay(chans, inp, dur, fb, maxdur)  # delay as a function
+def delay(input, dur, fb, maxdur, optional chans = 1):
+    Delay(chans, input, dur, fb, maxdur)  # delay as a function
 
 
 
@@ -688,6 +717,7 @@ class Ola_pitch_shift (Ugen):
     
     def set_ratio(value):
         o2_send_cmd("/arco/olaps/ratio", 0, "Uf", id, value)
+        this
         
 
 def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
@@ -724,16 +754,20 @@ class Trig(Ugen):
 
     def set_window(window):
         o2_send_cmd("/arco/trig/window", 0, "Ui", id, window)
+        this
 
     def set_threshold(threshold):
         o2_send_cmd("/arco/trig/threshold", 0, "Uf", id, threshold)
+        this
 
     def set_threshold(pause):
         o2_send_cmd("/arco/trig/pause", 0, "Uf", id, pause)
+        this
 
     def onoff(reply_addr, threshold, runlen):
         o2_send_cmd("/arco/trig/onoff", 0, "Usff",
                     id, reply_addr, threshold, runlen)
+        this
 
 
 def trig(input, reply_addr, window, threshold, pause):
@@ -797,8 +831,26 @@ def dualslewb(input, mode, optional chans = 1):
 
 # fader.srp - constructor implementation
 #
+# Roger B. Dannenberg
+# Nov 2023
 
-def fader(input, current, optional dur, goal, mode = 1, chans):
+# Support for fade_in: In the simple case, where we faded in ugen,
+# we could just swap in the ugen and swap out the fader using a
+# scheduled call. But what if the user says to fade() before the
+# fade_in() is complete? What we need to do is cancel the pending
+# end-of-fade-in, and use the fader to fade to zero. We'll use a
+# dictionary for keeping track of everything fading in, mapping
+# the ugen being faded in to the fader. Either fade_in_complete
+# will remove the fader, or fade() will remove the fader from
+# the dictionary.
+
+print "INCLUDING fader.srp"
+
+fade_in_lookup = {}  // maps ugen to its fader
+
+
+def fader(input, current,  optional dur, goal, chans,
+          keyword mode = FADE_SMOOTH):
 # Create a Fader, with optional intialization. Example:
 #     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
 #     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
@@ -807,12 +859,13 @@ def fader(input, current, optional dur, goal, mode = 1, chans):
         fader.set_dur(dur)
     if goal:
         fader.set_goal(goal)
+    fader
 
 
 class Fader (Ugen):
-    def init(input, current, optional mode = 1, chans):
+    def init(input, current, optional mode = FADE_SMOOTH, chans):
         if not chans:
-            chans = max_chans(max_chans(1, x1), x2)
+            chans = max_chans(1, input)
         super.init(create_ugen_id(), "fader", chans, 'a', "Ufi",
                    'input', input, 'current', current, 'mode', mode)
 
@@ -838,11 +891,19 @@ class Fader (Ugen):
 
     def set_goal(goal, optional chan):
         if chan:
-            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, chan, goal)
+            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, chan, goal)
         for i = 0 to chans:
-            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, i,
+            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, i,
                         goal if isnumber(goal) else goal[i])
         this
+
+
+    def fade_in_complete(ugen):
+        var fader = fade_in_lookup.get(ugen)
+        if fader:  // fade in was not cancelled, so end it now
+            output_ugen.swap(this, ugen)  // remove fader from ugen
+            fade_in_lookup.remove(ugen)
+        // otherwise, fade_in was cancelled by a fade()
 
 # add.srp -- feedback add unit generator
 #
@@ -850,39 +911,45 @@ class Fader (Ugen):
 # June 2023
 
 class Add(Ugen):
-    def init(optional chans = 1, wrap = true, id_num):
+    def init(chans, wrap, id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
                    "Add", chans, A_RATE, "i", 'wrap', 1 if wrap else 0)
 
     def ins(ugen):
         o2_send_cmd("/arco/add/ins", 0, "UU", id, ugen.id)
+        this
 
     def rem(ugen):
         o2_send_cmd("/arco/add/rem", 0, "UU", id, ugen.id)
+        this
 
     def swap(ugen, replacement):
         o2_send_cmd("/arco/add/swap", 0, "UUU", id, ugen.id, replacement.id)
+        this
 
 
-def add(optional wrap = true, chans = 1): Add(chans, wrap)
+def add(optional chans = 1, keyword wrap = true): Add(chans, wrap)
 
 
 class Addb(Ugen):
-    def init(optional chans = 1, wrap = true, id_num):
+    def init(chans, wrap):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
                    "Addb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
 
     def ins(ugen):
         o2_send_cmd("/arco/addb/ins", 0, "UU", id, ugen.id)
+        this
 
     def rem(ugen):
         o2_send_cmd("/arco/addb/rem", 0, "UU", id, ugen.id)
+        this
 
     def swap(ugen, replacement):
         o2_send_cmd("/arco/addb/swap", 0, "UUU", id, ugen.id, replacement.id)
+        this
 
 
-def addb(optional wrap = true, chans = 1): Addb(chans, wrap)
+def addb(optional chans = 1, keyword wrap = true): Addb(chans, wrap)
 
 # thru.srp -- audio pass-through
 #
@@ -897,6 +964,7 @@ class Thru (Ugen):
 
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
+        this
 
 def thru(input, optional chans = 1):
     Thru(input, chans)
@@ -907,6 +975,7 @@ def fanout(input, chans)
 # which requires the number of channels you are expanding to. You should
 # only use this if input is mono.
     Thru(input, chans)
+
 # zero.srp -- audio zero
 #
 # Roger B. Dannenberg
