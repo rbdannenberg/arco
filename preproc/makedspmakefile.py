@@ -89,13 +89,13 @@ def make_makefile(arco_path, manifest, outf):
             basename = ugen[0 : -1]
         if basename in NONFAUST:
             # special case: mult.srp selects to instantiate either Mult or
-            # Multx, and the Serpent code is in srp_path, but named mult.srp:
+            # Multx, and the Serpent code is in srp_path, but named math.srp:
             if basename == "multx":
-                if "mult" in manifest or "multb" in manifest or \
-                   "mult*" in manifest:
-                    continue  # multx is handled by mult, already in list
+                if "math" in manifest or "mathb" in manifest or \
+                   "math*" in manifest:
+                    continue  # multx is handled by math, already in list
                 else:
-                    basename = "mult"
+                    basename = "mathugen"
             source = srp_path + basename + ".srp"
             append_to_srp_srcs(ugen, source)
         else:

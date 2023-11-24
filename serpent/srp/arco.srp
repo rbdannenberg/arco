@@ -427,7 +427,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     prefs = Prefs(appname)
     display "arco_init setting default window prefs", default_window, prefs
     default_window.set_prefs(prefs)
-    audiomaster_gain = prefs.get('master_gain', -12.0)
+    arco_master_gain = prefs.get('master_gain', -12.0)
 
     if not set_arco_state('discovery'):
         return

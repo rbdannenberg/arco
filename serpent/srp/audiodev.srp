@@ -17,6 +17,7 @@ require "arcoscope"
 
 
 fileinput_files = nil
+arco_meter_prefade = false
 
 
 def audio_file_exists(path):
@@ -70,13 +71,13 @@ def audiodev_init()
 
 
 def actl_inpks(timestamp, address, types, rest peaks):
-    if audioin_monitor:
-        audioin_monitor.set_peaks(peaks)
+    if arco_in_monitor:
+        arco_in_monitor.set_peaks(peaks)
 
 
 def actl_outpks(timestamp, address, types, rest peaks):
-    if audioout_monitor:
-        audioout_monitor.set_peaks(peaks)
+    if arco_out_monitor:
+        arco_out_monitor.set_peaks(peaks)
 
 def actl_probe(timestamp, address, types, rest data):
     if master_scope:
@@ -277,7 +278,7 @@ class Configure_audio (Arco_window):
         var out_dev = device_id(audio_output_rb, 'audio_out_dev')
 
         // set audio gain before opening
-        arco_gain(db_to_linear(audiomaster_gain))
+        arco_gain(db_to_linear(arco_master_gain))
 
         display "Calling arco_open", in_dev, out_dev
         // Indicate no input or no output by setting channels to zero:
@@ -323,17 +324,19 @@ class Clip_light (Eventlight):
 class Audio_monitor:
     var clip_obj
     var vu_obj
+    var gain  // correct for fader or mute applied downstream from Vu meter
     
     def init(clip, vu):
         clip_obj = clip
         vu_obj = vu
+        gain = 1
 
     def set_clip()
         clip_obj.clip()
 
     def set_peaks(vector)
         for x at chan in vector
-            vu_obj.update(chan, x)
+            vu_obj.update(chan, x * gain)
             if x > 0.99:
                 set_clip()
         vu_obj.tick()
@@ -359,7 +362,7 @@ class Monitor_audio (Arco_window):
     var scope_h
 
     def init(title, x, y, w, h, varname, prefs, keyword color):
-        scope_x = 425
+        scope_x = 440
         scope_y = 5
         scope_h = 200 
         var left = 5
@@ -370,13 +373,13 @@ class Monitor_audio (Arco_window):
 
         ## Audio Input Controls
         if arco_input_chans > 0:
-            Statictext(mon_win, "In", left, in_out_y + 1, 40, 20)
+            Statictext(mon_win, "In", left, in_out_y + 1, 40, 20, 'in_txt')
             inclip_light = Clip_light(mon_win, left + 15, in_out_y + 5,
                                       'inclip_light')
             var right_of_light = wxs_x + wxs_w + 15  // some extra space
             input_vu_meter = Vumeter(mon_win, arco_input_chans, 
                                      left + 5, in_out_y + 26, 'input_vu_meter')
-            audioin_monitor = Audio_monitor(inclip_light, input_vu_meter)
+            arco_in_monitor = Audio_monitor(inclip_light, input_vu_meter)
             input_vu = vu("/actl/inpks", 0.05)
             input_vu.set('input', input_ugen)
             input_vu.run()  // add to run_set to make it compute peaks
@@ -404,23 +407,31 @@ class Monitor_audio (Arco_window):
             mon_input_bn.add_target_method(this, 'mon_input')
 
             # login (log input audio) button
-            Checkbox(mon_win, "LogInp", 'R', 'S', 75, 'S', 'audio_login_cb')
+            Checkbox(mon_win, "RecInp", 'R', 'S', 75, 'S', 'audio_login_cb')
             audio_login_cb.add_target_method(this, 'audio_loginp')
 
         ## Audio Output Controls
         if arco_output_chans > 0:
             Labeled_slider(mon_win, "Master", left, 10, 330, 25, 50, 
                            -100.0, 24.0,
-                           audiomaster_gain, 'db', 'master_slider')
-            master_slider.add_target_method(this, 'set_audiomaster_gain')
+                           arco_master_gain, 'db', 'master_slider')
+            master_slider.add_target_method(this, 'set_arco_master_gain')
 
-            ## enable audio button
-            Checkbox(mon_win, "Mute", wxs_x + wxs_w + 15, 'S', 60, 25,
-                     'mute_audio_bn')
+            ## enable audio button. Note: If y is -1, somehow x gets shifted. Maybe
+            # a wxWidgets bug. The max() protects against this.
+            Checkbox(mon_win, "Mute", wxs_x + wxs_w + 7, max(wxs_y - 10, 0),
+                     60, 25, 'mute_audio_bn')
             mute_audio_bn.add_target_method(this, 'mute_audio')
 
+            ## output meter is pre- or post-fader?
+            Checkbox(mon_win, "Meter is", 'S', wxs_y + 15, 70, 25, 'prefade_bn')
+            prefade_bn.add_target_method(this, 'meter_prefade')
+
+            Statictext(mon_win, "prefader", wxs_x + 20, wxs_y + 18, 40, 15,
+                       'prefade_txt')
+
             left = left + 185
-            Statictext(mon_win, "Out", left, in_out_y + 1, 40, 20)
+            Statictext(mon_win, "Out", left, in_out_y + 1, 40, 20, 'out_txt')
             Clip_light(mon_win, left + 27, in_out_y + 5, 'outclip_light')
             right_of_light = wxs_x + wxs_w + 15  // some extra space
 
@@ -431,12 +442,12 @@ class Monitor_audio (Arco_window):
             test_tone_osc = nil
 
             ## log button
-            Checkbox(mon_win, "LogOut", 'R', 'S', 75, 'S', 'audio_logout_cb')
+            Checkbox(mon_win, "RecOut", 'R', 'S', 75, 'S', 'audio_logout_cb')
             audio_logout_cb.add_target_method(this, 'audio_logout')
 
             Vumeter(mon_win, arco_output_chans, 
                     left, in_out_y + 26, 'output_vu_meter')
-            audioout_monitor = Audio_monitor(outclip_light, output_vu_meter)
+            arco_out_monitor = Audio_monitor(outclip_light, output_vu_meter)
             output_vu = vu("/actl/outpks", 0.05)
             output_vu.set('input', output_ugen)
             output_vu.run()  // add to run_set to make it compute peaks
@@ -470,7 +481,7 @@ class Monitor_audio (Arco_window):
         scope_input_choice.add_target_method(this, 'scope_input_handler')
 
         Statictext(mon_win, "Chan", scope_x + 120, scope_y + scope_h + 5,
-                   40, 20, 'scope_channel_lb')
+                   40, 20, 'scope_channel_txt')
         scope_channel_sp = nil  // spin control is not initialized
         make_channel_selector(probe_what.chans)
         scope_channel_sp.set_size(40, 30) // reset size to work around bug
@@ -488,12 +499,12 @@ class Monitor_audio (Arco_window):
 
     def delete():
         print "****** monitor_audio delete called **********"
-        if audioin_monitor:
-            audioin_monitor.delete()
-            audioin_monitor = nil
-        if audioout_monitor:
-            audioout_monitor.delete()
-            audioout_monitor = nil
+        if arco_in_monitor:
+            arco_in_monitor.delete()
+            arco_in_monitor = nil
+        if arco_out_monitor:
+            arco_out_monitor.delete()
+            arco_out_monitor = nil
         if input_vu:
             input_vu.set('input', zero_ugen)  // disconnect from input
             input_vu.unrun()                //      to stop it
@@ -610,14 +621,24 @@ class Monitor_audio (Arco_window):
 
     def mute_audio(rest ignore):
     # handler for mute button: something changed, so do an update
-        set_audiomaster_gain(nil, audiomaster_gain)
+        set_arco_master_gain(nil, arco_master_gain)
 
 
-    def set_audiomaster_gain(slider, g)
-        audiomaster_gain = g
+    def meter_prefade(obj, event, x, y):
+    # handler for Meter is pre-fade button
+        arco_meter_prefade = x
+        arco_out_monitor.gain = 1 if x else arco_master_gain
+
+
+    def set_arco_master_gain(slider, g)
+        arco_master_gain = g
         display "set master gain", mute_audio_bn.value()
-        arco_gain(0 if mute_audio_bn.value() else 
-                  db_to_linear(audiomaster_gain))
+        arco_muted = mute_audio_bn.value()
+        var gain = 0 if arco_muted else
+                   db_to_linear(arco_master_gain)
+        arco_gain(gain)
+        if not arco_meter_prefade
+            arco_out_monitor.gain = gain
         prefs.set('master_gain', g)
-        print "Saving audiomaster_gain as", g
+        print "Saving arco_master_gain as", g
         prefs.save()
