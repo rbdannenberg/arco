@@ -36,6 +36,7 @@ public:
     Dualslewb(int id, int nchans, Ugen_ptr input_, float attack, float release,
             Sample current, bool attack_linear, bool release_linear) :
 	  Ugen(id, 'b', nchans) {
+        states.set_size(chans);
         set_attack(attack, attack_linear);
         set_release(release, release_linear);
         for (int i = 0; i < chans; i++) {

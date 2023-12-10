@@ -21,21 +21,6 @@ void arco_pwl_new(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/pwl/act int32 id, int32 action_id;
- *    set the action_id
- */
-void arco_pwl_act(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t id = argv[0]->i;
-    int32_t action_id = argv[1]->i;
-    // end unpack message
-
-    UGEN_FROM_ID(Pwl, pwl, id, "arco_pwl_act");
-    pwl->action_id = action_id;
-}
-
-
 /* /arco/pwl/env id d0 y0 d1 y1 ... dn-1 [yn-1]
  */
 static void arco_pwl_env(O2SM_HANDLER_ARGS)
@@ -74,6 +59,19 @@ static void arco_pwl_start(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/pwl/stop int32 id;
+ */
+static void arco_pwl_stop(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Pwl, pwl, id, "arco_pwl_stop");
+    pwl->stop();
+}
+
+
 /* O2SM INTERFACE: /arco/pwl/decay int32 id, float d;
  */
 static void arco_pwl_decay(O2SM_HANDLER_ARGS)
@@ -108,8 +106,8 @@ static void pwl_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/pwl/new", "i", arco_pwl_new, NULL, true, true);
-    o2sm_method_new("/arco/pwl/act", "ii", arco_pwl_act, NULL, true, true);
     o2sm_method_new("/arco/pwl/start", "i", arco_pwl_start, NULL, true, true);
+    o2sm_method_new("/arco/pwl/stop", "i", arco_pwl_stop, NULL, true, true);
     o2sm_method_new("/arco/pwl/decay", "if", arco_pwl_decay, NULL, true, true);
     o2sm_method_new("/arco/pwl/set", "if", arco_pwl_set, NULL, true, true);
     // END INTERFACE INITIALIZATION

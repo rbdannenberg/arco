@@ -30,7 +30,7 @@ written to the same folder as dspmanifest.txt.
 """
 
 NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
-            "alpass", "mix", "fileplay", "filerec", "fileio", "nofileio", \
+            "allpass", "mix", "fileplay", "filerec", "fileio", "nofileio", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
@@ -126,12 +126,14 @@ def make_makefile(arco_path, manifest, outf):
         print("\n", file=outf)
 
     # write the code to make allugens.srp
-    print("allugens.srp:", end="", file=outf)
+    print("allugens.srp: dspmakefile", end="", file=outf)
     for src in srp_srcs:
         print(" " + src, end="", file=outf)
     print("\n\trm -f allugens.srp", file=outf)
     print("\ttouch allugens.srp", file=outf)
     for src in srp_srcs:
+        print('\techo "\\n# ---- included from', src, \
+              '----\\n" >> allugens.srp', file=outf)
         print("\tcat", src, ">> allugens.srp", file=outf)
         # this newline also is needed for files with no final newline:
         print("\techo >> allugens.srp", file=outf)  # blank line separator
@@ -247,12 +249,25 @@ def make_inclfile(arco_path, manifest, outf):
         print("target_link_libraries(arco4lib PRIVATE", file=outf)
         print("    debug ${FLSYN_DBG_LIB} optimized ${FLSYN_OPT_LIB})",
               file=outf)
+
         print("target_link_libraries(arco4lib PRIVATE", file=outf)
         print("    debug ${GLIB_DBG_LIB} optimized ${GLIB_OPT_LIB})",
               file=outf)
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
-              file=outf)
+        print('if(NOT EXISTS "${GLIB_DBG_LIB}")', file=outf)
+        print('  message(FATAL_ERROR "Could not find ${GLIB_DBG_LIB}, ' + \
+              'delete GLIB_DBG_LIB from cache and fix in ' + \
+              'apps/common/libraries.txt")', file=outf)
+        print("endif()", file=outf)
+        print('if(NOT EXISTS "${GLIB_OPT_LIB}")', file=outf)
+        print('  message(FATAL_ERROR "Could not find ${GLIB_OPT_LIB}, ' + \
+              'delete GLIB_OPT_LIB from cache and fix in ' + \
+              'apps/common/libraries.txt")', file=outf)
+        print("endif()", file=outf)
+              
+#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("    debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
+#              file=outf)
+
         print("target_link_libraries(arco4lib PRIVATE", file=outf)
         print("    debug readline optimized readline)", file=outf)
         # make this one public - I don't want to ever link curses in twice,

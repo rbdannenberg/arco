@@ -6,15 +6,18 @@
 # Roger B. Dannenberg
 # Oct 2023
 
-class Points:
+points_mgr = nil
+
+class Points_mgr:
     var recplay, mix, outgain
 
     def init():
     # pointillistic short flute notes: record and later play
-        mix = mix(2)
+        mix = mix(2).term()  // mixer propagages termination
         recplay = recplay(input_ugen, 1, 1, 0.5)
         recplay.run()
         recplay.record(true)
+        recplay.trace()
         sched_select(rtsched)  // for scheduling below
 
         # launch a bunch of echoes at random offsets
@@ -44,7 +47,7 @@ class Points:
             // time is approximately delay:
             var start_time = pr_unif(min(10, delay + 0.1))
             sched_cause(delay, this, 'echo', i, start_time, rate, gain)
-        outgain = gain_control(mix, points_gain_sl, Db_constraint())
+        outgain = gain_control(mix, points_gain_sl, term = true)
         outgain.play()  // initially no inputs and silence -- see echo()
 
 
@@ -53,18 +56,22 @@ class Points:
         rp.borrow(recplay)
         rp.set_speed(rate)
         // randomly choose pan for each delay:
-        var rpname = mix_name(i)
+        var rp_name = mix_name(i)
         mix.ins(rp_name, rp, pan_45(random()))
         rp.start(start_time)
-        create_action(rp, this, 'player_finished', rp_name)
-
-
-    def player_finished(rp_name):
-        YOU ARE HERE
+        rp.term()  // when player finishes, it will be removed from mixer input
+        rp.trace()
 
 
     def stop_recording():
         recplay.record(false)
         recplay.unrun()
         display "stop_recording"
+
+
+    def finish():
+        if outgain:
+            outgain.fade(0.5)
+            outgain = nil
+
 

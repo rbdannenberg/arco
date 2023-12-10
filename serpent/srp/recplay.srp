@@ -9,7 +9,6 @@ def recplay(input, optional chans = 1, gain = 1,
 
 
 class Recplay (Ugen):
-    var action_id
 
     def init(chans, input, gain, fade_time, loop):
         super.init(create_ugen_id(), "Recplay", chans, 'a', "UUfB",

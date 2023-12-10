@@ -30,8 +30,6 @@ public:
         points.init(0);   // initially empty, so size = 0
     }
 
-    ~Pweb() { send_action_id(action_id); }
-
     const char *classname() { return Pweb_name; }
 
     void real_run() {
@@ -40,8 +38,8 @@ public:
             if (next_point_index >= points.size()) {
                 seg_togo = INT_MAX;
                 seg_factor = 1.0f;
-                send_action_id(action_id);
-                if (current == 0 && (flags & CAN_TERMINATE)) {
+                send_action_id();
+                if (current == bias && (flags & CAN_TERMINATE)) {
                     terminate();
                 }
                 printf("Pweb: done\n");
@@ -61,7 +59,13 @@ public:
         next_point_index = 0;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
-        printf("pweb start: final_value %g\n", final_value);
+        printf("pweb start: final_value %g\n", final_value - bias);
+    }
+
+    void stop() {
+        next_point_index = 0;
+        seg_togo = INT_MAX;
+        seg_factor = 1.0f;
     }
 
     void decay(int d) {

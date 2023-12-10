@@ -1,7 +1,9 @@
 #ifndef AUDIOBLOCK_H
 #define AUDIOBLOCK_H
 
-#define AUDIOBLOCK_FRAMES 8000
+// what's a good size? 8000 was experiencing file read underflows.
+// 16000 is 1/3 second at least, and for mono, it's 32KB.
+#define AUDIOBLOCK_FRAMES 16000
 
 typedef struct  {
     int32_t frames;    // <= blocksize/channels, measured in frames, not samples

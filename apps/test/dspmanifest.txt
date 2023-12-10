@@ -11,7 +11,7 @@ fileplay
 filerec
 recplay
 delay
-alpass
+allpass
 olapitchshift
 feedback
 granstream
@@ -19,3 +19,4 @@ flsyn
 pv
 yin
 trig
+route

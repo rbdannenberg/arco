@@ -28,8 +28,6 @@ public:
         points.init(0);        // initially empty, so size = 0
     }
     
-    ~Pwl() { send_action_id(action_id); }
-
     const char *classname() { return Pwl_name; }
 
     void real_run() {
@@ -43,9 +41,8 @@ public:
             if (n == 0) { // set up next segment
                 current = final_value;  // make output value exact
                 if (next_point_index >= points.size()) {
-                    seg_togo = INT_MAX;
-                    seg_incr = 0.0f;
-                    send_action_id(action_id);
+                    stop();
+                    send_action_id();
                     if (current == 0 && (flags & CAN_TERMINATE)) {
                         terminate();
                     }
@@ -69,6 +66,12 @@ public:
         next_point_index = 0;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
+    }
+
+    void stop() {
+        next_point_index = 0;
+        seg_togo = INT_MAX;
+        seg_incr = 0.0f;
     }
 
     void decay(float d) {

@@ -7,7 +7,7 @@ class Gated_foo (Instrument):
     var faded  // ugen representing input fader
 
     def init(input, ratio, delay, regen, smooth,
-             psgain, delgain, attack, decay):
+             psgain, delgain, attack, release):
         instr_begin()
         var faded = fader(input, 0, 0.1, 1)
         var pshift = ola_pitch_shift(input, ratio, 0.01, 0.1)
@@ -18,8 +18,10 @@ class Gated_foo (Instrument):
         mix.ins('pshift', pshift, psgain)
         mix.ins('delay', del, delgain)
         var power = dnsampleb(input, DNSAMPLE_POWER)
-        var gate = dualslewb(lowpassb(power, smooth), attack, decay)
-        var ds20 = mult(dualslew, 20)
+        var power_lp = lowpassb(power, smooth)
+        display "Gated_foo.init", power_lp
+        var gate = dualslewb(power_lp, attack, release)
+        var ds20 = mult(gate, 20)
         var out = mult(mix, ds20)
         super.init("Gated_foo", out)
 

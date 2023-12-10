@@ -65,15 +65,24 @@ updated, but this will: `obj.set('x', not obj.x)` since it is guaranteed to
 change `x`.
 
 ## Setting dependencies
-To "connect" a constraint to a GUI control, use the `connect(control, name)`
-method. `control` is a GUI control created by `Spinctrl`, `Slider`,
-`Labeled_slider`, or `Checkbox` (a Checkbox is considered to output 0 or 1
-even though it's "native" output is Boolean) *or* `control` can be a subclass
-of another `Constraint`. (Do not create circular constraint dependencies!)
+To "connect" a constraint to a GUI control, use the `connect(control,
+name, control_number)` method. `control` is a GUI control created by
+`Spinctrl`, `Slider`, `Labeled_slider`, or `Checkbox` (a Checkbox is
+considered to output 0 or 1 even though it's "native" output is
+Boolean) *or* `control` can be a subclass of another `Constraint`. (Do
+not create circular constraint dependencies!) 
 
 The `name` parameter is the symbol representing the instance variable to
 be set to the value of the control. This parameter is optional and defaults
-to `'x'`.
+to `'x'`.  You can connect up to three controls to a single constraint,
+and this is most sensible if there are multiple variables to
+control. Each variable should be given a different number, e.g. for
+two controls, call
+```
+constraint.connect(slider_a, 'x', 1)
+constraint.connect(slider_b, 'y', 2)
+```
+Each variable must be associated with a different number.
 
 ## Creating dependents
 If you want to use the *output* of the constraint in an audio computation,
@@ -176,6 +185,8 @@ monitor_gain = nil
 monitor_gain_constraint = nil
 ```
 
+### An Aside: Textual vs. Visual Languages
+
 I'm always thinking about visual vs. textual programminig systems and
 their relative merits. For Arco , that's 9 lines of code to send input
 to output with gain control, but the Center_constraint class is
@@ -188,3 +199,61 @@ programming, though, adding the panning and channel assignments
 creates some extra work, and the ability of textual approaches like
 this to encapsulate, parameterize, and reuse little building blocks
 is a big advantage of textual programming languages.
+
+## More on Cleanup
+
+There is still more to freeing unused objects. I think there is a
+clash between "push" and "pull" structures. Audio computation in Arco
+is "pull" because the audio output "pulls" data from the unit
+generators that it depends on. The recursively propagates up the tree
+toward signal generators. But we do not want the propagation to be
+accessing sliders and check boxes at audio rates, so we have "pull"
+structures such as Constraint objects that "push" changes from GUI
+callbacks through constraints and into Const unit generators, which
+can be read quickly as a "pull" access.
+
+You can free subtrees of the "pull" structure when unit generators no
+longer depend on them. When we feed leaves of the tree with "push"
+structures, we get references "up" through the "pull" structure, but
+we also need references "down" through the "push" structure, leaving
+objects that are referenced from both directions.
+
+Let's enumerate some cases of interest:
+1. One constraint controls one Const used by one Mult for gain
+   control. If the sound finishes, we should remove the Mult, the
+   Const and the constraint.
+2. One constraint controls one Const that is shared, e.g. by a
+   succession of notes or sound events. When the sound event finishes,
+   the Mult should be freed, but the Const survives to be shared by
+   another note.
+3. Either of the cases above, except the slider is deleted. We want to
+   free the constraint and its reference to the Const, but leave the
+   Const in place with only a reference from the Mult.
+4. Like case 3, but with the option of recreating the slider. Here, we
+   want the Const to be global and never freed, so it's a simpler
+   case.
+In all cases, if we know the sound has finished, we can explicitly
+shut things down and delete them, so let's consider only cases where
+objects terminate and termination propagates to the Mult. Then what?
+
+Case 1. When the Mult terminates, we can use the `atend` mechanism to
+invoke `finish` on the constraint to run some clean-up code. The
+method calls `constraint.finish()`. There were two references to the
+Const: from Mult and from the constraint. Both references are removed,
+so the Const is freed.
+
+Case 2. We still want Mult to terminate so that it can be freed, but
+we do not want the Const or constraint controlling it to go away. To
+accomplish that, we simply do not set an `atend` action on the Mult,
+and we do not need to use a Constrained_const. A Const will do.
+
+Case 3. Freeing the control frees the constraint. Freeing the
+constraint frees the const_ugen. The Const (or Constrained_const) is
+now only referenced by the Mult, and will be freed when Mult is
+freed. If the Const is shared, reference counts will keep it alive
+until the last Mult is freed.
+
+Case 4. If you kept a reference to the Const (Case 2), you can
+reattach a new constraint when you have a new control (slider). If you
+kept a reference to the constraint, you can `connect` a new slider
+rather than creating a new constraint.

@@ -77,7 +77,14 @@ void Initializer::init()
 }
 
 
+const char *OP_TO_STRING[NUM_MATH_OPS] = {
+    "MATH_OP_MUL", "MATH_OP_ADD", "MATH_OP_SUB", "MATH_OP_DIV", "MATH_OP_MAX",
+    "MATH_OP_MIN", "MATH_OP_CLP", "MATH_OP_POW", "MATH_OP_LT", "MATH_OP_GT",
+    "MATH_OP_SCP", "MATH_OP_POWI", "MATH_OP_RND", "MATH_OP_SH", "MATH_OP_QNT" };
+
+
 Ugen::~Ugen() {
+    send_action_id();
     // special case: check for run set or output set references
     assert((flags & IN_RUN_SET) == 0);
     printf("Ugen delete %d\n", id);
@@ -89,6 +96,12 @@ void Ugen::unref() {
     printf("Ugen::unref id %d %s new refcount %d\n",
            id, classname(), refcount);
     if (refcount == 0) {
+        terminate();  // notify `atend` mechanism if it is pending
+        // this should be in destructor, but destructors cannot call
+        // inherited methods in c++.
+        if (flags & UGENTRACE) {
+            arco_print("Deleting traced ugen: "); print();
+        }
         delete this;
     }
 }
@@ -116,10 +129,27 @@ void Ugen::indent_spaces(int indent)
 }
 
 
-void Ugen::print(int indent, const char *param) {
-    arco_print("%s_%d(%s) refs %d chans %d ",
-               classname(), id, param, refcount, chans);
+// Both param ("") and revisiting (false) are optional
+void Ugen::print(int indent, const char *param, bool revisiting) {
+    const char *openp = "(";
+    const char *closep = ") ";
+    if (!*param) {
+        openp = closep = "";
+    }
+    const char *was = (this == ugen_table[id] ? "" : "(was) ");
+    arco_print("%s %s%s%sid %s%d refs %d chans %d ",
+               classname(), openp, param, closep, was, id, refcount, chans);
+    if (flags & TERMINATED) {
+        arco_print("TERMINATED ");
+    } else if (flags & TERMINATING) {
+        arco_print("terminate in %g sec ", tail_blocks * BP);
+    } else if (flags & CAN_TERMINATE) {
+        arco_print("can terminate ");
+    }
     print_details(indent);
+    if (revisiting) {
+        arco_print(" (shown above)");
+    }
     arco_print("\n");
 }    
 
@@ -129,19 +159,25 @@ void Ugen::print(int indent, const char *param) {
 //
 void Ugen::print_tree(int indent, bool print_flag, const char *param)
 {
+    bool visited = ((flags & UGEN_MARK) != 0);
     if (print_flag) {
-        if (flags & UGEN_MARK) {
-            return;  // cut off the search; we've been here before
-        }
         indent_spaces(indent);
-        print(indent, param);
+        print(indent, param, visited);
         flags |= UGEN_MARK;
+        if (visited) {
+            return;
+        }
     } else {
-        if (!(flags & UGEN_MARK)) {
+        if (!visited) {
             return;  // cut off the search; we've been here before
         }
         flags &= ~UGEN_MARK;  // clear flag
     }
+    // tricky logic: if we're printing and haven't visited this ugen
+    // yet then we print the sub-tree; otherwise, if we're not printing
+    // and just clearing all the flags, we get here if the flag is set
+    // (visited == true), so we visit the subtree to clear subtree flags.
+    // In both cases, if we are here, then print_flag == !visited.
     print_sources(indent + 1, print_flag);
 }
 
@@ -161,9 +197,33 @@ void Ugen::const_set(int chan, Sample x, const char *from)
 }
 
 
+/* /arco/act id action_id  */
+void arco_act(O2SM_HANDLER_ARGS)
+{
+    int32_t id = argv[0]->i;
+    int32_t action_id = argv[1]->i;
 
-/* /arco/free id id id ...
- */
+    ANY_UGEN_FROM_ID(ugen, id, "arco_act");
+    ugen->action_id = action_id;
+}
+
+
+void arco_trace(O2SM_HANDLER_ARGS)
+{
+    int32_t id = argv[0]->i;
+    int32_t trace = argv[1]->i;
+
+    ANY_UGEN_FROM_ID(ugen, id, "arco_act");
+    if (trace) {
+        arco_print("Tracing ugen: "); ugen->print();
+        ugen->flags |= UGENTRACE;
+    } else {
+        ugen->flags &= ~UGENTRACE;
+    }
+}
+
+
+/* /arco/free id id id ...  */
 void arco_free(O2SM_HANDLER_ARGS)
 {
     o2_extract_start(msg);
@@ -187,6 +247,8 @@ void ugen_initialize()
     Initializer::init();  // add all message handlers to O2sm
 
     o2sm_method_new("/arco/free", NULL, arco_free, NULL, false, false);
+    o2sm_method_new("/arco/act", "ii", arco_act, NULL, true, true);
+    o2sm_method_new("/arco/trace", "ii", arco_trace, NULL, true, true);
 }
 
 

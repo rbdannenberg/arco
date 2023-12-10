@@ -168,8 +168,9 @@ public:
     const char *classname() { return Recplay_name; }
 
     void print_details(int indent) {
-        arco_print("recording %s, playing %s",
-                   recording ? "true" : "false", playing ? "true" : "false");
+        arco_print("rec %s, play %s speed %g",
+                   recording ? "true" : "false", playing ? "true" : "false",
+                   speed);
     }
 
 

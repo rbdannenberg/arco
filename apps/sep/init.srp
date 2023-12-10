@@ -90,13 +90,16 @@ def arco_ready():
 #    simulator = Simulator()
     air_mgr = Air_mgr()
     sep_cue = Sep_cue()
+    fast_mgr = Fast_mgr()
     trigger_mgr = Trigger_mgr(default_window, SHOWTRIG_X, SHOWTRIG_Y)
     win.fit_to_children()
 
     // -------- input to output ----------
     monitor_gain_constraint = Center_constraint(0.0)
-    monitor_gain = gain_control(route(input_ugen, 0), monitor_gain_sl,
-                                monitor_gain_constraint)
+    var input_left = route(1).ins(input_ugen, 0, 0)
+    monitor_gain = gain_control(input_left, monitor_gain_sl,
+                                monitor_gain_constraint, term = false)
+    display "in to out", monitor_gain, input_left
     monitor_gain.play()
 
 
@@ -118,72 +121,95 @@ cycle_transpose = 0
 
 // create and apply gain constraint connected to a slider
 
-ugen_to_constraint = {}  // mapping from ugen to constraint
-
-def gain_control(input, slider, optional constraint):
+def gain_control(input, slider, optional constraint, keyword term = true):
+#
 # multiply input by gain determined by slider; the result is
-# the multiplier that implements gain, so it represents the output
+# the multiplier that implements gain, so it represents the output.
+# If term is true, the multiplier has the CAN_TERMINATE flag set, and
+# when the multiplier is freed, the constraint's finish method is
+# invoked.
+# 
     display "gain_control", input, slider, slider.val, constraint
     if not constraint:
         constraint = Db_constraint()
     constraint.connect(slider)
     var ugen = constraint.get_const()
-    ugen_to_constraint[ugen] = constraint
-    return mult(input, ugen)
+    var m = mult(input, ugen)
+    if term:
+        m.atend(FINISH, constraint)
+    return m
 
 
-def constrained_ugen_finish(ugen):
-# To free some objects (ugen and constraint), call this to shut down
-# a gain created by gain_control. ugen is the result of gain_control().
-# This is especially important to call if you repeatedly call gain_control.
-# E.g. suppose over time you create a 1000 notes, each with a gain_control'd
-# output, and the gain_control results (all mult ugens representing the note
-# outputs) are all sent the .mute() message. The result will be that you
-# still have 1000 constraints attached to and activated by the slider, and
-# each constraint change will update an associated const or smoothb ugen.
-# Not good! You can solve this by calling constrained_ugen_finish(ugen)
-# before calling ugen.mute(). This will detach the constraint from the
-# slider, allowing garbage collection to reclaim the mult and const
-# (or smoothb).  Alternatively, you could make one gain control, sum *all*
-# the notes and apply the gain to the sum. You would then need to detach
-# each note output from the mix ugen input when the note ends. Another
-# option is do not use gain_control. Instead make and keep one constraint,
-# say constraint_1, and apply gain control by
-#     output = mult(input, constraint_1.get_const())
-# This works because get_const() (or get_smoothb) will return a cached
-# const ugen (or smoothb ugen) which will then be shared by all mult ugens.
-# To get rid of the single constraint and const, if needed, you can call
-# slider.remove_target_method(constraint_1) and then constraint_1 = nil.
-    var constraint = ugen_to_constraint.get(ugen)
-    if constraint:
-        constraint.finish()
-
-
-// make a trigger indicator
+######### trigger, indicator, and input detection ###########
 
 def actl_trig(timestamp, address, types, idnum, rms)
     // display "TRIG ONSET DETECTED:", idnum, rms
     trigger_mgr.trigger()
 
+def actl_onoff(timestamp, address, types, idnum, onoff)
+    trigger_mgr.onoff(onoff)
+
 
 class Trigger_mgr:
-    var trigger_mode
+# create object main program and keep it around for whole performance;
+#    creation includes indicator light on GUI
+# start_trigger to initialize trigger for first note
+# stop_trigger when done
+# start_onoff to detect playing in FAST and ENABLE2 sections
+# stop_onoff when done
+
+    var running  // tells us if we are connected
+    var trigger_mode  // 'start' for trigger, 'fast' for onoff detect
     var trig_ugen  // the unit generator
+    var on_or_off  // 0 or 1 reflecting state from trig_ugen
 
     def init(win, x, y):
-        display "Showtrig init", x, y
+        display "Trigger_mgr init", x, y
         Statictext(win, "Audio trigger:", x, y, 100, 20, 'showtrig_label')
         // window size of 896 is multiple of 32 and ~20ms,
         // gives ~100Hz analysis rate. Pause for 0.2s after trigger:
         trig_ugen = trig(input_ugen, "/actl/trig", 896, 0.01, 0.2)
         o2_method_new("/actl/trig", "if", 'actl_trig', t)
+        o2_method_new("/actl/onoff", "ii", 'actl_onoff', t)
         Eventlight(win, 20, x + 100, y, 'showtrig_light')
         showtrig_light.on_color = "GREEN"
+        on_or_off = 0
 
-    def start():
+
+    def start_trigger():
+        display "Trigger_mgr.start_trigger"
+        if trigger_mode == 'fast':
+            stop_onoff()
+        trig_ugen.set_threshold(0.01)
         trigger_mode = 'start'
+        enable()
+
+
+    def stop_trigger():
+        display "Trigger_mgr.stop_trigger"
+        trigger_mode = nil
+        trig_ugen.set_threshold(10000.0)
+        disable()
+        
+
+    def start_onoff(optional runlen = 0.001):
+        display "Trigger_mgr.start_onoff"
+        if trigger_mode == 'start' or trigger_mode == 'gliss':
+           stop_trigger()
+        trig_ugen.onoff("/actl/onoff", 0.02, runlen)
+        trigger_mode = 'fast'
+        enable()
+
+
+    def stop_onoff():
+        display "Trigger_mgr.stop_onoff"
+        trigger_mode = nil
+        trig_ugen.onoff("", 0.02, 0.02)
+        disable()
+
 
     def trigger():
+    # callback from Arco server
         showtrig_light.blink()
         // display "Trigger_mgr.trigger", trigger_mode
         if trigger_mode == 'start':
@@ -193,8 +219,32 @@ class Trigger_mgr:
 #TODO: gliss_mgr
             gliss_mgr.gliss_action()
 
+
+    def onoff(onoff):
+    # callback from Arco server
+        if onoff == on_or_off:
+            return
+        on_or_off = onoff
+        if trigger_mode == 'fast':
+            fast_mgr.onoff(onoff)
+        
+
     def enable()
-        trig_ugen.run()
+        if running:
+            print "ERROR: trigger is already running"
+            breakpoint()
+        else:
+            trig_ugen.run()
+            running = true
+
+
+    def disable()
+        if not running:
+            print "ERROR: Trigger_mgr.disable: trigger is not running"
+            breakpoint()
+        else:
+            trig_ugen.unrun()
+            running = false
 
 
 
@@ -222,7 +272,13 @@ sep_cue_to_descr = ["  ", "Start", "Point", "Pizz", "Melo", "Riffs", "Riffs2",
 cue_to_file_name = { CUE_START: "1-air.wav",
                      CUE_POINTS: "2-points.wav",
                      CUE_PIZZ: "3-pizz.wav",
-                     CUE_MELO: "4-melody.wav" }
+                     CUE_MELO: "4-melody.wav",
+                     CUE_FAST: "5-fast-a.wav",
+                     CUE_ENABLE2: "5-fast-c.wav"}
+
+fast_file_names = ["5-fast-a.wav", "5-fast-b.wav", "5-fast-c.wav",
+                   "5-fast-d.wav", "5-fast-e.wav", "5-fast-b.wav", 
+                   "5-fast-d.wav"]
 
 class Cue_buttons:
     def init(x, y):
@@ -262,12 +318,14 @@ class Cue_buttons:
 class Sep_cue:
     var cue_num
     var advance_last_time
+    var fast_num
 
 
     def init():
         cue_num = 0
         x = 265
         y = 230
+        fast_num = 0
         Statictext(default_window, " ", x, y, 80, 100, 'sepcue_text')
         sepcue_text.set_color("YELLOW")
         sepcue_text.set_font(95, WXS_FONT_SWISS, WXS_FONT_NORMAL, WXS_FONT_BOLD,
@@ -297,10 +355,14 @@ class Sep_cue:
     # to the current cue_num.
         print "**** sep_sim", cue_to_string(cue_num)
         var file_name = cue_to_file_name.get(cue_num)
-        if file_name:
-            play_into_input_from(file_name)
-        else:
+        if cue_num == CUE_FAST:  // special case: multiple files for this cue
+            file_name = fast_file_names[fast_num]
+            fast_num = (fast_num + 1) % len(fast_file_names)
+        if not file_name:
             print "********* NO INPUT SIMULATION FILE FOR THIS CUE ************"
+        else:
+            display "sep_sim: playing", file_name
+            play_into_input_from(file_name)
 
 
     def set_cue_num(num, optional source = "set_cue_num"):
@@ -310,22 +372,36 @@ class Sep_cue:
         // ------- these changes are installed regardless of how we get to the cue:
         if cue_num == CUE_START:
             print "Setting up trigger for CUE_START cue"
-            trigger_mgr.enable()  // runs unit generator
-            trigger_mgr.start()   // enables "air" section
+            trigger_mgr.start_trigger()   // enables "air" section
         elif cue_num == CUE_POINTS:
-            points_obj = Points()
+            trigger_mgr.stop_trigger()
+            points_mgr = Points_mgr()
         elif cue_num == CUE_PIZZ:
+            if points_mgr:
+                points_mgr.stop_recording()
             pizz_rec_obj = Pizz_rec()
             pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5, 75)
             pizz_instr.play()
         elif cue_num == CUE_MELO:
-            melo_obj = Melo()
+            melo_mgr= Melo_mgr()
         elif cue_num == CUE_FAST:
-            fast_obj = Fast()
-            fast_obj.cycles_control(true, false)
+            fast_mgr.start()
             // shut down air, points, pizz, melo if running
-            YOU ARE HERE
-            points_obj
+            if air_mgr:
+                air_mgr.finish()
+                air_mgr = nil
+            if points_mgr:
+                points_mgr.finish()
+                points_mgr = nil
+            if pizz_instr:
+                pizz_instr.fade(0.5)
+                pizz_instr = nil
+            if melo_mgr:
+                melo_mgr.stop()
+                melo_mgr = nil
+        elif cue_num == CUE_ENABLE2:
+            fast_mgr.cycles_control(true, false)
+            fast_mgr.enable2(true)                
 
 
     def sep_advance(rest ignore):
@@ -348,7 +424,7 @@ class Sep_cue:
         elif cue_num == CUE_MELO:
             nil
         elif cue_num == CUE_FAST:
-            simulator.cycles_control(true, false)
+            nil
         elif cue_num == CUE_ENABLE2:
             fast_instr = Fast()
             fast.play()
@@ -389,7 +465,7 @@ class Sep_cue:
     def pizz_rep():
         pizz_rep_instr = Pizz(pizz_rec_obj.recplay, 48, 1, 6.4, -0.8,
                               pizzrep_gain, 105)
-        pizz_rep_rev = Stereo_reverb(pizz_rep_instr, 0.02, 3)
+        pizz_rep_rev = multi_reverb(pizz_rep_instr, 3, 0.02, 2)
         pizz_rep_rev.play()
 
 

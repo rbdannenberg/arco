@@ -128,19 +128,6 @@ append_to_global(ALL_INCLUDE_DIRECTORIES "${PA_INCL}")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${SNDFILE_INCL}")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${FLSYN_INCL}")
 
-#if(APPLE)
-#  find_library(COREAUDIO CoreAudio)
-#  find_library(FOUNDATION Foundation)
-#  find_library(COREFOUNDATION CoreFoundation)
-#  find_library(CORESERVICES CoreServices)
-#  find_library(AUDIOTOOLBOX AudioToolbox)
-#  find_library(AUDIOUNIT AudioUnit)
-#  find_library(AVFOUNDATION AVFoundation)
-#  find_library(COREMIDI CoreMIDI)
-#  find_library(APPKIT AppKit)
-#  find_library(CARBON Carbon)
-#endif()
-
 add_library(arco4lib STATIC ${ARCO4_APP_SRC})  
 include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude") 
 message(STATUS "ARCO_SRC: ${ARCO_SRC}") 
@@ -259,19 +246,4 @@ endif()
 #-------end of libsndfile and externals --------------------------------
 
 message(STATUS "EXTRA_PA_LIBS ${EXTRA_PA_LIBS}")
-
-#target_link_libraries(arco4lib PUBLIC
-#    ${EXTRA_PA_LIBS}  # for linux
-#    ${COREAUDIO}
-#    ${FOUNDATION}
-#    ${COREMIDI}
-#    ${COREFOUNDATION}
-#    ${CORESERVICES}
-#    ${AUDIOTOOLBOX}
-#    ${AUDIOUNIT}
-#    ${AVFOUNDATION}
-#    ${APPKIT}
-#    ${CARBON}
-#    )
-
 

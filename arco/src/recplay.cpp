@@ -197,6 +197,9 @@ void Recplay::real_run()
 
     input_samps = input->run(current_block);
     gain_samps = gain->run(current_block);
+    if (lender_ptr) {
+        lender_ptr->run(current_block);
+    }
 
     if (recording) {
         int buffer = (int) INDEX_TO_BUFFER(rec_index);
@@ -209,6 +212,14 @@ void Recplay::real_run()
                 Sample_ptr b = O2_MALLOCNT(SAMPLES_PER_BUFFER, Sample);
                 assert(b);
                 states[i].my_buffers.push_back(b);
+                if (flags & UGENTRACE) {
+                    int n = states[i].my_buffers.size();
+                    if (n % 10 == 0) {
+                        arco_print("Recorded %g sec in ",
+                                   AP * n * SAMPLES_PER_BUFFER);
+                        print();
+                    }
+                }
             }
         }
         
@@ -227,20 +238,19 @@ void Recplay::real_run()
         // boundaries so it may fade up to one block early (<1ms)
         // the test for !stopping is redundant but helps with debugging by
         // not calling stop multiple times. If we are recording, the 
-        // END_COUNT is increasing, so we do not stop. (But this could
-        // be bad if speed > 1 and we overtake the live recording. In that
-        // case playback will stop abruptly.)
-        //
-        // "+ 1 + BL" is correct: round up fade_len * speed,
+        // END_COUNT is increasing, so we only worry about running out of
+        // samples when speed > 1.
+        //     "+ 1 + BL" is correct: round up fade_len * speed,
         // and then we need extra for interpolation.
         // note that fade_len is derived from fade when playback is
         // started. You cannot change the fade-out time after you start.
-        if (!stopping && !RECORDING &&
-            play_index + long(fade_len * speed) + 1 + BL >= END_COUNT) {
-            stop();
+        if (!stopping) {
+            if ((!RECORDING || speed >= 1) &&
+                (play_index + long(fade_len * speed) + 1 + BL >= END_COUNT)) {
+                stop();
+            }
         }
-
-        // if the record buffer is very short, or if speed has changed,
+        // If the record buffer is very short, or if speed has changed,
         // it's possible that there is not enough time to fade out, 
         // in which case we could overrun the buffers and try to 
         // access non-existent memory. Test for overrun now, and just
@@ -265,8 +275,8 @@ void Recplay::real_run()
             // will finish before we run out of samples.
             block_zero_n(out_samps, chans);
             playing = false;
-            arco_warn("Recplay: sudden stop, out of samples");
-            send_action_id(action_id);
+            arco_warn("Recplay sudden stop, out of samples"); print();
+            send_action_id();
             if (flags & CAN_TERMINATE) {
                 terminate();
             }
@@ -304,7 +314,7 @@ void Recplay::real_run()
                     if (loop) {
                         start(start_time);
                     } else {
-                        send_action_id(action_id);
+                        send_action_id();
                         if (flags & CAN_TERMINATE) {
                             terminate();
                         }
@@ -375,8 +385,8 @@ void Recplay::start(double start_time_)
     for (int i = 0; i < chans; i++) {  // just to be safe, initialize
         states[i].prev_sample = 0;     // for interpolation
     }
-    fade_count = long(fade * AR * BL_RECIP);
-    fade_len = fade_count * BL;
+    fade_len = long(fade * AR);
+    fade_count = fade_len * BL_RECIP;
     if (fade_len <= 0) {
         arco_warn("Recplay: fade_len too short, not starting.");
         goto no_play;
@@ -411,7 +421,7 @@ void Recplay::start(double start_time_)
     playing = true;
     return;
 no_play:
-    send_action_id(action_id);
+    send_action_id();
 }
 
 
@@ -596,21 +606,6 @@ static void arco_recplay_start(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/recplay/act int32 id, int32 action_id;
- *    set the action_id
- */
-void arco_recplay_act(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t id = argv[0]->i;
-    int32_t action_id = argv[1]->i;
-    // end unpack message
-
-    UGEN_FROM_ID(Recplay, recplay, id, "arco_recplay_act");
-    recplay->action_id = action_id;
-}
-
-
 /* O2SM INTERFACE: /arco/recplay/stop int32 id;
  */
 static void arco_replay_stop(O2SM_HANDLER_ARGS)
@@ -655,8 +650,6 @@ static void recplay_init()
                     true);
     o2sm_method_new("/arco/recplay/start", "if", arco_recplay_start, NULL,
                     true, true);
-    o2sm_method_new("/arco/recplay/act", "ii", arco_recplay_act, NULL, true,
-                    true);
     o2sm_method_new("/arco/recplay/stop", "i", arco_replay_stop, NULL, true,
                     true);
     o2sm_method_new("/arco/recplay/borrow", "ii", arco_replay_borrow, NULL,

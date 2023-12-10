@@ -28,8 +28,6 @@ public:
         points.init(0);        // initially empty, so size = 0
     }
 
-    ~Pwlb() { send_action_id(action_id); }
-
     const char *classname() { return Pwlb_name; }
 
 
@@ -44,7 +42,7 @@ public:
             if (next_point_index >= points.size()) {
                 seg_togo = INT_MAX;
                 seg_incr = 0.0f;
-                send_action_id(action_id);
+                send_action_id();
                 if (current == 0 && (flags & CAN_TERMINATE)) {
                     terminate();
                 }
@@ -63,6 +61,11 @@ public:
         next_point_index = 0;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
+    }
+
+    void stop() {
+        seg_togo = INT_MAX;
+        seg_incr = 0.0f;
     }
 
     void decay(float d) {

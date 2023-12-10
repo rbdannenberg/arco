@@ -4,38 +4,31 @@
 # Oct 2023
 
 class Route (Ugen):
-    def init(input, chan):
-        var chans = len(chan) if isarray(chan) else 1
-        super.init(create_ugen_id(), "Route", chans, A_RATE, "",
-                   no_msg = true)
+    def init(chans):
+        super.init(create_ugen_id(), "Route", chans, A_RATE, "")
+
+    def ins(input, rest routes):
+        send_ins_rem(input, routes, "/arco/route/ins")
+        this
+
+    def rem(input, rest routes):
+        send_ins_rem(input, routes, "/arco/route/rem")
+        this
+
+    def send_ins_rem(input, routes, address):
         o2_send_start()
         o2_add_int32(arco_ugen_id(id))
         o2_add_int32(arco_ugen_id(input.id))
-        add_chan_and_send(chans, chan, "/arco/route/new")
-        inputs = {'input': input}
+        for src_dst in routes:
+            o2_add_int32(src_dst)
+        o2_send_finish(0, address, true)
+        this
 
-
-    def set_routes(chan):
-        var chans = len(chan) if isarray(chan) else 1
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        add_chan_and_send(chans, chan, "/arco/route/routes")
-
-
-    def add_chan_and_send(chans, chan, msg):
-    # adding channel sources to message is similar for new and routes:
-        for i = 0 to chans:
-            o2_add_int32(chan if isnumber(chan) else chan[i])
-        o2_send_finish(0, msg, true)
-
-    def set_route(output_chan, input_chan):
-        o2_send_cmd("/arco/route/route", 0, "Uii", id, output_chan, input_chan)
+    def reminput(input):
+        o2_send_cmd("/arco/route/reminput", 0, "UU", id, input)
+        this
 
 
 
-def route(input, chan):
-# route from input channels to output channels.
-# If chan is an integer, create one channel output routed from input
-#     channel given by chan.
-# If chan is an array, create an output channel for each element.
-    return Route(input, chan)
+def route(chans):
+    return Route(chans)

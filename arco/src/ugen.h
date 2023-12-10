@@ -18,11 +18,15 @@
 
 // flags for Unit generators to cooperate with audioio, etc.
 const int IN_RUN_SET = 1;
-const int UGEN_MARK = 2;  // used for graph traversal
+const int UGEN_MARK = 2;      // used for graph traversal
 const int CAN_TERMINATE = 4;  // allows end in input to terminate
-const int TERMINATING = 8;  // have we terminated?  After termination,
-const int TERMINATED = 16;  // have we terminated?  After termination,
+const int TERMINATING = 8;    // Are we terminating?  We detected inputs
+// are all zero or Mix or Sum have no more inputs. Running for tail_blocks
+// more sample blocks.
+const int TERMINATED = 16;    // have we terminated?  After termination,
 // it can be assumed that the output signal in all channels is zero.
+const int UGENTRACE = 32;     // print debugging info on this ugen. Mainly
+// to confirm that destructors run on ugens.
 
 // special Unit generator IDs:
 const int ZERO_ID = 0;
@@ -55,6 +59,8 @@ const int MATH_OP_RND = 12;
 const int MATH_OP_SH = 13;
 const int MATH_OP_QNT = 14;
 #define NUM_MATH_OPS 15
+
+extern const char *OP_TO_STRING[NUM_MATH_OPS];
 
 // IMPORTANT: x1 and x2 should be variables, not expressions
 // since they are evaluated multiple times. x1 is modified
@@ -100,6 +106,7 @@ class Ugen : public O2obj {
     Vec<Sample> output;
     Sample_ptr out_samps;  // pointer to actual sample memory
     int current_block;
+    int action_id;
 
     // to initialize a Ugen without installing in table, pass id = -1
     Ugen(int id, char ab, int nchans) {
@@ -139,6 +146,7 @@ class Ugen : public O2obj {
             out_samps = NULL;
         }
         current_block = 0;
+        action_id = 0;
     }
 
     // subclasses should override to unref inputs
@@ -148,7 +156,8 @@ class Ugen : public O2obj {
     
     void indent_spaces(int indent);
 
-    virtual void print(int indent, const char *param);
+    virtual void print(int indent = 0, const char *param = "",
+                       bool revisiting = false);
 
     virtual void print_tree(int indent, bool print_flag, const char *param);
     
@@ -203,7 +212,7 @@ class Ugen : public O2obj {
     }
 
 
-    virtual void on_terminate() { ; }  // override if needed
+    virtual void on_terminate() { send_action_id(); }  // override if needed
 
 
     // declare that when an input terminates, this ugen should continue
@@ -231,7 +240,7 @@ class Ugen : public O2obj {
 
     void const_set(int chan, Sample x, const char *from);
 
-    void send_action_id(int &action_id, int status = 0) {
+    void send_action_id(int status = 0) {
         if (action_id == 0) return;
         o2sm_send_start();
         o2sm_add_int32(action_id);

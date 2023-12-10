@@ -7,7 +7,7 @@
 // piece-wise exponential
 //
 // control points are d0 y0 d1 y1 ... dn-1 [yn-1] where yn-1 defaults to
-// 0.0. HOWEVER, all di points are shifted positively by bias, which defaults
+// 0.0. HOWEVER, all yi points are shifted positively by bias, which defaults
 // to 0.01 (about -40dB), exponential decays are computed, and then the
 // bias is removed from the result. If yi is 0 the output will be zero, but
 // the shape of the exponential decay will be what you would see in a decay
@@ -45,8 +45,6 @@ public:
         points.init(0);        // initially empty, so size = 0
     }
     
-    ~Pwe() { send_action_id(action_id); }
-
     const char *classname() { return Pwe_name; }
 
     void real_run() {
@@ -60,10 +58,9 @@ public:
             if (n == 0) { // set up next segment
                 current = final_value;  // make output value exact
                 if (next_point_index >= points.size()) {
-                    seg_togo = INT_MAX;
-                    seg_factor = 1.0f;
-                    send_action_id(action_id);
-                    if (current == 0 && (flags & CAN_TERMINATE)) {
+                    stop();
+                    send_action_id();
+                    if (current == bias && (flags & CAN_TERMINATE)) {
                         terminate();
                     }
                 } else {
@@ -91,6 +88,12 @@ public:
         next_point_index = 0;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
+    }
+
+
+    void stop() {
+        seg_togo = INT_MAX;
+        seg_factor = 1.0f;
     }
 
 

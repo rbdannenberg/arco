@@ -48,7 +48,6 @@ public:
     int x2_stride;
     Sample_ptr x2_samps;
 
-
     Math(int id, int nchans, int op_, Ugen_ptr x1_, Ugen_ptr x2_) :
             Ugen(id, 'a', nchans) {
         op = op_;
@@ -98,6 +97,10 @@ public:
         }
     }
 
+    void print_details(int indent) {
+        arco_print("op %s ", OP_TO_STRING[op]);
+    }
+    
     void print_sources(int indent, bool print_flag) {
         x1->print_tree(indent, print_flag, "x1");
         x2->print_tree(indent, print_flag, "x2");

@@ -9,7 +9,6 @@ def probe(input, reply_addr)
 
 
 class Probe (Ugen):
-    var action_id
     var running
 
     def init(input, reply_addr):

@@ -10,18 +10,18 @@
 const char *Dnsampleb_name = "Dnsampleb";
 
 Dnsampleb_method dnsampleb_methods[] = {
-    &Dnsampleb::dnsample_basic,
-    &Dnsampleb::dnsample_avg,
-    &Dnsampleb::dnsample_peak,
-    &Dnsampleb::dnsample_rms,
-    &Dnsampleb::dnsample_power,
-    &Dnsampleb::dnsample_lowpass,
-    &Dnsampleb::dnsample_lowpass };
+    &Dnsampleb::dnsampleb_basic,
+    &Dnsampleb::dnsampleb_avg,
+    &Dnsampleb::dnsampleb_peak,
+    &Dnsampleb::dnsampleb_rms,
+    &Dnsampleb::dnsampleb_power,
+    &Dnsampleb::dnsampleb_lowpass,
+    &Dnsampleb::dnsampleb_lowpass };
 
 /* O2SM INTERFACE: /arco/dnsampleb/new int32 id, int32 chans, 
                                        int32 input, int32 mode;
  */
-void arco_dnsample_new(O2SM_HANDLER_ARGS)
+void arco_dnsampleb_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -30,7 +30,7 @@ void arco_dnsample_new(O2SM_HANDLER_ARGS)
     int32_t mode = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(ugen, input, "arco_dnsample_new");
+    ANY_UGEN_FROM_ID(ugen, input, "arco_dnsampleb_new");
 
     new Dnsampleb(id, chans, ugen, mode);
 }
@@ -82,7 +82,7 @@ void arco_dnsampleb_mode(O2SM_HANDLER_ARGS)
 void dnsampleb_initialize()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/dnsampleb/new", "iiii", arco_dnsample_new, NULL,
+    o2sm_method_new("/arco/dnsampleb/new", "iiii", arco_dnsampleb_new, NULL,
                     true, true);
     o2sm_method_new("/arco/dnsampleb/repl_input", "ii",
                     arco_dnsampleb_repl_input, NULL, true, true);
@@ -92,3 +92,5 @@ void dnsampleb_initialize()
                     true, true);
     // END INTERFACE INITIALIZATION
 }
+
+Initializer dnsampleb_init_obj(dnsampleb_initialize);

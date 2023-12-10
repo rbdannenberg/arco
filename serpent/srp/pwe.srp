@@ -17,7 +17,7 @@ class Pwe (Ugen):
     # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
     # If the length is odd, a final yn = 0.0 is appended.
         o2_send_start()
-        o2_add_int32(id)
+        o2_add_int32(arco_ugen_id(id))
         # track cummulative time and samples to avoid accumulated time error
         var time = 0
         var count = 0
@@ -33,6 +33,10 @@ class Pwe (Ugen):
 
     def start():
         o2_send_cmd("/arco/pwe/start", 0, "U", id)
+        this
+
+    def stop():
+        o2_send_cmd("/arco/pwe/stop", 0, "U", id)
         this
 
     def decay(dur):
@@ -57,7 +61,6 @@ def pwe(keyword init, start = true, rest points):
 
 
 class Pweb (Ugen):
-    var action_id
 
     def init(points):
         super.init(create_ugen_id(), "Pweb", 1, 'b', "", omit_chans = true)
@@ -104,6 +107,9 @@ class Pweb (Ugen):
         o2_send_cmd("/arco/pweb/start", 0, "U", id)
         this
 
+    def stop():
+        o2_send_cmd("/arco/pweb/stop", 0, "U", id)
+        this
 
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)

@@ -4,16 +4,18 @@
 # June 2023
 
 class Sum(Ugen):
-    def init(chans, wrap, id_num):
+    def init(chans, wrap, optional id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
                    "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0)
 
-    def ins(ugen):
-        o2_send_cmd("/arco/sum/ins", 0, "UU", id, ugen.id)
+    def ins(rest ugens):
+        for ugen in ugens:
+            o2_send_cmd("/arco/sum/ins", 0, "UU", id, ugen.id)
         this
 
-    def rem(ugen):
-        o2_send_cmd("/arco/sum/rem", 0, "UU", id, ugen.id)
+    def rem(rest ugens):
+        for ugen in ugens:
+            o2_send_cmd("/arco/sum/rem", 0, "UU", id, ugen.id)
         this
 
     def swap(ugen, replacement):
@@ -25,16 +27,18 @@ def sum(optional chans = 1, keyword wrap = true): Sum(chans, wrap)
 
 
 class Sumb(Ugen):
-    def init(chans, wrap):
+    def init(chans, wrap, optional id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
                    "Sumb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
 
-    def ins(ugen):
-        o2_send_cmd("/arco/sumb/ins", 0, "UU", id, ugen.id)
+    def ins(rest ugens):
+        for ugen in ugens:
+            o2_send_cmd("/arco/sumb/ins", 0, "UU", id, ugen.id)
         this
 
-    def rem(ugen):
-        o2_send_cmd("/arco/sumb/rem", 0, "UU", id, ugen.id)
+    def rem(rest ugens):
+        for ugen in ugens:
+            o2_send_cmd("/arco/sumb/rem", 0, "UU", id, ugen.id)
         this
 
     def swap(ugen, replacement):

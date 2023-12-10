@@ -10,7 +10,6 @@ def fileplay(filename, optional chans = 2, start = 0, end = 0,
 
 
 class Fileplay (Ugen):
-    var action_id
 
     def init(chans, filename, start, end, cycle, mix, expand):
         // -chans cuts off standard creation:

@@ -13,6 +13,7 @@ AIR_GAINS = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.45, 0.4, 0.35, 0.3,
 assert(len(AIR_TRANS) == len(AIR_DELS))
 assert(len(AIR_DELS) == len(AIR_GAINS))
 
+air_mgr = nil
 
 class Air_mgr:
     var airmix  // was airs2, renamed to airmix:
@@ -23,9 +24,9 @@ class Air_mgr:
     def trigger():
     # start the air section in response to detecting first sound
         sched_select(rtsched)
-        sched_cause(capture_dly_sl.val, air_mgr, 'air', t)
+        sched_cause(capture_dly_sl.val, air_mgr, 'start')
         sched_cause(5, this, 'stop_recording')
-        sched_cause(70, this, 'air', false)
+        sched_cause(70, this, 'finish')
         
 
     def stop_recording():
@@ -33,16 +34,16 @@ class Air_mgr:
         air_rp.unrun()
 
 
-    def air(on_flag):
+    def start():
     # start recording and delayed playbacks of first sound, note that
     # recording starts FIRST_NOTE_DELAY (0.3 sec) after detection
-        if on_flag and not airmix:
+        if not airmix:
             air_rp = recplay(input_ugen, 1, 1, 2)  // chans, gain, fade_time
             air_rp.run()
             air_rp.record(t)
             print "air_rp.record(t) -- started recording first gesture"
 
-            airmix = Mix(2)
+            airmix = mix(2)
             for tran at i in AIR_TRANS:
                 //display "airs", i, tran, AIR_DELS[i]
                 if AIR_DELS[i] == 0:
@@ -64,11 +65,12 @@ class Air_mgr:
                         print "SCHEDULE PULSE ****", AIR_DELS[i]
             outgain = gain_control(airmix, intro_gain_sl)
             outgain.play()
-        elif airmix:
+
+    def finish():
+        if airmix:
             airmix.fade(1)
             airmix = nil
             air_rp = nil
-            constrained_ugen_finish(outgain)
             outgain = nil
 
 

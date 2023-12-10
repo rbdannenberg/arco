@@ -6,7 +6,7 @@
 
 extern const char *Dnsampleb_name;
 
-enum Dnsample_mode {
+enum Dnsampleb_mode {
     BASIC = 0,
     AVG = 1,
     PEAK = 2,
@@ -45,7 +45,7 @@ struct Dnsampleb_state {
 class Dnsampleb : public Ugen {
 public:
     Vec<Dnsampleb_state> states;
-    Dnsampleb_method dnsample;
+    Dnsampleb_method dnsampleb;
 
     Ugen_ptr input;
     int32_t input_stride;
@@ -110,7 +110,7 @@ public:
             arco_warn("Dnsampleb set_mode got invalid mode, using BASIC");
             mode = 0;
         }
-        dnsample = dnsampleb_methods[mode];
+        dnsampleb = dnsampleb_methods[mode];
         tail_blocks = 0;
         if (mode == (int) LOWPASS500) {
             set_cutoff(500.0);
@@ -120,12 +120,12 @@ public:
     }
     
 
-    Sample dnsample_basic(Dnsampleb_state *state) {
+    Sample dnsampleb_basic(Dnsampleb_state *state) {
         Sample s = *input_samps;
         return s;
     }
 
-    Sample dnsample_avg(Dnsampleb_state *state) {
+    Sample dnsampleb_avg(Dnsampleb_state *state) {
         Sample s = 0;
         for (int i = 0; i < BL; i++) {
             s += input_samps[i];
@@ -133,7 +133,7 @@ public:
         return s * BL_RECIP;
     }
 
-    Sample dnsample_peak(Dnsampleb_state *state) {
+    Sample dnsampleb_peak(Dnsampleb_state *state) {
         Sample s = fabs(*input_samps++);
         for (int i = 1; i < BL; i++) {
             s = MAX(fabs(input_samps[i]), s);
@@ -141,7 +141,7 @@ public:
         return s;
     }
 
-    Sample dnsample_power(Dnsampleb_state *state) {
+    Sample dnsampleb_power(Dnsampleb_state *state) {
         Sample sum = 0;
         for (int i = 0; i < BL; i++) {
             Sample s = input_samps[i];
@@ -150,11 +150,11 @@ public:
         return sum * BL_RECIP;
     }
 
-    Sample dnsample_rms(Dnsampleb_state *state) {
-        return sqrt(dnsample_power(state));
+    Sample dnsampleb_rms(Dnsampleb_state *state) {
+        return sqrt(dnsampleb_power(state));
     }
 
-    Sample dnsample_lowpass(Dnsampleb_state *state) {
+    Sample dnsampleb_lowpass(Dnsampleb_state *state) {
         Sample sum = 0;
         for (int i = 0; i < BL; i++) {
             state->prev = alpha * input_samps[i] +
@@ -171,7 +171,7 @@ public:
         }
         Dnsampleb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            *out_samps++ = (this->*dnsample)(state++);
+            *out_samps++ = (this->*dnsampleb)(state++);
             input_samps += input_stride;
         }
     }

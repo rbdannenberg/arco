@@ -97,21 +97,6 @@ void arco_filerec_rec(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/filerec/act int32 id, int32 action_id;
- *    set the action_id
- */
-void arco_filerec_act(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t id = argv[0]->i;
-    int32_t action_id = argv[1]->i;
-    // end unpack message
-
-    UGEN_FROM_ID(Filerec, filerec, id, "arco_filerec_act");
-    filerec->action_id = action_id;
-}
-
-
 static void filerec_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
@@ -124,8 +109,6 @@ static void filerec_init()
     o2sm_method_new("/arco/filerec/ready", "hB", arco_filerec_ready, NULL,
                     true, true);
     o2sm_method_new("/arco/filerec/rec", "iB", arco_filerec_rec, NULL, true,
-                    true);
-    o2sm_method_new("/arco/filerec/act", "ii", arco_filerec_act, NULL, true,
                     true);
     // END INTERFACE INITIALIZATION
 }

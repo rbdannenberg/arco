@@ -1,0 +1,46 @@
+# add.srp -- feedback add unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Add(Ugen):
+    def init(chans, wrap, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
+                   "Add", chans, A_RATE, "i", 'wrap', 1 if wrap else 0)
+
+    def ins(rest ugens):
+        for ugen in ugens:
+            o2_send_cmd("/arco/add/ins", 0, "UU", id, ugen.id)
+        this
+
+    def rem(ugen):
+        o2_send_cmd("/arco/add/rem", 0, "UU", id, ugen.id)
+        this
+
+    def swap(ugen, replacement):
+        o2_send_cmd("/arco/add/swap", 0, "UUU", id, ugen.id, replacement.id)
+        this
+
+
+def add(optional chans = 1, keyword wrap = true): Add(chans, wrap)
+
+
+class Addb(Ugen):
+    def init(chans, wrap):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
+                   "Addb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
+
+    def ins(ugen):
+        o2_send_cmd("/arco/addb/ins", 0, "UU", id, ugen.id)
+        this
+
+    def rem(ugen):
+        o2_send_cmd("/arco/addb/rem", 0, "UU", id, ugen.id)
+        this
+
+    def swap(ugen, replacement):
+        o2_send_cmd("/arco/addb/swap", 0, "UUU", id, ugen.id, replacement.id)
+        this
+
+
+def addb(optional chans = 1, keyword wrap = true): Addb(chans, wrap)

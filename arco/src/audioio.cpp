@@ -269,13 +269,7 @@ static void arco_prtree(O2SM_HANDLER_ARGS)
 {
     arco_print("------------ Ugen Tree ----------------\n");
     UGEN_FROM_ID(Sum, sum, OUTPUT_ID, "arco_prtree");
-    for (int i = 0; i < sum->inputs.size(); i++) {
-        Ugen_ptr ugen = sum->inputs[i];
-        if (ugen->flags & UGEN_MARK) { // special case: print again
-            ugen->flags &= ~UGEN_MARK;
-        }
-        ugen->print_tree(0, true, "member of output_set");
-    }
+    sum->print_tree(0, true, "audio output sum");
     for (int i = 0; i < run_set.size(); i++) {
         Ugen_ptr ugen = run_set[i];
         if (ugen->flags & UGEN_MARK) { // special case: print again
@@ -319,8 +313,7 @@ static void arco_prugens(O2SM_HANDLER_ARGS)
     for (int i = 0; i < ugen_table.size(); i++) {
         Ugen_ptr ugen = ugen_table[i];
         if (ugen) {
-            ugen->print(1,
-                        "");
+            ugen->print(1);
         }
     }
     arco_print("---------------------------------------\n");

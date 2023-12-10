@@ -70,7 +70,10 @@ public:
             if (!finished) {
                 record(false);
             } else {
-                printf("Filerec::unref deleting %p\n", this);
+                if (flags & UGENTRACE) {
+                    printf("Filerec::unref deleting traced ugen: ");
+                    print();
+                }
                 delete this;
             }
         }
@@ -122,7 +125,7 @@ public:
         }
         if (ready_flag) {
             isready = true;
-            send_action_id(action_id, 0);  // successful open
+            send_action_id();  // successful open
             if (recording) {  // do we need to send block(s)?
                 while (num_ready_to_send > 0) {
                     send_a_block();
@@ -130,7 +133,7 @@ public:
             }
         } else {
             arco_warn("Filerec - failure to open file");
-            send_action_id(action_id, -1);
+            send_action_id(-1);
             finished = true;
         }
     }

@@ -65,7 +65,6 @@ public:
         // initialize Vec of per-channel prev_gain value(s) and zero them:
         input_desc->prev_gain.set_size(MAX(input_desc->input->chans,
                                            input_desc->gain->chans), true);
-        printf("mix prev_gain.size %d\n", input_desc->prev_gain.size());
     }
 
 

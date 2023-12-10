@@ -4,16 +4,18 @@
 // Nov, 2023
 
 class Pitchdly (Instrument):
+
     def init(input, optional gain = 1, delay = 0, ratio = 1, xfade = 0.03,
              window = 0.03, regen = 0, keyword name):
+         // removed support for these options
+         assert(gain == 1 and delay == 0 and regen == 0)
          instr_begin()
-         var fader2 = fader(input).set_dur(0.1).set_goal(gain)
-         var feedback = feedback(fader2, zero_ugen, smoothb(regen, 3))
-         // maxdelay = 0.2, but it seems that delay is never used
-         var delay = delay(fader, delay, 0, 0.2)
-         var pshift = ola_pitch_shift(delay, ratio, xfade, window)
-         var fader1 = fader(pshift, 0).set_dur(0.3).set_goal(regen)
-         super.init(name, pshift)
+         // Note: original Pitchdly had a possibility of delay and feedback,
+         // but the "regen" parameter was zero, and the delay was zero,
+         // so only the pitch shifter was actually used for anything
+         // Also, input gain was always 1, so we don't need the input fader
+         var pshift = ola_pitch_shift(input, ratio, xfade, window)
+         super.init("Pitchdly", pshift)
 
-    def finish():
-        feedback.set('from', zero_ugen)
+    def set_ratio(ratio)
+        output.set_ratio(ratio)

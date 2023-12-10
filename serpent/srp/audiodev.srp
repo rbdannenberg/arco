@@ -15,7 +15,7 @@ CONFIGURE_COLOR = Wxs_color(200, 230, 200)
 MONITOR_COLOR = Wxs_color(0xC6, 0xCF, 0xFF)
 require "arcoscope"
 
-
+config_win = nil
 fileinput_files = nil
 arco_meter_prefade = false
 
@@ -229,6 +229,10 @@ class Configure_audio (Arco_window):
                'reset_audio_button')
         reset_audio_button.add_target_method(this, 'reset_audio_handler')
 
+        wxs_x = wxs_x + 5; wxs_y = wxs_y + 4
+        Statictext(this, arco_state_string(arco_state), 'R', 'S', 150, 'H',
+                   'arco_state_txt')
+
         Statictext(this, "Cpu Load:", 10, 'D', 110, 20, 'cpuloadst')
         y = wxs_y  // save y offset
         Gauge(this, 100, 'R', y - 3, 120, 20, 'cpuloadgauge')
@@ -243,6 +247,14 @@ class Configure_audio (Arco_window):
         fit_to_children()
         start_poll_for_status()
 
+
+    def arco_state_string(state):
+        "Audio: " + str(state)
+
+
+    def set_state(state):
+        arco_state_txt.set_string(arco_state_string(state))
+        
 
     def poll_for_status(id):
         if not varname or id != poll_for_status_id:

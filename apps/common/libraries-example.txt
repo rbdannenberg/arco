@@ -57,6 +57,7 @@ string(CONCAT FLSYN_OPT_LIB
 string(CONCAT FLSYN_DBG_LIB
     "/Users/rbd/fluidsynth-2.3.3/build/libfluidsynth-OBJ.build/"
     "Debug/libfluidsynth-static.a")
+# glib contains gio and is used by fluidsynth: 
 set(GLIB_OPT_LIB "/opt/homebrew/Cellar/glib/2.76.4/lib/libglib-2.0.dylib"
     CACHE PATH "Glib 2.0 library") 
 set(GLIB_DBG_LIB  "/opt/homebrew/Cellar/glib/2.76.4/lib/libglib-2.0.dylib"

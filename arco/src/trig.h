@@ -44,7 +44,11 @@ class Trig : public Ugen {
         trig_threshold = threshold;
         set_pause(pause);
         init_input(input);
-        sum0 = 0;
+        // initial RMS will exceed any reasonable threshold, so the
+        // first test, based on only 1/2 window size, will fail to set
+        // enabled. We will become enabled as soon as a full window
+        // RMS is below threshold:
+        sum0 = 1.0e10;
         sum1 = 0;
         count = 0;
         onoff_addr = NULL;
@@ -52,6 +56,7 @@ class Trig : public Ugen {
         onoff_count = 0;
         onoff_runlen = 2;  // this value is not used - see onoff() method
         reported_state = false;
+        enabled = false;
     }
 
 
@@ -128,22 +133,30 @@ class Trig : public Ugen {
         count += BL;
         // end of half window?
         if (count >= (window_size >> 1)) {
-            sum0 = sqrt(sum0 / (window_size * input->chans));
-            if (enabled && sum0 > trig_threshold && pause_for <= 0) {
+            float rms = sqrtf(sum0 / (window_size * input->chans));
+            if (enabled && rms > trig_threshold && pause_for <= 0) {
                 o2sm_send_start();
                 o2sm_add_int32(id);
-                o2sm_add_float(sum0);
+                o2sm_add_float(rms);
                 o2sm_send_finish(0, address, false);
                 pause_for = pause;
+                // set sum1 to sum0, which is above threshold, so that when
+                // analysis resumes, the initial rms, which will be based on
+                // only 1/2 window of new input, will also exceed threshold
+                // so that the trigger will not be reenabled. The following
+                // rms, based on a whole window, will be the first opportunity
+                // to set enabled, and possibly on the third half-window (at
+                // the earliest), we can generate another trigger.
+                sum1 = sum0;
                 enabled = false;
             } else if (sum0 < trig_threshold) {
                 enabled = true;
             }
 
             if (onoff_addr) {  // is onoff mode enabled?
-                if (sum0 > onoff_threshold) {
+                if (rms > onoff_threshold) {
                     onoff_state = true;
-                } else if (sum0 < onoff_threshold * 0.9) { // hysteresis
+                } else if (rms < onoff_threshold * 0.9) { // hysteresis
                     onoff_state = false;
                 }
                 onoff_count++;

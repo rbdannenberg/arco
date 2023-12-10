@@ -35,6 +35,10 @@ class Pwl (Ugen):
         o2_send_cmd("/arco/pwl/start", 0, "U", id)
         this
 
+    def stop():
+        o2_send_cmd("/arco/pwl/stop", 0, "U", id)
+        this
+
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_snd_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
@@ -58,7 +62,6 @@ def pwl(keyword init, start = true, rest points):
 
 
 class Pwlb (Ugen):
-    var action_id
 
     def init(points):
         super.init(create_ugen_id(), "Pwlb", 1, 'b', "", omit_chans = true)
@@ -102,6 +105,11 @@ class Pwlb (Ugen):
 
     def start():
         o2_send_cmd("/arco/pwlb/start", 0, "U", id)
+        this
+
+
+    def stop():
+        o2_send_cmd("/arco/pwlb/stop", 0, "U", id)
         this
 
 

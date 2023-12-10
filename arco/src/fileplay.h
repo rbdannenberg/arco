@@ -89,7 +89,10 @@ public:
             if (!stopped) {
                 play(false);
             } else {
-                printf("Fileplay::unref deleting %p\n", this);
+                if (flags & UGENTRACE) {
+                    printf("Fileplay::unref deleting traced ugen: ");
+                    print();
+                }
                 delete this;
             }
         }
@@ -123,7 +126,7 @@ public:
     void ready(bool is_ready) {
         if (!is_ready && !started) {
             arco_warn("Fileplay - failure to start reading from file");
-            send_action_id(action_id, -1);  // send error code
+            send_action_id(-1);  // send error code
         }
         if (!is_ready) {  // there is nothing more to read
             stopped = true;
@@ -138,7 +141,7 @@ public:
     void set_action_id(int id) {
         action_id = id;
         if (stopped) {
-            send_action_id(action_id, started ? 0 : -1);
+            send_action_id(started ? 0 : -1);
         }
     }
 
@@ -164,7 +167,7 @@ public:
         block_on_deck ^= 1;  // swap 0 <-> 1
         Audioblock *block = blocks[block_on_deck];
         if (!block && !stopped) {
-            printf("Warning: fileplay underflow\n");
+            arco_warn("fileplay underflow\n");
         }
         frame_in_block = 0;
         return block;
@@ -176,7 +179,7 @@ public:
         if (!started || stopped || !block) {
             block_zero_n(out_samps, chans);
             if (stopped) {
-                send_action_id(action_id);
+                send_action_id();
             }
             return;
         }

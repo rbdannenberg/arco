@@ -25,7 +25,7 @@ class Constraint:
     var val  // the output value of the constraint
     var non_updating_set  // when these are set, do not compute()
     var const_ugen  // associated Const instance set to val
-    var control_to_var_map  // what variable gets new value from control
+    var name1, name2, name3
     var method
     var target
     var trace
@@ -34,7 +34,9 @@ class Constraint:
     def init():
         val = compute()
         inputs = []
-        control_to_var_map = {}
+        name1 = 'x'
+        name2 = 'x2'
+        name3 = 'x3'
         non_updating_set = {}
 
 
@@ -98,13 +100,26 @@ class Constraint:
         return const_ugen
 
 
-    def connect(control, optional name = 'x'):
+    def connect(control, optional name = 'x', control_number = 1):
     # control must be one of: Checkbox (val is 1 or 0), Spinctrl, Slider,
     # Labeled_slider OR it can be another Constraint
-        var meth = 'control_change'
+        if control_number < 1 or control_number > 2:
+            print "ERROR (Constraint.connect) bad control_number",
+            print         control_number
+            return
+
+        if control_number == 1:
+            name1 = name
+        elif control_number == 2:
+            name2 = name
+        else:
+            name3 = name
+
+        control_number = str(control_number)        
+        var meth = intern("control_change_" + control_number)
         var initial_value = 0
         if isinstance(control, Checkbox):
-            meth = 'check_change'
+            meth = intern("check_change_" + control_number)
             initial_value = 1 if control.value() else 0
         elif isinstance(control, Spinctrl) or
               isinstance(control, Slider) or
@@ -117,7 +132,6 @@ class Constraint:
             print     object_class(control)
             return
         control.add_target_method(this, meth)
-        control_to_var_map[control] = name
         set(name, initial_value)
 
 
@@ -125,10 +139,7 @@ class Constraint:
         control.remove_target_method(this)
 
 
-    def finish():
-        var controls = control_to_var_map.get_keys()
-        for control in controls:
-            disconnect(control)
+    def finish(rest ignore):  // ignores status code sent by Arco atend(FINISH)
         const_ugen = nil  // in case we were controlling a Const ugen
         non_updating_set.clear()  // even if this is not freed,
                                   // we'll release this array
@@ -166,12 +177,17 @@ class Constraint:
                     index = index + 1
 
 
-    def check_change(control, event, x, y):
-        var name = control_to_var_map[control]
+    def check_change_1(control, event, x, y): check_change(x, name1)
+    def check_change_2(control, event, x, y): check_change(x, name2)
+    def check_change_3(control, event, x, y): check_change(x, name3)
+    def check_change(x, name):
         set(name, 1 if x else 0)
 
 
-    def control_change(control, rest args):
+    def control_change_1(control, rest args): control_change(control, args, name1)
+    def control_change_2(control, rest args): control_change(control, args, name2)
+    def control_change_3(control, rest args): control_change(control, args, name3)
+    def control_change(control, args, name):
     # this is a callback for numerical control change events
     # args will be simply [value] if the control is Labeled_slider,
     # or [event, x, y] for all other controls. Use len(args) to
@@ -179,7 +195,6 @@ class Constraint:
     # but this way we can handle future non-primitive controls that just
     # provide a value.)
         var x = args[0] if len(args) == 1 else args[1]
-        var name = control_to_var_map[control]
         set(name, x)
 
 

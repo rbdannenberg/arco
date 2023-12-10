@@ -1,0 +1,15 @@
+# allpass.srp -- feedback all-pass filter unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Allpass (Ugen):
+    def init(chans, input, dur, fb, maxdur):
+        super.init(create_ugen_id(), "Allpass", chans, 'a', "UUUf",
+	           'input', input, 'dur', dur, 'fb', fb, 'maxdur', maxdur)
+
+
+def allpass(input, dur, fb, maxdur, optional chans = 1):
+    Allpass(chans, input, dur, fb, maxdur)  # allpass as a function
+
+

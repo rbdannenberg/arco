@@ -10,90 +10,88 @@
 
 const char *Route_name = "Route";
 
-/* /arco/route/new id, input_id, chan0, chan1, ... chann-1
+/* /arco/route/new int32 id, int32 chans;
  */
 void arco_route_new(O2SM_HANDLER_ARGS)
 {
-    argc = (int) strlen(types);
-    if (argc < 2) {
-        goto bad_args;
-    }
-    {
-        o2_extract_start(msg);
-        O2arg_ptr ap = o2_get_next(O2_INT32); if (!ap) goto bad_args;
-        int id = ap->i;
-        ap = o2_get_next(O2_INT32); if (!ap) goto bad_args;
-        ANY_UGEN_FROM_ID(input, ap->i, "arco_route_new");
-        Route *route = new Route(id, argc - 2, input);
-        int index = 0;
-        while ((ap = o2_get_next(O2_INT32))) {
-            route->set_route(index++, ap->i);
-        }
-        if (index != argc - 2) {
-            ugen_table[route->id] = NULL;
-            route->unref();
-            goto bad_args;
-        }
-        return;
-    }
-  bad_args:
-    arco_warn("/arco/route/new: bad type string %s", types);
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t chans = argv[1]->i;
+    // end unpack message
+
+    new Route(id, chans);
 }
 
 
-/* /arco/route/routes id, chan0, chan1, ... chann-1
- *   set output source channels to chani
- *   this is equivalent to the sequence:
- *        /arco/route/route id 0 chan0
- *        /arco/route/route id 1 chan1
- *        ...
- *        /arco/route/set id n-1 chann-1
- */
-void arco_route_routes(O2SM_HANDLER_ARGS)
+void arco_route_ins_rem(O2SM_HANDLER_ARGS, const char *name, bool ins_flag)
 {
+    int id, input;
     o2_extract_start(msg);
     O2arg_ptr ap = o2_get_next(O2_INT32); if (!ap) goto bad_args;
+    id = ap->i;
+    ap = o2_get_next(O2_INT32); if (!ap) goto bad_args;
+    input = ap->i;
     {
-        UGEN_FROM_ID(Route, route, ap->i, "arco_route_routes");
-        
-        int index = 0;
+        UGEN_FROM_ID(Route, route, id, name);
+        ANY_UGEN_FROM_ID(ugen, input, name);
+        int src, dst;
+        int n = 2;
         while ((ap = o2_get_next(O2_INT32))) {
-            route->set_route(index++, ap->i);
+            src = ap->i;
+            ap = o2_get_next(O2_INT32);
+            if (!ap) break;
+            dst = ap->i;
+            ins_flag ? route->ins(ugen, src, dst) : route->rem(ugen, src, dst);
+            n += 2;
         }
-        if (index != argc) {
+        if (n != argc) {
             goto bad_args;
         }
         return;
     }
   bad_args:
-    arco_warn("/arco/route/routes: bad type string %s", types);
+    arco_warn("/arco/route/%s: bad type string %s", name + 11, types);
 }
 
 
-/* O2SM INTERFACE: /arco/route/repl_input int32 id, int32 input_id;
- */
-void arco_route_repl_input(O2SM_HANDLER_ARGS)
+void arco_route_ins(O2SM_HANDLER_ARGS)
+{
+    arco_route_ins_rem(msg, types, argv, argc, user_data,
+                       "arco_route_ins", true);
+}
+
+
+void arco_route_rem(O2SM_HANDLER_ARGS)
+{
+    arco_route_ins_rem(msg, types, argv, argc, user_data,
+                       "arco_route_rem", false);
+}
+
+
+/* /arco/route/reminput id, input; */
+void arco_route_reminput(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t input_id = argv[1]->i;
+    int32_t input = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Route, route, id, "arco_route_repl_inp")
-    ANY_UGEN_FROM_ID(input, input_id, "arco_route_repl_inp");
-    route->repl_input(input);
+    UGEN_FROM_ID(Route, route, id, "arco_route_reminput");
+    ANY_UGEN_FROM_ID(ugen, input, "arco_route_reminput");
+
+    route->reminput(ugen);
 }
 
 
 static void route_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/route/repl_input", "ii", arco_route_repl_input, NULL,
+    o2sm_method_new("/arco/route/new", "ii", arco_route_new, NULL, true, true);
+    o2sm_method_new("/arco/route/reminput", "ii", arco_route_reminput, NULL,
                     true, true);
     // END INTERFACE INITIALIZATION
-    o2sm_method_new("/arco/route/new", NULL, arco_route_new, NULL, true, true);
-    o2sm_method_new("/arco/route/routes", NULL, arco_route_routes,
-                    NULL, true, true);
+    o2sm_method_new("/arco/route/ins", NULL, arco_route_ins, NULL, false, true);
+    o2sm_method_new("/arco/route/rem", NULL, arco_route_rem, NULL, false, true);
 }
 
 Initializer route_init_obj(route_init);

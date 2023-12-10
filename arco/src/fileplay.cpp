@@ -30,7 +30,6 @@ Fileplay::~Fileplay()
     if (!stopped) {
         send_fileplay_play((int64_t) this, false);
     }
-    if (action_id) send_action_id(action_id);
 }
 
 
@@ -104,21 +103,6 @@ void arco_fileplay_play(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/fileplay/act int32 id, int32 action_id;
- *    set the action_id
- */
-void arco_fileplay_act(O2SM_HANDLER_ARGS)
-{
-    // begin unpack message (machine-generated):
-    int32_t id = argv[0]->i;
-    int32_t action_id = argv[1]->i;
-    // end unpack message
-
-    UGEN_FROM_ID(Fileplay, fileplay, id, "arco_fileplay_act");
-    fileplay->action_id = action_id;
-}
-
-
 static void fileplay_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
@@ -126,7 +110,6 @@ static void fileplay_init()
     o2sm_method_new("/arco/fileplay/samps", "hh", arco_fileplay_samps, NULL, true, true);
     o2sm_method_new("/arco/fileplay/ready", "hiB", arco_fileplay_ready, NULL, true, true);
     o2sm_method_new("/arco/fileplay/play", "iB", arco_fileplay_play, NULL, true, true);
-    o2sm_method_new("/arco/fileplay/act", "ii", arco_fileplay_act, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
 

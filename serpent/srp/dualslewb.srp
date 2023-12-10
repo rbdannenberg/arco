@@ -5,23 +5,27 @@
 
 class Dualslewb(Ugen):
     def init(chans, input, attack, release, optional current = 0,
-             attack_linear = 1, release_linear = 1):
+             attack_linear = true, release_linear = true):
         super.init(create_ugen_id(), "Dualslewb", chans, 'a', "UUfffii",
 	           'input', input, 'attack', attack, 'release', release,
-                   'current', current, 'attack_linear', attack_linear,
-                   'release_linear', release_linear)
+                   'current', current,
+                   'attack_linear', 1 if attack_linear else 0,
+                   'release_linear', 1 if release_linear else 0)
 
     def set_current(current):
         o2_send_cmd("/arco/dualslewb/current", "Uf", id, current)
 
-    def set_attack(attack, optional attack_linear = 1):
-        o2_send_cmd("/arco/dualslewb/attack", "Ufi", id, attack, attack_linear)
+    def set_attack(attack, optional attack_linear = true):
+        o2_send_cmd("/arco/dualslewb/attack", "Ufi",
+                    id, attack, 1 if attack_linear else 0)
 
-    def set_release(release, optional release_linear = 1):
+    def set_release(release, optional release_linear = true):
         o2_send_cmd("/arco/dualslewb/release", "Ufi",
-                         id, release, release_linear)
+                    id, release, 1 if release_linear else 0)
 
 
-def dualslewb(input, mode, optional chans = 1):
-    Dualslewb(chans, input, mode)  # dualslewb as a function
-
+def dualslewb(input, optional attack = 0.02, release = 0.02, current = 0,
+              chans = 1, keyword attack_linear = true, release_linear = true):
+# Dualslewb as a function
+    Dualslewb(chans, input, attack, release, current,
+              1 if attack_linear else 0, 1 if release_linear else 0) 

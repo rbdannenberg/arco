@@ -6,6 +6,7 @@
 # Roger B. Dannenberg
 # Oct 2023
 
+pizz_instr = nil
 
 class Pizz (Instrument):
     var mix, count, off, outgain
@@ -33,28 +34,45 @@ class Pizz (Instrument):
             var rp = recplay(zero_ugen, 1, 1)
             rp.set_speed(rate)
             rp.borrow(recplay)
-            mix.ins(mix_name(i), rp, pan_45(pr_unif(0.3, 0.7), gain))
-            sched_cause(delay, this, 'echo', rp, rate)
+            // rp.term() -- do not terminate because we reuse 4 rp's many until
+            // off is set to true (see end_all()). We clean up by explicitly
+            // fading and removing outgain and setting off to get rid of
+            // references to recplay's in scheduled events.
+            var name = mix_name(i)
+            mix.ins(name, rp, pan_45(pr_unif(0.3, 0.7), gain))
+            sched_cause(delay, this, 'echo', rp, rate, name)
         sched_cause(dur, this, 'end_all')
+        print "Pizz.init - ending in", dur, "secs"
         outgain = gain_control(mix, pizz_gain_sl)
+        outgain.trace()
         super.init("Pizz", outgain)
 
 
-    def echo(rp, rate):
+    def echo(rp, rate, name):
         if off:
+            print "Pizz.echo: off is set; removing recplay", name, "from mixer"
             count = count - 1
+            mix.rem(name)
         else:
+            print "Pizz.echo: (re)starting playback from", name
             rp.start(0)
-            sched_cause(6.7 / rate + random(), this, 'echo', rp, rate)
+            // Note: recording is 6.5 sec long (a constant in init.srp)
+            sched_cause(6.7 / rate + random(), this, 'echo', rp, rate, name)
 
 
     def end_all():
-        display "stopping Pizz", count
+        display "Pizz.end_all - ending Pizz", count
         off = true
         if count > 0:
+            print "    deferring ending until players finish playing"
             sched_cause(3, this, 'end_all')
         else:
             outgain.mute()
-            constrained_ugen_finish(outgain)
             outgain = nil
             // TODO: creator should remove references to this instance
+
+
+    def end_now():
+        print "Pizz.end_now: fading out in 0.1 sec"
+        outgain.fade(0.1)  // force fade-out
+        off = true

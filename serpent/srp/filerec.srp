@@ -9,7 +9,6 @@ def filerec(filename, input, optional chans = 2)
 
 
 class Filerec (Ugen):
-    var action_id
 
     def init(chans, filename, input):
         super.init(create_ugen_id(), "Filerec", chans, '', "sU",

@@ -6,37 +6,49 @@
 REVERB_COMBDELAY = [0.028049887, 0.031315193, 0.036439909,
                     0.040294785, 0.044195011, 0.046780045]
 
-REVERB_ALPASSDELAY = [143.6482085, 454.6391753, 621.1267606,
+REVERB_ALLPASSDELAY = [143.6482085, 454.6391753, 621.1267606,
                       832.0754717, 1422.580645]  // in Hz
-for hz at i in REVERB_ALPASSDELAY:
-    REVERB_ALPASSDELAY[i] = 1 / hz
+for hz at i in REVERB_ALLPASSDELAY:
+    REVERB_ALLPASSDELAY[i] = 1 / hz
     
 REVERB_DECAY = [0.822, 0.802, 0.773, 0.753, 0.753, 0.753]
 
 
 class Reverb (Instrument):
+# Simple 1-channel reverb for 1-channel input. To use a signal
+# for "wet", set "wet" to 1 (default) and build a separate mixer
+# to mix the wet and dry signals.
     var combs
-    var alpasses
-    var out
+    var allpasses
+    var lowpass
 
-    def init(input, rt60):
-        combs = array(len(REVERB_COMBDELAY))
-        alpasses = array(len(REVERB_ALPASSDELAY))
+    def init(input, rt60, wet, hz, optional chans):
+        if not chans and input.chans != 1:
+            display "WARNING: Reverb dropping channels of multi-channel input",
+            display        input
         instr_begin()
-        var acomball = mix(1)
+        combs = array(len(REVERB_COMBDELAY))
+        allpasses = array(len(REVERB_ALLPASSDELAY))
+        instr_begin()
+        var rvb = sum(1)
         for delay at i in REVERB_COMBDELAY:
             combs[i] = delay(input, delay,
                              exp(-6.9087 * delay / (rt60 * REVERB_DECAY[i])),
                              delay + 0.001)
-            acomball.ins(intern("comb" + str(i)), combs[i], 1.0)
+            rvb.ins(combs[i])
                          
-        out = acomball
-        for delay at i in REVERB_ALPASSDELAY:
-            out = alpass(out, delay, exp(-6.9087 * delay / (rt60 * 0.7)),
+        for delay at i in REVERB_ALLPASSDELAY:
+            rvb = allpass(rvb, delay, exp(-6.9087 * delay / (rt60 * 0.7)),
                          delay + 0.001)
-            alpasses[i] = out
-        out = lowpass(out, 9000.0)
-        super.init("Reverb", out)
+            allpasses[i] = rvb
+        lowpass = lowpass(rvb, 9000.0)
+        if wet != 1:
+            output = mix(1)
+            output.ins('dry', input, 1 - wet)
+            output.ins('wet', lowpass, wet)
+        else:
+            output = lowpass
+        super.init("Reverb", output)
 
 
     def set_input(input):
@@ -48,45 +60,187 @@ class Reverb (Instrument):
         for cb at i in combs:
             cb.set('fb', exp(-6.9087 * REVERB_COMBDELAY[i] /
                              (rt60 * REVERB_DECAY[i])))
-        for ap at i in alpasses:
-            ap.set('fb', exp(-6.9087 * REVERB_ALPASSDELAY[i] / (rt60 * 0.7)))
+        for ap at i in allpasses:
+            ap.set('fb', exp(-6.9087 * REVERB_ALLPASSDELAY[i] / (rt60 * 0.7)))
+
 
     def set_cutoff(freq):
-      out.set('cutoff', freq)
+      lowpass.set('cutoff', freq)
 
 
 
-def reverb(input, rt60): return Reverb(input, rt60)
+def reverb(input, rt60, optional wet = 1, hz = 10000):
+    return Reverb(input, rt60, wet, hz)
 
 
-class Stereo_reverb(Instrument):
-# Stereo_reverb takes in input, wet (reverb gain), and reverb time
-# It constructs two Reverb instruments and scales the gain and cutoff
-# of the right reverb by 1.1 to get slightly different output
-# The reverb outputs are assigned to left and right channels and the
-# input is added to form a stereo output. A mono input will be
-# duplicated, which will give it a boost in power.
 
-    var left, right, mix
-    
-    def init(input, wet, rt60):
-        left = Reverb(input, rt60)
-        right = Reverb(input, rt60)
-        mix = mix(2)
-        mix.ins('left', left, [wet, 0])
-        mix.ins('right', right, [0, wet])
-        mix.ins('input', input, [1, 1])
-        super.init("Stereo_reverb",  mix)
+RIGHT_GAIN = [0, 1]
 
-    def set_input(input):
-        left.set_input(input)
-        right.set_input(input)
+class Multi_reverb(Instrument):
+# Multi_reverb takes in input, reverb time, and wet (reverb gain).
+# It constructs one or two Reverb instruments and scales the delay
+# and cutoff of the right reverb by 1.1 to get slightly different
+# output. The reverbs (one or two) are added round-robin to the
+# output channels, as is the input. If there is only a mono input,
+# it is routed to both output reverbs and dry signal is routed to
+# all output channels, without attempting to get equal power output.
+# The same is true for M > 2 outputs, where 2 reverbs are duplicated
+# and routed round-robin to all outputs.
+#
+# A route is used for each reverb input to mix channels round-robin
+# down to left and right reverb, and another route is used to mix
+# mono reverbs round robin to the output channels along with
+# dry signals if wet != 1.
+#
+# Wet cannot be changed, but you can make a reverb with wet == 1 and
+# make your own mix of dry and wet signals.
+
+    var input
+    var dry_input
+    var reverbs
+    var reverb_inputs
+    var wet
+
+
+    def init(input_, rt60, wet_, hz, chans_):
+        // initially input is nil
+        chans = chans_
+        wet = wet_
+        // at this point, input is nil, so multi_init knows there is
+        // no previous input to remove:
+        multi_init(input_, rt60, wet, hz, chans)
+        input = input_
+        assert(output.chans == chans_)
+        super.init("Stereo_reverb",  output)
+
+
+    def connect_input(new_input):
+    # logic to route input channels to one or two reverbs. If reverbs
+    # exist, invoke .set_input() method(s) on reverb(s); otherwise, assume
+    # caller will create reverbs with initial inputs from reverb_inputs.
+    #
+    # Preconditions: if there are 1 or 2 route ugens as inputs to reverb(s),
+    # they are in reverb_inputs[] (and we can reuse them).
+    #                if set_input_flag, then the necessary reverbs exist
+        display "multi_reverb.connect_input", input, new_input, chans
+        if input:  // this is the previous input -- take out of routers
+            for ri in reverb_inputs:
+                ri.reminput(input)
+
+        var left_input = reverb_inputs[0]
+        var left_params = [new_input]
+        var right_input
+        var right_params
+        if chans == 1:  // case: multi in, mono out, sum input channels
+            for i = 0 to new_input.chans:
+                left_params.append(i).append(0)
+        else:           // case: mono in, multi out
+            right_input = reverb_inputs[1]  // input to 2 outs, round-robin
+            right_params = [new_input]
+            for i = 0 to new_input.chans:
+                if i % 2 == 0:
+                    left_params.append(i).append(0)
+                else:
+                    right_params.append(i).append(0)
+            if new_input.chans == 1:  // mono input goes to both reverbs
+                right_params.append(0).append(0)
+            sendapply(right_input, 'ins', right_params)
+        sendapply(left_input, 'ins', left_params)
+        if reverbs:
+            reverbs[0].set_input(left_input)
+            if chans > 1:
+                reverbs[1].set_input(right_input)
+
+
+    def connect_dry_inputs(new_input):
+    # logic to route input channels to output (with scaling by dry_gain)
+    # the multiplier that implements dry_gain and is routed to output
+    # channels is saved in dry_input so that if input is replaced, we
+    # can remove the previous dry_input from output
+        var dry_gain = 1 - wet
+        // remove old input from output router
+        display "connect_dry_inputs reminput on", output, input
+        if dry_input:
+            output.reminput(dry_input)
+
+        // route new_input channels to output channels here
+        dry_input = mult(new_input, dry_gain)
+        var params = [dry_input]
+        if new_input.chans == 1:  // if there is one input channel,
+            for i = 0 to chans:   // it is routed to all output channels
+                params.append(0).append(i)
+        else:  // send inputs to outputs round robin
+            for i = 0 to input.chans:
+                params.append(i).append(i % chans)
+        display "connect_dry_inputs setting connections to",
+        display         output, params, reverbs
+        sendapply(output, 'ins', params)
+
+            
+    def multi_init(input, rt60, wet, hz, chans):
+        display "multi_reverb.multi_init", input, chans
+        assert(input.chans >= 1 and chans >= 1)
+        // construct reverb input
+        var right
+        var left = route(1)
+        reverb_inputs = [left]
+        if chans > 1:
+            right = route(1)
+            reverb_inputs.append(right)
+        connect_input(input)  // build routes, do not set_input()'s
+        // note: connect_input does nothing here if input is mono
+        left = reverb(left, rt60, 1, hz)
+        reverbs = [left]
+        if chans > 1:
+            right = reverb(right, rt60 * 1.1, 1, hz * 1.1)
+            reverbs.append(right)
+        else:
+            right = nil
+
+        // now mix the output
+        output = route(chans)
+
+        if wet != 1:  // add in the inputs direct to outputs
+            # reassign left and right (wet) to scaled left and right
+            left = mult(left, wet)
+            if chans > 1:
+                right = mult(right, wet)
+            # also set up dry routes
+            connect_dry_inputs(input)
+
+        // assign reverbs round-robin to output channels
+        if chans > 1:  // multi-channel output
+            left_params = [left]
+            right_params = [right]
+            for i = 0 to chans:  // even from left; odd from right
+                if i % 2 == 0:
+                    left_params.append(0).append(i)
+                else:
+                    right_params.append(0).append(i)
+            sendapply(output, 'ins', left_params)
+            sendapply(output, 'ins', right_params)
+        else:  // only one reverb; must be one output channel
+            output.ins(left, 0, 0)
+
 
     def set_rt60(rt60)
-        left.set_rt60(rt60)
-        right.set_rt60(rt60)
+        for r in reverbs:
+            r.set_rt60(rt60)
 
     def set_cutoff(freq)
-        left.set_cutoff(freq)
-        right.set_cutoff(freq)
+        for r in reverbs:
+            r.set_cutoff(freq)
 
+    def set_input(new_input):
+        display "multi_reverb.set_input", input, new_input
+        connect_input(new_input)
+        if wet != 1:
+            connect_dry_inputs(new_input)
+        input = new_input  // remember so we can remove from routes later
+
+
+
+def multi_reverb(input, rt60, optional wet = 1, hz = 10000, chans):
+    if not chans:
+        chans = input.chans
+    Multi_reverb(input, rt60, wet, hz, chans)

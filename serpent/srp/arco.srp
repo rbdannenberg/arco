@@ -129,6 +129,8 @@ def set_arco_state(newstate):
             return false
     display "arco_state change to", newstate
     arco_state = newstate
+    if config_win:
+        config_win.set_state(arco_state)
     return true
 
 
@@ -186,8 +188,7 @@ def create_action(ugen, object, method, rest parameters):
     else:
         action_dict[next_action_id] = [action]
         ugen.action_id = next_action_id
-        o2_send_cmd("/arco/" + tolower(ugen.classname) + "/act", 0, "Ui",
-                    ugen.id, next_action_id)
+        o2_send_cmd("/arco/act", 0, "Ui", ugen.id, next_action_id)
         next_action_id = next_action_id + 1
     print "create_action for ugen", ugen.id, "action", ugen.action_id
 
@@ -662,6 +663,7 @@ class Ugen:
     var chans // output channels
     var rate // output rate: A_RATE or B_RATE
     var inputs  // dictionary of inputs
+    var action_id  // key to action_dict to get action_list
 
     # init installs Ugen in table if id is not nil.  If id is nil,
     # no_msg should be true (to suppress /arco/*/new message -- see below).
@@ -777,7 +779,15 @@ class Ugen:
 
 
     def fade_in(dur, keyword mode = FADE_SMOOTH, term = true):
-    # fade from 0 to 1, then disconnect fader
+    # -- fade from 0 to 1, then disconnect fader. This ugen must
+    # *not* be connected to output_ugen (i.e. .play() has not
+    # been called. On return, this ugen will be connected
+    # through a fader to output_ugen and starting to fade in.
+    # After the fade-in, the fader will be removed and this
+    # ugen will be connected directly to output_ugen. During
+    # the fade-in or after the fade-in, you can call the
+    # fade method to fade back out and remove this ugen from
+    # the output_ugen.
         var fader = fader(this, 0, dur, 1, mode = mode)
         if term: fader.term()
         fade_in_lookup[this] = fader
@@ -788,7 +798,9 @@ class Ugen:
 
     def smooth_disconnect(input_name, ugen, fade_time):
     # fade to nothing over fade_time (seconds); then disconnect from
-    # some unit generator at fade_time + 0.1.
+    # some unit generator at fade_time + 0.1. This must be connected
+    # to ugen, which must support a call to the set method as follows:
+    #         ugen.set(input_name, zero_ugen)
         var faded = fader(this, 1, 1).set_dur(fade_time).set_goal(0)
         ugen.set(input_name, faded)
         sched_select(rtsched)
@@ -841,7 +853,7 @@ class Ugen:
 
     def atend(action, optional arg):
     # When this unit generator ends, action will be sent to this or, if
-    # provided, to arg, which in either case must handle /arco/<class>/act
+    # provided, to arg, which in either case must handle /arco/act
     # which is currently handled by Pwlb and Fileplay classes.
         if action == MUTE or action == FINISH:
             create_action(this, arg if arg else this, action)
@@ -850,6 +862,10 @@ class Ugen:
 
     def term(optional dur = 0):
         o2_send_cmd("/arco/term", 0, "Uf", id, dur)
+        this
+
+    def trace(optional trace_flag = true):
+        o2_send_cmd("/arco/trace", 0, "Ui", id, 1 if trace_flag else 0)
         this
 
 
@@ -915,9 +931,11 @@ class Instrument (Ugen):
                    no_msg = true)
         output = ugen
         id = output.id
+        if len(instr_stack) == 0:
+            error("instr_stack is empty. Maybe you forgot to call " +
+                  "instr_begin() at the beginning of your Instrument " +
+                  "subclass's init() function")
         parameter_bindings = instr_stack.unappend()
-        for key in parameter_bindings.keys():
-            var ug = parameter_bindings[key]
 
 
     def get(input):

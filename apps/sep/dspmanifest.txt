@@ -14,7 +14,7 @@ fileplay
 filerec
 recplay
 delay
-alpass
+allpass
 olapitchshift
 feedback
 trig

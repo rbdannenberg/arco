@@ -29,7 +29,7 @@ methods often include the forms:
    (the input "value" is an integer ID for another object).
 
 ### Creating and Updating a Ugen
-To create a Ugen:
+To create a Ugen (see also the next subsection , "Serpent"):
 ````
 /arco/fmosc/new ID chans input1 input2 ...
 ````
@@ -95,6 +95,21 @@ replace command:
 /arco/fmosc/repl_freq ID freqID
 ```
 where freqID is the ID of the replacement input.
+
+### Serpent
+
+In Serpent, use the class name, in lower case, as a constructor
+function. The result is an object that is an instance of a subclass
+of Ugen that serves to represent Arco unit generators. E.g.
+`fmosc(pitch, fmod, env)` creates an instance of `Fmosc`. With few
+exceptions, you work with these `Ugen` objects and should never
+make direct access to Arco unit generator IDs. To modify an input,
+use `set(name, value)` where `name` is a symbol (symbol literals
+use single quotes), e.g. `'freq'` and `value` is a number, an
+array of numbers (multi-channel constants) or a Ugen. For many
+unit generators, there are also special methods such as
+`set_dur(dur)` that modify unit generator parameters that are not
+input signals. See Section "General Methods" below for more.
 
 ### More Details
 
@@ -168,7 +183,7 @@ does not affect other uses, such as connecting `ugen` to a mixer
 (see `mix()`).
 
 ### ugen.get(name)
-Unit generators have named inputs. E.g. the `alpass` ugen has
+Unit generators have named inputs. E.g. the `allpass` ugen has
 inputs named `'input'`, `'dur'`, and `'fb'`. You can retrieve the
 input with this method. Note that for c-rate (`Const`) inputs, this
 method will return the Const object, not the constant value(s).
@@ -204,49 +219,47 @@ which should be implemented by the receiving object (`this` or `arg`).
 
 ### ugen.term([tail])
 Sets the `CAN_TERMINATE` flag true and sets `tail_blocks` to a count
-corresponding to `tail` seconds (unless the `TERMINATING` flag is true).
-When this unit generator ends, it will set `TERMINATING` and after
-running for `tail_blocks` more blocks, it will set its `TERMINATED`
-flag. Typically, this is applied to signal generators such as `pwl`,
-`pwe` and `recplay` (when playing). The `TERMINATED` flag propagates
-through filters, multipliers, etc., to 
+corresponding to `tail` seconds (unless the `TERMINATING` flag is
+already true). When this unit generator ends, it will set
+`TERMINATING` and after running for `tail_blocks` more blocks, it
+will set its `TERMINATED` flag. `CAN_TERMINATE` is the default for
+most unit generators so that `TERMINATED` will propagate from
+input signals to consumers. `CAN_TERMINATE` is *not* the default for
+signal generators such as `pwl`, `pwe` and `recplay` (when playing).
+Thus, you can typically mark only the determining unit generator
+such as an envelope by claling its `.term` method in order to
+cause an entire sound to terminate. When an input to a `Sum` or
+`Mix` terminates, the input is automatically removed, so the
+typical application of `.term` is to indicate that when an
+envelope completes, the sound it modulates (e.g. using a `Mult`)
+should be detached from a mix or sum, and through reference
+counting, the entire sound should be freed.
 
+In addition to the possibility of releasing a tree of unit
+generators, any `atend` action is performed when `TERMINATED`
+becomes set, so you can use `ugen.atend(FINISH, target)` to
+run the `.finish` method of any object upon the termination
+of `ugen`.
+
+### ugen.trace(bool)
+Sets the `UGENTRACE` flag of a unit generator. When the flag is
+set, the unit generator description is printed. When the unit
+generator is freed, the description is printed again. The main
+application is to confirm that unit generators are properly
+freed. Unit generators may log other information to assist
+with debugging and testing tasks.
 
 ## Unit Generators and Messages
 
 In each section, Serpent constructor and methods are listed in
 **`bold`** followed by `O2 message formats`.
 
-### add, addb
+### allpass
 ```
-add([chans], wrap = true)
-.ins(ugen)
-.rem(ugen)
-.set_gain(gain)
+allpass(input, dur, fb, maxdur [, chans])
 ```
 
-`/arco/add/new id chans wrap` -- Create a new add unit generator.
-If `wrap` is zero, extra input channels are deleted. Otherwise,
-input channels are "wrapped" around output channels as in `mix`.
-If there is one input channel, it is added to the first output
-channel only, not duplicated to all output channels.
-
-`/arco/add/ins id ugen_id` -- Insert unit generator with id
-`ugen_id` into this adder.
-
-`/arco/add/rem id ugen_id` -- Remove unit generator with id
-`ugen_id` from this adder.
-
-`/arco/add/set_gain id gain` -- Set an overall gain applied to
-the sum of inputs. Changes to gain are smoothed.
-
-
-### alpass
-```
-alpass(input, dur, fb, maxdur [, chans])
-```
-
-`/arco/alpass/new id chans input dur fb maxdur` - Create a new alpass
+`/arco/allpass/new id chans input dur fb maxdur` - Create a new allpass
 unit generator with audio input and output. All channels have the same
 maximum duration (`maxdur`), but each channel can have a different
 delay (`dur`) and feedback (`fb`). `id` is the object id. This is
@@ -255,21 +268,21 @@ frequency has the same gain. If the desired control parameters are
 frequency (in Hz) and decay time (T60, in seconds), set `dur` to 1 /
 *hz* and set `fb` (feedback) to `exp(-6.9087 * dur / decay_time)`
 
-`/arco/alpass/max id dur` - Reallocates delay memory for a maximum
+`/arco/allpass/max id dur` - Reallocates delay memory for a maximum
 duration of `dur`.
 
-`/arco/alpass/repl_input id input_id` - Set input to object with
+`/arco/allpass/repl_input id input_id` - Set input to object with
 id `input_id`.
 
-`/arco/alpass/repl_dur id dur_id` - Set duration input to object with
+`/arco/allpass/repl_dur id dur_id` - Set duration input to object with
 id `dur_id`.
 
-`/arco/alpass/set_dur id chan dur` - Set duration to a float value
+`/arco/allpass/set_dur id chan dur` - Set duration to a float value
 `dur`.
 
-`/arco/alpass/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
+`/arco/allpass/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
-`/arco/alpass/set_fb id chan fb` - Set feedback to float value `fb`.
+`/arco/allpass/set_fb id chan fb` - Set feedback to float value `fb`.
 
 ### const
 ```
@@ -345,21 +358,30 @@ alternate value after selecting mode LOWPASS500 or LOWPASS100.
 
 ### dualslewb
 ```
-dualslewb(input, attack, [, decay] [, attack_linear] [, release_linear]
-          [, chans])
+dualslewb(input, [, attack] [, release] [, current] [, chans]
+          [, attack_linear = true] [, release_linear = true])
+          -- defaults are attack = 0.02, release = 0.02,
+             current = true, chans = 1; note that attack_linear
+             and release_linear are keyword parameters.
+.set_current(current)
+.set_attack(attack [, attack_linear]) -- defaults to true
+.set_release(attack [, release_linear]) -- defaults to true
 ```
 
-`/arco/dualslewb/new id chans input attack release attack_linear`
-`    release_linear` - create a slew-rate limiter that smooths the
-input by limiting the slope. There are separate parameters for upward
-and downward slopes, specified by attack (time in seconds) and
-release (time in seconds). The limiter can also use exponential
-curves, in which case, attack and release are times needed to slew
-from 0 to 1. (A bias of 0.01 is used so that exponential curves can
-decay all the way to zero.) Control the shape (linear or non-linear)
-with the parameters `attack_linear` and `release_linear`, which are
-1 for linear and 0 for exponential. Any negative input is considered
-to be zero and output is strictly non-negative.
+`/arco/dualslewb/new id chans input attack release current`
+`     attack_linear release_linear` - create a slew-rate limiter
+that smooths the input by limiting the slope. There are separate
+parameters for upward and downward slopes, specified by attack (time
+in seconds) and release (time in seconds). The limiter can also use
+exponential curves, in which case, attack and release are times needed
+to slew from 0 to 1. (A bias of 0.01 is used so that exponential
+curves can decay all the way to zero.) Control the shape (linear or
+non-linear) with the parameters `attack_linear` and `release_linear`,
+which are 1 for linear and 0 for exponential. Any negative input is
+considered to be zero and output is strictly non-negative. The initial
+output value is given by `current`. Note that the parameters `attack`,
+`release`, `attack_linear`, and `release_linear` are not signals and
+apply to all channels in multi-channel instances.
 
 `/arco/dualslewb/set_attack id attack attack_linear` - Change the
 `attack` and `attack_linear` control parameters.
@@ -1024,8 +1046,10 @@ ratio. Greater than 1 means raise the pitch.
 ### pwe, pweb
 ```
 pwe(d0, y0, d1, y1, ..., [init=0], [start=true])
+    -- d0 through dn are specified in seconds relative to start
 .set_points(d0, y0, d1, y1, ...)
 .start()
+.stop()
 .decay(dur)
 .set(y)
 ```
@@ -1051,7 +1075,18 @@ audio output. `id` is the object id. Envelope does not start until
 function shape for object with id. All remaining parameters are
 floats, alternating segment durations (in samples) and segment final
 values. The envelope starts at the current output value and ends at
-yn-1 (defaults to 0).  `/arco/pwe/start id` - starts object with id.
+yn-1 (defaults to 0). (Note that the Serpent api specified di in
+seconds from the beginning, while the O2 message specifies di in
+samples between one breakpoint and the next.)
+
+`/arco/pwe/start id` - starts object with id.
+
+`/arco/pwe/stop id` - stops the envelope at the current value. A new
+envelope can be optionally specified. Next, the envelope can be started
+(with `start`), which will follow the current envelope breakpoints,
+starting with the current value. Alternatively, `decay` can be used to
+fade to zero (without replacing the current envelope). You can also
+use `set` to change the envelope output value discontinuously.
 
 `/arco/pwe/decay id dur` - decay from the current value of object with
 id to zero in `dur` (int32) blocks.
@@ -1070,6 +1105,7 @@ same except the address begins with `/arco/pweb/`.
 pwl(d0, y0, d1, y1, ..., [init=0], [start=true])
 .set_points(d0, y0, d1, y1, ...)
 .start()
+.stop()
 .decay(dur)
 .set(y)
 ```
@@ -1084,6 +1120,13 @@ values. The envelope starts at the current output value and ends at
 yn-1 (defaults to 0).
 
 `/arco/pwl/start id` - starts object with id.
+
+`/arco/pwl/stop id` - stops the envelope at the current value. A new
+envelope can be optionally specified. Next, the envelope can be started
+(with `start`), which will follow the current envelope breakpoints,
+starting with the current value. Alternatively, `decay` can be used to
+fade to zero (without replacing the current envelope). You can also
+use `set` to change the envelope output value discontinuously.
 
 `/arco/pwl/decay id dur` - decay from the current value of object with
 id to zero in `dur` samples.
@@ -1182,31 +1225,42 @@ channel `chan` to float value `bandwidth_id`.
 
 ### route
 ```
-route(input, chan)  // chan is integer channel or 
-                    // array of channel numbers
-.set_routes(chan)   // chan is integer or array
-.set_route(output_chan, input_chan)
+route([chans])
+.ins(input, src, dst [, src, dst]*)  // route from src to dst channel
+.rem(input, src, dst [, src, dst]*)  // remove routes from src to dst
+.reminput(input)  // remove all routes from this input
 ```
-A `route` provides a sort of patch bay to route input chnanels to
-output channels. The input can have an arbitrary number of channels.
-There is a fan-out of N: input channels can be replicated to multiple
-output channels. The fan-in is 1: an output channel cannot mix inputs.
+A `route` is similar to `sum`, but it provides a sort of patch bay
+to route input chnanels to output channels. The inputs can have an
+arbitrary number of channels and each channel has fan-out and can
+be connected to any number of output channels. Output channels have
+fan-in and can be the sum of any number of inputs.
 
-`/arco/route/new id input_id chan0 chan1 ...` - Create a new route
-ugen with input from `input_id`. The number of `chan` parameters
-determines the number of output channels. Each `chani` indicates
-the source channel. If the source channel does not exist, zero is
-output, so -1 can be used to indicate output silence on that channel.
+Implementation: For each output channel, there is a list of sources,
+each of which points to a sample buffer. The list is never empty,
+and if there are no designated inputs, the list has one input that
+points to the output of the system Zero ugen. There is also a list of
+inputs (not including Zero).
 
-`/arco/route/routes id chan0 chan1 ...` - Set new routing info.
-The number of output channels is not changed. Extra parameters are
-ignored. Missing parameters result in no change to the mapping for
-the missing channels.
+If an input terminates, it is removed entirely.
 
-`/arco/route/route id outchan inchan` - Route `inchan` to `outchan`,
-leaving other routes unaltered.
 
-`/arco/route/repl_input id input` - Replace the current input with `input`.
+`/arco/route/new id chans` - Create a new route ugen with the given
+number of channels.
+
+`/arco/route/ins id input src0 dst0 src1 dst1 ...` - Set new routing
+info. Routes are specified in pairs of source channel (a channel of
+`input` and destination channel (a channel of the output). Routes to
+non-existing channels are ignored.  The same input can be passed
+multiple times, e.g. to connect different channels to different
+outputs. Duplicate routes (same input, source and destination)
+are ignored.
+
+
+`/arco/route/rem id input src0 dst0 src1 dst1 ...` - Remove routes.
+
+`/arco/route/reminput id input` - Remove all routes from all channels
+of input.
 
 
 ### sine, sineb
@@ -1259,6 +1313,31 @@ smoothly.)
 
 `/arco/smoothb/cutoff id cutoff` - set the cuoff frequency of the filter
 (same cutoff for all channels).
+
+### sum, sumb
+```
+sum([chans], wrap = true)
+.ins(ugen)
+.rem(ugen)
+.set_gain(gain)
+```
+
+`/arco/sum/new id chans wrap` -- Create a new sum unit generator.
+If `wrap` is zero, extra input channels are deleted. Otherwise,
+input channels are "wrapped" around output channels as in `mix`.
+If there is one input channel, it is added to the first output
+channel only, not duplicated to all output channels.
+
+`/arco/sum/ins id ugen_id` -- Insert unit generator with id
+`ugen_id` into this adder. If ugen_id is already being added,
+this message is ignored.
+
+`/arco/sum/rem id ugen_id` -- Remove unit generator with id
+`ugen_id` from this adder.
+
+`/arco/sum/set_gain id gain` -- Set an overall gain applied to
+the sum of inputs. Changes to gain are smoothed.
+
 
 ### thru, fanout
 ```
@@ -1317,9 +1396,17 @@ audio.
 overlapping frames with square windows. The frame size is `window` (in
 samples, rounded up to a  multiple of BL). It the input is
 multi-channel, the channels are summed before taking the RMS. When the
-RMS crosses threshold, a message is sent to `repl_addr` with the type
-string "i" and the unit generator `id`. After the message is sent,
-analysis pauses for `pause` seconds.
+RMS crosses threshold in the positive direction, a message is sent to
+`repl_addr` with the type string "i" and the unit generator `id`.
+After the message is sent, analysis pauses for `pause` seconds. Then,
+analysis starts after the next full window of input, and the next
+trigger will be sent when the RMS (again) crosses the threshold.
+Trigger detection is always enabled, but set a very high threshold to
+avoid actually detecting anything. Since there is no signal output or
+downstream dependent, you *must* add a trig to the run set to cause
+processing to happen. You can remove from the run set to disable
+processing. (See `/arco/run` and `/arco/unrun`.)
+
 
 `/arco/trig/onoff id repl_addr threshold runlen` - A `trig` can also
 report on sound vs. silence by sending messages when the sound goes

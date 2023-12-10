@@ -18,7 +18,7 @@ print "INCLUDING fader.srp"
 fade_in_lookup = {}  // maps ugen to its fader
 
 
-def fader(input, current,  optional dur, goal, chans,
+def fader(input, current, optional dur, goal, chans,
           keyword mode = FADE_SMOOTH):
 # Create a Fader, with optional intialization. Example:
 #     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
