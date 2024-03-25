@@ -17,12 +17,19 @@ require "points"
 require "pizz"
 require "melo"
 require "fast"
+require "gliss"
 require "pan"
+require "mididevice"
+require "midicontrol"
+
 
 MUSIC_PATH = "/Users/rbd/Music/separation-logic/"
 
 SHOWTRIG_X = 280
 SHOWTRIG_Y = 360
+
+
+pizz_rec_obj = nil  // global used to check for recording
 
 
 # Sound files for testing:
@@ -45,10 +52,11 @@ audioinput_files = [
         "singtone.wav", // sung tone steady
         "whistle.wav",  // whistle tones at end
         "long.wav",     // long melody at end
-        "air-only.wav"  // just air tones from 1-air.wav used at end
+        "air-only2.wav"  // air tones from end of a recording
         ]
 
 arco_set_input_files(audioinput_files)
+
 
 def play_into_input_from(name):
     var fullname = MUSIC_PATH + name
@@ -58,6 +66,10 @@ def play_into_input_from(name):
 def main():
     arco_init(latency = 10, network = false, title = "Separation Logic",
               appname = "sep")
+    display "main", prefs
+    midi_devices = Midi_devices(prefs, open_later = true)
+    midi_devices.open_midi(device = 'midi_in_device')
+    display "main", prefs, midi_devices.success, midi_devices.in_dev, midi_devices.out_dev
     arco_run()
 
 
@@ -91,6 +103,7 @@ def arco_ready():
     air_mgr = Air_mgr()
     sep_cue = Sep_cue()
     fast_mgr = Fast_mgr()
+    gliss_mgr = Gliss_mgr()
     trigger_mgr = Trigger_mgr(default_window, SHOWTRIG_X, SHOWTRIG_Y)
     win.fit_to_children()
 
@@ -159,7 +172,8 @@ class Trigger_mgr:
 # stop_onoff when done
 
     var running  // tells us if we are connected
-    var trigger_mode  // 'start' for trigger, 'fast' for onoff detect
+    var trigger_mode  // 'start' for trigger at start, 'fast' for onoff detect,
+                      // 'gliss' for trigger in gliss
     var trig_ugen  // the unit generator
     var on_or_off  // 0 or 1 reflecting state from trig_ugen
 
@@ -176,12 +190,12 @@ class Trigger_mgr:
         on_or_off = 0
 
 
-    def start_trigger():
-        display "Trigger_mgr.start_trigger"
-        if trigger_mode == 'fast':
+    def start_trigger(mode):
+        display "Trigger_mgr.start_trigger", mode
+        if trigger_mode and trigger_mode != mode:
             stop_onoff()
         trig_ugen.set_threshold(0.01)
-        trigger_mode = 'start'
+        trigger_mode = mode
         enable()
 
 
@@ -192,12 +206,12 @@ class Trigger_mgr:
         disable()
         
 
-    def start_onoff(optional runlen = 0.001):
-        display "Trigger_mgr.start_onoff"
-        if trigger_mode == 'start' or trigger_mode == 'gliss':
+    def start_onoff(mode, optional runlen = 0.001):
+        display "Trigger_mgr.start_onoff", mode
+        if trigger_mode and trigger_mode != mode:
            stop_trigger()
         trig_ugen.onoff("/actl/onoff", 0.02, runlen)
-        trigger_mode = 'fast'
+        trigger_mode = mode
         enable()
 
 
@@ -216,7 +230,6 @@ class Trigger_mgr:
             air_mgr.trigger()
             trigger_mode = nil
         elif trigger_mode == 'gliss':
-#TODO: gliss_mgr
             gliss_mgr.gliss_action()
 
 
@@ -231,18 +244,18 @@ class Trigger_mgr:
 
     def enable()
         if running:
-            print "ERROR: trigger is already running"
-            breakpoint()
+            print "WARNING: trigger is already running"
         else:
+            print "Trigger_mgr.enable: trig_ugen.run()"
             trig_ugen.run()
             running = true
 
 
     def disable()
         if not running:
-            print "ERROR: Trigger_mgr.disable: trigger is not running"
-            breakpoint()
+            print "WARNING: Trigger_mgr.disable: trigger is not running"
         else:
+            print "Trigger_mgr.disable: trig_ugen.unrun()"
             trig_ugen.unrun()
             running = false
 
@@ -274,7 +287,10 @@ cue_to_file_name = { CUE_START: "1-air.wav",
                      CUE_PIZZ: "3-pizz.wav",
                      CUE_MELO: "4-melody.wav",
                      CUE_FAST: "5-fast-a.wav",
-                     CUE_ENABLE2: "5-fast-c.wav"}
+                     CUE_ENABLE2: "5-fast-c.wav",
+                     CUE_GLISS: "long.wav",
+                     CUE_WHISTLE: "whistle.wav",
+                     CUE_AIR: "air-only2.wav" }
 
 fast_file_names = ["5-fast-a.wav", "5-fast-b.wav", "5-fast-c.wav",
                    "5-fast-d.wav", "5-fast-e.wav", "5-fast-b.wav", 
@@ -287,13 +303,16 @@ class Cue_buttons:
         make_button(CUE_PIZZ, 'cue_b_btn', 'cue_b')
         make_button(CUE_MELO, 'cue_c_btn', 'cue_c')
         make_button(CUE_FAST, 'cue_d_btn', 'cue_d')
+        make_button(CUE_GLISS, 'cue_f_btn', 'cue_f')
+        make_button(CUE_WHISTLE, 'cue_i_btn', 'cue_i')
+        make_button(CUE_AIR, 'cue_j_btn', 'cue_j')
 
 
     def make_button(i, varname, method, keyword x = 'S', y = 'D'):
         Button(default_window, sep_cue_to_string[i], x, y, 20, 20, varname).
                 add_target_method(this, method)
         wxs_x = wxs_x + 25  // move right for descriptive text
-        Statictext(default_window, sep_cue_to_descr[i], 'S', 'S', 50, 20)
+        Statictext(default_window, sep_cue_to_descr[i], 'S', 'S', 60, 20)
         wxs_x = wxs_x - 25  // move back to button position
         
 
@@ -313,6 +332,14 @@ class Cue_buttons:
     def cue_d(rest ignore):
         sep_cue.set_cue_num(CUE_FAST)
 
+    def cue_f(rest ignore):
+        sep_cue.set_cue_num(CUE_GLISS)
+
+    def cue_i(rest ignore):
+        sep_cue.set_cue_num(CUE_WHISTLE)
+
+    def cue_j(rest ignore):
+        sep_cue.set_cue_num(CUE_AIR)
 
 
 class Sep_cue:
@@ -372,7 +399,7 @@ class Sep_cue:
         // ------- these changes are installed regardless of how we get to the cue:
         if cue_num == CUE_START:
             print "Setting up trigger for CUE_START cue"
-            trigger_mgr.start_trigger()   // enables "air" section
+            trigger_mgr.start_trigger('start')   // enables "air" section
         elif cue_num == CUE_POINTS:
             trigger_mgr.stop_trigger()
             points_mgr = Points_mgr()
@@ -380,29 +407,60 @@ class Sep_cue:
             if points_mgr:
                 points_mgr.stop_recording()
             pizz_rec_obj = Pizz_rec()
-            pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5, 75)
+            pizz_instr = Pizz(pizz_rec_obj.recplay, 4, 1.5, 3, -1.5, 75,
+                              pizz_gain_sl)
             pizz_instr.play()
         elif cue_num == CUE_MELO:
             melo_mgr= Melo_mgr()
         elif cue_num == CUE_FAST:
-            fast_mgr.start()
-            // shut down air, points, pizz, melo if running
-            if air_mgr:
-                air_mgr.finish()
-                air_mgr = nil
-            if points_mgr:
-                points_mgr.finish()
-                points_mgr = nil
-            if pizz_instr:
-                pizz_instr.fade(0.5)
-                pizz_instr = nil
-            if melo_mgr:
-                melo_mgr.stop()
-                melo_mgr = nil
+            start_cue_fast()
         elif cue_num == CUE_ENABLE2:
-            fast_mgr.cycles_control(true, false)
-            fast_mgr.enable2(true)                
+            start_cue_fast()
+            // fast_mgr.cycles_control(true, false)
+            // fast_mgr.enable2(true)                
+            fast_mgr.start2()
+        elif cue_num == CUE_GLISS:
+            fast_mgr.finish()   // safe even if not started
+            gliss_mgr.start()
+            sched_select(rtsched)
+            sched_cause(30, this, 'pizz_rep')
+        elif cue_num == CUE_GLISSUP:
+            gliss_mgr.gliss_rate = -20
+        elif cue_num == CUE_GLISSNORM:
+            gliss_mgr.gliss_rate = 4
+        elif cue_num == CUE_WHISTLE:
+            print "CUE_WHISTLE in set_cue_num"
+            // if necessary, set gliss_mgr to the state of CUE_GLISSNORM
+            gliss_mgr.start()
+            gliss_mgr.gliss_rate = 4
+        elif cue_num == CUE_AIR:
+            gliss_mgr.finish()
+            print "CUE_AIR in set_cue_num"
+            start_cue_fast(false)
+            fast_mgr.reverb_gain.set_points(0.5, 0.03)
+        elif cue_num == CUE_END:
+            fast_mgr.finish()
+            fast_mgr = nil
 
+            
+    def start_cue_fast(optional trigger_enable = true):
+        if not fast_mgr.started:
+            fast_mgr.start(trigger_enable)
+        // shut down air, points, pizz, melo if running
+        if air_mgr:
+            air_mgr.finish()
+            air_mgr = nil
+        if points_mgr:
+            points_mgr.finish()
+            points_mgr = nil
+        if pizz_instr:
+            pizz_instr.fade(0.5)
+            pizz_instr = nil
+        if melo_mgr:
+            melo_mgr.stop()
+            melo_mgr = nil
+
+    
 
     def sep_advance(rest ignore):
 //        print "*** sep_advance turning on trace ***"
@@ -426,29 +484,19 @@ class Sep_cue:
         elif cue_num == CUE_FAST:
             nil
         elif cue_num == CUE_ENABLE2:
-            fast_instr = Fast()
-            fast.play()
+            nil
         elif cue_num == CUE_GLISS:
-            simulator.cycles_control(false, false)
-
-#TODO: fix:
-
-            audio_server <- fast(false)
-            audio_server <- gliss(true)
-            rtsched.start_use()
-            rtsched.cause(30, this, 'pizz_rep')
-            rtsched.finish_use()
+            nil
         elif cue_num == CUE_GLISSUP:
-            audio_server <- set_gliss_rate(-20)
+            nil
         elif cue_num == CUE_GLISSNORM:
-            audio_server <- set_gliss_rate(4)
+            nil
         elif cue_num == CUE_WHISTLE:
             nil // do nothing here!
         elif cue_num == CUE_AIR:
-            simulator.cycles_control(true, true)
-            audio_server <- wet(0.03)
+            nil
         elif cue_num == CUE_END:
-            audio_server <- endit()
+            nil
         else:
             simulator.cycles_control(false, true)
             print "WARNING: sep_advace: unknown cue"
@@ -463,8 +511,12 @@ class Sep_cue:
 
 
     def pizz_rep():
-        pizz_rep_instr = Pizz(pizz_rec_obj.recplay, 48, 1, 6.4, -0.8,
-                              pizzrep_gain, 105)
+        if not pizz_rec_obj:
+            print "####### WARNING: cannot reprise pizz without a recording"
+            print "        Was 'B - Pizz' skipped?"
+            return
+        pizz_rep_instr = Pizz(pizz_rec_obj.recplay, 48, 1, 6.4, -0.8, 105,
+                              pizzrep_gain_sl)
         pizz_rep_rev = multi_reverb(pizz_rep_instr, 3, 0.02, 2)
         pizz_rep_rev.play()
 
@@ -503,7 +555,7 @@ class Pizz_rec:
 //declare_msg_type('set_ending_gain', "d")
 
 SLIDER_NAMES = ["0 - Intro", "A - Points", "B - Pizz",
-                "C - Melody", "D - Riffs", "D - Extra", "E - Droop",
+                "C - Melody", "D - Riffs", "E - Extra", "F - Droop",
                 "Pizz-rep", "Ending"]
 
 SLIDER_SYMBOLS = ['intro_gain_sl', 'points_gain_sl',

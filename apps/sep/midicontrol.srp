@@ -1,0 +1,39 @@
+# midicontrol.srp -- control Separation Logic from MIDI pedals
+
+class Midicontrol (Midi_handler_default):
+    def sep_advance():
+        if sep_cue:
+            sep_cue.sep_advance()
+        
+    def noteon(ch, p, v):
+        print "midicontrol: noteon", ch, p, v
+        sep_advance()
+
+    def noteoff(ch, p, v):
+        print "midicontrol: noteoff ignored", ch, p, v
+
+    def pedup(ch):
+        print "midicontrol: pedup ignored", ch
+
+    def peddown(ch):
+        print "midicontrol: peddown", ch
+        sep_advance()
+
+    def control(ch, c, val):
+        if c == 64:
+            if val < 64:
+                ped_up(ch)
+            else
+                ped_down(ch)
+        elif c < 64:
+            print "midicontrol: continuous control ignored", ch, c, val
+        else:
+            print "midicontrol: control", ch, c, val
+            sep_advance()
+
+    def program(ch, val):
+        print "midicontrol: program", ch, val
+        sep_advance()
+
+
+midi_handler = Midicontrol()

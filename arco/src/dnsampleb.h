@@ -165,7 +165,7 @@ public:
 
 
     void real_run() {
-        Sample_ptr input_samps = input->run(current_block); // update input
+        input_samps = input->run(current_block); // update input
         if (input->flags & TERMINATED) {
             terminate();
         }

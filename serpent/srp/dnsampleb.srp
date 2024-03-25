@@ -5,7 +5,7 @@
 
 class Dnsampleb(Ugen):
     def init(chans, input, mode):
-        super.init(create_ugen_id(), "Dnsampleb", chans, 'b', "UUf",
+        super.init(create_ugen_id(), "Dnsampleb", chans, 'b', "Uf",
 	           'input', input, 'mode', mode)
 
     def set_cutoff(hz):

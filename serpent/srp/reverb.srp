@@ -170,7 +170,7 @@ class Multi_reverb(Instrument):
             for i = 0 to chans:   // it is routed to all output channels
                 params.append(0).append(i)
         else:  // send inputs to outputs round robin
-            for i = 0 to input.chans:
+            for i = 0 to new_input.chans:
                 params.append(i).append(i % chans)
         display "connect_dry_inputs setting connections to",
         display         output, params, reverbs

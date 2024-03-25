@@ -115,8 +115,8 @@ static void trig_init()
                     true);
     o2sm_method_new("/arco/trig/onoff", "isff", arco_trig_onoff, NULL, true,
                     true);
-    o2sm_method_new("/arco/trig/repl_input", "ii", arco_trig_repl_input, NULL,
-                    true, true);
+    o2sm_method_new("/arco/trig/repl_input", "ii", arco_trig_repl_input,
+                    NULL, true, true);
     o2sm_method_new("/arco/trig/window", "ii", arco_trig_window, NULL, true,
                     true);
     o2sm_method_new("/arco/trig/thresh", "if", arco_trig_thresh, NULL, true,

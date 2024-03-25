@@ -996,7 +996,7 @@ class Trig(Ugen):
         o2_send_cmd("/arco/trig/threshold", 0, "Uf", id, threshold)
         this
 
-    def set_threshold(pause):
+    def set_pause(pause):
         o2_send_cmd("/arco/trig/pause", 0, "Uf", id, pause)
         this
 

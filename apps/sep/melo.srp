@@ -31,6 +31,10 @@ class Melo_mgr:
 
 
     def echo(name):
+        if not recplay:
+            print "##### WARNING: Melo.echo has no recplay buffer to play!!"
+            print "      No echo/delayed recording will be played"
+            return
         var rp = recplay(zero_ugen, 1, 1)
         rp.borrow(recplay)
         mix.ins(name, rp, pan_45(random()))
@@ -38,13 +42,14 @@ class Melo_mgr:
 
 
     def stop_recording():
-        recplay.record(false)
-        recplay.unrun()
+        if recplay:  // maybe we are stopped already!
+            recplay.record(false)
+            recplay.unrun()
 
 
     def stop():
-        recplay = nil
-        mix = nil
-        outgain.fade(1)
-        outgain = nil  // free the constraint
-
+        if outgain:  // started and not stopped already
+            recplay = nil
+            mix = nil
+            outgain.fade(1)
+            outgain = nil  // free the constraint

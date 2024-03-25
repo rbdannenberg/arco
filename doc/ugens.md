@@ -1397,7 +1397,8 @@ overlapping frames with square windows. The frame size is `window` (in
 samples, rounded up to a  multiple of BL). It the input is
 multi-channel, the channels are summed before taking the RMS. When the
 RMS crosses threshold in the positive direction, a message is sent to
-`repl_addr` with the type string "i" and the unit generator `id`.
+`repl_addr` with the type string "if", the unit generator `id`, and
+the rms value that crossed the threshold.
 After the message is sent, analysis pauses for `pause` seconds. Then,
 analysis starts after the next full window of input, and the next
 trigger will be sent when the RMS (again) crosses the threshold.
