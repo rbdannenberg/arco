@@ -67,6 +67,19 @@ set(INTL_OPT_LIB "/opt/homebrew/Cellar/gettext/0.21.1/lib/libintl.a"
 set(INTL_DBG_LIB "/opt/homebrew/Cellar/gettext/0.21.1/lib/libintl.a"
     CACHE PATH "libintl library needed by Glib 2.0")  
 
+set(FFTW_INCL "/usr/local/include" CACHE PATH
+    "Include directory for fftw")
+set(FFTW_OPT_LIB "/usr/local/lib/libfftw3.a" CACHE FILEPATH
+    "FFTW libary")
+set(FFTW_DBG_LIB "/usr/local/lib/libfftw3.a" CACHE FILEPATH
+    "FFTW libary")
+
+set(MODAL_INCL "/Users/jerrycheng/Desktop/Arco/modal/include" CACHE PATH
+    "Include directory for Modal")
+set(MODAL_OPT_LIB "/Users/jerrycheng/Desktop/Arco/modal/libmodal.a" CACHE FILEPATH
+    "Modal libary")
+set(MODAL_DBG_LIB "/Users/jerrycheng/Desktop/Arco/modal/libmodal.a" CACHE FILEPATH
+    "Modal libary")
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "" CACHE STRING
     "application macOS version" FORCE)
