@@ -34,7 +34,7 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
-            "mathugenb"]
+            "mathugenb", "onset"]
 
 MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
              "ugen_clip", "ugen_less", "ugen_greater", "ugen_soft_clip"]
@@ -145,6 +145,7 @@ def make_inclfile(arco_path, manifest, outf):
     need_ringbuf = False  # need to compile with ringbuf.h
     need_fastrand = False # need to compile with fastrand.h
     need_flsyn_lib = False  # special: ugen needs fluidsynth library
+    need_onset_lib = False
     need_fft = False  # need to compile and link with ffts files
     need_windowed_input = False  # need to compile and link with windowedinput.h
         # (this is an abstract superclass; perhaps multiple ugens depend on it)
@@ -242,6 +243,8 @@ def make_inclfile(arco_path, manifest, outf):
             print(sources)
         if basename == "flsyn":
             need_flsyn_lib = True
+        if basename == "onset":
+            need_onset_lib = True
 
     print(")", file=outf)
     print("\ntarget_sources(arco4lib PRIVATE ${ARCO_SRC})", file=outf)
@@ -277,6 +280,14 @@ def make_inclfile(arco_path, manifest, outf):
 #        print("target_link_libraries(arco4lib PUBLIC", file=outf)
 #        print("    debug ${CURSES_LIB} optimized ${CURSES_LIB})", file=outf)
 #        print("set(ARCO_TARGET_LINK_OBJC true PARENT_SCOPE)", file=outf)
+    if need_onset_lib:
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug ${MODAL_DBG_LIB} optimized ${MODAL_OPT_LIB})",
+              file=outf)
+
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug ${FFTW_DBG_LIB} optimized ${FFTW_OPT_LIB})",
+              file=outf)
 
 def is_a_unit_generator(line):
     "determine if line describes a unit generator (not empty, not a comment)"

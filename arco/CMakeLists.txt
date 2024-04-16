@@ -132,6 +132,9 @@ endif()
 if(MODAL_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES "${MODAL_INCL}")
 endif()
+if(FFTW_INCL)
+  append_to_global(ALL_INCLUDE_DIRECTORIES "${FFTW_INCL}")
+endif()
 
 add_library(arco4lib STATIC ${ARCO4_APP_SRC})  
 set_target_properties(arco4lib PROPERTIES
