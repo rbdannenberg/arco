@@ -710,8 +710,8 @@ def yintest(obj, event, x, y):
 
 onset_handler_installed = false
 
-def actl_onset(timestamp, address, types, idnum, rms) //idnum, rms are paremeters
-    display "ONSET DETECTED:", idnum, rms
+def actl_onset(timestamp, address, types, idnum, channel) //idnum, rms are paremeters
+    display "ONSET DETECTED:", idnum, channel
     onsettext.set_string(ONSET_ON_TEXT)
     sched_select(rtsched)
     sched_cause(0.1, onsettext, 'set_string', ONSET_OFF_TEXT)
