@@ -119,8 +119,14 @@ add_custom_target(make_faust_ugens ALL
 
 append_to_global(ALL_INCLUDE_DIRECTORIES  
                  "${CMAKE_CURRENT_LIST_DIR}/src")
+append_to_global(ALL_INCLUDE_DIRECTORIES
+                 "${CMAKE_CURRENT_LIST_DIR}/../ffts/src")
+append_to_global(ALL_INCLUDE_DIRECTORIES
+                 "${CMAKE_CURRENT_LIST_DIR}/../pffft/")
 append_to_global(ALL_INCLUDE_DIRECTORIES  
-                 "${CMAKE_CURRENT_LIST_DIR}/../ffts/src")  
+                 "${CMAKE_CURRENT_LIST_DIR}/../modal/modal/detectionfunctions/")  
+append_to_global(ALL_INCLUDE_DIRECTORIES  
+                 "${CMAKE_CURRENT_LIST_DIR}/../modal/src/")  
 append_to_global(ALL_INCLUDE_DIRECTORIES
                  "${CMAKE_CURRENT_LIST_DIR}/../cmupv/src")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${O2_INCL}")

@@ -7,6 +7,8 @@
 import sys
 import os
 
+USE_PFFFT = True  # use PFFFT (new) instead of ffts for FFTs
+
 """
 Command line should have three parameters:
     path-to-arco-root
@@ -188,6 +190,17 @@ def make_inclfile(arco_path, manifest, outf):
     if ("delay" in manifest) or ("granstream" in manifest):
         need_dcblocker = True
 
+    if "onset" in manifest:  # add modal implementation files
+        df_path = arco_path + "/modal/modal/detectionfunctions/"
+        print("    " + df_path + "detectionfunctions.cpp",
+                      df_path + "detectionfunctions.h\n",
+              "    " + df_path + "mq.cpp",
+                      df_path + "mq.h", file=outf)
+        ms_path = arco_path + "/modal/src/"
+        print("    " + ms_path + "onsetdetection.cpp",
+                      ms_path + "onsetdetection.h", file=outf)
+        need_fft = True
+
     ## Include source files to satisfy dependencies
     if need_ringbuf:
         print("    " + arco_path + "/arco/src/ringbuf.h", file=outf)
@@ -196,13 +209,20 @@ def make_inclfile(arco_path, manifest, outf):
         print("    " + arco_path + "/arco/src/fastrand.h", file=outf)
 
     if need_fft:
-        print("    " + arco_path + "/ffts/src/fftext.c",
-                       arco_path + "/ffts/src/fftext.h\n",
-              "    " + arco_path + "/ffts/src/fftlib.c",
-                       arco_path + "/ffts/src/fftlib.h\n",
-              "    " + arco_path + "/ffts/src/matlib.c",
-                       arco_path + "/ffts/src/matlib.h\n",
-              file=outf)
+        if USE_PFFFT:
+            print("    " + arco_path + "/pffft/pffft.c",
+                          arco_path + "/pffft/pffft.h\n",
+                  "    " + arco_path + "/pffft/ffts_compat.cpp",
+                          arco_path + "/pffft/ffts_compat.h\n",                          
+                  file=outf)
+        else:
+            print("    " + arco_path + "/ffts/src/fftext.c",
+                          arco_path + "/ffts/src/fftext.h\n",
+                  "    " + arco_path + "/ffts/src/fftlib.c",
+                          arco_path + "/ffts/src/fftlib.h\n",
+                  "    " + arco_path + "/ffts/src/matlib.c",
+                          arco_path + "/ffts/src/matlib.h\n",
+                  file=outf)
 
     if need_windowed_input:
         print("    " + arco_path + "/arco/src/windowedinput.h")
@@ -243,8 +263,6 @@ def make_inclfile(arco_path, manifest, outf):
             print(sources)
         if basename == "flsyn":
             need_flsyn_lib = True
-        if basename == "onset":
-            need_onset_lib = True
 
     print(")", file=outf)
     print("\ntarget_sources(arco4lib PRIVATE ${ARCO_SRC})", file=outf)
@@ -280,14 +298,7 @@ def make_inclfile(arco_path, manifest, outf):
 #        print("target_link_libraries(arco4lib PUBLIC", file=outf)
 #        print("    debug ${CURSES_LIB} optimized ${CURSES_LIB})", file=outf)
 #        print("set(ARCO_TARGET_LINK_OBJC true PARENT_SCOPE)", file=outf)
-    if need_onset_lib:
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug ${MODAL_DBG_LIB} optimized ${MODAL_OPT_LIB})",
-              file=outf)
 
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug ${FFTW_DBG_LIB} optimized ${FFTW_OPT_LIB})",
-              file=outf)
 
 def is_a_unit_generator(line):
     "determine if line describes a unit generator (not empty, not a comment)"

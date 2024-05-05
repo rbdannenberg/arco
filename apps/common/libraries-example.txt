@@ -74,12 +74,12 @@ set(FFTW_OPT_LIB "/usr/local/lib/libfftw3.a" CACHE FILEPATH
 set(FFTW_DBG_LIB "/usr/local/lib/libfftw3.a" CACHE FILEPATH
     "FFTW libary")
 
-set(MODAL_INCL "/Users/jerrycheng/Desktop/Arco/modal/include" CACHE PATH
-    "Include directory for Modal")
-set(MODAL_OPT_LIB "/Users/jerrycheng/Desktop/Arco/modal/libmodal.a" CACHE FILEPATH
-    "Modal libary")
-set(MODAL_DBG_LIB "/Users/jerrycheng/Desktop/Arco/modal/libmodal.a" CACHE FILEPATH
-    "Modal libary")
-
+set(MODAL_INCL "/Users/rbd/Modal/include" CACHE PATH  
+    "Include directory for Modal")  
+set(MODAL_OPT_LIB "/Users/rbd/Modal/libmodal.a" CACHE FILEPATH  
+    "Modal libary")  
+set(MODAL_DBG_LIB "/Users/rbd/Modal/libmodal.a" CACHE FILEPATH  
+    "Modal libary")  
+ 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "" CACHE STRING
     "application macOS version" FORCE)

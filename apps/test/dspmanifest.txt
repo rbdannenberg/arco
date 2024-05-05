@@ -1,3 +1,4 @@
+# manifest for test (daserpent)
 vu
 probe
 pwl*

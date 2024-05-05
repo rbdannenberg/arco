@@ -1048,6 +1048,23 @@ def route(chans):
     return Route(chans)
 
 
+# ---- included from /Users/rbd/arco/serpent/srp/onset.srp ----
+
+# trig.srp -- sound event detection
+#
+# Roger B. Dannenberg
+# August 2023
+
+class Onset(Ugen):
+    def init(input, reply_addr):
+        super.init(create_ugen_id(), "Onset", 0, 'a', "Usiff", omit_chans = t,
+                   'input', input, 'reply_addr', reply_addr)
+
+
+def onset(input, reply_addr):
+    Onset(input, reply_addr)  # onset as a function
+
+
 # ---- included from /Users/rbd/arco/serpent/srp/thru.srp ----
 
 # thru.srp -- audio pass-through

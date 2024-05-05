@@ -1,0 +1,40 @@
+name: Surge-PFFFT-Test
+
+on: [pull_request, workflow_dispatch]
+
+jobs:
+  build_and_test:
+    name: Build PFFT Test Cases
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # show all errors for each platform (vs. cancel jobs on error)
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+
+    steps:
+      - name: Get latest CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Configure
+        shell: bash
+        run: cmake -Bbuild -DCMAKE_BUILD_TYPE=Release -DSURGE_PFFFT_BUILD_TESTS=TRUE
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --config Release --parallel 4 --target surge-pffft-tests
+
+      - name: Run Tests (win)
+        shell: bash
+        if: matrix.os == 'windows-latest'
+        run: ./build/src-test/Release/surge-pffft-tests.exe
+
+
+      - name: Run Tests (non win)
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: ./build/src-test/surge-pffft-tests
