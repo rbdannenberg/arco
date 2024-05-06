@@ -1,0 +1,21 @@
+def chorddetect(reply_addr, frame_size, sample_rate):
+    return Chorddetect(reply_addr, frame_size, sample_rate)
+
+
+class Chorddetect (Ugen):
+    def init(reply_addr, period)
+        // CHANGE!!
+        super.init(create_ugen_id(), "Vu", 0, '', "sf",
+                   'reply_addr', reply_addr)
+
+    def start(reply_addr, period):
+        o2_send_cmd("/arco/chorddetect/start", 0, "Usf", id, reply_addr)
+        this
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "Chorddetect set", id, value.id
+        o2_send_cmd("/arco/chorddetect/repl_input", 0, "UU", id, value.id)
+        this
+

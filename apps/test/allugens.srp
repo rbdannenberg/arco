@@ -1,5 +1,5 @@
 
-# ---- included from /Users/rbd/arco/serpent/srp/vu.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/vu.srp ----
 
 # vu.srp -- record and play audio in memory
 #
@@ -27,7 +27,7 @@ class Vu (Ugen):
         this
        
 
-# ---- included from /Users/rbd/arco/serpent/srp/probe.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/probe.srp ----
 
 # probe.srp -- stream audio from file
 #
@@ -69,7 +69,7 @@ class Probe (Ugen):
         
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/pwl.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/pwl.srp ----
 
 # pwl.srp -- piece-wise linear envelope
 #
@@ -208,7 +208,7 @@ def pwlb(keyword init, start = true, rest points):
     return pwlb
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/pwe.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/pwe.srp ----
 
 # pwe.srp -- piece-wise linear envelope
 #
@@ -344,7 +344,7 @@ def pweb(keyword init, start = true, rest points):
     return pweb
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/mix.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/mix.srp ----
 
 # mix.srp -- audio mixer
 #
@@ -429,7 +429,7 @@ def mix_name(i):
     intern("in" + str(i))
 
 
-# ---- included from /Users/rbd/arco/ugens/sine/sine.srp ----
+# ---- included from /Users/markzhou/arco/ugens/sine/sine.srp ----
 
 # sine.srp - constructor implementation
 #
@@ -453,7 +453,7 @@ def sineb(freq, amp, optional chans):
 
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/mathugen.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/mathugen.srp ----
 
 # add.srp - constructor implementation for mult, add, ugen_div, ugen_max,
 #           ugen_min, ugen_clip, ugen_less, ugen_greater, ugen_soft_clip.
@@ -580,7 +580,7 @@ def ugen_quantizeb(x1, x2, optional chans):
     mathb(MATH_OP_QNT, x1, x2, chans)
 
 
-# ---- included from /Users/rbd/arco/ugens/reson/reson.srp ----
+# ---- included from /Users/markzhou/arco/ugens/reson/reson.srp ----
 
 # reson.srp - constructor implementation
 #
@@ -610,7 +610,7 @@ def resonb(snd, center, q, optional chans):
 
 
 
-# ---- included from /Users/rbd/arco/ugens/lowpass/lowpass.srp ----
+# ---- included from /Users/markzhou/arco/ugens/lowpass/lowpass.srp ----
 
 # lowpass.srp - constructor implementation
 #
@@ -637,7 +637,7 @@ def lowpassb(snd, cutoff, optional chans):
 
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/fileplay.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/fileplay.srp ----
 
 # fileplay.srp -- stream audio from file
 #
@@ -667,7 +667,7 @@ class Fileplay (Ugen):
         this
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/filerec.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/filerec.srp ----
 
 # filerec.srp -- stream audio from file
 #
@@ -694,7 +694,7 @@ class Filerec (Ugen):
         this
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/recplay.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/recplay.srp ----
 
 # recplay.srp -- record and play audio in memory
 #
@@ -735,7 +735,7 @@ class Recplay (Ugen):
         this
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/delay.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/delay.srp ----
 
 # delay.srp -- feedback delay unit generator
 #
@@ -754,7 +754,7 @@ def delay(input, dur, fb, maxdur, optional chans = 1):
 
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/allpass.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/allpass.srp ----
 
 # allpass.srp -- feedback all-pass filter unit generator
 #
@@ -773,7 +773,7 @@ def allpass(input, dur, fb, maxdur, optional chans = 1):
 
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/olapitchshift.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/olapitchshift.srp ----
 
 # olapitchshift.srp -- overlap add pitch shift unit generator
 #
@@ -795,7 +795,7 @@ def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
     Ola_pitch_shift(chans, input, ratio, xfade, windur)
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/feedback.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/feedback.srp ----
 
 # feedback.srp -- mix input with most recent output of some Ugen
 #
@@ -818,7 +818,7 @@ def feedback(input, from, gain, optional chans = 1):
     Feedback(chans, input, from, gain)
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/granstream.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/granstream.srp ----
 
 # granstream.srp -- granular synthesis from input stream unit generator
 #
@@ -878,7 +878,7 @@ def granstream(input, polyphony, dur, enable, optional chans = 1):
 
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/flsyn.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/flsyn.srp ----
 
 # flsyn.srp - fluid synth interface
 #
@@ -931,7 +931,7 @@ class Flsyn (Ugen):
 def flsyn(path): Flsyn(path)
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/pv.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/pv.srp ----
 
 # pv.srp -- overlap add pitch shift unit generator
 #
@@ -957,7 +957,7 @@ def pv(input, ratio, fftsize, hopsize, points, mode, optional chans = 1):
     Pv(chans, input, ratio, fftsize, hopsize, points, mode)
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/yin.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/yin.srp ----
 
 # yin.srp -- yin pitch estimation unit generator
 #
@@ -975,7 +975,7 @@ def yin(input, minstep, maxstep, hopsize, address, optional chans = 1):
     Yin(chans, input, minstep, maxstep, hopsize, address)  # yin as a function
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/trig.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/trig.srp ----
 
 # trig.srp -- sound event detection
 #
@@ -1010,7 +1010,7 @@ def trig(input, reply_addr, window, threshold, pause):
     Trig(input, reply_addr, window, threshold, pause)  # trig as a function
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/route.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/route.srp ----
 
 # route.srp -- route input channels to output channels
 #
@@ -1048,7 +1048,32 @@ def route(chans):
     return Route(chans)
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/thru.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/chorddetect.srp ----
+
+def chorddetect(reply_addr, frame_size, sample_rate):
+    return Chorddetect(reply_addr, frame_size, sample_rate)
+
+
+class Chorddetect (Ugen):
+    def init(reply_addr, period)
+        // CHANGE!!
+        super.init(create_ugen_id(), "Vu", 0, '', "sf",
+                   'reply_addr', reply_addr)
+
+    def start(reply_addr, period):
+        o2_send_cmd("/arco/chorddetect/start", 0, "Usf", id, reply_addr)
+        this
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "Chorddetect set", id, value.id
+        o2_send_cmd("/arco/chorddetect/repl_input", 0, "UU", id, value.id)
+        this
+
+
+
+# ---- included from /Users/markzhou/arco/serpent/srp/thru.srp ----
 
 # thru.srp -- audio pass-through
 #
@@ -1076,7 +1101,7 @@ def fanout(input, chans)
     Thru(input, chans)
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/zero.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/zero.srp ----
 
 # zero.srp -- audio zero
 #
@@ -1104,7 +1129,7 @@ class Zerob (Ugen)
 # def zerob(): purposefully not defined here!
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/fader.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/fader.srp ----
 
 # fader.srp - constructor implementation
 #
@@ -1183,7 +1208,7 @@ class Fader (Ugen):
         // otherwise, fade_in was cancelled by a fade()
 
 
-# ---- included from /Users/rbd/arco/serpent/srp/sum.srp ----
+# ---- included from /Users/markzhou/arco/serpent/srp/sum.srp ----
 
 # sum.srp -- sum and sumb unit generators
 #

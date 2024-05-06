@@ -34,7 +34,7 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
-            "mathugenb"]
+            "mathugenb", "chorddetect"]
 
 MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
              "ugen_clip", "ugen_less", "ugen_greater", "ugen_soft_clip"]
@@ -149,6 +149,7 @@ def make_inclfile(arco_path, manifest, outf):
     need_windowed_input = False  # need to compile and link with windowedinput.h
         # (this is an abstract superclass; perhaps multiple ugens depend on it)
     need_dcblocker = False # need to compile and link with dcblocker.h
+    need_chromagram_lib = False
     
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
@@ -242,6 +243,8 @@ def make_inclfile(arco_path, manifest, outf):
             print(sources)
         if basename == "flsyn":
             need_flsyn_lib = True
+        if basename == "chorddetect":
+            need_chromagram_lib = True
 
     print(")", file=outf)
     print("\ntarget_sources(arco4lib PRIVATE ${ARCO_SRC})", file=outf)
@@ -277,6 +280,26 @@ def make_inclfile(arco_path, manifest, outf):
 #        print("target_link_libraries(arco4lib PUBLIC", file=outf)
 #        print("    debug ${CURSES_LIB} optimized ${CURSES_LIB})", file=outf)
 #        print("set(ARCO_TARGET_LINK_OBJC true PARENT_SCOPE)", file=outf)
+
+    # ADDITION FOR CHROMAGRAM following the flsyn format
+    if need_chromagram_lib:
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug ${CHROMAGRAM_DBG_LIB} optimized ${CHROMAGRAM_OPT_LIB})",
+              file=outf)
+
+        print('if(NOT EXISTS "${CHROMAGRAM_DBG_LIB}")', file=outf)
+        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_DBG_LIB}, ' + \
+              'delete CHROMAGRAM_DBG_LIB from cache and fix in ' + \
+              'apps/common/libraries.txt")', file=outf)
+        print("endif()", file=outf)
+        print('if(NOT EXISTS "${CHROMAGRAM_OPT_LIB}")', file=outf)
+        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_OPT_LIB}, ' + \
+              'delete CHROMAGRAM_OPT_LIB from cache and fix in ' + \
+              'apps/common/libraries.txt")', file=outf)
+        print("endif()", file=outf)
+              
+        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("    debug readline optimized readline)", file=outf)
 
 def is_a_unit_generator(line):
     "determine if line describes a unit generator (not empty, not a comment)"

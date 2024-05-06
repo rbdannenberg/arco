@@ -141,18 +141,30 @@ option(USE_LIBSNDFILE_EXTERNALS "Link with Ogg, Vorbis, and FLAC" FALSE)
 
 if(SNDFILE_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES ${SNDFILE_INCL})   
-endif()  
-find_library(SNDFILE_OPT_LIB 
+endif()
+
+find_library(SNDFILE_OPT_LIB
              NAMES libsndfile_static.a sndfile_static sndfile.a sndfile 
              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug)  
 find_library(SNDFILE_DBG_LIB 
              NAMES libsndfile_static.a sndfile_static sndfile.a sndfile 
              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug)  
 
+if(CHROMAGRAM_INCL)
+    append_to_global(ALL_INCLUDE_DIRECTORIES ${CHROMAGRAM_INCL})
+endif()
+
+find_library(CHROMAGRAM_OPT_LIB
+             NAMES libchromagram.a
+             PATH_SUFFIXES Release Debug)
+find_library(CHROMAGRAM_DBG_LIB
+             NAMES libchromagram.a
+             PATH_SUFFIXES Release Debug)
+
 if(PA_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES ${PA_INCL})  
-endif() 
-# NOTE:  Ubuntu's libportaudio.a will not link without a Jack library, so  
+endif()
+# NOTE:  Ubuntu's libportaudio.a will not link without a Jack library, so
 #        if we do not find our OWN library in portaudio or nyquist,  
 #        in this special case we'll look for the dynamic (.so) library  
 if(UNIX AND NOT APPLE) # Linux  
