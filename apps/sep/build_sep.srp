@@ -1,0 +1,63 @@
+# build_sep.srp -- build full stand-alone application
+#
+# Roger B. Dannenberg
+# Feb 2024
+
+# This script will only work if run in the same directory, and if
+# the serpent directory is in ../../../serpent/
+
+require "build_application"
+# now SERPENT is where to find lib, wxslib, etc.
+
+LIB = SERPENT + "lib/"
+PROG = SERPENT + "programs/"
+WXS = SERPENT + "wxslib/"
+ARCO = "../../serpent/srp/"
+
+SERPENTSOURCES = [
+    "air.srp",
+    "allugens.srp",
+    "fast.srp",
+    "gatedfoo.srp",
+    "gliss.srp",
+    "init.srp",
+    "melo.srp",
+    "pitchdly.srp",
+    "pizz.srp",
+    "points.srp",
+    "sepcontrols.srp",
+    "simulator.srp",
+    "midicontrol.srp",
+
+    PROG + "midi-io.srp",
+    PROG + "mididevice.srp",
+    LIB + "debug.srp",
+    WXS + "wxserpent.srp",
+    WXS + "vumeter.srp",
+    WXS + "evlight.srp",
+    WXS + "scope.srp",
+    LIB + "prefs.srp",
+    LIB + "prob.srp",
+    LIB + "sched.srp",
+    LIB + "timemap.srp",
+    ARCO + "arco.srp",
+    ARCO + "windowmgr.srp",
+    ARCO + "arcoslider.srp",
+    ARCO + "arcoscope.srp",
+    ARCO + "vu.srp",
+    WXS + "slider.srp",
+    ARCO + "audiodev.srp",
+    ARCO + "reverb.srp",
+    ARCO + "steps.srp",
+    ARCO + "constraint.srp",
+    ARCO + "pan.srp",
+    ARCO + "o2util.srp",
+    LIB + "strparse.srp",
+    LIB + "termcolor.srp",
+    LIB + "precision.srp",
+    LIB + "utils.srp" ]
+
+
+APPFULLNAME = "SeparationLogic"
+build_release()
+exit()

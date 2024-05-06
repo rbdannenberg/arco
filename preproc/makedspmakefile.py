@@ -7,6 +7,8 @@
 import sys
 import os
 
+USE_PFFFT = True  # use PFFFT (new) instead of ffts for FFTs
+
 """
 Command line should have three parameters:
     path-to-arco-root
@@ -34,7 +36,7 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
-            "mathugenb", "chorddetect"]
+            "mathugenb", "onset", "chorddetect"]
 
 MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
              "ugen_clip", "ugen_less", "ugen_greater", "ugen_soft_clip"]
@@ -145,6 +147,7 @@ def make_inclfile(arco_path, manifest, outf):
     need_ringbuf = False  # need to compile with ringbuf.h
     need_fastrand = False # need to compile with fastrand.h
     need_flsyn_lib = False  # special: ugen needs fluidsynth library
+    need_onset_lib = False
     need_fft = False  # need to compile and link with ffts files
     need_windowed_input = False  # need to compile and link with windowedinput.h
         # (this is an abstract superclass; perhaps multiple ugens depend on it)
@@ -188,6 +191,17 @@ def make_inclfile(arco_path, manifest, outf):
     if ("delay" in manifest) or ("granstream" in manifest):
         need_dcblocker = True
 
+    if "onset" in manifest:  # add modal implementation files
+        df_path = arco_path + "/modal/modal/detectionfunctions/"
+        print("    " + df_path + "detectionfunctions.cpp",
+                      df_path + "detectionfunctions.h\n",
+              "    " + df_path + "mq.cpp",
+                      df_path + "mq.h", file=outf)
+        ms_path = arco_path + "/modal/src/"
+        print("    " + ms_path + "onsetdetection.cpp",
+                      ms_path + "onsetdetection.h", file=outf)
+        need_fft = True
+
     ## Include source files to satisfy dependencies
     if need_ringbuf:
         print("    " + arco_path + "/arco/src/ringbuf.h", file=outf)
@@ -196,13 +210,20 @@ def make_inclfile(arco_path, manifest, outf):
         print("    " + arco_path + "/arco/src/fastrand.h", file=outf)
 
     if need_fft:
-        print("    " + arco_path + "/ffts/src/fftext.c",
-                       arco_path + "/ffts/src/fftext.h\n",
-              "    " + arco_path + "/ffts/src/fftlib.c",
-                       arco_path + "/ffts/src/fftlib.h\n",
-              "    " + arco_path + "/ffts/src/matlib.c",
-                       arco_path + "/ffts/src/matlib.h\n",
-              file=outf)
+        if USE_PFFFT:
+            print("    " + arco_path + "/pffft/pffft.c",
+                          arco_path + "/pffft/pffft.h\n",
+                  "    " + arco_path + "/pffft/ffts_compat.cpp",
+                          arco_path + "/pffft/ffts_compat.h\n",                          
+                  file=outf)
+        else:
+            print("    " + arco_path + "/ffts/src/fftext.c",
+                          arco_path + "/ffts/src/fftext.h\n",
+                  "    " + arco_path + "/ffts/src/fftlib.c",
+                          arco_path + "/ffts/src/fftlib.h\n",
+                  "    " + arco_path + "/ffts/src/matlib.c",
+                          arco_path + "/ffts/src/matlib.h\n",
+                  file=outf)
 
     if need_windowed_input:
         print("    " + arco_path + "/arco/src/windowedinput.h")

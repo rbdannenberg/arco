@@ -1,0 +1,191 @@
+# build_application.srp - create an application for MacOS
+#
+# Builds for arm or intel depending upon what you compiled.
+# Assumes you have built an application in the current directory,
+#    e.g. arco/apps/sep/Release/sep.app
+# so what we need to do is install the search path and copy in
+# all the Serpent source files.
+#
+# After updating the application to be stand-alone, it is zipped
+# for distribution.
+#
+# Configuration: the following global variables are set to
+# default values when this file is loaded. You can reassign
+# these as necessary before calling build_release():
+#    SERPENT -- serpent directory (e.g. SERPENT/lib has serpent lib files)
+#    REL -- the Release directory for the app
+#    APPNAME -- the application base name, e.g. "sep" or "daserpent"
+#    APPFULLNAME -- the name to appear on the menu bar far left,
+#                   defaults to the current directory name
+#    APPBINARY -- the name of the binary found in app's Contents/MacOS/.
+#                 defaults to APPNAME if you leave this set to nil.
+#    ICONNAME -- relative or absolute path to application icon file
+#    VERSION -- a version, typically an integer; user is prompted to
+#               enter a version number when this file is loaded, but
+#               this global can be modified before build_release().
+#    SEMVERS -- defaults to 1.x.0 where x is VERSION, but this global
+#               can be modified before build_release(). Leave it set
+#               to nil to indicate constructing the default.
+# SERPENT and REL should end in "/"
+# Defaults assume current directory is <HOME>/arco/apps/<APPNAME>/
+# and the binary is ./<REL>/Contents/MacOS/<APPNAME>
+# and there is an icon file in ./<APPNAME>.icns
+#
+# You also need to define:
+#    SERPENTSOURCES -- a list of relative or full path names for
+#                      serpent source files
+# 
+
+
+# Roger B. Dannenberg
+# Feb 2024
+
+require "debug"
+
+def cwd_dir_name():
+    var path = getcwd()
+    path = subseq(path, 0, -1)  // remove last "/"
+    var loc = find(path, "/")
+    while loc != -1:
+        path = subseq(path, loc + 1)
+        loc = find(path, "/")
+    display "cwd_dir_name returns", path
+    return path
+    
+
+def readint():
+    var i = stdin.readvalue()
+    while not isinteger(i):
+        print "Type an integer:",
+        i = stdin.readvalue()
+    return i
+
+
+def removefile(path):
+    var err = unlink(path)
+    if err:
+        display "WARNING (removefile)", path, err
+
+
+def removedir(path):
+    if isdir(path):
+        system_check("rm -r " + path)
+
+
+def createdir(path):
+    system_check("mkdir -p " + path)
+
+
+def copyfile(dst, src):
+    system_check("cp -p " + src + " " + dst)
+
+
+def copyfiles(dst, srcs):
+    for src in srcs:
+        copyfile(dst, src)
+
+
+def copydir(dst, src):
+    system_check("cp -Rp " + src + " " + dst)
+
+
+def makezipfile(wd, zipbase, filepaths):
+    var paths = ""
+    for path in filepaths:
+        paths = paths + " " + path
+    var cmd = "cd " + wd + "; zip -r " + zipbase + ".zip " + paths
+    display "makezipfile", cmd
+    system_check(cmd)
+
+
+def movefile(dst, src):
+    if isdir(dst):
+        removedir(dst)
+    system_check("mv " + src + " " + dst)
+
+
+def changeplist(plist, attr, value):
+    var cmd = "/usr/libexec/PlistBuddy -c 'Delete " + attr + " string' " + plist
+    print cmd
+    var err = system(cmd)
+    if err != t:
+        print "NOTE: You can IGNORE the Does Not Exist message"
+    system_check("/usr/libexec/PlistBuddy -c 'Add " + attr +
+                 " string " + value + "' " + plist)
+
+
+def system_check(cmd):
+    print cmd
+    var rslt = system(cmd)
+    if rslt != t:
+        display "system_check", rslt, cmd
+        breakpoint()
+
+
+SERPENT = "../../../serpent/"
+REL = "Release/"
+APPNAME = cwd_dir_name()
+APPFULLNAME = APPNAME
+APPBINARY = nil
+ICONNAME = APPNAME + ".icns"
+print "Version number (integer):",
+VERSION = str(readint())
+SEMVERS = nil
+
+
+def build_release():
+    // assume we are in <HOME>/arco/apps/<APPNAME>:
+    SLIB = SERPENT + "lib/"
+    WXSLIB = SERPENT + "wxslib/"
+    SPRG = SERPENT + "programs/"
+
+    // print "Version number (e.g. \"8\"):",
+    VERSION2 = VERSION if len(VERSION) == 2 else "0" + VERSION
+    APPDIRNAME = APPNAME + ".app"
+    if not SEMVERS:
+        SEMVERS = "1." + VERSION + ".0"
+
+    print
+
+    removefile(APPNAME + ".zip")
+
+    var rp = REL + APPDIRNAME + "/Contents/"
+    var rl = rp + "Resources/"
+    var macos = rp + "MacOS/"
+    removedir(rp + "_CodeSignature")
+    copyfiles(rl, SERPENTSOURCES)
+    copyfile(rl + APPNAME + ".icns", ICONNAME)
+    var plist = rp + "Info.plist"
+    make_plist(plist)
+    make_launch_file(rp + "MacOS/srp_launch")
+
+    print
+    print "----------------- make zip file ------------------"    
+    makezipfile(REL, APPFULLNAME + VERSION, [APPDIRNAME])
+    print "==================== ALL DONE ==================="
+
+
+def make_launch_file(srplaunch):
+# make the shell script to launch the application from the Resources directory
+# srplaunch is the launch script
+    if not APPBINARY:
+        APPBINARY = APPNAME
+    var outf = open(srplaunch, "w")
+    outf.write("#!/bin/bash\n")
+    outf.write("srppath=$0\n")
+    outf.write("cd \"${srppath%/*}\"\n")
+    outf.write("cd ../Resources\n")
+    outf.write("../MacOs/" + APPBINARY + "\n")
+    system_check("chmod +x " + srplaunch + "\n")
+    outf.close()
+
+
+def make_plist(plist):
+    changeplist(plist, ":CFBundleShortVersionString", SEMVERS)
+    changeplist(plist, ":CFBundleVersion", SEMVERS)
+    changeplist(plist, ":CFBundleGetInfoString", APPNAME)
+    changeplist(plist, ":CFBundleIconFile", APPNAME + ".icns")
+    changeplist(plist, ":CFBundleLongVersionString",
+                APPNAME + " - Version " + SEMVERS)
+    changeplist(plist, ":CFBundleName", APPFULLNAME)
+    changeplist(plist, ":CFBundleExecutable", "srp_launch")

@@ -11,7 +11,8 @@ pizz_instr = nil
 class Pizz (Instrument):
     var mix, count, off, outgain
 
-    def init(recplay, delay_spread, rate_origin, rate_slope, gain, dur):
+    def init(recplay, delay_spread, rate_origin, rate_slope, gain, dur,
+             gain_slider):
     # count is number of pizz players to launch
     # delay_spread is the spread in seconds between each launch (not counting
     #       added jitter of 0 to 1 seconds)
@@ -43,7 +44,7 @@ class Pizz (Instrument):
             sched_cause(delay, this, 'echo', rp, rate, name)
         sched_cause(dur, this, 'end_all')
         print "Pizz.init - ending in", dur, "secs"
-        outgain = gain_control(mix, pizz_gain_sl)
+        outgain = gain_control(mix, gain_slider)
         outgain.trace()
         super.init("Pizz", outgain)
 

@@ -22,7 +22,13 @@
 # start2() -- start the second section
 # finish2() -- stop the second section
 #
-# outputs are directly to the final output (using .play()).
+# outputs go directly to the final output (using .play()).
+# two outputs are played:
+#    dry_output is stereo, with input from:
+#        psum = sum of 3 pitch shifters, input controlled by fast_gain_slider
+#        reverb = (multi_reverb of psum) * reverb_gain (is a pweb)
+#    gfoutput is gain_control(mix of two Gated_foo, cycles_gain_slider)
+#        
 #
 # Reverb gain modification: The original live version was pretty
 # quiet in this section. Too much reverb would cause feedback, and
@@ -42,25 +48,13 @@ RVB_WET = 0.007
 require "gatedfoo"
 require "pitchdly"
 
-// def gated_foo(swap):
-//    var mix = Mix(2)
-//    var left = 0.3 * fast_gain
-//    var right = 0.7 * fast_gain
-//
-//    // pan pitch shift and delay left and right...
-//    if swap:  // ...unless swap, in which case pan the opposite directions:
-//        var tmp = left
-//        left = right
-//        right = tmp
-//    mix.ins('ps', ola_pitch_shift(input_ugen, RATIO, XFADE, WINDIR, 1),
-//                  [left, right])
-//    mix.ins('del', delay(input_ugen, DUR, FB, MAXDUR, 1),
-//                   [right, left])
-//    var gate = dualslewlin(lowpassb(powerb(input_ugen), CUTOFF, 1))
-//    return mult(mix, gate)
-    
     
 class Fast_mgr:
+    var started
+    var inst_num  // increments when we restart - protects against
+    // starting a long fade with a scheduled output cut and then
+    // restarting before the long fade finishes -- we do not want
+    // to cut the newly restarted instance of the effect
     var pitdly1, pitdly2, pitdly3
     var shift2, shift3    // pitch shifts
     var cycle_period      // how often we update pitch shifts
@@ -81,6 +75,7 @@ class Fast_mgr:
     def init():
         cycle_period = 0.1
         cycle_transpose = 0
+        inst_num = 0
 
 
     def cycles():  # called periodically, started in .start() method
@@ -100,13 +95,20 @@ class Fast_mgr:
     # so create it only if we need it; otherwise return what's already there:
         if not fast_input:
             fast_input = gain_control(input_ugen, fast_gain_sl, term = true)
+            fast_input = fader(fast_input, 1)
             fast_input.trace()
         fast_input    
 
 
-    def start():
+    def start(optional trigger_enable = true):
     # create effect and reverb, connect reverb to output
-        trigger_mgr.start_onoff()  // detect when flute is playing - see onoff()
+        if started:
+            print "######## Fast_mgr: already started"
+            return
+        started = true
+        inst_num = inst_num + 1
+        if trigger_enable:  // detect when flute is playing - see onoff()
+            trigger_mgr.start_onoff('fast')
         if not reverb:
             get_fast_input()
             pitdly1 = Pitchdly(fast_input, 1, 0, 1.0, 0.03, 0.03, 0,
@@ -149,16 +151,25 @@ class Fast_mgr:
 
 
     def finish():
+        if not started:
+            return
         fast_cycles.stop()
-        if reverb:
-            reverb.mute_input()
-            sched_cause(20, this, 'cycles_fade')
+        if fast_input and reverb:
+            // note that fast_input is a Fader
+            fast_input.set_dur(0.1) // cut all input
+            fast_input.set_goal(0)
+            fast_input = nil
+            sched_cause(20, this, 'cycles_fade', inst_num)
         if gfoutput:
             gfoutput.fade(1)
             gfoutput = nil
+        started = false
 
 
-    def cycles_fade():
+    def cycles_fade(inum):
+        if inum != inst_num:
+            print "Fast_mgr.cycles_fade: ignoring because inst_num changed"
+            return
         if RVB_EXPAND:
            dry_output.fade(1)
         else:
@@ -169,19 +180,18 @@ class Fast_mgr:
 
 
     def start2():
+    # prerequisite: start() has been called, started == true (see init.srp)
         get_fast_input()
         var mix = mix(2)
-        var gf1 = Gated_foo(fast_input, 0.5, 0.15, 0.6, 100, 1, 1, 0.05, 1)
-        mix.ins('gf1', gf1, [1, 0.75])
+        var gf1 = Gated_foo(fast_input, 0.5, 0.15, 0.6, 100, 0.1, 0.1, 0.05, 1)
+        mix.ins('gf1', gf1, [.01, 0.0075])
 
-        var gf2 = Gated_foo(fast_input, 0.3, 0.2, 0.6, 100, 1, 1, 0.05, 1)
-        mix.ins('gf2', gf2, [1.2, 1.6])
+        var gf2 = Gated_foo(fast_input, 0.3, 0.2, 0.6, 100, 0.1, 0.1, 0.05, 1)
+        mix.ins('gf2', gf2, [.012, .016])
 
-        gfoutput = gain_control(mix, fast_gain_sl, term = true)
+        gfoutput = gain_control(mix, cycles_gain_sl, term = true)
         gfoutput.trace()
         gfoutput.play()
-
-        trigger_mgr.onoff_start()
 
 
     def onoff(onoff):

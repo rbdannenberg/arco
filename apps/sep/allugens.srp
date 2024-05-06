@@ -1048,7 +1048,7 @@ class Trig(Ugen):
         o2_send_cmd("/arco/trig/threshold", 0, "Uf", id, threshold)
         this
 
-    def set_threshold(pause):
+    def set_pause(pause):
         o2_send_cmd("/arco/trig/pause", 0, "Uf", id, pause)
         this
 
@@ -1071,7 +1071,7 @@ def trig(input, reply_addr, window, threshold, pause):
 
 class Dnsampleb(Ugen):
     def init(chans, input, mode):
-        super.init(create_ugen_id(), "Dnsampleb", chans, 'b', "UUf",
+        super.init(create_ugen_id(), "Dnsampleb", chans, 'b', "Uf",
 	           'input', input, 'mode', mode)
 
     def set_cutoff(hz):

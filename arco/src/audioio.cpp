@@ -698,7 +698,8 @@ static void arco_run(O2SM_HANDLER_ARGS)
     ugen->flags |= IN_RUN_SET;
     run_set.push_back(ugen);
     ugen->ref();
-    // printf("arco_run %d @ %p inserted, flags %x\n", id, ugen, ugen->flags);
+    printf("arco_run %s %d @ %p inserted, flags %x\n", ugen->classname(),
+           id, ugen, ugen->flags);
 }
 
 

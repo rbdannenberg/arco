@@ -1,0 +1,66 @@
+# gliss.srp -- control and implementation of "droop" section of
+#             Separation Logic
+#
+# based on previous implementation in Aura
+#
+# Roger B. Dannenberg
+# Oct 2023
+
+gliss_mgr = nil
+
+class Gliss_mgr:
+    var started
+    var gip1, gip2, gip3, gipsum
+    var gliss_instance
+    var gliss_rate
+
+    def init():
+        gliss_instance = 0
+        return
+
+    def start():
+        if started:
+            print "######## Gliss_mgr: already started"
+            return
+        started = true
+        gliss_rate = 0
+        gip1 = Pitchdly(input_ugen, 1, 0, 0.75, 0.03, 0.03, 0, name = "gip1")
+        gip2 = Pitchdly(input_ugen, 1, 0, 0.5, 0.03, 0.03, 0, name = "gip2")
+        gip3 = Pitchdly(input_ugen, 1, 0, 0.67, 0.03, 0.03, 0, name = "gip2")
+        gipsum = sum(1)
+        gipsum.ins(gip1, gip2, gip3)
+        var gipsumrev = multi_reverb(gipsum, 3.0, 0.1)
+        gloutput = gain_control(gipsumrev, droop_gain_sl, term = true)
+        gloutput.play()
+        trigger_mgr.start_trigger('gliss')
+
+
+    def gliss_action():
+        print "gliss_action called"
+        gliss_instance = gliss_instance + 1
+        gliss_update(gliss_instance, 0)
+        
+
+    def gliss_update(inst, count):
+        if inst != gliss_instance or not gipsum:
+            display "gliss_update instance ending", inst
+            return  // some other instance is running
+        gliss_rate = min(4, gliss_rate + 0.003)
+        display "gliss_update", gliss_rate
+        var scale = -sqrt(real(count)) * gliss_rate
+        // seems like we should integrate gliss_rate, but this is how it
+        // was in the original implementation and recording
+        // display "gliss_update", inst, count, scale
+        gip1.set_ratio(step_to_ratio(scale * 0.15))
+        gip2.set_ratio(step_to_ratio(scale * 0.2))
+        gip3.set_ratio(step_to_ratio(scale * 0.25))
+        sched_cause(0.05, this, 'gliss_update', inst, count + 1)
+
+
+    def finish():
+        if not started:
+            return
+        if gloutput:  // started and not stopped already
+            gloutput.fade(1)
+            gloutput = nil  // free the constraint
+        started = false

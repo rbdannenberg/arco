@@ -75,6 +75,9 @@ class Air_mgr:
 
 
     def make_new_del(i, tran, gain, pulse):
+        if not air_rp:
+           print "WARNING: Air_mgr.make_new_del called but air_rp is nil"
+           return
         var rp = recplay(zero_ugen, 1, 1, 2)
         rp.borrow(air_rp)
         rp.set_speed(tran)

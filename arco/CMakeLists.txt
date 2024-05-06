@@ -119,16 +119,36 @@ add_custom_target(make_faust_ugens ALL
 
 append_to_global(ALL_INCLUDE_DIRECTORIES  
                  "${CMAKE_CURRENT_LIST_DIR}/src")
+append_to_global(ALL_INCLUDE_DIRECTORIES
+                 "${CMAKE_CURRENT_LIST_DIR}/../ffts/src")
+append_to_global(ALL_INCLUDE_DIRECTORIES
+                 "${CMAKE_CURRENT_LIST_DIR}/../pffft/")
 append_to_global(ALL_INCLUDE_DIRECTORIES  
-                 "${CMAKE_CURRENT_LIST_DIR}/../ffts/src")  
+                 "${CMAKE_CURRENT_LIST_DIR}/../modal/modal/detectionfunctions/")  
 append_to_global(ALL_INCLUDE_DIRECTORIES  
-                 "${CMAKE_CURRENT_LIST_DIR}/../cmupv/src")  
+                 "${CMAKE_CURRENT_LIST_DIR}/../modal/src/")  
+append_to_global(ALL_INCLUDE_DIRECTORIES
+                 "${CMAKE_CURRENT_LIST_DIR}/../cmupv/src")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${O2_INCL}")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${PA_INCL}")
 append_to_global(ALL_INCLUDE_DIRECTORIES "${SNDFILE_INCL}")
-append_to_global(ALL_INCLUDE_DIRECTORIES "${FLSYN_INCL}")
+if(FLSYN_INCL)
+  append_to_global(ALL_INCLUDE_DIRECTORIES "${FLSYN_INCL}")
+endif()
+if(MODAL_INCL)
+  append_to_global(ALL_INCLUDE_DIRECTORIES "${MODAL_INCL}")
+endif()
+if(FFTW_INCL)
+  append_to_global(ALL_INCLUDE_DIRECTORIES "${FFTW_INCL}")
+endif()
 
 add_library(arco4lib STATIC ${ARCO4_APP_SRC})  
+set_target_properties(arco4lib PROPERTIES
+                      MSVC_RUNTIME_LIBRARY 
+                      "MultiThreaded$<$<CONFIG:Debug>:Debug>${MSVCRT_DLL}"
+                      WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+                      XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS
+                      "$<IF:$<CONFIG:DEBUG>,YES,NO>")
 include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude") 
 message(STATUS "ARCO_SRC: ${ARCO_SRC}") 
 

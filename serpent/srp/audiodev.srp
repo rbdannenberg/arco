@@ -34,6 +34,7 @@ def simulate_input_from_file(path):
     if arco_state != 'running':
         display "WARNING: simulate_input_from_file", path, arco_state
         return
+    display "simulate_input_from_file", path
     var fileinput_player
     if audio_file_exists(path):
         fileinput_player = fileplay(path, arco_input_chans,
@@ -41,6 +42,7 @@ def simulate_input_from_file(path):
         input_ugen.set_alternate(fileinput_player)
         fileinput_player.go()
     else:
+        print "WARNING in simulate_input_from_file: file not found"
         input_ugen.set_alternate(zero_ugen)
 
 

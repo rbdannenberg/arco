@@ -37,7 +37,7 @@ class Atone (Instrument):
             mix.ins(name, sine(freq * i, 0.8 ** i), env)
         if not SIMPLE and pr_coin(0.5):
             // reson filter center frequency envelope:
-            var renv = member(pwlb(random(), pr_unif(4, 10) * freq, 
+            var renv = member(pwlb(random(), pr_unif(4, 10) * freq,
                                    5.0, 200.0, max(5.0, dur * 2)), 'renv')
             var q = pr_unif(0.5, 2.0)
             mix = reson(mix, renv, q)
@@ -134,7 +134,7 @@ def arco_ready():
     wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
 
     Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
-    pwecheckbox.add_target_method(nil, 'pwetest')                
+    pwecheckbox.add_target_method(nil, 'pwetest')
 
     Button(win, "Allpass Test", 'S', 'D', 'S', 'S', 'alpcheckbox')
     alpcheckbox.add_target_method(nil, 'alptest')
@@ -210,6 +210,13 @@ def arco_ready():
 
     Checkbox(win, "Quantization Test", 'S', 'D', 'S', 'S', 'qntcheckbox')
     qntcheckbox.add_target_method(nil, 'qnttest')
+    
+    Checkbox(win, "Onset", 'S', 'D', 55, 'S', 'onsetcheckbox')
+    onsetcheckbox.add_target_method(nil, 'onsettest')
+    
+    ONSET_ON_TEXT = "◼ Onset"
+    ONSET_OFF_TEXT = "◻ Onset"
+    Statictext(win, ONSET_OFF_TEXT, 'R', wxs_y + 2, 55, 'S', 'onsettext')
 
     ui_initialized = true
     default_window.fit_to_children()
@@ -219,8 +226,8 @@ def atone_sequence():
     var step = 40 + irandom(40)
     var freq = 440.0 * (2.0 ** (1/12)) ** (step - 69)
     var dur = pr_unif(0.5, 10)
-    var nharm = 1 if SIMPLE else irandom(15) + 2 
-    display "atone_sequence", freq, dur, nharm, sched_current, 
+    var nharm = 1 if SIMPLE else irandom(15) + 2
+    display "atone_sequence", freq, dur, nharm, sched_current,
     display     vtsched, sched_vtime
     // careful here: start() is a method of Atone, but we must "play"
     // the Ugen returned by stereoize. (We could have put stereoize
@@ -243,7 +250,7 @@ def host_openaggr(timestamp, address, types, info)
         var id = int(info)
         print "  --> opening this device, id", id
         arco_open(id, id, 2, 2, LATENCY_MS, 32)
-        o2_send_cmd("/arco/open", 0, "iiiiiis", id, id, 2, 2, LATENCY_MS, 32, 
+        o2_send_cmd("/arco/open", 0, "iiiiiis", id, id, 2, 2, LATENCY_MS, 32,
                     "actl");
         o2_send_cmd("/arco/prtree", o2_time_get() + 1, "");
         
@@ -374,7 +381,7 @@ def play_atone_test(obj, event, x, y)
 
 sound_file_path = "/Users/rbd/Music/soundscape1/digichoir1.wav"
 
-// handler for psfbutton: play the sound file 
+// handler for psfbutton: play the sound file
 def play_sound_file(rest ignore):
 # We could simply play the Fileplay Ugen, but we're using a
 # Mix(er) to provide an (unused) gain control and also to
@@ -699,7 +706,30 @@ def yintest(obj, event, x, y):
         yin = nil
         yininp = nil
 
+########## ONSET TEST #############
 
+onset_handler_installed = false
+
+def actl_onset(timestamp, address, types, idnum, channel) //idnum, rms are paremeters
+    display "ONSET DETECTED:", idnum, channel
+    onsettext.set_string(ONSET_ON_TEXT)
+    sched_select(rtsched)
+    sched_cause(0.1, onsettext, 'set_string', ONSET_OFF_TEXT)
+
+    
+// handler for onsetcheckbox: play/stop onset analysis of input
+def onsettest(obj, event, x, y):
+    display "onsettest", x
+    if x:
+        if not onset_handler_installed:
+            o2_method_new("/actl/onset", "if", 'actl_onset', t)
+            print "installed onset handler"
+            onset_handler_installed = true
+        onset = onset(input_ugen, "/actl/onset")
+        onset.run()
+    else:
+        onset.unrun()
+        onset = nil
 
 ########## TRIG TEST #############
 
