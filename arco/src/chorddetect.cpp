@@ -13,24 +13,25 @@ const char *Chorddetect_name = "Chorddetect";
 void Chorddetect::real_run()
 {
     input_samps = input->run(current_block);
-    // check termination of input?
     
     // convert input samples to double and process with chromagram
     double frame[BL];
+    
     for (int i = 0; i < BL; i++) {
         frame[i] = *input_samps++;
     }
     
     chromagram.processAudioFrame(frame);
-    
     if (chromagram.isReady()) { // only runs if we have enough samples
+        
         std::vector<double> chroma = chromagram.getChromagram();
+        ChordDetector chord_detector;
         chord_detector.detectChord(chroma);
         // send message with chord information
         o2sm_send_start();
-        o2sm_add_int32(chord_detector.rootNote);
-        const char* q = ChordQualityToString(chord_detector.quality);
-        o2sm_add_string(q);
+        o2sm_add_string(RootNoteToString(chord_detector.rootNote));
+        o2sm_add_string(ChordQualityToString(chord_detector.quality));
+        o2sm_add_int32(chord_detector.intervals);
         o2sm_send_finish(0, cd_reply_addr, false);
     }
     
@@ -64,6 +65,12 @@ const char* Chorddetect::ChordQualityToString(int quality)
     case ChordDetector::Augmented5th:
         return "Augmented 5th";
     }
+}
+// Convert root note integer to string
+const char* Chorddetect::RootNoteToString(int root)
+{
+    const char* notes[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+    return notes[root];
 }
 
 /* O2SM INTERFACE: /arco/chorddetect/start int32 id, string reply_addr;

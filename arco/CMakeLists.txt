@@ -141,6 +141,9 @@ endif()
 if(FFTW_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES "${FFTW_INCL}")
 endif()
+if(CHROMAGRAM_INCL)
+    append_to_global(ALL_INCLUDE_DIRECTORIES ${CHROMAGRAM_INCL})
+endif()
 
 add_library(arco4lib STATIC ${ARCO4_APP_SRC})  
 set_target_properties(arco4lib PROPERTIES
@@ -170,19 +173,20 @@ find_library(SNDFILE_DBG_LIB
              NAMES libsndfile_static.a sndfile_static sndfile.a sndfile 
              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug)  
 
-if(CHROMAGRAM_INCL)
-    append_to_global(ALL_INCLUDE_DIRECTORIES ${CHROMAGRAM_INCL})
-endif()
 
-find_library(CHROMAGRAM_OPT_LIB
-             NAMES libchromagram.a
+             
+find_library(FFTW_OPT_LIB
+             NAMES libfftw3.a
              PATH_SUFFIXES Release Debug)
-find_library(CHROMAGRAM_DBG_LIB
-             NAMES libchromagram.a
+find_library(FFTW_DBG_LIB
+             NAMES libfftw3.a
              PATH_SUFFIXES Release Debug)
 
 if(PA_INCL)
-  append_to_global(ALL_INCLUDE_DIRECTORIES ${PA_INCL})  
+  append_to_global(ALL_INCLUDE_DIRECTORIES ${PA_INCL})
+endif()
+if(FFTW_INCL)
+  append_to_global(ALL_INCLUDE_DIRECTORIES ${FFTW_INCL})
 endif()
 # NOTE:  Ubuntu's libportaudio.a will not link without a Jack library, so
 #        if we do not find our OWN library in portaudio or nyquist,  

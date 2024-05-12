@@ -211,6 +211,11 @@ def arco_ready():
     Checkbox(win, "Quantization Test", 'S', 'D', 'S', 'S', 'qntcheckbox')
     qntcheckbox.add_target_method(nil, 'qnttest')
     
+    
+    Checkbox(win, "Chorddetect Test", 'S', 'D', 'S', 'S', 'chorddetectcheckbox')
+    chorddetectcheckbox.add_target_method(nil, 'chorddetecttest')
+    Statictext(win, "----", 'R', 'S', 'S', 'S', 'chorddetecttext')
+    
     Checkbox(win, "Onset", 'S', 'D', 55, 'S', 'onsetcheckbox')
     onsetcheckbox.add_target_method(nil, 'onsettest')
     
@@ -218,6 +223,7 @@ def arco_ready():
     ONSET_OFF_TEXT = "◻ Onset"
     Statictext(win, ONSET_OFF_TEXT, 'R', wxs_y + 2, 55, 'S', 'onsettext')
 
+    
     ui_initialized = true
     default_window.fit_to_children()
 
@@ -730,6 +736,30 @@ def onsettest(obj, event, x, y):
     else:
         onset.unrun()
         onset = nil
+        
+########## CHORDDETECT TEST #############
+
+chorddetect_handler_installed = false
+
+def actl_chorddetect(timestamp, address, types, root_note, quality, interval)
+    # display root_note, quality, interval
+    result = root_note + " " + quality + " " + str(interval)
+    chorddetecttext.set_string(result)
+
+    
+def chorddetecttest(obj, event, x, y):
+    display "chorddetect", x
+    if x:
+        if not chorddetect_handler_installed:
+            o2_method_new("/actl/chorddetect", "ssi", 'actl_chorddetect', t)
+            print "installed chorddetect handler"
+            chorddetect_handler_installed = true
+        CD = chorddetect("/actl/chorddetect", 1024, 44100)
+        CD.set('input', input_ugen)
+        CD.run()
+    else:
+        CD.unrun()
+        CD = nil
 
 ########## TRIG TEST #############
 

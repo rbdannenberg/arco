@@ -152,7 +152,7 @@ def make_inclfile(arco_path, manifest, outf):
     need_windowed_input = False  # need to compile and link with windowedinput.h
         # (this is an abstract superclass; perhaps multiple ugens depend on it)
     need_dcblocker = False # need to compile and link with dcblocker.h
-    need_chromagram_lib = False
+    need_fftw = False # for use with chromagram for now
     
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
@@ -201,6 +201,14 @@ def make_inclfile(arco_path, manifest, outf):
         print("    " + ms_path + "onsetdetection.cpp",
                       ms_path + "onsetdetection.h", file=outf)
         need_fft = True
+    
+    if "chorddetect" in manifest:  # add chromagram and chord detection implementation files
+        df_path = arco_path + "/arco/src/"
+        print("    " + df_path + "Chromagram.cpp",
+                      df_path + "Chromagram.h\n",
+              "    " + df_path + "ChordDetector.cpp",
+                      df_path + "ChordDetector.h\n", file=outf)
+        need_fftw = True
 
     ## Include source files to satisfy dependencies
     if need_ringbuf:
@@ -264,8 +272,8 @@ def make_inclfile(arco_path, manifest, outf):
             print(sources)
         if basename == "flsyn":
             need_flsyn_lib = True
-        if basename == "chorddetect":
-            need_chromagram_lib = True
+#        if basename == "chorddetect":
+#            need_chromagram_lib = True
 
     print(")", file=outf)
     print("\ntarget_sources(arco4lib PRIVATE ${ARCO_SRC})", file=outf)
@@ -303,22 +311,41 @@ def make_inclfile(arco_path, manifest, outf):
 #        print("set(ARCO_TARGET_LINK_OBJC true PARENT_SCOPE)", file=outf)
 
     # ADDITION FOR CHROMAGRAM following the flsyn format
-    if need_chromagram_lib:
+#    if need_chromagram_lib:
+#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("    debug ${CHROMAGRAM_DBG_LIB} optimized ${CHROMAGRAM_OPT_LIB})",
+#              file=outf)
+#
+#        print('if(NOT EXISTS "${CHROMAGRAM_DBG_LIB}")', file=outf)
+#        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_DBG_LIB}, ' + \
+#              'delete CHROMAGRAM_DBG_LIB from cache and fix in ' + \
+#              'apps/common/libraries.txt")', file=outf)
+#        print("endif()", file=outf)
+#        print('if(NOT EXISTS "${CHROMAGRAM_OPT_LIB}")', file=outf)
+#        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_OPT_LIB}, ' + \
+#              'delete CHROMAGRAM_OPT_LIB from cache and fix in ' + \
+#              'apps/common/libraries.txt")', file=outf)
+#        print("endif()", file=outf)
+#              
+#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("    debug readline optimized readline)", file=outf)
+
+    if need_fftw:
         print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug ${CHROMAGRAM_DBG_LIB} optimized ${CHROMAGRAM_OPT_LIB})",
+        print("    debug ${FFTW_DBG_LIB} optimized ${FFTW_OPT_LIB})",
               file=outf)
 
-        print('if(NOT EXISTS "${CHROMAGRAM_DBG_LIB}")', file=outf)
-        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_DBG_LIB}, ' + \
-              'delete CHROMAGRAM_DBG_LIB from cache and fix in ' + \
+        print('if(NOT EXISTS "${FFTW_DBG_LIB}")', file=outf)
+        print('  message(FATAL_ERROR "Could not find ${FFTW_DBG_LIB}, ' + \
+              'delete FFTW_DBG_LIB from cache and fix in ' + \
               'apps/common/libraries.txt")', file=outf)
         print("endif()", file=outf)
-        print('if(NOT EXISTS "${CHROMAGRAM_OPT_LIB}")', file=outf)
-        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_OPT_LIB}, ' + \
-              'delete CHROMAGRAM_OPT_LIB from cache and fix in ' + \
+        print('if(NOT EXISTS "${FFTW_OPT_LIB}")', file=outf)
+        print('  message(FATAL_ERROR "Could not find ${FFTW_OPT_LIB}, ' + \
+              'delete FFTW_OPT_LIB from cache and fix in ' + \
               'apps/common/libraries.txt")', file=outf)
         print("endif()", file=outf)
-              
+
         print("target_link_libraries(arco4lib PRIVATE", file=outf)
         print("    debug readline optimized readline)", file=outf)
 
