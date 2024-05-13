@@ -434,7 +434,7 @@ void pv_initialize(Phase_vocoder x)
     int fft_error_sign =
 #endif
         fftInit(pv->log2_fft); // target fftInit
-    assert(!fft_error_sign);
+    assert(fft_error_sign == 1);  // test for success
 
     pv->phase = PV_START;
 }
