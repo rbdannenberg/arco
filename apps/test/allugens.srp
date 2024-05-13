@@ -25,7 +25,7 @@ class Vu (Ugen):
         display "Vu set", id, value.id
         o2_send_cmd("/arco/vu/repl_input", 0, "UU", id, value.id)
         this
-       
+
 
 # ---- included from /Users/rbd/arco/serpent/srp/probe.srp ----
 
