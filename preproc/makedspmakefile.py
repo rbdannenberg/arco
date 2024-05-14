@@ -152,7 +152,6 @@ def make_inclfile(arco_path, manifest, outf):
     need_windowed_input = False  # need to compile and link with windowedinput.h
         # (this is an abstract superclass; perhaps multiple ugens depend on it)
     need_dcblocker = False # need to compile and link with dcblocker.h
-    need_fftw = False # for use with chromagram for now
     
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
@@ -208,7 +207,7 @@ def make_inclfile(arco_path, manifest, outf):
                       df_path + "Chromagram.h\n",
               "    " + df_path + "ChordDetector.cpp",
                       df_path + "ChordDetector.h\n", file=outf)
-        need_fftw = True
+        need_fft = True
 
     ## Include source files to satisfy dependencies
     if need_ringbuf:
@@ -330,24 +329,24 @@ def make_inclfile(arco_path, manifest, outf):
 #        print("target_link_libraries(arco4lib PRIVATE", file=outf)
 #        print("    debug readline optimized readline)", file=outf)
 
-    if need_fftw:
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug ${FFTW_DBG_LIB} optimized ${FFTW_OPT_LIB})",
-              file=outf)
-
-        print('if(NOT EXISTS "${FFTW_DBG_LIB}")', file=outf)
-        print('  message(FATAL_ERROR "Could not find ${FFTW_DBG_LIB}, ' + \
-              'delete FFTW_DBG_LIB from cache and fix in ' + \
-              'apps/common/libraries.txt")', file=outf)
-        print("endif()", file=outf)
-        print('if(NOT EXISTS "${FFTW_OPT_LIB}")', file=outf)
-        print('  message(FATAL_ERROR "Could not find ${FFTW_OPT_LIB}, ' + \
-              'delete FFTW_OPT_LIB from cache and fix in ' + \
-              'apps/common/libraries.txt")', file=outf)
-        print("endif()", file=outf)
-
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug readline optimized readline)", file=outf)
+#    if need_fftw:
+#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("    debug ${FFTW_DBG_LIB} optimized ${FFTW_OPT_LIB})",
+#              file=outf)
+#
+#        print('if(NOT EXISTS "${FFTW_DBG_LIB}")', file=outf)
+#        print('  message(FATAL_ERROR "Could not find ${FFTW_DBG_LIB}, ' + \
+#              'delete FFTW_DBG_LIB from cache and fix in ' + \
+#              'apps/common/libraries.txt")', file=outf)
+#        print("endif()", file=outf)
+#        print('if(NOT EXISTS "${FFTW_OPT_LIB}")', file=outf)
+#        print('  message(FATAL_ERROR "Could not find ${FFTW_OPT_LIB}, ' + \
+#              'delete FFTW_OPT_LIB from cache and fix in ' + \
+#              'apps/common/libraries.txt")', file=outf)
+#        print("endif()", file=outf)
+#
+#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("    debug readline optimized readline)", file=outf)
 
 def is_a_unit_generator(line):
     "determine if line describes a unit generator (not empty, not a comment)"

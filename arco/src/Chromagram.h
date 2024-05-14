@@ -34,6 +34,12 @@
 #include "kiss_fft.h"
 #endif
 
+#if (!defined(USE_FFTW) && !defined(USE_KISS_FFT))
+#define USE_PFFFT
+#include "pffft.h"
+#include "ffts_compat.h"
+#endif
+
 //=======================================================================
 /** A class for calculating a Chromagram from input audio
  * in a real-time context */
@@ -102,6 +108,9 @@ private:
     void makeHammingWindow();
     double round (double val);
     
+    // TODO: These are going to result in calls to free which is not lock-free
+    // TODO:    Use O2MALLOC instead (and maybe Vec, but probably these can
+    // TODO:    just be changed to float *
     std::vector<double> window;
     std::vector<double> buffer;
     std::vector<double> magnitudeSpectrum;
@@ -132,6 +141,11 @@ private:
     kiss_fft_cfg cfg;
     kiss_fft_cpx* fftIn;
     kiss_fft_cpx* fftOut;
+#endif
+    
+#ifdef USE_PFFFT
+    int log2_fft_size;
+    float *fft_data;
 #endif
     
 };

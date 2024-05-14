@@ -90,6 +90,11 @@ Chromagram::~Chromagram()
     delete [] fftIn;
     delete [] fftOut;
 #endif
+    
+#ifdef USE_PFFFT
+    // TODO: use O2MALLOC and O2FREE for storage
+    delete [] fft_data;
+#endif
 }
 
 //==================================================================================
@@ -115,6 +120,9 @@ void Chromagram::processAudioFrame (std::vector<double> inputAudioFrame)
     downSampleFrame(inputAudioFrame);
     
     // move samples back
+    // TODO: this is inefficient. Should shift buffer by
+    // TODO:   chromaCalculationInterval after calculateChromagram(); then no
+    // TODO:   other shifting would be necessary
     for (int i = 0; i < bufferSize - downSampledAudioFrameSize; i++)
     {
         buffer[i] = buffer[i + downSampledAudioFrameSize];
@@ -169,6 +177,7 @@ void Chromagram::setChromaCalculationInterval (int numSamples)
 //==================================================================================
 std::vector<double> Chromagram::getChromagram()
 {
+    // TODO: pretty sure this does a deep copy -- not a good idea
     return chromagram;
 }
 
@@ -194,6 +203,13 @@ void Chromagram::setupFFT()
     fftIn = new kiss_fft_cpx[bufferSize];
     fftOut = new kiss_fft_cpx[bufferSize];
     cfg = kiss_fft_alloc (bufferSize,0,0,0);
+#endif
+    
+#ifdef USE_PFFFT
+    fft_data = new float[bufferSize];
+    log2_fft_size = ilog2(bufferSize);
+    int rslt = fftInit(log2_fft_size);
+    assert(rslt == 1);
 #endif
 }
 
@@ -291,9 +307,36 @@ void Chromagram::calculateMagnitudeSpectrum()
         magnitudeSpectrum[i] = sqrt (magnitudeSpectrum[i]);
     }
 #endif
+
+
+#ifdef USE_PFFFT
+    // -----------------------------------------------
+    // PFFFT VERSION
+    // -----------------------------------------------
+    int i = 0;
+    
+    for (int i = 0; i < bufferSize; i++) {
+        fft_data[i] = buffer[i] * window[i];
+    }
+    
+    // execute kiss fft
+    rffts(fft_data, log2_fft_size, 1);
+    
+    // compute first (N/2)+1 mag values
+    magnitudeSpectrum[0] = fft_data[0];
+    magnitudeSpectrum[bufferSize / 2] = fft_data[1];  // nyquist term
+    for (i = 1; i < (bufferSize / 2) + 1; i++) {
+        magnitudeSpectrum[i] = sqrt(pow(fft_data[i * 2], 2) +
+                                    pow (fft_data[i * 2 + 1], 2));
+        magnitudeSpectrum[i] = sqrt(magnitudeSpectrum[i]);
+    }
+#endif
+
 }
 
 //==================================================================================
+// TODO: this is some kind of low-pass filter, but it should preserve state
+// TODO:     across audio frames
 void Chromagram::downSampleFrame (std::vector<double> inputAudioFrame)
 {
     std::vector<double> filteredFrame (inputAudioFrameSize);
