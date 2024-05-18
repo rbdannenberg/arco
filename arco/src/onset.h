@@ -38,8 +38,8 @@ class Onset : public Ugen {
         init_input(input);
         
         samps_stored = 0;
-        frame_size = 2048;
-        hop_size = 512;
+        frame_size = 256;
+        hop_size = 128;
         input_chans = input->chans;
         
         odfs = O2_MALLOCNT(input_chans, LPSpectralDifferenceODF*);
