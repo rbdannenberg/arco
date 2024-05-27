@@ -215,7 +215,8 @@ def arco_ready():
     Checkbox(win, "Chorddetect Test", 'S', 'D', 'S', 'S', 'chorddetectcheckbox')
     chorddetectcheckbox.add_target_method(nil, 'chorddetecttest')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'chorddetecttext')
-    
+
+    wxs_x = COLUMN_TWO
     Checkbox(win, "Onset", 'S', 'D', 55, 'S', 'onsetcheckbox')
     onsetcheckbox.add_target_method(nil, 'onsettest')
     
