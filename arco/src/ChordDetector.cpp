@@ -30,13 +30,7 @@ ChordDetector::ChordDetector()
 }
 
 //=======================================================================
-void ChordDetector::detectChord (std::vector<double> chroma)
-{
-    detectChord (&chroma[0]);
-}
-
-//=======================================================================
-void ChordDetector::detectChord (double* chroma)
+void ChordDetector::detectChord (float* chroma)
 {
 	for (int i = 0; i < 12; i++)
 	{

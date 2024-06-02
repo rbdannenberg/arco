@@ -20,7 +20,7 @@
 //=======================================================================
 
 #include "Chromagram.h"
-
+#include "arcougen.h"
 //==================================================================================
 Chromagram::Chromagram (int frameSize, int fs)
  :  referenceFrequency (130.81278265),
@@ -39,10 +39,10 @@ Chromagram::Chromagram (int frameSize, int fs)
     setupFFT();
     
     // set buffer size
-    buffer.resize (bufferSize);
+    buffer = O2_MALLOCNT(bufferSize, float);
     
     // setup chromagram vector
-    chromagram.resize (12);
+    chromagram = O2_MALLOCNT(12, float);
     
     // initialise chromagram
     for (int i = 0; i < 12; i++)
@@ -51,7 +51,7 @@ Chromagram::Chromagram (int frameSize, int fs)
     }
     
     // setup magnitude spectrum vector
-    magnitudeSpectrum.resize ((bufferSize/2)+1);
+    magnitudeSpectrum = O2_MALLOCNT((bufferSize/2)+1, float);
     
     // make window function
     makeHammingWindow();
@@ -70,11 +70,25 @@ Chromagram::Chromagram (int frameSize, int fs)
     
     // initialise chroma ready variable
     chromaReady = false;
+    
+    // initialize buffer index
+    bufferIndex = 0;
+    
+    // initialize downsampling low pass filter states
+    x_1 = 0;
+    x_2 = 0;
+    y_1 = 0;
+    y_2 = 0;
 }
 
 //==================================================================================
 Chromagram::~Chromagram()
 {
+    O2_FREE(window);
+    O2_FREE(buffer);
+    O2_FREE(magnitudeSpectrum);
+    O2_FREE(downsampledInputAudioFrame);
+    O2_FREE(chromagram);
     // ------------------------------------
 #ifdef USE_FFTW
     // destroy fft plan
@@ -92,26 +106,14 @@ Chromagram::~Chromagram()
 #endif
     
 #ifdef USE_PFFFT
-    // TODO: use O2MALLOC and O2FREE for storage
-    delete [] fft_data;
+    O2_FREE(fft_data);
+    
 #endif
 }
 
-//==================================================================================
-void Chromagram::processAudioFrame (double* inputAudioFrame)
-{
-    // create a vector
-    std::vector<double> v;
-    
-    // use the array to initialise it
-    v.assign (inputAudioFrame, inputAudioFrame + inputAudioFrameSize);
-    
-    // process the vector
-    processAudioFrame (v);
-}
 
 //==================================================================================
-void Chromagram::processAudioFrame (std::vector<double> inputAudioFrame)
+void Chromagram::processAudioFrame (float* inputAudioFrame)
 {
     // our default state is that the chroma is not ready
     chromaReady = false;
@@ -119,19 +121,10 @@ void Chromagram::processAudioFrame (std::vector<double> inputAudioFrame)
     // downsample the input audio frame by 4
     downSampleFrame(inputAudioFrame);
     
-    // move samples back
-    // TODO: this is inefficient. Should shift buffer by
-    // TODO:   chromaCalculationInterval after calculateChromagram(); then no
-    // TODO:   other shifting would be necessary
-    for (int i = 0; i < bufferSize - downSampledAudioFrameSize; i++)
-    {
-        buffer[i] = buffer[i + downSampledAudioFrameSize];
-    }
-    
     int n = 0;
     
     // add new samples to buffer
-    for (int i = (bufferSize - downSampledAudioFrameSize); i < bufferSize; i++)
+    for (int i = bufferIndex; i < bufferIndex + downSampledAudioFrameSize; i++)
     {
         buffer[i] = downsampledInputAudioFrame[n];
         n++;
@@ -139,12 +132,27 @@ void Chromagram::processAudioFrame (std::vector<double> inputAudioFrame)
     
     // add number of samples from calculation
     numSamplesSinceLastCalculation += inputAudioFrameSize;
-        
+    
+    bufferIndex += downSampledAudioFrameSize;
+    
     // if we have had enough samples
     if (numSamplesSinceLastCalculation >= chromaCalculationInterval)
     {
         // calculate the chromagram
         calculateChromagram();
+        
+        // If buffer cannot take one more frame, shift it left by downSampledCalcInterval and update bufferIndex
+        int downSampledCalcInterval = chromaCalculationInterval / 4;
+        if (bufferIndex + downSampledAudioFrameSize >= bufferSize) {
+            
+            for (int i = 0; i < bufferSize - downSampledCalcInterval; i++)
+            {
+                assert(i + downSampledCalcInterval < bufferSize);
+                buffer[i] = buffer[i + downSampledCalcInterval];
+            }
+            
+            bufferIndex -= downSampledCalcInterval;
+        }
         
         // reset num samples counter
         numSamplesSinceLastCalculation = 0;
@@ -156,10 +164,8 @@ void Chromagram::processAudioFrame (std::vector<double> inputAudioFrame)
 void Chromagram::setInputAudioFrameSize (int frameSize)
 {
     inputAudioFrameSize = frameSize;
-    
-    downsampledInputAudioFrame.resize (inputAudioFrameSize / 4);
-    
-    downSampledAudioFrameSize = (int) downsampledInputAudioFrame.size();
+    downsampledInputAudioFrame = O2_MALLOCNT(inputAudioFrameSize / 4, float);
+    downSampledAudioFrameSize = inputAudioFrameSize / 4;
 }
 
 //==================================================================================
@@ -171,13 +177,17 @@ void Chromagram::setSamplingFrequency (int fs)
 //==================================================================================
 void Chromagram::setChromaCalculationInterval (int numSamples)
 {
+    // True number of samples buffer can store is bufferSize * 4 since we downsample
+    if (numSamples > bufferSize * 4) {
+        printf("Failed to set Chroma Calculation Interval. Cannot be greater than window size\n");
+        return;
+    }
     chromaCalculationInterval = numSamples;
 }
 
 //==================================================================================
-std::vector<double> Chromagram::getChromagram()
+float* Chromagram::getChromagram()
 {
-    // TODO: pretty sure this does a deep copy -- not a good idea
     return chromagram;
 }
 
@@ -206,7 +216,7 @@ void Chromagram::setupFFT()
 #endif
     
 #ifdef USE_PFFFT
-    fft_data = new float[bufferSize];
+    fft_data = O2_MALLOCNT(bufferSize, float);
     log2_fft_size = ilog2(bufferSize);
     int rslt = fftInit(log2_fft_size);
     assert(rslt == 1);
@@ -319,7 +329,6 @@ void Chromagram::calculateMagnitudeSpectrum()
         fft_data[i] = buffer[i] * window[i];
     }
     
-    // execute kiss fft
     rffts(fft_data, log2_fft_size, 1);
     
     // compute first (N/2)+1 mag values
@@ -335,11 +344,9 @@ void Chromagram::calculateMagnitudeSpectrum()
 }
 
 //==================================================================================
-// TODO: this is some kind of low-pass filter, but it should preserve state
-// TODO:     across audio frames
-void Chromagram::downSampleFrame (std::vector<double> inputAudioFrame)
+void Chromagram::downSampleFrame (float* inputAudioFrame)
 {
-    std::vector<double> filteredFrame (inputAudioFrameSize);
+    float* filteredFrame = O2_MALLOCNT(inputAudioFrameSize, float);
     
     float b0,b1,b2,a1,a2;
     float x_1,x_2,y_1,y_2;
@@ -350,10 +357,6 @@ void Chromagram::downSampleFrame (std::vector<double> inputAudioFrame)
     a1 = -0.0000;
     a2 = 0.1716;
     
-    x_1 = 0;
-    x_2 = 0;
-    y_1 = 0;
-    y_2 = 0;
     
     for (int i = 0; i < inputAudioFrameSize; i++)
     {
@@ -369,13 +372,15 @@ void Chromagram::downSampleFrame (std::vector<double> inputAudioFrame)
     {
         downsampledInputAudioFrame[i] = filteredFrame[i * 4];
     }
+    
+    O2_FREE(filteredFrame);
 }
 
 //==================================================================================
 void Chromagram::makeHammingWindow()
 {
     // set the window to the correct size
-    window.resize (bufferSize);
+    window = O2_MALLOCNT(bufferSize, float);
     
     // apply hanning window to buffer
     for (int n = 0; n < bufferSize;n++)

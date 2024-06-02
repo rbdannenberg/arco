@@ -62,15 +62,7 @@ public:
      * the length indicated by the input audio frame size passed to the constructor
      * @see setInputAudioFrameSize
      */
-    void processAudioFrame (double* inputAudioFrame);
-    
-    /** Process a single audio frame. This will determine whether enough samples
-     * have been accumulated and if so, will calculate the chromagram
-     * @param inputAudioFrame a vector containing the input audio frame. This should be
-     * the length indicated by the input audio frame size passed to the constructor
-     * @see setInputAudioFrameSize
-     */
-    void processAudioFrame (std::vector<double> inputAudioFrame);
+    void processAudioFrame (float* inputAudioFrame);
     
     /** Sets the input audio frame size
      * @param frameSize the input audio frame size
@@ -92,7 +84,7 @@ public:
     void setChromaCalculationInterval (int numSamples);
     
     /** @returns the chromagram vector */
-    std::vector<double> getChromagram();
+    float* getChromagram();
     
     /** @returns true if a new chromagram vector has been calculated at the current iteration. This should
      * be called after processAudioFrame
@@ -104,23 +96,21 @@ private:
     void setupFFT();
     void calculateChromagram();
     void calculateMagnitudeSpectrum();
-	void downSampleFrame (std::vector<double> inputAudioFrame);
+	void downSampleFrame (float* inputAudioFrame);
     void makeHammingWindow();
     double round (double val);
     
-    // TODO: These are going to result in calls to free which is not lock-free
-    // TODO:    Use O2MALLOC instead (and maybe Vec, but probably these can
-    // TODO:    just be changed to float *
-    std::vector<double> window;
-    std::vector<double> buffer;
-    std::vector<double> magnitudeSpectrum;
-    std::vector<double> downsampledInputAudioFrame;
-    std::vector<double> chromagram;
+    float* window;
+    float* buffer;
+    float* magnitudeSpectrum;
+    float* downsampledInputAudioFrame;
+    float* chromagram;
     
     double referenceFrequency;
     double noteFrequencies[12];
     
     int bufferSize;
+    int bufferIndex; // Where to add new samples in buffer
     int samplingFrequency;
     int inputAudioFrameSize;
     int downSampledAudioFrameSize;
@@ -130,6 +120,9 @@ private:
     int numSamplesSinceLastCalculation;
     int chromaCalculationInterval;
     bool chromaReady;
+    
+    //  downsampling low pass filter states
+    float x_1, x_2, y_1, y_2;
 
 #ifdef USE_FFTW
     fftw_plan p;

@@ -22,17 +22,12 @@ public:
     Ugen_ptr input;
     int input_stride;
     Sample_ptr input_samps;
-
-    // TO DO: currently chord detector's frame size is BL = 32 and sample rate is AR = 44100
-    // Let user set own frame size? Would require storing in a buffer in real_run().
-    Chorddetect(int id, int chans, char *reply_addr, int frame_size,
-                int sample_rate) : Ugen(id, 0, 0), chromagram(BL, AR)
+    
+    Chorddetect(int id, int chans, char *reply_addr) : Ugen(id, 0, 0), chromagram(BL, AR)
                 {
         printf("Chorddetect constructor id %d classname %s\n", id, classname());
         cd_reply_addr = NULL;
         input = NULL;
-//        chromagram.setInputAudioFrameSize(frame_size);
-//        chromagram.setSamplingFrequency(AR);
         start(reply_addr);
     }
 
@@ -44,6 +39,9 @@ public:
         if (cd_reply_addr) {
             O2_FREE(cd_reply_addr);
         }
+        
+        // TODO: destroy chromagram
+        chromagram.~Chromagram();
     }
 
     
@@ -73,6 +71,9 @@ public:
         assert(ugen->rate == 'a');
         init_param(ugen, input, input_stride);
         chans = ugen->chans;
+        if (chans > 1) {
+            printf("WARNING: Input has more than one channel, only the first channel is used for chord detection.\n");
+        }
     }
 
     void start(const char *reply_addr);

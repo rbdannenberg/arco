@@ -44,15 +44,10 @@ public:
 	/** Constructor */
 	ChordDetector();
     
-    /** Detects the chord from a chromagram. This is the vector interface 
-     * @param chroma a vector of length 12 containing the chromagram
-     */
-    void detectChord (std::vector<double> chroma);
-    
     /** Detects the chord from a chromagram. This is the array interface
      * @param chroma an array of length 12 containing the chromagram
      */
-    void detectChord (double* chroma);
+    void detectChord (float* chroma);
 	
     /** The root note of the detected chord */
 	int rootNote;

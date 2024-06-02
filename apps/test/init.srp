@@ -755,7 +755,7 @@ def chorddetecttest(obj, event, x, y):
             o2_method_new("/actl/chorddetect", "ssi", 'actl_chorddetect', t)
             print "installed chorddetect handler"
             chorddetect_handler_installed = true
-        CD = chorddetect("/actl/chorddetect", 1024, 44100)
+        CD = chorddetect("/actl/chorddetect")
         CD.set('input', input_ugen)
         CD.run()
     else:

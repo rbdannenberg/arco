@@ -1,11 +1,11 @@
-def chorddetect(reply_addr, frame_size, sample_rate):
-    return Chorddetect(reply_addr, frame_size, sample_rate)
+def chorddetect(reply_addr):
+    return Chorddetect(reply_addr)
 
 
 class Chorddetect (Ugen):
-    def init(reply_addr, frame_size, sample_rate)
-        super.init(create_ugen_id(), "Chorddetect", 0, '', "sii",
-                   'reply_addr', reply_addr, 'frame_size', frame_size, 'sample_rate', sample_rate)
+    def init(reply_addr)
+        super.init(create_ugen_id(), "Chorddetect", 0, '', "s",
+                   'reply_addr', reply_addr)
 
     def start(reply_addr):
         o2_send_cmd("/arco/chorddetect/start", 0, "Us", id, reply_addr)

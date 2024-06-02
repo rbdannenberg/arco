@@ -14,17 +14,11 @@ void Chorddetect::real_run()
 {
     input_samps = input->run(current_block);
     
-    // convert input samples to double and process with chromagram
-    double frame[BL];
-    
-    for (int i = 0; i < BL; i++) {
-        frame[i] = *input_samps++;
-    }
-    
-    chromagram.processAudioFrame(frame);
+    // Note: processAudioFrame assumes input_samps has length BL, so it only processes the first channel of input and the rest are ignored.
+    chromagram.processAudioFrame(input_samps);
     if (chromagram.isReady()) { // only runs if we have enough samples
         
-        std::vector<double> chroma = chromagram.getChromagram();
+        float* chroma = chromagram.getChromagram();
         ChordDetector chord_detector;
         chord_detector.detectChord(chroma);
         // send message with chord information
@@ -46,8 +40,7 @@ void Chorddetect::start(const char *reply_addr) {
     strcpy(cd_reply_addr, reply_addr);
 }
 
-// ChordQuality is an enum, but we are sending string message to O2
-// This converts between the two
+// Converts chord quality enum to string message
 const char* Chorddetect::ChordQualityToString(int quality)
 {
     switch (quality)
@@ -66,6 +59,7 @@ const char* Chorddetect::ChordQualityToString(int quality)
         return "Augmented 5th";
     }
 }
+
 // Convert root note integer to string
 const char* Chorddetect::RootNoteToString(int root)
 {
@@ -105,7 +99,7 @@ static void arco_chorddetect_repl_input(O2SM_HANDLER_ARGS)
 
 
 
-/* O2SM INTERFACE: /arco/chorddetect/new int32 id, int32 chans, string reply_addr, int32 frame_size, int32 sample_rate;
+/* O2SM INTERFACE: /arco/chorddetect/new int32 id, int32 chans, string reply_addr;
  */
 static void arco_chorddetect_new(O2SM_HANDLER_ARGS)
 {
@@ -113,11 +107,9 @@ static void arco_chorddetect_new(O2SM_HANDLER_ARGS)
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
     char *reply_addr = argv[2]->s;
-    int32_t frame_size = argv[3]->i;
-    int32_t sample_rate = argv[4]->i;
     // end unpack message
 
-    new Chorddetect(id, chans, reply_addr, frame_size, sample_rate);
+    new Chorddetect(id, chans, reply_addr);
 }
 
 
@@ -128,7 +120,7 @@ static void chorddetect_init()
                     NULL, true, true);
     o2sm_method_new("/arco/chorddetect/repl_input", "ii",
                     arco_chorddetect_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/chorddetect/new", "iisii", arco_chorddetect_new,
+    o2sm_method_new("/arco/chorddetect/new", "iis", arco_chorddetect_new,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
