@@ -40,8 +40,6 @@ public:
             O2_FREE(cd_reply_addr);
         }
         
-        // TODO: destroy chromagram
-        chromagram.~Chromagram();
     }
 
     

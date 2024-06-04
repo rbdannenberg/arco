@@ -349,14 +349,12 @@ void Chromagram::downSampleFrame (float* inputAudioFrame)
     float* filteredFrame = O2_MALLOCNT(inputAudioFrameSize, float);
     
     float b0,b1,b2,a1,a2;
-    float x_1,x_2,y_1,y_2;
     
     b0 = 0.2929;
     b1 = 0.5858;
     b2 = 0.2929;
     a1 = -0.0000;
     a2 = 0.1716;
-    
     
     for (int i = 0; i < inputAudioFrameSize; i++)
     {
