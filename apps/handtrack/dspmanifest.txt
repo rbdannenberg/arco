@@ -1,0 +1,11 @@
+# manifest for test (daserpent)
+vu
+probe
+pwl*
+pwe*
+mix
+sine*
+mult*
+route
+reson*
+smoothb

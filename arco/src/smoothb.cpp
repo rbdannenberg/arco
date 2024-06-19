@@ -85,6 +85,7 @@ void arco_smoothb_setn(O2SM_HANDLER_ARGS)
         if (index != argc - 1) {
             goto bad_args;
         }
+        return;
     }
   bad_args:
     arco_warn("/arco/smoothb/setn: bad type string %s", types);

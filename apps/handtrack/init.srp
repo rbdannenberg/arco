@@ -1,0 +1,209 @@
+# arco.srp -- Serpent library for controlling Arco
+#
+# Roger B. Dannenberg
+# Jan 2022
+
+# call arco_init(ensemble) to start
+# call arco_run() after setting up UI and or scheduling things
+# arco_ready is set to true when arco is ready for action
+
+require "debug"
+require "wxserpent"
+//require "prob"
+require "arco"
+require "allugens"
+//require "reverb"
+//require "soundfont"
+//require "pan"
+require "steps"
+
+SIMPLE = false
+
+ui_initialized = false
+ready_count = 0
+
+def arco_ready():
+# called when arco is intialized and ready to make sound or when
+# arco audio stream has been reopened
+    display "**** arco audio is running! ****", ready_count
+    ready_count = ready_count + 1
+    if ready_count > 1:
+        display "arco_ready called again", ready_count
+        breakpoint()
+    var win = default_window
+    if ui_initialized:
+        return
+
+    display "arco_ready", wxs_h, wxs_space,
+    display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
+    var WIDTH = 170
+    var SLWIDTH = 270
+
+    Checkbox(win, "Sound On", 5, 5, WIDTH, 20, 'stcheckbox')
+    stcheckbox.add_target_method(nil, 'play_simple_test')
+
+    Checkbox(win, "Show Data", 'S', 'D', 'S', 'S', 'showdatabox')
+    showdatabox.add_target_method(nil, 'show_data_click')
+
+    Labeled_slider(win, "Smooth Hz", 'S', 'D', SLWIDTH, 'S', 70, 0.1, 10, 5,
+                   'exponential', 'smoothhz')
+    smoothhz.add_target_method(nil, 'set_smooth')
+
+
+// handler for /host/openaggr messages with param info (a string)
+def host_openaggr(timestamp, address, types, info)
+    var LATENCY_MS = 50
+    print info
+    if find(info, "Aggregate") >= 0 or find(info, "default") >= 0:
+        var id = int(info)
+        print "  --> opening this device, id", id
+        arco_open(id, id, 2, 2, LATENCY_MS, 32)
+        o2_send_cmd("/arco/open", 0, "iiiiiis", id, id, 2, 2, LATENCY_MS, 32,
+                    "actl");
+        o2_send_cmd("/arco/prtree", o2_time_get() + 1, "");
+        
+
+def host_openaggr_init()
+    o2_service_new("host")
+    o2_method_new("/host/openaggr", "s", 'host_openaggr', t)
+
+
+
+######### Synthesis Tests ##############
+
+sins = array(6)
+sinamps = array(len(sins))
+sinfreqs = array(len(sins))
+centerfreq = nil
+reson = nil
+
+// handler for stcheckbox: play/stop some sine tones
+def play_simple_test(obj, event, x, y):
+    display "play_simple_test", x
+    if x:
+        var hz = smoothhz.value()
+        var mix = mix(1)
+        for s at i in sins:
+            sinfreqs[i] = smoothb(440 * (i + 1), hz)
+            sinamps[i] = smoothb(0.01 * 0.5 ** i, hz)
+            sins[i] = sine(sinfreqs[i], sinamps[i])
+            mix.ins(intern("i" + str(i)), sins[i], 1.0)
+        centerfreq = smoothb(200, hz)
+        reson = reson(mix, centerfreq, 4.0)
+        reson.play()
+    else:
+        for s at i in sins:
+            sins[i] = nil  // delete reference for garbage collection
+        reson.mute()
+        reson = nil
+        centerfreq = nil
+
+
+def show_data_click(obj, event, x, y):
+    show_data = x
+
+
+def set_smooth(slider, hz):
+    for sf at i in sinfreqs:
+        if not sf:  // if smoothb's are deleted, ignore slider
+            return
+        sf.set_cutoff(hz)
+        sinamps[i].set_cutoff(hz)
+    display "set_smooth", hz
+
+
+
+########## Main Initialization ################
+
+def arco_prugens_handler(rest ignore):
+    // this tells Arco to print the Ugen tree -- it can be useful for
+    //     debugging.
+    o2_send_cmd("/arco/prtree", 0, "")
+    // also print the list of Ugens accessible by integer ID:
+    o2_send_cmd("/arco/prugens", 0, "")
+
+
+def arco_ugen_gc_info_handler(rest ignore):
+    arco_ugen_gc_info()
+
+
+htamp = 0.01
+gains = array(len(sins), 0.0)
+rms = 1.0  // don't allow zero
+show_data = nil
+
+
+def htclient_obj(timestamp, address, types, kind, score, x, y, w, h):
+    if show_data:
+        display "htclient_obj", kind, score, x, y, w, h
+    for s in sins:  // return if any oscillator has been deleted
+        if not s:
+            return
+    if not reson:
+       return
+    if kind == 1: // open hand
+        var xavg = x + w / 3
+        var pitch = interpolate(max(min(xavg, 450), 50), 50, 48, 450, 72)
+        var freq = step_to_hz(pitch)
+        for s at i in sins:
+            sinfreqs[i].set(freq * (i + 1))
+        var spread = w / h
+        if show_data:
+            display "hand", spread
+        rolloff = 0.8
+        var sizegain = ((max(min(h, 400), 100) - 50) / 350) ** 2
+
+        gains = [rolloff ** i for i = 0 to len(sins)]
+        var rms = 0
+        for g in gains:
+            rms = rms + g * g  // sum of amplitudes squared
+        rms = sqrt(rms / len(gains))  // finish to get rms
+        sizegain = sizegain / rms
+        for g at i in gains:
+            gains[i] = g * sizegain
+        set_gains()
+
+        spread = max(0.7, min(0.9, spread))
+        var center = interpolate(spread, 0.7, freq, 0.9, freq * 8)
+        if centerfreq:
+            centerfreq.set(center)
+    elif kind == 2: // closed hand
+        htamp = max(0.001, htamp * 0.95)
+        set_gains()
+        display "closed hand", htamp
+    elif kind == 4: // point up
+        htamp = min(0.1, htamp * 1.05)
+        set_gains()
+        display "point up", htamp
+
+
+def set_gains():
+    // normalize gains to get rms = 1
+    for s at i in sins:
+        g = htamp * gains[i]
+        sinamps[i].set(g)
+        if show_data:
+            print i, g,
+    if show_data:
+        print
+
+
+def main():
+    o2_debug_flags("") // ("SsBl")
+    arco_init(ensemble = "rbdhttest", latency = 60, network = false,
+              title = "HandTrack Demo")
+    arco_run()
+    sched_select(rtsched)
+
+    o2_http_initialize(8080, "www")
+    o2_service_new("htclient")
+    o2_method_new("/htclient/obj", "ifffff", 'htclient_obj', t)
+
+    var file_menu = default_window.get_menu("File")
+    file_menu.item("Print Ugen Info", "print Ugen tree and table",
+                   nil, nil, 'arco_prugens_handler')
+    file_menu.item("Arco Ugen GC Info", "print info about Ugen IDs",
+                   nil, nil, 'arco_ugen_gc_info_handler')
+
+
+main()

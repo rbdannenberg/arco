@@ -39,7 +39,10 @@ These instructions assume you want to run Arco as a library within Serpent. Whil
 
 - Install CMake (I prefer CMake.app, but you should be able to run ccmake from a terminal if you prefer)
 - - Clone and build o2 from https://github.com/rbdannenberg/o2
-- Checkout and build serpent from SourceForge (serpent project: https://sourceforge.net/projects/serpent, see `serpent/doc/installation-mac64.htm` for installation guide. This will take some time since you will need to build WxWidgets from sources. **Note that you need to check out the source code, not a compiled application.** Serpent installation instructions will show you how to Serpent on your path so you can run it from a Terminal (command line/shell). This is optional, but you should at least make sure wxserpent64 runs. Once it runs, you will build an Arco app, which will essentially be wxserpent64 with Arco linked in.
+- Checkout and build serpent from SourceForge (serpent project: https://sourceforge.net/projects/serpent, see `serpent/doc/installation-mac64.htm` for installation guide. This will take some time since you will need to build WxWidgets from sources. 
+  - **Note 1: that you need to check out the source code, not a compiled application. Do not simply take the MacOS Download, which defaults to compiled binaries. You can also find sources (for all platforms) in the Linux download or under the Files tab at SourceForge.**
+  - **Note 2: Serpent installation instructions begin with installing from sources, but you are *building* from sources, so skip down to the section on building from osources.**
+- Serpent installation instructions (part 1) will show you how to put Serpent on your path so you can run it from a Terminal (command line/shell). This is optional, but you should at least make sure wxserpent64 runs. Once it runs, you will build an Arco app, which will essentially be wxserpent64 with Arco linked in.
 - Clone http://github.com/rbdannenberg/arco. My cloned repo is in `~/arco`, but we'll call it ARCODIR
 - Install `portaudio`
 - Install or build `libsndfile`

@@ -71,3 +71,23 @@ CMakeCache.txt
 /apps/sep/Release/
 
 /apps/test/Release/
+
+/apps/handtrack/make_faust_ugens.sh
+
+/apps/handtrack/cmake_install.cmake
+
+/apps/handtrack/dspmakefile
+
+/apps/handtrack/CMakeCache.txt
+
+/apps/handtrack/dspsources.cmakeinclude
+
+/apps/handtrack/allugens.srp
+
+/apps/handtrack/wxsbuild/
+
+/apps/handtrack/CMakeFiles/
+
+/apps/handtrack/serpent/
+
+

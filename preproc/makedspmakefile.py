@@ -281,20 +281,38 @@ def make_inclfile(arco_path, manifest, outf):
         print("    debug ${FLSYN_DBG_LIB} optimized ${FLSYN_OPT_LIB})",
               file=outf)
 
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug ${GLIB_DBG_LIB} optimized ${GLIB_OPT_LIB})",
+        print('if(NOT (GLIB_DBG_LIB STREQUAL "ignore"))', file=outf)
+        print("  target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("      debug ${GLIB_DBG_LIB} optimized ${GLIB_OPT_LIB})",
               file=outf)
-        print('if(NOT EXISTS "${GLIB_DBG_LIB}")', file=outf)
-        print('  message(FATAL_ERROR "Could not find ${GLIB_DBG_LIB}, ' + \
+        print('  if(NOT EXISTS "${GLIB_DBG_LIB}")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${GLIB_DBG_LIB}, ' + \
               'delete GLIB_DBG_LIB from cache and fix in ' + \
               'apps/common/libraries.txt")', file=outf)
-        print("endif()", file=outf)
-        print('if(NOT EXISTS "${GLIB_OPT_LIB}")', file=outf)
-        print('  message(FATAL_ERROR "Could not find ${GLIB_OPT_LIB}, ' + \
+        print("  endif()", file=outf)
+        print('  if(NOT EXISTS "${GLIB_OPT_LIB}")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${GLIB_OPT_LIB}, ' + \
               'delete GLIB_OPT_LIB from cache and fix in ' + \
               'apps/common/libraries.txt")', file=outf)
+        print("  endif()", file=outf)
         print("endif()", file=outf)
               
+        print('if(NOT (INTL_DBG_LIB STREQUAL "ignore"))', file=outf)
+        print("  target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("      debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
+              file=outf)
+        print('  if(NOT EXISTS "${INTL_DBG_LIB}")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${INTL_DBG_LIB}, ' + \
+              'delete INTL_DBG_LIB from cache and fix in ' + \
+              'apps/common/libraries.txt")', file=outf)
+        print("  endif()", file=outf)
+        print('  if(NOT EXISTS "${INTL_OPT_LIB}")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${INTL_OPT_LIB}, ' + \
+              'delete INTL_OPT_LIB from cache and fix in ' + \
+              'apps/common/libraries.txt")', file=outf)
+        print("  endif()", file=outf)
+        print("endif()", file=outf)
+
 #        print("target_link_libraries(arco4lib PRIVATE", file=outf)
 #        print("    debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
 #              file=outf)

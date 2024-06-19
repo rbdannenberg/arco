@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # Jan 2022
 
-# call arco_init(ensemble) to start
+# call arco_init() to start (see def arco_init(...) for options)
 # call arco_run() after setting up UI and or scheduling things
 # arco_ready is set to true when arco is ready for action
 
@@ -467,7 +467,6 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
     o2_method_new("/actl/reset", "", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
-    // o2_method_new("/actl/yin", "fff", 'actl_yin', t)
     sched_select(rtsched)
     sched_cause(0.1, nil, 'poll_for_arco')
     if IS_WXSERPENT:

@@ -41,6 +41,12 @@ set(VORBISFILE_OPT_LIB "/Users/rbd/nyquist/Release/libvorbisfile_static.a"
                        CACHE FILEPATH "vorbisfile library - optimized version")
 set(VORBISFILE_DBG_LIB "/Users/rbd/nyquist/Debug/libvorbisfile_static.a"
                        CACHE FILEPATH "vorbisfile library - debug version")
+set(OPUS_INCL "/opt/homebrew/include/opus" CACHE
+              PATH "opus library include directory")
+set(OPUS_OPT_LIB "/opt/homebrew/lib/libopus.a" CACHE  
+                 FILEPATH "opus library - optimized version")  
+set(OPUS_DBG_LIB "/opt/homebrew/lib/libopus.a" CACHE  
+                 FILEPATH "opus library - debug version")  
 set(FAUST_PATH "/Users/rbd/faust/bin")
 
 set(O2_INCL "/Users/rbd/o2/src" CACHE PATH "Main O2 include directory")

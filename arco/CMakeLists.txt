@@ -206,16 +206,16 @@ message(STATUS "PA_OPT_LIB ${PA_OPT_LIB}, PA_DBG_LIB ${PA_DBG_LIB}")
 
 target_link_libraries(arco4lib PRIVATE 
     debug ${PA_DBG_LIB} optimized ${PA_OPT_LIB}
-    debug ${SNDFILE_DBG_LIB} optimized ${SNDFILE_OPT_LIB}) 
+    debug ${SNDFILE_DBG_LIB} optimized ${SNDFILE_OPT_LIB})
 
 
 if(USE_LIBSNDFILE_EXTERNALS)
   # libsndfile also uses libogg and libvorbis. For these, we don't need
   #   the include path because they are accessed only indirectly through 
   #   libsndfile
-  if(OGG_INCL) 
-      append_to_global(ALL_INCLUDE_DIRECTORIES ${OGG_INCL})  
-  endif() 
+  # if(OGG_INCL) 
+  #     append_to_global(ALL_INCLUDE_DIRECTORIES ${OGG_INCL})  
+  # endif() 
   find_library(OGG_OPT_LIB NAMES ogg_static.a ogg_static ogg.a ogg 
                HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
   find_library(OGG_DBG_LIB NAMES ogg_static.a ogg_static ogg.a ogg 
@@ -223,9 +223,12 @@ if(USE_LIBSNDFILE_EXTERNALS)
 
   message(STATUS "OGG_OPT_LIB ${OGG_OPT_LIB}, OGG_DBG_LIB ${OGG_DBG_LIB}")      
 
-  if(FLAC_INCL)
-      append_to_global(ALL_INCLUDE_DIRECTORIES ${FLAC_INCL})  
-  endif() 
+  # FLAC_INCL has a non-standard assert.h that breaks compilations, so
+  # see if we can get away with NOT putting this on the include path -
+  # libsndfile is built separately
+  # if(FLAC_INCL)
+  #     append_to_global(ALL_INCLUDE_DIRECTORIES ${FLAC_INCL})  
+  # endif() 
   find_library(FLAC_OPT_LIB NAMES flac_static.a FLAC_static.a flac_static 
                                   FLAC_static flac.a FLAC.a flac FLAC
                HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
@@ -235,9 +238,10 @@ if(USE_LIBSNDFILE_EXTERNALS)
 
   message(STATUS "FLAC_OPT_LIB ${FLAC_OPT_LIB}, FLAC_DBG_LIB ${FLAC_DBG_LIB}") 
 
-  if(VORBIS_INCL)
-      append_to_global(ALL_INCLUDE_DIRECTORIES ${VORBIS_INCL})
-  endif() 
+  # Since FLAC_INCL seems unnecessary, let's eliminate VORBIS_INCL too
+  # if(VORBIS_INCL)
+  #     append_to_global(ALL_INCLUDE_DIRECTORIES ${VORBIS_INCL})
+  # endif() 
   find_library(VORBIS_OPT_LIB NAMES vorbis_static.a vorbis_static 
                                     vorbis.a vorbis 
                HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
@@ -269,7 +273,8 @@ if(USE_LIBSNDFILE_EXTERNALS)
     debug ${FLAC_DBG_LIB} optimized ${FLAC_OPT_LIB}
     debug ${VORBIS_DBG_LIB} optimized ${VORBIS_OPT_LIB}
     debug ${VORBISENC_DBG_LIB} optimized ${VORBISFILE_OPT_LIB}
-    debug ${VORBISFILE_DBG_LIB} optimized ${VORBISFILE_OPT_LIB})
+    debug ${VORBISFILE_DBG_LIB} optimized ${VORBISFILE_OPT_LIB}
+    debug ${OPUS_DBG_LIB} optimized ${OPUS_OPT_LIB})
 endif()
 
 # Now we need additional linux libraries:
