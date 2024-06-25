@@ -10,10 +10,26 @@ OSX_VER=12.0
 
 # option to bypass homebrew and build everything from sources
 # set to true to allow linking to brew libraries, set to nothing
-# to build from sources (except libsndfile still gets FLAC, Vorbis,
-# etc. from libsndfile if they are available.
-TRY_BREW=
-#TRY_BREW=true
+# to build from sources. However, libsndfile may get FLAC, Vorbis,
+# etc. from homebrew if they are available there. I haven't
+# figured out how to make a completely static link with all the
+# libsndfile components (or how to make libsndfile *without* opus,
+# ogg, vorbis, mp3, etc.) so the default configuration is to
+# simply use homebrew where possible.
+#TRY_BREW=
+TRY_BREW=true
+
+# mv_to_new_dir(file, dir) - remove dir, make it, move file to it
+function mv_to_new_dir() {
+    if [ -e $2 ];
+    then
+        rm -rf $2
+    fi
+    mkdir $2
+    mv $1 $2
+}
+
+echo "# At start, arco/build_everything_cmd.sh in $PWD"
 
 # but we still need some libraries from brew, so make sure they are installed
 brew install libogg
@@ -37,10 +53,13 @@ then
          > ../serpent_src_for_build_everything_cmd.zip
   fi
   pushd ..
+  echo "# Before build serpent, arco/build_everything_cmd.sh in $PWD"
+
   unzip serpent_src_for_build_everything_cmd.zip
   cd serpent
   ./build_everything_cmd.sh
   popd
+  echo "# After build serpent, arco/build_everything_cmd.sh in $PWD"
 fi
 
 # building serpent will build o2 and wxWidgets, which we can use for Arco too
@@ -76,9 +95,11 @@ then
          > ../fluidsynth.zip
   fi  
   pushd ..
+  echo "# Before build fluidsynth, arco/build_everything_cmd.sh in $PWD"
   unzip fluidsynth.zip
   mv fluidsynth-$FLSYNVER fluidsynth
   cd fluidsynth
+  echo "# Before fluidsynth cmake, arco/build_everything_cmd.sh in $PWD"
   cmake . -DBUILD_SHARED_LIBS=off -Denable-pulseaudio=off \
         -Denable-framework=off -Denable-jack=off \
         -Denable-aufile=off -Denable-coreaudio=off \
@@ -90,8 +111,8 @@ then
         -Denable-sdl2=off -Denable-wasapi=off \
         -Denable-waveout=off -Denable-winmidi=off
   make
-  mkdir -p Release
-  mv src/libfluidsynth.a Release/libfluidsynth-static.a
+  mv src/libfluidsynth.a src/libfluidsynth-static.a
+  mv_to_new_dir libfluidsynth-static.a Release
   echo "===== made Release ===="
   rm src/fluidsynth
   make clean
@@ -107,13 +128,14 @@ then
         -Denable-waveout=off -Denable-winmidi=off \
         -DCMAKE_BUILD_TYPE=Debug
   make
-  mkdir -p Debug
-  mv src/libfluidsynth.a Debug/libfluidsynth-static.a
+  mv src/libfluidsynth.a src/libfluidsynth-static.a
+  mv_to_new_dir src/libfluidsynth-static.a Debug
   echo "===== made Debug ===="
   rm src/fluidsynth
   popd
+  echo "# After making fluidsynth, arco/build_everything_cmd.sh in $PWD"
 fi
-
+# currently we are in build/arco
 # install PortAudio, but only if it is not there already
 # try to use homebrew, then install from sources
 
@@ -131,32 +153,37 @@ else
            > ../portaudio.tgz
     fi
     pushd ..
+    echo "# Before unzipping portaudio, arco/build_everything_cmd.sh in $PWD"
     tar -xf portaudio.tgz
     cd portaudio
+    echo "# Before building portaudio, arco/build_everything_cmd.sh in $PWD"
     echo "=============== Building PortAudio Library ==============="
     cmake . -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER \
           -DPA_BUILD_SHARED=off -DPA_DISABLE_INSTALL=on
     make clean
     make
-    mkdir -p Release
-    mv libportaudio.a Release/libportaudio-static.a
+    mv libportaudio.a libportaudio-static.a
+    mv_to_new_dir libportaudio-static.a Release
 
     make clean
     cmake . -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER \
           -DPA_BUILD_SHARED=off -DPA_DISABLE_INSTALL=on
     make 
-    mkdir -p Debug
-    mv libportaudio.a Debug/libportaudio-static.a
+    mv libportaudio.a libportaudio-static.a
+    mv_to_new_dir libportaudio-static.a Debug
     # back to arco directory:
     popd
+    echo "# After building portaudio, arco/build_everything_cmd.sh in $PWD"
   fi
   pushd ../portaudio
-  PA_OPT_LIB="$PWD/Release/libportaudio-static.a"
+  echo "# Getting portaudio paths, arco/build_everything_cmd.sh in $PWD"
+
   PA_DBG_LIB="$PWD/Debug/libportaudio-static.a"
   PA_INCL="$PWD/include"
   popd
+  echo "# After portaudio, arco/build_everything_cmd.sh in $PWD"
 fi
 
 echo "PA_OPT_LIB = $PA_OPT_LIB"
@@ -177,7 +204,9 @@ else
            > ../sndfile.zip
     fi
     pushd ..
+    # ready to pop back to arco, we are in build
     unzip sndfile.zip
+    echo "# Before building libsndfile, arco/build_everything_cmd.sh in $PWD"
     mv libsndfile-* sndfile
     cd sndfile
     echo "=============== Building SndFile Library ==============="
@@ -185,12 +214,13 @@ else
     # even if cd fails, we can still pop back to where we were:
     pushd ..
     cd /opt/homebrew/Cellar/flac/*/include/FLAC
+    echo "# Before patching FLAC, arco/build_everything_cmd.sh in $PWD"
     if [ -e assert.h ]
     then
       mv assert.h flacassert.h
     fi        
     popd
-
+    echo "# After patching FLAC, arco/build_everything_cmd.sh in $PWD"
     # strangely, the default cc (c compiler) from Xcode doesn't work
     cmake . -DBUILD_EXAMPLES=off -DBUILD_PROGRAMS=off -DBUILD_SHARED_LIBS=OFF \
           -DENABLE_MPEG=OFF \
@@ -214,8 +244,8 @@ else
           -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER -DBUILD_TESTING=OFF
     make clean
     make
-    mkdir -p Release
-    mv libsndfile.a Release/libsndfile-static.a
+    mv libsndfile.a libsndfile-static.a
+    mv_to_new_dir libsndfile-static.a Release
 
     make clean
     cmake . -DBUILD_EXAMPLES=off -DBUILD_PROGRAMS=off -DBUILD_SHARED_LIBS=OFF \
@@ -240,26 +270,33 @@ else
           -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER -DBUILD_TESTING=OFF
     make 
     mkdir -p Debug
-    mv libsndfile.a Debug/libsndfile-static.a
+    mv libsndfile.a libsndfile-static.a
+    mv_to_new_dir libsndfile-static.a Debug
 
     # unpatch homebrew FLAC
-    # even if cd fails, we can still pop back to where we were:
+    # prepare to pop back to here, which is build/sndfile
     pushd ..
+    echo "# After building libsndfile, arco/build_everything_cmd.sh in $PWD"
     cd /opt/homebrew/Cellar/flac/*/include/FLAC
+    echo "# Ready to restore FLAC, arco/build_everything_cmd.sh in $PWD"
     if [ -e flacassert.h ]
     then
       mv flacassert.h assert.h
     fi        
     popd
+    echo "# Done restoring FLAC, arco/build_everything_cmd.sh in $PWD"
 
     # back to arco directory:
     popd
+    echo "# Back to arco, arco/build_everything_cmd.sh in $PWD"
   fi
   pushd ../sndfile
+  echo "# Setting variables for built sndfile, arco/build_everything_cmd.sh in $PWD"
   SNDFILE_OPT_LIB="$PWD/Release/libsndfile-static.a"
   SNDFILE_DBG_LIB="$PWD/Debug/libsndfile-static.a"
   SNDFILE_INCL="$PWD/include"
   popd
+  echo "# Completed work on sndfile, arco/build_everything_cmd.sh in $PWD"
 fi
 
 echo "SNDFILE_OPT_LIB = $SNDFILE_OPT_LIB"
@@ -271,6 +308,7 @@ echo "SNDFILE_INCL = $SNDFILE_INCL"
 # Create libraries.txt
 BUILD_DIR=$(dirname $PWD)
 pushd apps/common
+echo "# Start libraries.txt, arco/build_everything_cmd.sh in $PWD"
 sed "s|/Users/rbd/nyquist/nylsf|$SNDFILE_INCL|g" \
     libraries-example.txt > tmplib1.txt
 sed "s|/Users/rbd/nyquist/Release/libsndfile_static.a|$SNDFILE_OPT_LIB|g" \
@@ -325,23 +363,28 @@ sed "s|CMAKE_OSX_DEPLOYMENT_TARGET \"\"|CMAKE_OSX_DEPLOYMENT_TARGET \"$OSX_VER\"
 mv tmplib2.txt libraries.txt
 rm tmplib1.txt
 popd
-echo "arco/apps/common/libraries.txt is build"
+echo "# After arco/apps/common/libraries.txt is built, $PWD"
 
 # build the setpath.sh file
 pushd ..
+echo "# Create setpath.sh (SERPENTPATH), arco/build_everything_cmd.sh in $PWD"
 echo "export SERPENTPATH=$PWD/serpent/lib:$PWD/serpent/programs:$PWD/serpent/wxslib:$PWD/arco/serpent/srp" \
      > arco/apps/common/setpath.sh
 popd
+echo "# After making setpath.sh, arco/build_everything_cmd.sh in $PWD"
+
 
 # build the test app
 pushd apps/test
+echo "# Building apps/test, arco/build_everything_cmd.sh in $PWD"
 cmake . -DCMAKE_BUILD_TYPE=Debug -DUSE_LIBSNDFILE_EXTERNALS=ON \
       -DUSE_GLCANVAS=ON -DUSE_HID=ON -DUSE_MIDI=ON \
       -DUSE_O2=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER
 make
-mkdir -p Debug
-mv daserpent.app Debug
+mv_to_new_dir daserpent.app Debug
 popd
+cd ..
+echo "# After apps/test, arco/build_everything_cmd.sh in $PWD"
 echo "*---------------------------------"
 echo "* Made arco/apps/test"
 echo "* You can run it from the arco/apps/test directory using:"

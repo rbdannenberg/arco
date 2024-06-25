@@ -7,10 +7,10 @@
 # Structure of the CMake system:
 # 
 # apps/test/CMakeLists.txt
-#     serpent/arco4.cmakeinclude
-#         arco/CMakeLists.txt -- arco sources for arco library
-#         ../serpent/64bit/src/CMakeLists.txt
-#         ../serpent/wxs/CMakeLists.txt
+#     arco/serpent/arco4.cmakeinclude
+#         arco/arco/CMakeLists.txt -- arco sources for arco library
+#         arco/../serpent/64bit/src/CMakeLists.txt
+#         arco/../serpent/wxs/CMakeLists.txt
 #
 # library organization:
 #    wxslib -- wxWidgets gui and main for serpent, arco interface functions

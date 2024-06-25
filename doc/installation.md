@@ -4,11 +4,33 @@
 
 ## Contents
 
+- [Quick Install and Test](quick-install-and-test) - fully automated complete build for MacOS
 - [Dependencies](#dependencies) - what software does Arco depend on?
 - [General Installation Information](general-installation-information)
 - [Installation on MacOS](#installation-on-macos)
 - [Installation on Linux](#installation-on-linux)
 - [CMake Overview](#cMake-overview) - how is the build system organized?
+
+## Quick Install and Test
+
+The zip `file arco_src_for_build_everything_cmd.zip` contains code and a script
+that can be used to compile Arco and the daserpent test program as follows:
+
+ 1. create an empty build directory, e.g.
+    `cd; mkdir build`
+ 2. move arco_src_for_build_everything_cmd.zip to build directory, e.g.
+    `mv Downloads/arco_src_for_build_everything_cmd.zip build`
+ 3. unzip the file, e.g.
+    `cd build; unzip arco_src_for_build_everything_cmd.zip`
+ 4. execute build_everything_cmd.sh in arco, e.g.
+    `cd arco; ./build_everything_cmd.sh`
+
+The build_everything_cmd.sh file, in building and installing serpent,
+will offer options to configure your system to run serpent. See `serpent/make_src_for_build_everything_cmd.sh` for details.
+
+The script will build *only* the test program `arco/apps/test/daserpent.app`.
+Follow the instructions printed by `build_everything_cmd.sh` to run the 
+`daserpent` test program.
 
 ## Dependencies
 
@@ -49,12 +71,12 @@ These instructions assume you want to run Arco as a library within Serpent. Whil
 - Edit `ARCODIR/apps/common/libraries.txt` (see `ARCODIR/apps/common/libraries/libraries-example.txt` for a template) -- this "localizes" the build to your personal machine. Do not commit `libraries.txt` since it is the one part of the build that is specific to your machine.
 - Run CMake.app and go to `ARCODIR/apps/test` (or in a terminal, you can `cd ARCODIR/apps/test; ccmake .`)
 - Use configure ('c' in `ccmake`) to process files and offer options to set. Then set them as follows:
-  - set CMAKE_BUILD_TYPE = Debug
   - set HAVE_WX_PACKAGE = OFF
   - set USE_GLCANVAS = ON
   - set USE_MIDI = ON
   - set USE_NETWORK = ON
   - set USE_STATIC_LIBS = ON
+  - set USE_LIBSNDFILE_EXTERNALS = ON
   - leave OFF: USE_PROC, USE_SHFILE, USE_ZEROMQ, WXS_STDOUT_WINDOW
   - set WX_BASE_PATH to your top wxWidgets path, e.g.
     `/home/rbd/wxWidgets`; there should be wx-build inside this directory

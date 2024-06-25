@@ -18,15 +18,21 @@
 # arco from sources as follows:
 # 1. create an empty build directory, e.g.
 #        cd; mkdir build;
-# 2. unzip the file, e.g.
+# 2. move arco_src_for_build_everything_cmd.zip to build directory, e.g.
+#         mv Downloads/arco_src_for_build_everything_cmd.zip build
+# 3. unzip the file, e.g.
 #        cd build; unzip arco_src_for_build_everything_cmd.zip
-# 3. execute build_everything_cmd.sh in arco, e.g.
+# 4. execute build_everything_cmd.sh in arco, e.g.
 #        cd arco; ./build_everything_cmd.sh
 #
 # The build_everything_cmd.sh file, in building and installing
 # serpent, will offer options to configure your system to run
 # serpent. See serpent/make_src_for_build_everything_cmd.sh
 # for details.
+#
+# The script will build *only* the test program
+# arco/apps/test/daserpent.app. Follow the instructions printed by
+# build_everything_cmd.sh to run the daserpent test program.
 #
 
 # PRECONDITION: current directory is the build directory that will

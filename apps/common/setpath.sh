@@ -1,1 +1,1 @@
-export SERPENTPATH=$HOME/serpent/lib:$HOME/serpent/programs:$HOME/serpent/wxslib:$HOME/arco/serpent/srp
+export SERPENTPATH=/Users/rbd/serpent/lib:/Users/rbd/serpent/programs:/Users/rbd/serpent/wxslib:/Users/rbd/arco/serpent/srp
