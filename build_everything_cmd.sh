@@ -57,9 +57,12 @@ then
 
   unzip serpent_src_for_build_everything_cmd.zip
   cd serpent
+  echo "====== Building Serpent using serpent/build_everything_cmd.sh  ======"
   ./build_everything_cmd.sh
   popd
   echo "# After build serpent, arco/build_everything_cmd.sh in $PWD"
+else
+  echo "====== found ../serpent; assuming Serpent is built and ready  ======"
 fi
 
 # building serpent will build o2 and wxWidgets, which we can use for Arco too
