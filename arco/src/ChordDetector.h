@@ -21,7 +21,7 @@
 
 #ifndef CHORDDETECT_H
 #define CHORDDETECT_H
-
+#define NUM_CHORDS 120
 #include <vector>
 
 //=======================================================================
@@ -38,7 +38,8 @@ public:
         Suspended,
         Dominant,
         Dimished5th,
-        Augmented5th
+        Augmented5th,
+        Half_Dim
     };
     
 	/** Constructor */
@@ -57,16 +58,26 @@ public:
     
     /** Any other intervals that describe the chord, e.g. 7th */
 	int intervals;
+    
+    /** Confidence of the detected chord, calculated using entropy*/
+    double confidence;
+    
+    /** If the detection result has a confidence above a specified threshold*/
+    bool shouldDisplay;
 	
 private:
 	void makeChordProfiles();
 	void classifyChromagram();
 	double calculateChordScore (double* chroma, double* chordProfile, double biasToUse, double N);
 	int minimumIndex (double*array, int length);
-
+    void softmaxEntropyConfidence (double* chord, double* confidence);
+    void calculateChordScores (double* chord, double* chromagram);
+    void minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals);
+    void compareAlgos(double a_fifth, double a_third, double b_fifth, double b_third, bool printChromas = false);
+    
 	double chromagram[12];
-	double chordProfiles[108][12];
-	double chord[108];
+	double chordProfiles[NUM_CHORDS][12];
+	double chord[NUM_CHORDS];
 	double bias;
 };
 

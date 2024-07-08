@@ -21,6 +21,11 @@
 
 #include "ChordDetector.h"
 #include <math.h>
+#include <cmath>
+#include <algorithm>
+#include <numeric>
+
+
 
 //=======================================================================
 ChordDetector::ChordDetector()
@@ -45,149 +50,340 @@ void ChordDetector::detectChord (float* chroma)
 void ChordDetector::classifyChromagram()
 {
 	int i;
-	int j;
-	int fifth;
+    int fifth, third;
 	int chordindex;
 	
-	// remove some of the 5th note energy from chromagram
-	for (i = 0; i < 12; i++)
-	{
-		fifth = (i+7) % 12;
-		chromagram[fifth] = chromagram[fifth] - (0.1 * chromagram[i]);
-		
-		if (chromagram[fifth] < 0)
-		{
-			chromagram[fifth] = 0;
-		}
-	}
-	
-	// major chords
-	for (j = 0; j < 12; j++)
-	{
-		chord[j] = calculateChordScore (chromagram,chordProfiles[j], bias, 3);
-	}
-	
-	// minor chords
-	for (j = 12; j < 24; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 3);
-	}
-	
-	// diminished 5th chords
-	for (j = 24; j < 36; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 3);
-	}
-	
-	// augmented 5th chords
-	for (j = 36; j < 48; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 3);
-	}
-	
-	// sus2 chords
-	for (j = 48; j < 60; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], 1, 3);
-	}
-	
-	// sus4 chords
-	for (j = 60; j < 72; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], 1, 3);
-	}
-	
-	// major 7th chords
-	for (j = 72; j < 84; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], 1, 4);
-	}
-	
-	// minor 7th chords
-	for (j = 84; j < 96; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 4);
-	}
+    double a_fifth = 0.05; // Original: 0.1
+    double a_third = 0; // Original: 0
+    
+    // To compare two algorithms side by side, uncomment the compareAlgos() blow
+    // Arguments are the constants to reduce fifths and thirds by for the two algorithms
+    // For example, the current code uses 0.05, 0
+    // Has optional final argument `bool printChromas` to print chromagrams
+    
+//    compareAlgos(0.1, 0, 0.1, 0.05, false);
+    
+	// remove some harmonics from chromagram
+    for (i = 0; i < 12; i++)
+    {
+        fifth = (i + 7) % 12;
+        third = (i + 4) % 12;
+        
+        chromagram[third] = chromagram[third] - (a_third * chromagram[i]);
+        chromagram[fifth] = chromagram[fifth] - (a_fifth * chromagram[i]);
+        
+        if (chromagram[third] < 0)
+        {
+            chromagram[third] = 0;
+        }
+        if (chromagram[fifth] < 0)
+        {
+            chromagram[fifth] = 0;
+        }
+        
+    }
+    
+    calculateChordScores(chord, chromagram);
+    
+    chordindex = minimumIndex (chord, NUM_CHORDS);
+    
+    softmaxEntropyConfidence(chord, &confidence);
+    
+    minIndexToChord(chordindex, &rootNote, &quality, &intervals);
+    
+    double displayThreshold = 0.0005;
+    shouldDisplay = false;
+    if (confidence > displayThreshold){
+        shouldDisplay = true;
+    }
+    
 
-	// dominant 7th chords
-	for (j = 96; j < 108; j++)
-	{
-		chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 4);
-	}
-	
-	chordindex = minimumIndex (chord, 108);
-	
-	// major
-	if (chordindex < 12)
-	{
-		rootNote = chordindex;
-		quality = Major;
-		intervals = 0;
-	}
-	
-	// minor
-	if ((chordindex >= 12) && (chordindex < 24))
-	{
-		rootNote = chordindex-12;
-		quality = Minor;
-		intervals = 0;
-	}
-	
-	// diminished 5th
-	if ((chordindex >= 24) && (chordindex < 36))
-	{
-		rootNote = chordindex-24;
-		quality = Dimished5th;
-		intervals = 0;
-	}
-	
-	// augmented 5th
-	if ((chordindex >= 36) && (chordindex < 48))
-	{
-		rootNote = chordindex-36;
-		quality = Augmented5th;
-		intervals = 0;
-	}
-	
-	// sus2
-	if ((chordindex >= 48) && (chordindex < 60))
-	{
-		rootNote = chordindex-48;
-		quality = Suspended;
-		intervals = 2;
-	}
-	
-	// sus4
-	if ((chordindex >= 60) && (chordindex < 72))
-	{
-		rootNote = chordindex-60;
-		quality = Suspended;
-		intervals = 4;
-	}
-	
-	// major 7th
-	if ((chordindex >= 72) && (chordindex < 84))
-	{
-		rootNote = chordindex-72;
-		quality = Major;
-		intervals = 7;
-	}
-	
-	// minor 7th
-	if ((chordindex >= 84) && (chordindex < 96))
-	{
-		rootNote = chordindex-84;
-		quality = Minor;
-		intervals = 7;
-	}
-	
-	// dominant 7th
-	if ((chordindex >= 96) && (chordindex < 108))
-	{
-		rootNote = chordindex-96;
-		quality = Dominant;
-		intervals = 7;
-	}
+}
+
+void ChordDetector::compareAlgos(double a_fifth, double a_third, double b_fifth, double b_third, bool printChromas)
+{
+    int i;
+    int third;
+    int fifth;
+    int chordindex1, rootNote1, quality1, intervals1;
+    double confidence1;
+    int chordindex2, rootNote2, quality2, intervals2;
+    double confidence2;
+    
+    double chord1[NUM_CHORDS];
+    double chord2[NUM_CHORDS];
+    double chromagram1[12];
+    double chromagram2[12];
+    
+    for (i = 0; i < 12; i++)
+    {
+        chromagram1[i] = chromagram[i];
+        chromagram2[i] = chromagram[i];
+    }
+    
+    for (i = 0; i < 12; i++)
+    {
+        fifth = (i + 7) % 12;
+        third = (i + 4) % 12;
+        
+        chromagram1[third] = chromagram1[third] - (a_third * chromagram1[i]);
+        chromagram1[fifth] = chromagram1[fifth] - (a_fifth * chromagram1[i]);
+        
+        if (chromagram1[third] < 0)
+        {
+            chromagram1[third] = 0;
+        }
+        if (chromagram1[fifth] < 0)
+        {
+            chromagram1[fifth] = 0;
+        }
+        
+    }
+    
+    calculateChordScores(chord1, chromagram1);
+    
+    chordindex1 = minimumIndex (chord1, NUM_CHORDS);
+    
+    softmaxEntropyConfidence(chord1, &confidence1);
+    
+    minIndexToChord(chordindex1, &rootNote1, &quality1, &intervals1);
+    
+    
+    for (i = 0; i < 12; i++)
+    {
+        fifth = (i + 7) % 12;
+        third = (i + 4) % 12;
+        
+        chromagram2[third] = chromagram2[third] - (b_third * chromagram2[i]);
+        chromagram2[fifth] = chromagram2[fifth] - (b_fifth * chromagram2[i]);
+        
+        if (chromagram2[third] < 0)
+        {
+            chromagram2[third] = 0;
+        }
+        if (chromagram2[fifth] < 0)
+        {
+            chromagram2[fifth] = 0;
+        }
+    }
+    
+    if (printChromas) {
+        printf("Algo 1 chroma: \n");
+        for (i = 0; i < 12; i++)
+        {
+            printf("%f ", chromagram1[i]);
+        }
+        printf("\n");
+        
+        printf("Algo 2 chroma: \n");
+        for (i = 0; i < 12; i++)
+        {
+            printf("%f ", chromagram2[i]);
+        }
+        printf("\n");
+    }
+    
+    
+    calculateChordScores(chord2, chromagram2);
+    chordindex2 = minimumIndex(chord2, NUM_CHORDS);
+    
+    softmaxEntropyConfidence(chord2, &confidence2);
+    minIndexToChord(chordindex2, &rootNote2, &quality2, &intervals2);
+    
+    const char* qualities[] = {"Minor", "Major","Suspended", "Dominant","Diminished 5th", "Augmented 5th", "Half-Dim"};
+    const char* notes[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+    
+    printf("Algo 1: %s %s %d, Confidence: %f \n", notes[rootNote1], qualities[quality1], intervals1, confidence1);
+    printf("Algo 2: %s %s %d, Confidence: %f \n", notes[rootNote2], qualities[quality2], intervals2, confidence2);
+}
+//=======================================================================
+void ChordDetector::calculateChordScores (double chord[NUM_CHORDS], double chromagram[12])
+{
+    int j;
+    // major chords
+    for (j = 0; j < 12; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 3);
+    }
+    
+    // minor chords
+    for (j = 12; j < 24; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 3);
+    }
+    
+    // diminished 5th chords
+    for (j = 24; j < 36; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 3);
+    }
+    
+    // augmented 5th chords
+    for (j = 36; j < 48; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 3);
+    }
+    
+    // sus2 chords
+    for (j = 48; j < 60; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], 1, 3);
+    }
+    
+    // sus4 chords
+    for (j = 60; j < 72; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], 1, 3);
+    }
+    
+    // major 7th chords
+    for (j = 72; j < 84; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], 1, 4);
+    }
+    
+    // minor 7th chords
+    for (j = 84; j < 96; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 4);
+    }
+
+    // dominant 7th chords
+    for (j = 96; j < 108; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 4);
+    }
+    
+    // half-diminished chords
+    for (j = 108; j < 120; j++)
+    {
+        chord[j] = calculateChordScore (chromagram, chordProfiles[j], bias, 4);
+    }
+    
+}
+
+//=======================================================================
+void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals)
+{
+    // major
+    if (chordindex < 12)
+    {
+        *rootNote = chordindex;
+        *quality = Major;
+        *intervals = 0;
+    }
+    
+    // minor
+    if ((chordindex >= 12) && (chordindex < 24))
+    {
+        *rootNote = chordindex-12;
+        *quality = Minor;
+        *intervals = 0;
+    }
+    
+    // diminished 5th
+    if ((chordindex >= 24) && (chordindex < 36))
+    {
+        *rootNote = chordindex-24;
+        *quality = Dimished5th;
+        *intervals = 0;
+    }
+    
+    // augmented 5th
+    if ((chordindex >= 36) && (chordindex < 48))
+    {
+        *rootNote = chordindex-36;
+        *quality = Augmented5th;
+        *intervals = 0;
+    }
+    
+    // sus2
+    if ((chordindex >= 48) && (chordindex < 60))
+    {
+        *rootNote = chordindex-48;
+        *quality = Suspended;
+        *intervals = 2;
+    }
+    
+    // sus4
+    if ((chordindex >= 60) && (chordindex < 72))
+    {
+        *rootNote = chordindex-60;
+        *quality = Suspended;
+        *intervals = 4;
+    }
+    
+    // major 7th
+    if ((chordindex >= 72) && (chordindex < 84))
+    {
+        *rootNote = chordindex-72;
+        *quality = Major;
+        *intervals = 7;
+    }
+    
+    // minor 7th
+    if ((chordindex >= 84) && (chordindex < 96))
+    {
+        *rootNote = chordindex-84;
+        *quality = Minor;
+        *intervals = 7;
+    }
+    
+    // dominant 7th
+    if ((chordindex >= 96) && (chordindex < 108))
+    {
+        *rootNote = chordindex-96;
+        *quality = Dominant;
+        *intervals = 7;
+    }
+    
+    // half-diminished chords
+    if ((chordindex >= 108) && (chordindex < 120))
+    {
+        *rootNote = chordindex-108;
+        *quality = Half_Dim;
+        *intervals = 7;
+    }
+    
+}
+
+//=======================================================================
+void ChordDetector::softmaxEntropyConfidence (double chord[NUM_CHORDS], double* confidence)
+{
+    double probabilities[NUM_CHORDS];
+    double newScores[NUM_CHORDS];
+    
+    // Negate the scores then do softmax, since lower score means closer match to a chord.
+    for (int i = 0; i < NUM_CHORDS; i++) {
+        newScores[i] = -chord[i];
+    }
+    
+    double max_score = *(std::max_element(newScores, newScores + NUM_CHORDS));
+    
+    // Softmax
+    double sum_exp = 0.0;
+    
+    for (int i = 0; i < NUM_CHORDS; i++) {
+        sum_exp += std::exp(newScores[i] - max_score);
+    }
+    
+    for (int i = 0; i < NUM_CHORDS; i++) {
+        probabilities[i] = std::exp(newScores[i] - max_score) / sum_exp;
+    }
+    
+    // Entropy
+    double entropy = 0.0;
+    
+    for (int i = 0; i < NUM_CHORDS; i++) {
+        if (probabilities[i] > 0) {
+            entropy -= probabilities[i] * std::log(probabilities[i]);
+        }
+    }
+    
+    entropy /= std::log(NUM_CHORDS); // Normalize with max entropy
+    
+    *confidence = 1 - entropy;
+
 }
 
 //=======================================================================
@@ -240,7 +436,7 @@ void ChordDetector::makeChordProfiles()
 	double v3 = 1;
 	
 	// set profiles matrix to all zeros
-	for (j = 0; j < 108; j++)
+	for (j = 0; j < NUM_CHORDS; j++)
 	{
 		for (t = 0;t < 12;t++)
 		{
@@ -382,4 +578,21 @@ void ChordDetector::makeChordProfiles()
 		
 		j++;				
 	}
+    
+    // half-diminished chords (minor 7 flat 5)
+    for (i = 0; i < 12; i++)
+    {
+        root = i % 12;
+        third = (i + 3) % 12;
+        fifth = (i + 6) % 12;
+        seventh = (i + 10) % 12;
+        
+        chordProfiles[j][root] = v1;
+        chordProfiles[j][third] = v2;
+        chordProfiles[j][fifth] = v3;
+        chordProfiles[j][seventh] = v3;
+        
+        j++;
+    }
+    
 }

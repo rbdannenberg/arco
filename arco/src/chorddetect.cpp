@@ -26,6 +26,8 @@ void Chorddetect::real_run()
         o2sm_add_string(RootNoteToString(chord_detector.rootNote));
         o2sm_add_string(ChordQualityToString(chord_detector.quality));
         o2sm_add_int32(chord_detector.intervals);
+        o2sm_add_float(chord_detector.confidence);
+        o2sm_add_bool(chord_detector.shouldDisplay);
         o2sm_send_finish(0, cd_reply_addr, false);
     }
     
@@ -43,21 +45,8 @@ void Chorddetect::start(const char *reply_addr) {
 // Converts chord quality enum to string message
 const char* Chorddetect::ChordQualityToString(int quality)
 {
-    switch (quality)
-    {
-    case ChordDetector::Minor:
-        return "Minor";
-    case ChordDetector::Major:
-        return "Major";
-    case ChordDetector::Suspended:
-        return "Suspended";
-    case ChordDetector::Dominant:
-        return "Dominant";
-    case ChordDetector::Dimished5th:
-        return "Diminished 5th";
-    case ChordDetector::Augmented5th:
-        return "Augmented 5th";
-    }
+    const char* qualities[] = {"Min", "Maj","Sus", "Dom","Dim 5th", "Aug 5th", "Half-Dim"};
+    return qualities[quality];
 }
 
 // Convert root note integer to string

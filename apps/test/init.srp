@@ -742,17 +742,20 @@ def onsettest(obj, event, x, y):
 
 chorddetect_handler_installed = false
 
-def actl_chorddetect(timestamp, address, types, root_note, quality, interval)
-    # display root_note, quality, interval
-    result = root_note + " " + quality + " " + str(interval)
-    chorddetecttext.set_string(result)
+def actl_chorddetect(timestamp, address, types, root_note, quality, interval, confidence, shouldDisplay)
+    # display root_note, quality, interval, confidence
+    if shouldDisplay == 0:
+        chorddetecttext.set_string("No strong chord detected")
+    else:
+        result = root_note + " " + quality + " " + str(interval) + ", " + str(confidence)
+        chorddetecttext.set_string(result)
 
-    
+        
 def chorddetecttest(obj, event, x, y):
     display "chorddetect", x
     if x:
         if not chorddetect_handler_installed:
-            o2_method_new("/actl/chorddetect", "ssi", 'actl_chorddetect', t)
+            o2_method_new("/actl/chorddetect", "ssifi", 'actl_chorddetect', t)
             print "installed chorddetect handler"
             chorddetect_handler_installed = true
         CD = chorddetect("/actl/chorddetect")
