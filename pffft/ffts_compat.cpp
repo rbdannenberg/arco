@@ -26,6 +26,7 @@ int fftInit(long M)
         }
         return 1;
     }
+    return 2;
 }
 
 

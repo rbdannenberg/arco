@@ -91,3 +91,29 @@ CMakeCache.txt
 /apps/handtrack/serpent/
 
 
+
+/apps/test/.vs/
+
+/apps/test/ALL_BUILD.vcxproj
+
+/apps/test/ALL_BUILD.vcxproj.filters
+
+/apps/test/ALL_BUILD.vcxproj.user
+
+/apps/test/ZERO_CHECK.vcxproj
+
+/apps/test/ZERO_CHECK.vcxproj.filters
+
+/apps/test/daserpent.dir/
+
+/apps/test/daserpent.sln
+
+/apps/test/daserpent.vcxproj
+
+/apps/test/daserpent.vcxproj.filters
+
+/apps/test/daserpent.vcxproj.user
+
+/apps/test/x64/
+
+/fluidsynth/

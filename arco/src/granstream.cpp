@@ -233,11 +233,11 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 delay = attack_blocks;
                 assert(phase > BL && phase < bufferlen &&
                        bufferlen == perchannel->input_buf.get_fifo_len());
-                D printf("grain start: chan %ld gen %ld phase %g dur %g "
+                D printf("grain start: chan %d gen %ld phase %g dur %g "
                          "ratio %g\n",
-                       perchannel - &(gs->states[0]),
-                       this - &(perchannel->gens[0]), phase, dur_blocks * BP,
-                       ratio);
+                       (int) (perchannel - &(gs->states[0])),
+                       (long) (this - &(perchannel->gens[0])), 
+                       phase, dur_blocks * BP, ratio);
             } else {
                 delay = 1; // try again next block
                 state = GS_PREDELAY;

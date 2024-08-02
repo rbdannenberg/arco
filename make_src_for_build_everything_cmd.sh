@@ -120,7 +120,7 @@ cp -p ~/arco/pffft/*.{md,cpp,c,h,hpp} pffft/
 
 cp -p ~/arco/preproc/*.py preproc/
 
-cp -p ~/arco/serpent/arco4.cmakeinclude serpent/
+cp -p ~/arco/serpent/arco.cmakeinclude serpent/
 cp -p ~/arco/serpent/src/*.{cpp,h} serpent/src/
 cp -p ~/arco/serpent/srp/*.srp serpent/srp/
 

@@ -6,7 +6,7 @@
     <key>CFBundleDevelopmentRegion</key>
       <string>English</string>
     <key>CFBundleName</key>
-      <string>arco4</string>
+      <string>arco</string>
     <key>NSMicrophoneUsageDescription</key>
       <string>Apple macOS will only enable audio input with your
         permission. Without permission, this application

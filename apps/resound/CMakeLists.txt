@@ -6,7 +6,7 @@
 # Serpent code to further customize the package.
 #
 # This file ONLY sets global application-specific settings, then includes
-# arco4.cmakeinclude on the last line to do the real work that's common
+# arco.cmakeinclude on the last line to do the real work that's common
 # to all applications using wxserpent64:
 #
 # This uses a non-conventional approach to CMake described in
@@ -31,4 +31,4 @@ PROJECT(${ARCO_TARGET_NAME})
 
 # This command pulls in all the greatness of Arco (assumes we are in
 # <arco-root>/apps/<this-app-name>/):
-include(../../serpent/arco4.cmakeinclude)
+include(../../serpent/arco.cmakeinclude)

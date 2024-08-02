@@ -1,4 +1,4 @@
-/* arco4.cpp -- main program for arco4 server
+/* arco.cpp -- main program for arco server
  *
  * Roger B. Dannenberg
  * Dec 2021
@@ -413,7 +413,7 @@ int action(int ch)
         test_tone();
         break;
       case 't':
-        o2_send_cmd("/arco/test1", 0, "s", "Test from arco4 (main)");
+        o2_send_cmd("/arco/test1", 0, "s", "Test from arco (main)");
         break;
       default:
         break;

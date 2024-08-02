@@ -8,9 +8,13 @@
 
 #include <stdio.h>
 #include <fcntl.h>
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN 1  // someone includes windows.h
+#else
 #include <unistd.h>
-#include "sys/timeb.h"
 #include "pthread.h"
+#endif
+#include "sys/timeb.h"
 #include "sndfile.h"
 #include "o2atomic.h"
 #include "arcougen.h"
@@ -18,6 +22,7 @@
 #include "sharedmem.h"
 #include "audioio.h"
 #include "audioblock.h"
+#include "fileiothread.h"
 #include "fileio.h"
 
 #define D if (0)
@@ -26,10 +31,36 @@ extern O2sm_info *audio_bridge;
     
 O2sm_info *fileio_bridge = NULL;
 Vec<Fileio_obj *> fileio_objs;
-static pthread_t fileio_thread_id;
-static bool fileio_thread_created = false;
-static O2_context fio_o2_ctx;
-static bool fileio_quit_request = false;
+
+class Fileio_actual : public Fileio_thread {
+public:
+    O2_context fio_o2_ctx;
+
+    // thread_started() will be called once when thread starts
+    void thread_started() {
+        o2_ctx = &fio_o2_ctx;
+    }
+
+
+    // poll() will be called every period ms:
+    void poll() {
+        o2sm_poll();
+    }
+
+
+    // Upon stopping the thread, cleanup() is called
+    // to allow the subclass to take action:
+    void cleanup() {
+        while (fileio_objs.size() > 0) {
+            delete fileio_objs[0];
+        }
+        fileio_objs.finish();
+        o2sm_finish();
+    }
+};
+
+
+static Fileio_actual fileio_actual;
 
 
 class Fileio_reader : public Fileio_obj {
@@ -142,7 +173,6 @@ public:
         // if we're out of frames, then tell player we are done:
         ablock->last = frames_to_go > 0;
 
-        // o2sm_send_cmd("/arco/fileplay/samps", 0, "hh", addr, (int64_t) ablock);
         // instead of sending through O2, deliver straight to Arco:
         o2_send_start();
         o2_add_int64(addr);
@@ -332,28 +362,7 @@ void fileio_fileplay_play(O2SM_HANDLER_ARGS)
 /* O2SM INTERFACE: /fileio/quit; */
 void fileio_quit(O2SM_HANDLER_ARGS)
 {
-    fileio_quit_request = true;
-}
-
-
-// entry point for fileio thread -- it runs o2poll
-void *fileio_thread_run(void *data)
-{
-    o2_ctx = &fio_o2_ctx;
-    while (!fileio_quit_request) {
-        o2sm_poll();
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 50000;
-        select(0, NULL, NULL, NULL, &timeout);
-    }
-    // time to quit
-    while (fileio_objs.size() > 0) {
-        delete fileio_objs[0];
-    }
-    fileio_objs.finish();
-    o2sm_finish();
-    return NULL;
+    fileio_actual.quit();
 }
 
 
@@ -413,7 +422,7 @@ int fileio_initialize()
     assert(fileio_bridge == NULL);
     fileio_bridge = o2_shmem_inst_new();
     O2_context *save = o2_ctx;
-    o2sm_initialize(&fio_o2_ctx, fileio_bridge);
+    o2sm_initialize(&(fileio_actual.fio_o2_ctx), fileio_bridge);
     o2sm_service_new("fileio", NULL);
 
     // O2SM INTERFACE INITIALIZATION: (machine generated)
@@ -426,9 +435,9 @@ int fileio_initialize()
     // END INTERFACE INITIALIZATION
 
     // create a thread to poll for fileio
-    int rslt = pthread_create(&fileio_thread_id, NULL, fileio_thread_run, NULL);
-    if (rslt != 0) return rslt;
-    fileio_thread_created = true;
+    if (fileio_actual.initialize(50) != 0) {
+        return 1;
+    }
 
     o2_ctx = save;  // restore caller (probably main O2 thread)'s context
     return 0;

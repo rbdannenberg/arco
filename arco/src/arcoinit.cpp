@@ -6,7 +6,9 @@
 
 #include <stdio.h>
 #include <fcntl.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include "o2internal.h"  // need internal to offer bridge
 #include "o2atomic.h"
 #include "sharedmem.h"   // o2_shmem_inst_new()

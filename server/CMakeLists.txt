@@ -3,11 +3,11 @@
 # Structure of the CMake system (PROJ = server instance name)
 #
 # apps/PROJ/CMakeLists.txt
-#     server/arco4.cmakeinclude
+#     server/arco.cmakeinclude
 #         arco/CMakeLists.txt -- arco sources for arco library
 #
 # library organization:
-#    arco4lib -- arco audio processingm, including unit generators
+#    arcolib -- arco audio processingm, including unit generators
 #    o2_static, portaudio_static, libflac_static, sndfile_static,
 #        vorbis_static -- arco depends on these
 
@@ -26,7 +26,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 message(STATUS CMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR} " "
                CMAKE_CURRENT_LIST_DIR=${CMAKE_CURRENT_LIST_DIR})
 # "FRIENDS" is where to find dependent software: o2, serpent, liblo, portaudio,
-#  etc.  We are in arco4/serpent, so go up two levels:
+#  etc.  We are in arco/serpent, so go up two levels:
 get_filename_component(FRIENDS ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
 get_filename_component(FRIENDS ${FRIENDS} DIRECTORY)
 
@@ -38,7 +38,7 @@ set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "only build forx86_64" FORCE)
 
 option(USE_STATIC_LIBS "Build with static libs?" TRUE)
 
-SET(SOURCES src/arco4.cpp src/arco_ui.cpp src/arco_ui.h
+SET(SOURCES src/arco.cpp src/arco_ui.cpp src/arco_ui.h
             src/cmtio.c src/cmtio.h  
             src/svprefs.cpp src/svprefs.h)  
  
@@ -73,13 +73,13 @@ endif()
 # add arco -- builds audio and arco libraries
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)
 
-target_link_whole_library(${ARCO_SERVER_NAME} arco4lib)
+target_link_whole_library(${ARCO_SERVER_NAME} arcolib)
 target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
                       debug ${O2_DBG_LIB} optimized ${O2_OPT_LIB})
 target_link_libraries(${ARCO_SERVER_NAME} PRIVATE form ${CURSES_LIB})
 
 if(UNIX AND NOT APPLE)  # linux
-  target_link_libraries(arco4lib PRIVATE avahi-client avahi-common atomic rt) 
+  target_link_libraries(arcolib PRIVATE avahi-client avahi-common atomic rt) 
 endif()
 
 apply_common_settings()

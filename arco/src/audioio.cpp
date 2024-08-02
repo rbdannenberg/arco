@@ -74,7 +74,9 @@ External Control
 See doc/design.md
 
 */
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <stdio.h>
 #include <algorithm>  // min
 #ifdef __x86_64__

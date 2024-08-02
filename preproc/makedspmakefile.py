@@ -3,9 +3,14 @@
 #
 # Roger B. Dannenberg
 # April 2023
+#
+# Run this in the application direcotry, e.g. arco/apps/test
 
 import sys
 import os
+
+WIN32 = (os.name == 'nt')
+PY = "python" if WIN32 else "python3"
 
 USE_PFFFT = True  # use PFFFT (new) instead of ffts for FFTs
 
@@ -112,33 +117,59 @@ def make_makefile(arco_path, manifest, outf):
     print("all:  ", end="", file=outf)
     for source in sources:
         print(" \\\n    " + source, end="", file=outf)
-    print(" \\\n    allugens.srp", file=outf)
+    print(" \\\n    allugens.srp\n\n", file=outf)
     
     # for each source, write the command to generate it
     # this generates all variants (a-rate, b-rate) and both .cpp and .h
     for source in sources:
         sans_extension = source[ : -4]
         src_path, basename = sans_extension.rsplit("/", 1)
+        cmd = "sh " + src_path + "/generate_" + basename + ".sh"
+        if WIN32:
+            cmd = src_path + "/generate_" + basename + ".bat"
         print(source + ": " + sans_extension + ".ugen " + \
               arco_path + "/preproc/u2f.py", file=outf)
-        print("\tcd " + src_path + "; python3 " + arco_path + \
+        print("\tcd " + src_path + "\n\t" + PY + " " + arco_path + \
               "/preproc/u2f.py " + basename, file=outf)
-        print("\tcd " + src_path + "; sh " + src_path + \
-              "/generate_" + basename + ".sh", file=outf)
+        print("\tcd " + src_path + "\n\t" + cmd, file=outf)
+        # does NMake not restore the current directory? Not sure.
+        print("\tcd " + arco_app_path + "\n", file=outf)
         print("\n", file=outf)
 
     # write the code to make allugens.srp
-    print("allugens.srp: dspmakefile", end="", file=outf)
+    # nmake needs dspmakefile to be a target, even though we never use
+    # make or nmake to make dspmakefile; we only want to depend on it
+    # and regenerate allugens when dspmakefile changes:
+    print("dspmakefile. :", file=outf)
+    print('\tdir dspmakefile', file=outf)
+    print('\techo "ERROR: dspmakefile does not exist!"', file=outf)
+    print("", file=outf)
+
+    print("allugens.srp: dspmakefile.", end="", file=outf)
     for src in srp_srcs:
         print(" " + src, end="", file=outf)
-    print("\n\trm -f allugens.srp", file=outf)
-    print("\ttouch allugens.srp", file=outf)
+    if WIN32:
+        print("\n\tdel allugens.srp", file=outf)
+        print("\tcopy NUL allugens.srp", file=outf)
+    else:
+        print("\n\trm -f allugens.srp", file=outf)
+        print("\ttouch allugens.srp", file=outf)
     for src in srp_srcs:
-        print('\techo "\\n# ---- included from', src, \
-              '----\\n" >> allugens.srp', file=outf)
-        print("\tcat", src, ">> allugens.srp", file=outf)
-        # this newline also is needed for files with no final newline:
-        print("\techo >> allugens.srp", file=outf)  # blank line separator
+        if WIN32:
+            print('\techo. >> allugens.srp', file=outf)
+            print('\techo # ---- included from', src, \
+                  '----" >> allugens.srp', file=outf)
+            print('\techo. >> allugens.srp', file=outf)
+            src = src.replace('/', '\\')  # convert to Windows path
+            print("\ttype", src, ">> allugens.srp", file=outf)
+            # this newline also is needed for files with no final newline:
+            print("\techo. >> allugens.srp", file=outf)  # blank line separator
+        else:
+            print('\techo "\\n# ---- included from', src, \
+                  '----\\n" >> allugens.srp', file=outf)
+            print("\tcat", src, ">> allugens.srp", file=outf)
+            # this newline also is needed for files with no final newline:
+            print("\techo >> allugens.srp", file=outf)  # blank line separator
 
 
 def make_inclfile(arco_path, manifest, outf):
@@ -156,7 +187,7 @@ def make_inclfile(arco_path, manifest, outf):
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
     #
-    if ("fileplay" in manifest) or ("fileio" in manifest) or \
+    if ("fileplay" in manifest) or ("filerec" in manifest) or \
        ("fileio" in manifest):
         needed = "fileio"
         rejected = "nofileio"
@@ -171,6 +202,11 @@ def make_inclfile(arco_path, manifest, outf):
     print("set(ARCO_SRC ${ARCO_SRC}", file=outf)
 
     ## Compute Dependencies
+    if "fileio" in manifest:  # need fileiothread
+        print("    " + arco_path + "/arco/src/fileiothread.cpp",
+                       arco_path + "/arco/src/fileiothread.h",
+              file=outf)
+
     if "granstream" in manifest:  # add ringbuf which granstream depends on
         need_ringbuf = True
         need_fastrand = True
@@ -275,61 +311,61 @@ def make_inclfile(arco_path, manifest, outf):
 #            need_chromagram_lib = True
 
     print(")", file=outf)
-    print("\ntarget_sources(arco4lib PRIVATE ${ARCO_SRC})", file=outf)
+    print("\ntarget_sources(arcolib PRIVATE ${ARCO_SRC})", file=outf)
     if need_flsyn_lib:
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+        print("target_link_libraries(arcolib PRIVATE", file=outf)
         print("    debug ${FLSYN_DBG_LIB} optimized ${FLSYN_OPT_LIB})",
               file=outf)
 
         print('if(NOT (GLIB_DBG_LIB STREQUAL "ignore"))', file=outf)
-        print("  target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("      debug ${GLIB_DBG_LIB} optimized ${GLIB_OPT_LIB})",
-              file=outf)
         print('  if(NOT EXISTS "${GLIB_DBG_LIB}")', file=outf)
-        print('    message(FATAL_ERROR "Could not find ${GLIB_DBG_LIB}, ' + \
-              'delete GLIB_DBG_LIB from cache and fix in ' + \
-              'apps/common/libraries.txt")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${GLIB_DBG_LIB},',
+              'fix the definition in apps/common/libraries.txt")', file=outf)
         print("  endif()", file=outf)
         print('  if(NOT EXISTS "${GLIB_OPT_LIB}")', file=outf)
-        print('    message(FATAL_ERROR "Could not find ${GLIB_OPT_LIB}, ' + \
-              'delete GLIB_OPT_LIB from cache and fix in ' + \
-              'apps/common/libraries.txt")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${GLIB_OPT_LIB},',
+              'fix the definition in apps/common/libraries.txt")', file=outf)
         print("  endif()", file=outf)
+        print("  target_link_libraries(arcolib PRIVATE", file=outf)
+        print("      debug ${GLIB_DBG_LIB} optimized ${GLIB_OPT_LIB})",
+              file=outf)
         print("endif()", file=outf)
               
         print('if(NOT (INTL_DBG_LIB STREQUAL "ignore"))', file=outf)
-        print("  target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("      debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
-              file=outf)
         print('  if(NOT EXISTS "${INTL_DBG_LIB}")', file=outf)
-        print('    message(FATAL_ERROR "Could not find ${INTL_DBG_LIB}, ' + \
-              'delete INTL_DBG_LIB from cache and fix in ' + \
-              'apps/common/libraries.txt")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${INTL_DBG_LIB},',
+              'fix the definition in apps/common/libraries.txt")', file=outf)
         print("  endif()", file=outf)
         print('  if(NOT EXISTS "${INTL_OPT_LIB}")', file=outf)
-        print('    message(FATAL_ERROR "Could not find ${INTL_OPT_LIB}, ' + \
-              'delete INTL_OPT_LIB from cache and fix in ' + \
-              'apps/common/libraries.txt")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${INTL_OPT_LIB},',
+              'fix the definition in apps/common/libraries.txt")', file=outf)
         print("  endif()", file=outf)
+        print("  target_link_libraries(arcolib PRIVATE", file=outf)
+        print("      debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
+              file=outf)
         print("endif()", file=outf)
 
-#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("target_link_libraries(arcolib PRIVATE", file=outf)
 #        print("    debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
 #              file=outf)
 
-        print("target_link_libraries(arco4lib PRIVATE", file=outf)
-        print("    debug readline optimized readline)", file=outf)
+        # On windows, we build fluidsynth from sources and do not use/enable
+        # readline library. On non-windows, I think we use an installer or
+        # prebuilt binary that needs readline.
+        if not WIN32:
+            print("target_link_libraries(arcolib PRIVATE", file=outf)
+            print("    debug readline optimized readline)", file=outf)
         # make this one public - I don't want to ever link curses in twice,
         # and I'm not sure how this interacts with Arco Server's use of
         # curses. Not even sure why Fluidsynth needs curses if I'm just
         # trying to synthesize sound and not running it as an application.
-#        print("target_link_libraries(arco4lib PUBLIC", file=outf)
+#        print("target_link_libraries(arcolib PUBLIC", file=outf)
 #        print("    debug ${CURSES_LIB} optimized ${CURSES_LIB})", file=outf)
 #        print("set(ARCO_TARGET_LINK_OBJC true PARENT_SCOPE)", file=outf)
 
     # ADDITION FOR CHROMAGRAM following the flsyn format
 #    if need_chromagram_lib:
-#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("target_link_libraries(arcolib PRIVATE", file=outf)
 #        print("    debug ${CHROMAGRAM_DBG_LIB} optimized ${CHROMAGRAM_OPT_LIB})",
 #              file=outf)
 #
@@ -344,11 +380,11 @@ def make_inclfile(arco_path, manifest, outf):
 #              'apps/common/libraries.txt")', file=outf)
 #        print("endif()", file=outf)
 #              
-#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("target_link_libraries(arcolib PRIVATE", file=outf)
 #        print("    debug readline optimized readline)", file=outf)
 
 #    if need_fftw:
-#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("target_link_libraries(arcolib PRIVATE", file=outf)
 #        print("    debug ${FFTW_DBG_LIB} optimized ${FFTW_OPT_LIB})",
 #              file=outf)
 #
@@ -363,7 +399,7 @@ def make_inclfile(arco_path, manifest, outf):
 #              'apps/common/libraries.txt")', file=outf)
 #        print("endif()", file=outf)
 #
-#        print("target_link_libraries(arco4lib PRIVATE", file=outf)
+#        print("target_link_libraries(arcolib PRIVATE", file=outf)
 #        print("    debug readline optimized readline)", file=outf)
 
 def is_a_unit_generator(line):
@@ -411,12 +447,14 @@ def need_ugen(manifest, name):
 
 
 def main():
+    global arco_app_path
     if len(sys.argv) != 5:
-        print("Usage: python3 makedspmakefile.py arco_path " + \
+        print("Usage: " + PY + " makedspmakefile.py arco_path " + \
               "dspmanifest.txt dspmakefile dspsources.cmakeinclude")
         exit(-1)
     arco_path = sys.argv[1]
     manifest_name = sys.argv[2]
+    arco_app_path = os.path.dirname(manifest_name)
     makefile_name = sys.argv[3]
     inclfile_name = sys.argv[4]
 

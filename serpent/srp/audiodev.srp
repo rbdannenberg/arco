@@ -426,7 +426,7 @@ class Monitor_audio (Arco_window):
 
         ## Audio Output Controls
         if arco_output_chans > 0:
-            Labeled_slider(mon_win, "Master", left, 10, 330, 25, 50, 
+            Labeled_slider(mon_win, "Master", left, 10, 355, 25, 50, 
                            -100.0, 24.0,
                            arco_master_gain, 'db', 'master_slider')
             master_slider.add_target_method(this, 'set_arco_master_gain')
@@ -438,10 +438,10 @@ class Monitor_audio (Arco_window):
             mute_audio_bn.add_target_method(this, 'mute_audio')
 
             ## output meter is pre- or post-fader?
-            Checkbox(mon_win, "Meter is", 'S', wxs_y + 15, 70, 25, 'prefade_bn')
+            Checkbox(mon_win, "Meter is", 'S', wxs_y + 20, 70, 25, 'prefade_bn')
             prefade_bn.add_target_method(this, 'meter_prefade')
 
-            Statictext(mon_win, "prefader", wxs_x + 20, wxs_y + 18, 40, 15,
+            Statictext(mon_win, "prefader", wxs_x + 20, wxs_y + 20, 40, 15,
                        'prefade_txt')
 
             left = left + 185
@@ -488,7 +488,7 @@ class Monitor_audio (Arco_window):
         enable_scope_bn.set_value(t) // initially enabled
         enable_scope_bn.add_target_method(this, 'enable_scope')
 
-        Choice(mon_win, 'S', 'D', 'S', 'S', 'scope_input_choice')
+        Choice(mon_win, 'S', 'D', 'S', 25, 'scope_input_choice')
         scope_input_choice.append("Input")
         scope_input_choice.append("Output")
         scope_input_choice.set_value(probe_name)  // set earlier

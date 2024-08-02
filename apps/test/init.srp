@@ -1,4 +1,4 @@
-# arco.srp -- Serpent library for controlling Arco
+# init.srp -- Serpent library for controlling Arco
 #
 # Roger B. Dannenberg
 # Jan 2022
@@ -6,6 +6,8 @@
 # call arco_init(ensemble) to start
 # call arco_run() after setting up UI and or scheduling things
 # arco_ready is set to true when arco is ready for action
+
+print "apps/daserpent/init.srp is loading, getcwd() ->", getcwd()
 
 require "debug"
 require "wxserpent"

@@ -7,6 +7,12 @@
 // #include <fftw3.h>
 #include "ffts_compat.h"
 #include <math.h>
+
+// M_PI not defined in windows math.h:
+#ifndef M_PI
+#define M_PI (3.14159265358979323846264338327950288)
+#endif
+
 // #include "mq.h"
 // #include "exceptions.h"
 
@@ -61,7 +67,7 @@ class OnsetDetectionFunction {
                      int odf_size, sample* odf);
 };
 
-#ifndef IGNORE
+#ifndef DF_IGNORE_SOME_CLASSES
 class EnergyODF : public OnsetDetectionFunction {
     protected:
         sample prev_energy;
@@ -168,7 +174,7 @@ class LPSpectralDifferenceODF : public LinearPredictionODF {
         sample process_frame(int signal_size, sample* signal);
 };
 
-#ifndef IGNORE
+#ifndef DF_IGNORE_SOME_CLASSES
 class LPComplexODF : public LinearPredictionODF {
     protected:
         int num_bins;

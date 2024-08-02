@@ -12,6 +12,8 @@ also writes .srp file for the unit generator
 
 import sys
 import subprocess
+import glob
+import os
 
 def has_upper(s):
     for c in s:
@@ -36,7 +38,11 @@ def main():
     # now strip off .ugen because we need the directory name too
     classnamelc = source[ : -5]
     print("**** Cleaning out old sources")
-    subprocess.run(["rm " + classnamelc + "_*.{dsp,fh}"], shell=True)
+    for f in glob.glob(classnamelc + "_*.dsp"):
+        os.remove(f)
+    for f in glob.glob(classnamelc + "_*.fh"):
+        os.remove(f)
+    # subprocess.run(["rm " + classnamelc + "_*.{dsp,fh}"], shell=True)
     print("**** Translating", source)
     with open(source, "r") as srcf:
         src = srcf.readlines()

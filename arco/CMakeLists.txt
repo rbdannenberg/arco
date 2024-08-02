@@ -1,9 +1,32 @@
-# Arco4 CMakeLists.txt
+# Arco CMakeLists.txt
 #
 # Roger B. Dannenberg
 # Dec 2021
 
 cmake_minimum_required(VERSION 3.24)
+
+# execute python:
+set(PYTHON "python3")
+
+execute_process(COMMAND python3 --version
+                OUTPUT_VARIABLE pyversion_out
+                ERROR_VARIABLE pyerror_out)
+
+# If we get an error, assume python3 does not exist. On Windows, maybe we have python:
+if(pyerror_out)
+  execute_process(COMMAND python --version
+                  OUTPUT_VARIABLE pyversion_out
+                  ERROR_VARIABLE pyerror_out ENCODING AUTO)
+  string(FIND ${pyversion_out} "Python 3" py3found)
+  message(STATUS "python --version ${pyversion_out} error ${pyerror_out} loc ${py3found}")
+  if(py3found GREATER_EQUAL 0)
+    set(PYTHON "python")
+  else()
+    message(ERROR " Neither python3 nor python seems to run Python v3.")
+  endif()
+endif()
+
+message(STATUS "Found ${PYTHON} to run Python v.3.")
 
 set(ARCO_SRC
     arcoinit.cpp arcoinit.h
@@ -73,7 +96,7 @@ cmake_path(GET ARCO_PATH PARENT_PATH FRIENDS_PATH)
 # make dspmakefile and dspsources.cmakeinclude from dspmanifest.txt:
 #
 message(STATUS "----- executing makedspmakefile.py")  
-execute_process(COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
+execute_process(COMMAND ${PYTHON} ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
                     ${ARCO_PATH}
                     ${CMAKE_SOURCE_DIR}/dspmanifest.txt
                     ${CMAKE_SOURCE_DIR}/dspmakefile
@@ -85,7 +108,7 @@ if(makedspmakefile_out)
 endif() 
 if(makedspmakefile_err) 
     message(FATAL_ERROR "makedspmakefile.py error output: " ${makedspmakefile_err}) 
-endif() 
+endif()
 
 
 #
@@ -97,21 +120,37 @@ endif()
 # directory, then we run it. We can also set up dependencies
 # to run it at build time whenever something changes.
 #
-file(WRITE "${CMAKE_SOURCE_DIR}/make_faust_ugens.sh"
-     "export PATH=$PATH:${FAUST_PATH}\n"
-     "make --makefile=dspmakefile\n")
+message(STATUS "CMAKE_SOURCE_DIR where to run dspmakefile: ${CMAKE_SOURCE_DIR}")
+if(WIN32)
+  add_custom_target(make_faust_ugens ALL
+      COMMAND nmake /F dspmakefile
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
+else()
+  set(MFU_SET_PATH "")
+  if(FAUST_PATH)
+    set(MFU_SET_PATH "export PATH=$PATH:${FAUST_PATH}\n")
+  else()
+    message(STATUS "FAUST_PATH not set in apps/common/libraries.txt")
+    message(STATUS "   This may result in not finding FAUST compiler when")
+    message(STATUS "   running dspmakefile")
+  endif()
+  file(WRITE "${CMAKE_SOURCE_DIR}/make_faust_ugens.sh"
+       "${MFU_SET_PATH}"
+       "make --makefile=dspmakefile\n")
 #
 # now we run make by running the shell command
 #
-message(STATUS "----- executing make_faust_ugens.sh")
-execute_process(COMMAND sh make_faust_ugens.sh 
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  message(STATUS "----- executing make_faust_ugens.sh")
+  execute_process(COMMAND sh make_faust_ugens.sh 
+                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 #
 # also run make_faust_ugens at build time to make sure source code is generated
-add_custom_target(make_faust_ugens ALL
-    COMMAND sh make_faust_ugens.sh 
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
+  add_custom_target(make_faust_ugens ALL
+      COMMAND sh make_faust_ugens.sh 
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
+endif()
 #
 # now that sources are made, add them here using the cmakeinclude file
 # made by makedspmakefile.py called by make_faust_ugens.sh
@@ -135,6 +174,9 @@ append_to_global(ALL_INCLUDE_DIRECTORIES "${SNDFILE_INCL}")
 if(FLSYN_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES "${FLSYN_INCL}")
 endif()
+if(FLSYN_INCL2)
+  append_to_global(ALL_INCLUDE_DIRECTORIES "${FLSYN_INCL2}")
+endif()
 if(MODAL_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES "${MODAL_INCL}")
 endif()
@@ -145,18 +187,19 @@ if(CHROMAGRAM_INCL)
     append_to_global(ALL_INCLUDE_DIRECTORIES ${CHROMAGRAM_INCL})
 endif()
 
-add_library(arco4lib STATIC ${ARCO4_APP_SRC})  
-set_target_properties(arco4lib PROPERTIES
+add_library(arcolib STATIC ${ARCO_APP_SRC})
+
+set_target_properties(arcolib PROPERTIES
                       MSVC_RUNTIME_LIBRARY 
-                      "MultiThreaded$<$<CONFIG:Debug>:Debug>${MSVCRT_DLL}"
+                      "MultiThreaded$<$<CONFIG:Debug>:DebugDLL>"
                       WINDOWS_EXPORT_ALL_SYMBOLS TRUE
                       XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS
                       "$<IF:$<CONFIG:DEBUG>,YES,NO>")
 include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude") 
 message(STATUS "ARCO_SRC: ${ARCO_SRC}") 
 
-register_target(arco4lib)
-add_dependencies(arco4lib make_faust_ugens) 
+register_target(arcolib)
+add_dependencies(arcolib make_faust_ugens) 
 
 #-----------------------------------------------------------------------
 #------ libsndfile and externals ---------------------------------------
@@ -204,7 +247,7 @@ find_library(PA_DBG_LIB NAMES ${PREFERRED_PORTAUDIO_LIB} portaudio_static.a
 message(STATUS "PA_OPT_LIB ${PA_OPT_LIB}, PA_DBG_LIB ${PA_DBG_LIB}")
 
 
-target_link_libraries(arco4lib PRIVATE 
+target_link_libraries(arcolib PRIVATE 
     debug ${PA_DBG_LIB} optimized ${PA_OPT_LIB}
     debug ${SNDFILE_DBG_LIB} optimized ${SNDFILE_OPT_LIB})
 
@@ -268,13 +311,20 @@ if(USE_LIBSNDFILE_EXTERNALS)
   message(STATUS "VORBISFILE_OPT_LIB is ${VORBISFILE_OPT_LIB}, "
                  "VORBISFILE_DBG_LIB is ${VORBISFILE_DBG_LIB}") 
 
-  target_link_libraries(arco4lib PRIVATE
+  target_link_libraries(arcolib PRIVATE
     debug ${OGG_DBG_LIB} optimized ${OGG_OPT_LIB}
     debug ${FLAC_DBG_LIB} optimized ${FLAC_OPT_LIB}
     debug ${VORBIS_DBG_LIB} optimized ${VORBIS_OPT_LIB}
     debug ${VORBISENC_DBG_LIB} optimized ${VORBISFILE_OPT_LIB}
-    debug ${VORBISFILE_DBG_LIB} optimized ${VORBISFILE_OPT_LIB}
-    debug ${OPUS_DBG_LIB} optimized ${OPUS_OPT_LIB})
+    debug ${VORBISFILE_DBG_LIB} optimized ${VORBISFILE_OPT_LIB})
+  # I don't think opus is necessarily required by libsndfile, so
+  # if undefined, do not try to use it:
+  if(OPUS_DBG_LIB)
+    target_link_libraries(arcolib PRIVATE
+        debug ${OPUS_DBG_LIB} optimized ${OPUS_OPT_LIB})
+  else()
+    message(STATUS, "OPUS_DBG_LIB undefined, so will not link with Opus libs")
+  endif()
 endif()
 
 # Now we need additional linux libraries:
