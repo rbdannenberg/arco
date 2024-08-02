@@ -6,8 +6,14 @@
  * Used by fileio.h and fileio.cpp
  */
 
+#ifdef WIN32
 #define WIN32_LEAN_AND_MEAN 1
 #include "windows.h"
+#else
+#include "pthread.h"
+#include "sys/select.h"
+#endif
+
 #include "assert.h"
 #include "fileiothread.h"
 

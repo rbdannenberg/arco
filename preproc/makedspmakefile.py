@@ -125,15 +125,23 @@ def make_makefile(arco_path, manifest, outf):
         sans_extension = source[ : -4]
         src_path, basename = sans_extension.rsplit("/", 1)
         cmd = "sh " + src_path + "/generate_" + basename + ".sh"
+        # For make, u2f.py command has to be on the same line as the
+        # cd so it runs in the right directory. Make/Unix can use
+        # the ";" separator for commands:
+        cdsep = "; "
         if WIN32:
             cmd = src_path + "/generate_" + basename + ".bat"
+            # For Windows NMake, the cd command can go on a
+            # separate line (and I don't think ";" would work):
+            cdsep = "\n\t"
         print(source + ": " + sans_extension + ".ugen " + \
               arco_path + "/preproc/u2f.py", file=outf)
-        print("\tcd " + src_path + "\n\t" + PY + " " + arco_path + \
+        print("\tcd " + src_path + cdsep + PY + " " + arco_path + \
               "/preproc/u2f.py " + basename, file=outf)
-        print("\tcd " + src_path + "\n\t" + cmd, file=outf)
+        print("\tcd " + src_path + cdsep + cmd, file=outf)
         # does NMake not restore the current directory? Not sure.
-        print("\tcd " + arco_app_path + "\n", file=outf)
+        if WIN32:
+            print("\tcd " + arco_app_path + "\n", file=outf)
         print("\n", file=outf)
 
     # write the code to make allugens.srp
@@ -141,7 +149,6 @@ def make_makefile(arco_path, manifest, outf):
     # make or nmake to make dspmakefile; we only want to depend on it
     # and regenerate allugens when dspmakefile changes:
     print("dspmakefile. :", file=outf)
-    print('\tdir dspmakefile', file=outf)
     print('\techo "ERROR: dspmakefile does not exist!"', file=outf)
     print("", file=outf)
 

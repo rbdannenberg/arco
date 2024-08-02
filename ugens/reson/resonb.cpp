@@ -137,6 +137,8 @@ static void resonb_init()
                     true, true);
     // END INTERFACE INITIALIZATION
 
+    // "static" initialization code from faust:
+
 }
 
 Initializer resonb_init_obj(resonb_init);

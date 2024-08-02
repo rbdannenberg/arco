@@ -72,7 +72,7 @@ public:
         cutoff = cutoff_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
-        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
+        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
         init_snd(snd);
         init_cutoff(cutoff);
     }
