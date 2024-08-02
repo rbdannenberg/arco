@@ -29,40 +29,50 @@ function mv_to_new_dir() {
     mv $1 $2
 }
 
+# You should start in the build directory containing arco, where sources are
+# unzipped
+
+# Test to see if current directory contains arco:
+if [ ! -d arco ]
+then
+  echo "Something is wrong. Current directory should be the build directory"
+  echo "containing arco, which contains arco sources. Current directory is:"
+  pwd
+  exit
+fi
+
 echo "# At start, arco/build_everything_cmd.sh in $PWD"
 
 # but we still need some libraries from brew, so make sure they are installed
 brew install libogg
-brew install libFLAC
+brew install flac
 brew install libvorbis
-brew install libvorbisenc
-brew install libvorbisfile
-brew install libopus
-brew install glib
+brew install opus
+ https://cmu.zoom.us/rec/share/7dxfFLVcdaGEARpGfPAm4Rrp3jLBfKqAWovemNuGQ3mYQvWlXhHXqmQnSJM4ukjD.NtPr1QbMqipBvOH_
+Passcode: 22BXvA+J brew install glib
 # libintl is installed by gettext:
 brew install gettext
 
 # We need serpent: Get sources from serpent_src_for_build_everything.zip
 # and use build_everything.sh
-if [ ! -d ../serpent ]
+if [ ! -d serpent ]
 then
-  if [ ! -e ../serpent_src_for_build_everything_cmd.zip ]
+  if [ ! -e serpent_src_for_build_everything_cmd.zip ]
   then
     echo "================= Downloading Serpent Sources ================="
     curl -L https://sourceforge.net/projects/serpent/files/500/serpent_src_for_build_everything_cmd.zip/download \
-         > ../serpent_src_for_build_everything_cmd.zip
+         > serpent_src_for_build_everything_cmd.zip
   fi
-  pushd ..
-  echo "# Before build serpent, arco/build_everything_cmd.sh in $PWD"
 
   unzip serpent_src_for_build_everything_cmd.zip
-  cd serpent
+  pushd serpent
+  echo "# Before build serpent, arco/build_everything_cmd.sh in $PWD"
   echo "====== Building Serpent using serpent/build_everything_cmd.sh  ======"
   ./build_everything_cmd.sh
   popd
   echo "# After build serpent, arco/build_everything_cmd.sh in $PWD"
 else
-  echo "====== found ../serpent; assuming Serpent is built and ready  ======"
+  echo "====== found serpent; assuming Serpent is built and ready  ======"
 fi
 
 # building serpent will build o2 and wxWidgets, which we can use for Arco too
@@ -89,19 +99,18 @@ fi
 
 # We need fluidsynth
 FLSYNVER="2.3.5"
-if [ ! -d ../fluidsynth ]
+if [ ! -d fluidsynth ]
 then
-  if [ ! -e ../fluidsynth.zip ]
+  if [ ! -e fluidsynth.zip ]
   then
     echo "================== Downloading Fluidsynth ======================="
     curl -L https://github.com/FluidSynth/fluidsynth/archive/refs/tags/v$FLSYNVER.zip \
-         > ../fluidsynth.zip
+         > fluidsynth.zip
   fi  
-  pushd ..
   echo "# Before build fluidsynth, arco/build_everything_cmd.sh in $PWD"
   unzip fluidsynth.zip
   mv fluidsynth-$FLSYNVER fluidsynth
-  cd fluidsynth
+  pushd fluidsynth
   echo "# Before fluidsynth cmake, arco/build_everything_cmd.sh in $PWD"
   cmake . -DBUILD_SHARED_LIBS=off -Denable-pulseaudio=off \
         -Denable-framework=off -Denable-jack=off \
@@ -138,7 +147,7 @@ then
   popd
   echo "# After making fluidsynth, arco/build_everything_cmd.sh in $PWD"
 fi
-# currently we are in build/arco
+# currently we are in build
 # install PortAudio, but only if it is not there already
 # try to use homebrew, then install from sources
 
@@ -148,17 +157,16 @@ then
   PA_DBG_LIB="/opt/homebrew/lib/libportaudio.a"
   PA_INCL="/opt/homebrew/include"
 else
-  if [ ! -d ../portaudio ]
+  if [ ! -d portaudio ]
   then
-    if [ ! -e ../portaudio.tgz ]
+    if [ ! -e portaudio.tgz ]
     then
       curl -L https://files.portaudio.com/archives/pa_stable_v190700_20210406.tgz \
-           > ../portaudio.tgz
+           > portaudio.tgz
     fi
-    pushd ..
-    echo "# Before unzipping portaudio, arco/build_everything_cmd.sh in $PWD"
     tar -xf portaudio.tgz
-    cd portaudio
+    pushd portaudio
+    echo "# Before unzipping portaudio, arco/build_everything_cmd.sh in $PWD"
     echo "# Before building portaudio, arco/build_everything_cmd.sh in $PWD"
     echo "=============== Building PortAudio Library ==============="
     cmake . -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release \
@@ -180,7 +188,7 @@ else
     popd
     echo "# After building portaudio, arco/build_everything_cmd.sh in $PWD"
   fi
-  pushd ../portaudio
+  pushd portaudio
   echo "# Getting portaudio paths, arco/build_everything_cmd.sh in $PWD"
 
   PA_DBG_LIB="$PWD/Debug/libportaudio-static.a"
@@ -199,19 +207,18 @@ then
   SNDFILE_DBG_LIB="/opt/homebrew/lib/libsndfile.a"
   SNDFILE_INCL="/opt/homebrew/include"
 else
-  if [ ! -d ../sndfile ]
+  if [ ! -d sndfile ]
   then
-    if [ ! -e ../sndfile.zip ]
+    if [ ! -e sndfile.zip ]
     then
       curl -L https://github.com/libsndfile/libsndfile/archive/refs/tags/1.2.2.zip \
-           > ../sndfile.zip
+           > sndfile.zip
     fi
-    pushd ..
     # ready to pop back to arco, we are in build
     unzip sndfile.zip
-    echo "# Before building libsndfile, arco/build_everything_cmd.sh in $PWD"
     mv libsndfile-* sndfile
-    cd sndfile
+    pushd sndfile
+    echo "# Before building libsndfile, arco/build_everything_cmd.sh in $PWD"
     echo "=============== Building SndFile Library ==============="
     # patch homebrew FLAC
     # even if cd fails, we can still pop back to where we were:
@@ -289,11 +296,11 @@ else
     popd
     echo "# Done restoring FLAC, arco/build_everything_cmd.sh in $PWD"
 
-    # back to arco directory:
+    # back to build directory:
     popd
-    echo "# Back to arco, arco/build_everything_cmd.sh in $PWD"
+    echo "# Back to build, arco/build_everything_cmd.sh in $PWD"
   fi
-  pushd ../sndfile
+  pushd sndfile
   echo "# Setting variables for built sndfile, arco/build_everything_cmd.sh in $PWD"
   SNDFILE_OPT_LIB="$PWD/Release/libsndfile-static.a"
   SNDFILE_DBG_LIB="$PWD/Debug/libsndfile-static.a"
@@ -309,8 +316,8 @@ echo "SNDFILE_INCL = $SNDFILE_INCL"
 # O2 is set up by serpent
 
 # Create libraries.txt
-BUILD_DIR=$(dirname $PWD)
-pushd apps/common
+BUILD_DIR=$PWD
+pushd arco/apps/common
 echo "# Start libraries.txt, arco/build_everything_cmd.sh in $PWD"
 sed "s|/Users/rbd/nyquist/nylsf|$SNDFILE_INCL|g" \
     libraries-example.txt > tmplib1.txt
@@ -369,16 +376,14 @@ popd
 echo "# After arco/apps/common/libraries.txt is built, $PWD"
 
 # build the setpath.sh file
-pushd ..
 echo "# Create setpath.sh (SERPENTPATH), arco/build_everything_cmd.sh in $PWD"
 echo "export SERPENTPATH=$PWD/serpent/lib:$PWD/serpent/programs:$PWD/serpent/wxslib:$PWD/arco/serpent/srp" \
      > arco/apps/common/setpath.sh
-popd
 echo "# After making setpath.sh, arco/build_everything_cmd.sh in $PWD"
 
 
 # build the test app
-pushd apps/test
+pushd arco/apps/test
 echo "# Building apps/test, arco/build_everything_cmd.sh in $PWD"
 cmake . -DCMAKE_BUILD_TYPE=Debug -DUSE_LIBSNDFILE_EXTERNALS=ON \
       -DUSE_GLCANVAS=ON -DUSE_HID=ON -DUSE_MIDI=ON \
@@ -386,7 +391,7 @@ cmake . -DCMAKE_BUILD_TYPE=Debug -DUSE_LIBSNDFILE_EXTERNALS=ON \
 make
 mv_to_new_dir daserpent.app Debug
 popd
-cd ..
+
 echo "# After apps/test, arco/build_everything_cmd.sh in $PWD"
 echo "*---------------------------------"
 echo "* Made arco/apps/test"

@@ -209,21 +209,19 @@ if(SNDFILE_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES ${SNDFILE_INCL})   
 endif()
 
-find_library(SNDFILE_OPT_LIB
-             NAMES libsndfile_static.a sndfile_static sndfile.a sndfile 
-             HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug)  
-find_library(SNDFILE_DBG_LIB 
-             NAMES libsndfile_static.a sndfile_static sndfile.a sndfile 
-             HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug)  
+# find_library(SNDFILE_OPT_LIB
+#              NAMES libsndfile_static.a sndfile_static sndfile.a sndfile 
+#              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug)  
+# find_library(SNDFILE_DBG_LIB 
+#              NAMES libsndfile_static.a sndfile_static sndfile.a sndfile 
+#              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug)  
 
-
-             
-find_library(FFTW_OPT_LIB
-             NAMES libfftw3.a
-             PATH_SUFFIXES Release Debug)
-find_library(FFTW_DBG_LIB
-             NAMES libfftw3.a
-             PATH_SUFFIXES Release Debug)
+# find_library(FFTW_OPT_LIB
+#              NAMES libfftw3.a
+#              PATH_SUFFIXES Release Debug)
+# find_library(FFTW_DBG_LIB
+#              NAMES libfftw3.a
+#              PATH_SUFFIXES Release Debug)
 
 if(PA_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES ${PA_INCL})
@@ -237,13 +235,13 @@ endif()
 if(UNIX AND NOT APPLE) # Linux  
   set(PREFERRED_PORTAUDIO_LIB libportaudio.so)  
 endif()  
-find_library(PA_OPT_LIB NAMES ${PREFERRED_PORTAUDIO_LIB} portaudio_static.a 
-                              portaudio_static portaudio.a portaudio
-             PATHS "/usr/lib/x86_64-linux-gnu" PATH-SUFFIXES Release Debug)
+# find_library(PA_OPT_LIB NAMES ${PREFERRED_PORTAUDIO_LIB} portaudio_static.a 
+#                               portaudio_static portaudio.a portaudio
+#              PATHS "/usr/lib/x86_64-linux-gnu" PATH-SUFFIXES Release Debug)
  
-find_library(PA_DBG_LIB NAMES ${PREFERRED_PORTAUDIO_LIB} portaudio_static.a 
-                              portaudio_static portaudio.a portaudio
-             PATHS "/usr/lib/x86_64-linux-gnu" PATH-SUFFIXES Release Debug)
+# find_library(PA_DBG_LIB NAMES ${PREFERRED_PORTAUDIO_LIB} portaudio_static.a 
+#                               portaudio_static portaudio.a portaudio
+#              PATHS "/usr/lib/x86_64-linux-gnu" PATH-SUFFIXES Release Debug)
 message(STATUS "PA_OPT_LIB ${PA_OPT_LIB}, PA_DBG_LIB ${PA_DBG_LIB}")
 
 
@@ -259,10 +257,10 @@ if(USE_LIBSNDFILE_EXTERNALS)
   # if(OGG_INCL) 
   #     append_to_global(ALL_INCLUDE_DIRECTORIES ${OGG_INCL})  
   # endif() 
-  find_library(OGG_OPT_LIB NAMES ogg_static.a ogg_static ogg.a ogg 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
-  find_library(OGG_DBG_LIB NAMES ogg_static.a ogg_static ogg.a ogg 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(OGG_OPT_LIB NAMES ogg_static.a ogg_static ogg.a ogg 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(OGG_DBG_LIB NAMES ogg_static.a ogg_static ogg.a ogg 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
 
   message(STATUS "OGG_OPT_LIB ${OGG_OPT_LIB}, OGG_DBG_LIB ${OGG_DBG_LIB}")      
 
@@ -272,12 +270,12 @@ if(USE_LIBSNDFILE_EXTERNALS)
   # if(FLAC_INCL)
   #     append_to_global(ALL_INCLUDE_DIRECTORIES ${FLAC_INCL})  
   # endif() 
-  find_library(FLAC_OPT_LIB NAMES flac_static.a FLAC_static.a flac_static 
-                                  FLAC_static flac.a FLAC.a flac FLAC
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
-  find_library(FLAC_DBG_LIB NAMES flac_static.a FLAC_static.a flac_static 
-                                  FLAC_static flac.a FLAC.a flac FLAC
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(FLAC_OPT_LIB NAMES flac_static.a FLAC_static.a flac_static 
+  #                                 FLAC_static flac.a FLAC.a flac FLAC
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(FLAC_DBG_LIB NAMES flac_static.a FLAC_static.a flac_static 
+  #                                 FLAC_static flac.a FLAC.a flac FLAC
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
 
   message(STATUS "FLAC_OPT_LIB ${FLAC_OPT_LIB}, FLAC_DBG_LIB ${FLAC_DBG_LIB}") 
 
@@ -285,24 +283,24 @@ if(USE_LIBSNDFILE_EXTERNALS)
   # if(VORBIS_INCL)
   #     append_to_global(ALL_INCLUDE_DIRECTORIES ${VORBIS_INCL})
   # endif() 
-  find_library(VORBIS_OPT_LIB NAMES vorbis_static.a vorbis_static 
-                                    vorbis.a vorbis 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
-  find_library(VORBIS_DBG_LIB NAMES vorbis_static.a vorbis_static 
-                                    vorbis.a vorbis 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
-  find_library(VORBISENC_OPT_LIB NAMES vorbisenc_static.a vorbisenc_static 
-                                    vorbisenc.a vorbisenc 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
-  find_library(VORBISENC_DBG_LIB NAMES vorbisenc_static.a vorbisenc_static 
-                                    vorbisenc.a vorbisenc 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
-  find_library(VORBISFILE_OPT_LIB NAMES vorbisfile_static.a vorbisfile_static 
-                                    vorbisfile.a vorbisfile 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
-  find_library(VORBISFILE_DBG_LIB NAMES vorbisfile_static.a vorbisfile_static 
-                                    vorbisfile.a vorbisfile 
-               HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(VORBIS_OPT_LIB NAMES vorbis_static.a vorbis_static 
+  #                                   vorbis.a vorbis 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(VORBIS_DBG_LIB NAMES vorbis_static.a vorbis_static 
+  #                                   vorbis.a vorbis 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(VORBISENC_OPT_LIB NAMES vorbisenc_static.a vorbisenc_static 
+  #                                   vorbisenc.a vorbisenc 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(VORBISENC_DBG_LIB NAMES vorbisenc_static.a vorbisenc_static 
+  #                                   vorbisenc.a vorbisenc 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(VORBISFILE_OPT_LIB NAMES vorbisfile_static.a vorbisfile_static 
+  #                                   vorbisfile.a vorbisfile 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
+  # find_library(VORBISFILE_DBG_LIB NAMES vorbisfile_static.a vorbisfile_static 
+  #                                   vorbisfile.a vorbisfile 
+  #              HINTS "/usr/lib/x86_64-linux-gnu" PATH_SUFFIXES Release Debug) 
 
   message(STATUS "VORBIS_OPT_LIB is ${VORBIS_OPT_LIB}, "
                  "VORBIS_DBG_LIB is ${VORBIS_DBG_LIB}") 

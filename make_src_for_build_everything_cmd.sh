@@ -51,11 +51,7 @@ echo "the serpent directory and you will have to recompile all of it."
 if [ "yes" == $(ask_yes_or_no "Create serpent_src_for_build_everything_cmd.zip?") ]
 then
   rm -rf serpent
-  mkdir serpent
-  pushd serpent
   ~/serpent/make_src_for_build_everything_cmd.sh
-  popd
-  rm -r serpent
 fi
 
 echo "Warning: this script will remove arco from this build directory."
@@ -150,6 +146,5 @@ rm -rf arco
 if [ "yes" == $(ask_yes_or_no "Build arco from scratch here?") ]
 then
   unzip arco_src_for_build_everything_cmd.zip
-  cd arco
-  ./build_everything_cmd.sh
+  arco/build_everything_cmd.sh
 fi

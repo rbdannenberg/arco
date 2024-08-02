@@ -271,6 +271,11 @@ but they describe what I did.
   - generate (type `g`) (this should quit cmake and return to shell)
   - `make`
   - you should end up with libsndfile.a in your current directory
+- Edit `ARCODIR/apps/common/libraries.txt` (see
+  `ARCODIR/apps/common/libraries/libraries-example.txt` for a
+  template) -- this "localizes" the build to your personal machine.
+  Do not commit `libraries.txt` since it is the one part of the build
+  that is specific to your machine.
 - cd ARCODIR/apps/test
 - ccmake .
 - Use ccmake's `c` (configure) command to process files and offer
