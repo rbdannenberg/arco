@@ -41,7 +41,7 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
-            "mathugenb", "onset", "chorddetect"]
+            "mathugenb", "onset", "chorddetect", "spectralcentroid", "spectralrolloff"]
 
 MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
              "ugen_clip", "ugen_less", "ugen_greater", "ugen_soft_clip"]
@@ -251,6 +251,18 @@ def make_inclfile(arco_path, manifest, outf):
               "    " + df_path + "ChordDetector.cpp",
                       df_path + "ChordDetector.h\n", file=outf)
         need_fft = True
+    
+    if "spectralcentroid" in manifest:  # add FFTCalculator implementation files
+        df_path = arco_path + "/arco/src/"
+        print("    " + df_path + "FFTCalculator.cpp",
+                      df_path + "FFTCalculator.h\n", file=outf)
+        need_fft = True
+    
+    if "spectralrolloff" in manifest:  # add FFTCalculator implementation files
+        df_path = arco_path + "/arco/src/"
+        print("    " + df_path + "FFTCalculator.cpp",
+                      df_path + "FFTCalculator.h\n", file=outf)
+        need_fft = True
 
     ## Include source files to satisfy dependencies
     if need_ringbuf:
@@ -314,8 +326,6 @@ def make_inclfile(arco_path, manifest, outf):
             print(sources)
         if basename == "flsyn":
             need_flsyn_lib = True
-#        if basename == "chorddetect":
-#            need_chromagram_lib = True
 
     print(")", file=outf)
     print("\ntarget_sources(arcolib PRIVATE ${ARCO_SRC})", file=outf)

@@ -1,0 +1,21 @@
+def spectralcentroid(reply_addr):
+    return SpectralCentroid(reply_addr)
+
+
+class SpectralCentroid (Ugen):
+    def init(reply_addr)
+        super.init(create_ugen_id(), "SpectralCentroid", 0, '', "s",
+                   'reply_addr', reply_addr)
+
+    def start(reply_addr):
+        o2_send_cmd("/arco/spectralcentroid/start", 0, "Us", id, reply_addr)
+        this
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "SpectralCentroid set", id, value.id
+        o2_send_cmd("/arco/spectralcentroid/repl_input", 0, "UU", id, value.id)
+        this
+
+

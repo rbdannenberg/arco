@@ -147,7 +147,6 @@ void Chromagram::processAudioFrame (float* inputAudioFrame)
             
             for (int i = 0; i < bufferSize - downSampledCalcInterval; i++)
             {
-                assert(i + downSampledCalcInterval < bufferSize);
                 buffer[i] = buffer[i + downSampledCalcInterval];
             }
             
@@ -177,7 +176,7 @@ void Chromagram::setSamplingFrequency (int fs)
 //==================================================================================
 void Chromagram::setChromaCalculationInterval (int numSamples)
 {
-    // True number of samples buffer can store is bufferSize * 4 since we downsample
+    // True number of samples buffer can represent is bufferSize * 4 since we downsample
     if (numSamples > bufferSize * 4) {
         printf("Failed to set Chroma Calculation Interval. Cannot be greater than window size\n");
         return;
@@ -271,6 +270,8 @@ void Chromagram::calculateChromagram()
 void Chromagram::calculateMagnitudeSpectrum()
 {
     
+    // Original code by Adam Stark takes the square root of each magnitude. We have removed it.
+    
 #ifdef USE_FFTW
     // -----------------------------------------------
     // FFTW VERSION
@@ -290,7 +291,6 @@ void Chromagram::calculateMagnitudeSpectrum()
     for (i = 0; i < (bufferSize / 2) + 1; i++)
     {
         magnitudeSpectrum[i] = sqrt (pow (complexOut[i][0], 2) + pow (complexOut[i][1], 2));
-        magnitudeSpectrum[i] = sqrt (magnitudeSpectrum[i]);
     }
 #endif
     
@@ -314,7 +314,6 @@ void Chromagram::calculateMagnitudeSpectrum()
     for (i = 0; i < (bufferSize / 2) + 1; i++)
     {
         magnitudeSpectrum[i] = sqrt (pow (fftOut[i].r, 2) + pow (fftOut[i].i, 2));
-        magnitudeSpectrum[i] = sqrt (magnitudeSpectrum[i]);
     }
 #endif
 
@@ -334,10 +333,11 @@ void Chromagram::calculateMagnitudeSpectrum()
     // compute first (N/2)+1 mag values
     magnitudeSpectrum[0] = fft_data[0];
     magnitudeSpectrum[bufferSize / 2] = fft_data[1];  // nyquist term
-    for (i = 1; i < (bufferSize / 2) + 1; i++) {
-        magnitudeSpectrum[i] = sqrt(pow(fft_data[i * 2], 2) +
-                                    pow (fft_data[i * 2 + 1], 2));
-        magnitudeSpectrum[i] = sqrt(magnitudeSpectrum[i]);
+    // now compute mag from index 1 to index N/2-1
+    for (int i = 1; i < (bufferSize / 2); i++) {
+        float re = fft_data[i * 2];
+        float im = fft_data[i * 2 + 1];
+        magnitudeSpectrum[i] = sqrt(re * re + im * im);
     }
 #endif
 
