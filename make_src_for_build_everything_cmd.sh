@@ -46,19 +46,42 @@ function ask_yes_or_no() {
     esac
 }
 
-echo "Warning: creating serpent_src_for_build_everything_cmd.zip will remove"
-echo "the serpent directory and you will have to recompile all of it."
-if [ "yes" == $(ask_yes_or_no "Create serpent_src_for_build_everything_cmd.zip?") ]
+if [ `basename $PWD` = "arco" ]
 then
-  rm -rf serpent
-  ~/serpent/make_src_for_build_everything_cmd.sh
+    echo "***********************************************************"
+    echo "ERROR: you are running $0 in $PWD."
+    echo "If this is your arco source directory, this script will ask"
+    echo "to delete subdirectories arco and serpent. This is not what"
+    echo "you want. Rather than take the risk, this script will not"
+    echo "run in a directory named arco. Try running from a fresh"
+    echo "directory named build. E.g."
+    echo "    cd ..; mkdir build; cd build"
+    echo "    ../arco/make_src_for_build_everything_cmd.sh"
+    echo "***********************************************************"
+    exit 1
 fi
 
-echo "Warning: this script will remove arco from this build directory."
-echo "You will have to recompile all of it."
-if [ "no" == $(ask_yes_or_no "Continue by removing arco?") ]
+if [ -d serpent ]
 then
-  exit 0
+  echo "Warning: creating serpent_src_for_build_everything_cmd.zip will remove"
+  echo "the serpent directory and you will have to recompile all of it."
+
+  if [ "yes" == $(ask_yes_or_no "Create serpent_src_for_build_everything_cmd.zip?") ]
+  then
+    rm -rf serpent
+    ~/serpent/make_src_for_build_everything_cmd.sh
+  fi
+fi
+
+if [ -d arco ]
+then
+  echo "Warning: this script will remove arco from this build directory."
+  echo "You will have to recompile all of it."
+
+  if [ "no" == $(ask_yes_or_no "Continue by removing arco?") ]
+  then
+    exit 0
+  fi
 fi
 
 rm -rf arco
@@ -143,6 +166,8 @@ cd ..
 zip -r arco_src_for_build_everything_cmd.zip arco
 rm -rf arco
 
+echo "# Created arco_src_for_build_everything_cmd.zip"
+echo "# You can test it here and now by answering yes:"
 if [ "yes" == $(ask_yes_or_no "Build arco from scratch here?") ]
 then
   unzip arco_src_for_build_everything_cmd.zip

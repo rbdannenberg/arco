@@ -4,6 +4,11 @@
 # Roger B. Dannenberg
 # Jun 2024
 #
+# Usage: Normally, you will create an empty build directory (anywhere),
+# and unzip arco_src_for_build_everything_cmd.zip from an Arco release
+# on github. This will create an arco directory. cd arco and run this
+# script there, e.g. simply type ./build_everything_cmd.sh
+
 
 # deployment version for cmake:
 OSX_VER=12.0
@@ -32,16 +37,18 @@ function mv_to_new_dir() {
 # You should start in the build directory containing arco, where sources are
 # unzipped
 
-# Test to see if current directory contains arco:
-if [ ! -d arco ]
+# Test to see if we are running in the arco directory:
+if [ `basename $PWD` != "arco" ]
 then
-  echo "Something is wrong. Current directory should be the build directory"
-  echo "containing arco, which contains arco sources. Current directory is:"
-  pwd
+  echo "Something is wrong. Current directory should be the build/arco."
+  echo "Current directory is: $PWD"
   exit
 fi
 
-echo "# At start, arco/build_everything_cmd.sh in $PWD"
+echo "# At start,running $0 in $PWD"
+cd ..
+echo "# changing to $PWD"
+
 
 # but we still need some libraries from brew, so make sure they are installed
 brew install libogg
@@ -392,13 +399,13 @@ make
 mv_to_new_dir daserpent.app Debug
 popd
 
-echo "# After apps/test, arco/build_everything_cmd.sh in $PWD"
+echo "# After running $0 in $PWD and building apps/test, "
 echo "*---------------------------------"
-echo "* Made arco/apps/test"
-echo "* You can run it from the arco/apps/test directory using:"
-echo "*     cd arco/apps/test"
+echo "* Made arco/apps/test in $PWD"
+echo "* You can run it from the $PWD/arco/apps/test directory using:"
+echo "*     cd $PWD/arco/apps/test"
 echo "*     source ../common/setpath.sh"
 echo "*     Debug/daserpent.app/Contents/MacOS/daserpent"
 echo "*"
-echo "* build_everything_cmd.sh - build and installation completed"
+echo "* $0 - build and installation completed"
 echo "*---------------------------------"

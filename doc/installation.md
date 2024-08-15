@@ -14,7 +14,7 @@
 
 ## Quick Install and Test
 
-The zip `file arco_src_for_build_everything_cmd.zip` contains code and a script
+The zip file `arco_src_for_build_everything_cmd.zip` contains code and a script
 that can be used to compile Arco and the daserpent test program as follows:
 
  1. create an empty build directory, e.g.
