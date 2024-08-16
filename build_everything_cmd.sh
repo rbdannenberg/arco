@@ -158,11 +158,26 @@ fi
 # install PortAudio, but only if it is not there already
 # try to use homebrew, then install from sources
 
-if [ -e /opt/homebrew/lib/libportaudio.a ] && [ $TRY_BREW ]
+pushd arco/apps/common
+if [ $(uname -m) == "arm64" ]
 then
-  PA_OPT_LIB="/opt/homebrew/lib/libportaudio.a"
-  PA_DBG_LIB="/opt/homebrew/lib/libportaudio.a"
-  PA_INCL="/opt/homebrew/include"
+  HOMEBREW_BASE="/opt/homebrew"
+  cp libraries-example.txt tmplib0.txt
+else
+  HOMEBREW_BASE="/usr/local"
+  sed "s|/opt/homebrew|/usr/local|g" libraries-example.txt > tmplib0.txt
+fi
+popd
+# now libraries-example.txt has been copied to tmplib0.txt, and if this is
+# an Intel machine, the /opt/homebrew paths used by homebrew on ARM systems
+# has been rewritten to use /usr/local, used by Intel systems.
+
+
+if [ -e "$HOMEBREW_BASE/lib/libportaudio.a" ] && [ $TRY_BREW ]
+then
+  PA_OPT_LIB="$HOMEBREW_BASE/lib/libportaudio.a"
+  PA_DBG_LIB="$HOMEBREW_BASE/lib/libportaudio.a"
+  PA_INCL="$HOMEBREW_BASE/include"
 else
   if [ ! -d portaudio ]
   then
@@ -208,11 +223,11 @@ echo "PA_OPT_LIB = $PA_OPT_LIB"
 echo "PA_DBG_LIB = $PA_DBG_LIB"
 echo "PA_INCL = $PA_INCL"
 
-if [ -e /opt/homebrew/lib/libsndfile.a ] && [ $TRY_BREW ]
+if [ -e $HOMEBREW_BASE/lib/libsndfile.a ] && [ $TRY_BREW ]
 then
-  SNDFILE_OPT_LIB="/opt/homebrew/lib/libsndfile.a"
-  SNDFILE_DBG_LIB="/opt/homebrew/lib/libsndfile.a"
-  SNDFILE_INCL="/opt/homebrew/include"
+  SNDFILE_OPT_LIB="$HOMEBREW_BASE/lib/libsndfile.a"
+  SNDFILE_DBG_LIB="$HOMEBREW_BASE/lib/libsndfile.a"
+  SNDFILE_INCL="$HOMEBREW_BASE/include"
 else
   if [ ! -d sndfile ]
   then
@@ -230,7 +245,7 @@ else
     # patch homebrew FLAC
     # even if cd fails, we can still pop back to where we were:
     pushd ..
-    cd /opt/homebrew/Cellar/flac/*/include/FLAC
+    cd $HOMEBREW_BASE/Cellar/flac/*/include/FLAC
     echo "# Before patching FLAC, arco/build_everything_cmd.sh in $PWD"
     if [ -e assert.h ]
     then
@@ -241,22 +256,22 @@ else
     # strangely, the default cc (c compiler) from Xcode doesn't work
     cmake . -DBUILD_EXAMPLES=off -DBUILD_PROGRAMS=off -DBUILD_SHARED_LIBS=OFF \
           -DENABLE_MPEG=OFF \
-          -DFLAC_LIBRARY=/opt/homebrew/lib/libFLAC.a \
-          -DFLAC_INCLUDE_DIR=/opt/homebrew/include/FLAC \
-          -DMP3LAME_LIBRARY=/opt/homebrew/lib/libmp3lame.a \
-          -DMP3LAME_INCLUDE_DIR=/opt/homebrew/include/lame \
-          -DOGG_LIBRARY=/opt/homebrew/lib/libogg.a \
-          -DOGG_INCLUDE_DIR=/opt/homebrew/include \
-          -DOPUS_LIBRARY=/opt/homebrew/lib/libopus.a \
-          -DOPUS_INCLUDE_DIR=/opt/homebrew/include/opus \
-          -DSPEEX_LIBRARY=/opt/homebrew/lib/libspeex.a \
-          -DSPEEX_INCLUDE_DIR=/opt/homebrew/include/speex \
-          -DVorbis_Enc_LIBRARY=/opt/homebrew/lib/libvorbisenc.a \
-          -DVorbis_Enc_INCLUDE_DIR=/opt/homebrew/include/vorbis \
-          -DVorbis_File_LIBRARY=/opt/homebrew/lib/libvorbisfile.a \
-          -DVorbis_File_INCLUDE_DIR=/opt/homebrew/include/vorbis \
-          -DVorbis_Vorbis_LIBRARY=/opt/homebrew/lib/libvorbis.a \
-          -DVorbis_Vorbis_INCLUDE_DIR=/opt/homebrew/include/vorbis \
+          -DFLAC_LIBRARY=$HOMEBREW_BASE/lib/libFLAC.a \
+          -DFLAC_INCLUDE_DIR=$HOMEBREW_BASE/include/FLAC \
+          -DMP3LAME_LIBRARY=$HOMEBREW_BASE/lib/libmp3lame.a \
+          -DMP3LAME_INCLUDE_DIR=$HOMEBREW_BASE/include/lame \
+          -DOGG_LIBRARY=$HOMEBREW_BASE/lib/libogg.a \
+          -DOGG_INCLUDE_DIR=$HOMEBREW_BASE/include \
+          -DOPUS_LIBRARY=$HOMEBREW_BASE/lib/libopus.a \
+          -DOPUS_INCLUDE_DIR=$HOMEBREW_BASE/include/opus \
+          -DSPEEX_LIBRARY=$HOMEBREW_BASE/lib/libspeex.a \
+          -DSPEEX_INCLUDE_DIR=$HOMEBREW_BASE/include/speex \
+          -DVorbis_Enc_LIBRARY=$HOMEBREW_BASE/lib/libvorbisenc.a \
+          -DVorbis_Enc_INCLUDE_DIR=$HOMEBREW_BASE/include/vorbis \
+          -DVorbis_File_LIBRARY=$HOMEBREW_BASE/lib/libvorbisfile.a \
+          -DVorbis_File_INCLUDE_DIR=$HOMEBREW_BASE/include/vorbis \
+          -DVorbis_Vorbis_LIBRARY=$HOMEBREW_BASE/lib/libvorbis.a \
+          -DVorbis_Vorbis_INCLUDE_DIR=$HOMEBREW_BASE/include/vorbis \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER -DBUILD_TESTING=OFF
     make clean
@@ -267,22 +282,22 @@ else
     make clean
     cmake . -DBUILD_EXAMPLES=off -DBUILD_PROGRAMS=off -DBUILD_SHARED_LIBS=OFF \
           -DENABLE_MPEG=OFF \
-          -DFLAC_LIBRARY=/opt/homebrew/lib/libFLAC.a \
-          -DFLAC_INCLUDE_DIR=/opt/homebrew/include/FLAC \
-          -DMP3LAME_LIBRARY=/opt/homebrew/lib/libmp3lame.a \
-          -DMP3LAME_INCLUDE_DIR=/opt/homebrew/include/lame \
-          -DOGG_LIBRARY=/opt/homebrew/lib/libogg.a \
-          -DOGG_INCLUDE_DIR=/opt/homebrew/include \
-          -DOPUS_LIBRARY=/opt/homebrew/lib/libopus.a \
-          -DOPUS_INCLUDE_DIR=/opt/homebrew/include/opus \
-          -DSPEEX_LIBRARY=/opt/homebrew/lib/libspeex.a \
-          -DSPEEX_INCLUDE_DIR=/opt/homebrew/include/speex \
-          -DVorbis_Enc_LIBRARY=/opt/homebrew/lib/libvorbisenc.a \
-          -DVorbis_Enc_INCLUDE_DIR=/opt/homebrew/include/vorbis \
-          -DVorbis_File_LIBRARY=/opt/homebrew/lib/libvorbisfile.a \
-          -DVorbis_File_INCLUDE_DIR=/opt/homebrew/include/vorbis \
-          -DVorbis_Vorbis_LIBRARY=/opt/homebrew/lib/libvorbis.a \
-          -DVorbis_Vorbis_INCLUDE_DIR=/opt/homebrew/include/vorbis \
+          -DFLAC_LIBRARY=$HOMEBREW_BASE/lib/libFLAC.a \
+          -DFLAC_INCLUDE_DIR=$HOMEBREW_BASE/include/FLAC \
+          -DMP3LAME_LIBRARY=$HOMEBREW_BASE/lib/libmp3lame.a \
+          -DMP3LAME_INCLUDE_DIR=$HOMEBREW_BASE/include/lame \
+          -DOGG_LIBRARY=$HOMEBREW_BASE/lib/libogg.a \
+          -DOGG_INCLUDE_DIR=$HOMEBREW_BASE/include \
+          -DOPUS_LIBRARY=$HOMEBREW_BASE/lib/libopus.a \
+          -DOPUS_INCLUDE_DIR=$HOMEBREW_BASE/include/opus \
+          -DSPEEX_LIBRARY=$HOMEBREW_BASE/lib/libspeex.a \
+          -DSPEEX_INCLUDE_DIR=$HOMEBREW_BASE/include/speex \
+          -DVorbis_Enc_LIBRARY=$HOMEBREW_BASE/lib/libvorbisenc.a \
+          -DVorbis_Enc_INCLUDE_DIR=$HOMEBREW_BASE/include/vorbis \
+          -DVorbis_File_LIBRARY=$HOMEBREW_BASE/lib/libvorbisfile.a \
+          -DVorbis_File_INCLUDE_DIR=$HOMEBREW_BASE/include/vorbis \
+          -DVorbis_Vorbis_LIBRARY=$HOMEBREW_BASE/lib/libvorbis.a \
+          -DVorbis_Vorbis_INCLUDE_DIR=$HOMEBREW_BASE/include/vorbis \
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER -DBUILD_TESTING=OFF
     make 
@@ -294,7 +309,7 @@ else
     # prepare to pop back to here, which is build/sndfile
     pushd ..
     echo "# After building libsndfile, arco/build_everything_cmd.sh in $PWD"
-    cd /opt/homebrew/Cellar/flac/*/include/FLAC
+    cd $HOMEBREW_BASE/Cellar/flac/*/include/FLAC
     echo "# Ready to restore FLAC, arco/build_everything_cmd.sh in $PWD"
     if [ -e flacassert.h ]
     then
@@ -327,7 +342,7 @@ BUILD_DIR=$PWD
 pushd arco/apps/common
 echo "# Start libraries.txt, arco/build_everything_cmd.sh in $PWD"
 sed "s|/Users/rbd/nyquist/nylsf|$SNDFILE_INCL|g" \
-    libraries-example.txt > tmplib1.txt
+    tmplib0.txt > tmplib1.txt
 sed "s|/Users/rbd/nyquist/Release/libsndfile_static.a|$SNDFILE_OPT_LIB|g" \
     tmplib1.txt > tmplib2.txt
 sed "s|/Users/rbd/nyquist/Debug/libsndfile_static.a|$SNDFILE_DBG_LIB|g" \
@@ -338,31 +353,31 @@ sed "s|/Users/rbd/nyquist/Release/libportaudio_static.a|$PA_OPT_LIB|g" \
     tmplib2.txt > tmplib1.txt
 sed "s|/Users/rbd/nyquist/Debug/libportaudio_static.a|$PA_DBG_LIB|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/Users/rbd/nyquist/nylsf/ogg|/opt/homebrew/include|g" \
+sed "s|/Users/rbd/nyquist/nylsf/ogg|$HOMEBREW_BASE/include|g" \
     tmplib2.txt > tmplib1.txt
-sed "s|/Users/rbd/nyquist/Release/libogg_static.a|/opt/homebrew/lib/libogg.a|g" \
+sed "s|/Users/rbd/nyquist/Release/libogg_static.a|$HOMEBREW_BASE/lib/libogg.a|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/Users/rbd/nyquist/Debug/libogg_static.a|/opt/homebrew/lib/libogg.a|g" \
+sed "s|/Users/rbd/nyquist/Debug/libogg_static.a|$HOMEBREW_BASE/lib/libogg.a|g" \
     tmplib2.txt > tmplib1.txt
-sed "s|/Users/rbd/nyquist/FLAC/include|/opt/homebrew/include/FLAC|g" \
+sed "s|/Users/rbd/nyquist/FLAC/include|$HOMEBREW_BASE/include/FLAC|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/Users/rbd/nyquist/Release/libflac_static.a|/opt/homebrew/lib/libFLAC.a|g" \
+sed "s|/Users/rbd/nyquist/Release/libflac_static.a|$HOMEBREW_BASE/lib/libFLAC.a|g" \
     tmplib2.txt > tmplib1.txt
-sed "s|/Users/rbd/nyquist/Debug/libflac_static.a|/opt/homebrew/lib/libFLAC.a|g" \
+sed "s|/Users/rbd/nyquist/Debug/libflac_static.a|$HOMEBREW_BASE/lib/libFLAC.a|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/Users/rbd/nyquist/libvorbis/include|/opt/homebrew/include/vorbis|g" \
+sed "s|/Users/rbd/nyquist/libvorbis/include|$HOMEBREW_BASE/include/vorbis|g" \
     tmplib2.txt > tmplib1.txt
-sed "s|/Users/rbd/nyquist/Release/libvorbis_static.a|/opt/homebrew/lib/libvorbis.a|g" \
+sed "s|/Users/rbd/nyquist/Release/libvorbis_static.a|$HOMEBREW_BASE/lib/libvorbis.a|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/Users/rbd/nyquist/Debug/libvorbis_static.a|/opt/homebrew/lib/libvorbis.a|g" \
+sed "s|/Users/rbd/nyquist/Debug/libvorbis_static.a|$HOMEBREW_BASE/lib/libvorbis.a|g" \
     tmplib2.txt > tmplib1.txt
-sed "s|/Users/rbd/nyquist/Release/libvorbisenc_static.a|/opt/homebrew/lib/libvorbisenc.a|g" \
+sed "s|/Users/rbd/nyquist/Release/libvorbisenc_static.a|$HOMEBREW_BASE/lib/libvorbisenc.a|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/Users/rbd/nyquist/Debug/libvorbisenc_static.a|/opt/homebrew/lib/libvorbisenc.a|g" \
+sed "s|/Users/rbd/nyquist/Debug/libvorbisenc_static.a|$HOMEBREW_BASE/lib/libvorbisenc.a|g" \
     tmplib2.txt > tmplib1.txt
-sed "s|/Users/rbd/nyquist/Release/libvorbisfile_static.a|/opt/homebrew/lib/libvorbisfile.a|g" \
+sed "s|/Users/rbd/nyquist/Release/libvorbisfile_static.a|$HOMEBREW_BASE/lib/libvorbisfile.a|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/Users/rbd/nyquist/Debug/libvorbisfile_static.a|/opt/homebrew/lib/libvorbisfile.a|g" \
+sed "s|/Users/rbd/nyquist/Debug/libvorbisfile_static.a|$HOMEBREW_BASE/lib/libvorbisfile.a|g" \
     tmplib2.txt > tmplib1.txt
 sed "s|/Users/rbd/faust/bin|$HOME/faust/bin|g" tmplib1.txt > tmplib2.txt
 sed "s|/Users/rbd/o2/|$BUILD_DIR/o2/|g" tmplib2.txt > tmplib1.txt
@@ -371,9 +386,9 @@ sed "s|/Users/rbd/fluidsynth-2.3.3/include|$BUILD_DIR/fluidsynth/include|g" \
 sed "s|/Users/rbd/fluidsynth-2.3.3/build/libfluidsynth-OBJ.build|$BUILD_DIR/fluidsynth|g" \
     tmplib2.txt > tmplib1.txt
 # do we need GLIB?
-sed "s|/opt/homebrew/Cellar/glib/2.76.4/lib/libglib-2.0.dylib|/opt/homebrew/lib/libglib-2.0.a|g" \
+sed "s|$HOMEBREW_BASE/Cellar/glib/2.76.4/lib/libglib-2.0.dylib|$HOMEBREW_BASE/lib/libglib-2.0.a|g" \
     tmplib1.txt > tmplib2.txt
-sed "s|/opt/homebrew/Cellar/gettext/0.21.1/lib/libintl.a|/opt/homebrew/lib/libintl.a|g" tmplib2.txt \
+sed "s|$HOMEBREW_BASE/Cellar/gettext/0.21.1/lib/libintl.a|$HOMEBREW_BASE/lib/libintl.a|g" tmplib2.txt \
     > tmplib1.txt
 sed "s|CMAKE_OSX_DEPLOYMENT_TARGET \"\"|CMAKE_OSX_DEPLOYMENT_TARGET \"$OSX_VER\"|g" tmplib1.txt \
     > tmplib2.txt

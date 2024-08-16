@@ -171,5 +171,6 @@ echo "# You can test it here and now by answering yes:"
 if [ "yes" == $(ask_yes_or_no "Build arco from scratch here?") ]
 then
   unzip arco_src_for_build_everything_cmd.zip
-  arco/build_everything_cmd.sh
+  cd arco
+  ./build_everything_cmd.sh
 fi
