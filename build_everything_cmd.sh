@@ -20,7 +20,9 @@ OSX_VER=12.0
 # figured out how to make a completely static link with all the
 # libsndfile components (or how to make libsndfile *without* opus,
 # ogg, vorbis, mp3, etc.) so the default configuration is to
-# simply use homebrew where possible.
+# simply use homebrew where possible. Update: as of 16 Aug 2024,
+# we will build libsndfile locally without mp3 to avoid problems
+# encountered using Homebrew's libsndfile installation.
 #TRY_BREW=
 TRY_BREW=true
 
@@ -159,13 +161,12 @@ fi
 # try to use homebrew, then install from sources
 
 pushd arco/apps/common
-if [ $(uname -m) == "arm64" ]
+HOMEBREW_BASE=$(brew --prefix)
+if [ "$HOMEBREW_BASE" == "/opt/homebrew" ]
 then
-  HOMEBREW_BASE="/opt/homebrew"
   cp libraries-example.txt tmplib0.txt
 else
-  HOMEBREW_BASE="/usr/local"
-  sed "s|/opt/homebrew|/usr/local|g" libraries-example.txt > tmplib0.txt
+  sed "s|/opt/homebrew|$HOMEBREW_BASE|g" libraries-example.txt > tmplib0.txt
 fi
 popd
 # now libraries-example.txt has been copied to tmplib0.txt, and if this is
@@ -223,12 +224,15 @@ echo "PA_OPT_LIB = $PA_OPT_LIB"
 echo "PA_DBG_LIB = $PA_DBG_LIB"
 echo "PA_INCL = $PA_INCL"
 
-if [ -e $HOMEBREW_BASE/lib/libsndfile.a ] && [ $TRY_BREW ]
-then
-  SNDFILE_OPT_LIB="$HOMEBREW_BASE/lib/libsndfile.a"
-  SNDFILE_DBG_LIB="$HOMEBREW_BASE/lib/libsndfile.a"
-  SNDFILE_INCL="$HOMEBREW_BASE/include"
-else
+# NOTE: This first option did not always work due to unresolved
+# dependencies in Homebrew's libsndfile, so we always build it
+# locally now.
+#if [ -e $HOMEBREW_BASE/lib/libsndfile.a ] && [ $TRY_BREW ]
+#then
+#  SNDFILE_OPT_LIB="$HOMEBREW_BASE/lib/libsndfile.a"
+#  SNDFILE_DBG_LIB="$HOMEBREW_BASE/lib/libsndfile.a"
+#  SNDFILE_INCL="$HOMEBREW_BASE/include"
+#else
   if [ ! -d sndfile ]
   then
     if [ ! -e sndfile.zip ]
@@ -329,7 +333,7 @@ else
   SNDFILE_INCL="$PWD/include"
   popd
   echo "# Completed work on sndfile, arco/build_everything_cmd.sh in $PWD"
-fi
+#fi
 
 echo "SNDFILE_OPT_LIB = $SNDFILE_OPT_LIB"
 echo "SNDFILE_DBG_LIB = $SNDFILE_DBG_LIB"
