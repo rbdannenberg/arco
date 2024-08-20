@@ -12,27 +12,6 @@
 - [Installation on Windows](#installation-on-windows)
 - [CMake Overview](#cMake-overview) - how is the build system organized?
 
-## Quick Install and Test
-
-The zip file `arco_src_for_build_everything_cmd.zip` contains code and a script
-that can be used to compile Arco and the daserpent test program as follows:
-
- 1. create an empty build directory, e.g.
-    `cd; mkdir build`
- 2. move arco_src_for_build_everything_cmd.zip to build directory, e.g.
-    `mv Downloads/arco_src_for_build_everything_cmd.zip build`
- 3. unzip the file, e.g.
-    `cd build; unzip arco_src_for_build_everything_cmd.zip`
- 4. execute build_everything_cmd.sh in arco, e.g.
-    `cd arco; ./build_everything_cmd.sh`
-
-The build_everything_cmd.sh file, in building and installing serpent,
-will offer options to configure your system to run serpent. See
-`serpent/make_src_for_build_everything_cmd.sh` for details.
-
-The script will build *only* the test program `arco/apps/test/daserpent.app`.
-Follow the instructions printed by `build_everything_cmd.sh` to run the 
-`daserpent` test program.
 
 ## Dependencies
 
@@ -58,6 +37,86 @@ so I have /home/rbd/o2, /home/rbd/portaudio, /home/rbd/portmidi,
 the same so that Arco CMake files can find them.
 
 ## Installation on MacOS
+
+### Quick Install and Test
+
+The zip file `arco_src_for_build_everything_cmd.zip` contains code and a script
+that can be used to compile Arco and the daserpent test program as follows:
+
+ 1. create an empty build directory, e.g.
+    `cd; mkdir build`
+ 2. move arco_src_for_build_everything_cmd.zip to build directory, e.g.
+    `mv Downloads/arco_src_for_build_everything_cmd.zip build`
+ 3. unzip the file, e.g.
+    `cd build; unzip arco_src_for_build_everything_cmd.zip`
+ 4. execute build_everything_cmd.sh in arco, e.g.
+    `cd arco; ./build_everything_cmd.sh`
+
+The build_everything_cmd.sh file, in building and installing serpent,
+will offer options to configure your system to run serpent. See
+`serpent/make_src_for_build_everything_cmd.sh` for details.
+
+The script will build *only* the test program `arco/apps/test/daserpent.app`.
+Follow the instructions printed by `build_everything_cmd.sh` to run the
+`daserpent` test program.
+
+If you want to work on Arco implementation, you will want to clone the
+Arco repository so that you can update your sources with the latest
+changes and push your changes to the main shared repository. This
+*Quick Install and Test* gets sources from a zip file, so you should
+follow the next section.
+
+### Automated Install From a Clone of the Git Repository
+Using sources managed by git is similar to the *Quick Install and Test*
+described in the previous section:
+
+ 1. create an empty build directory, e.g.
+    `cd; mkdir build`
+ 2. change to the build directory:
+    `cd build`
+ 2. get sources into a directory `build/arco`:
+    `git clone git@github.com:rbdannenberg/arco.git`
+ 4. execute build_everything_cmd.sh in arco, e.g.
+    `cd arco; ./build_everything_cmd.sh`
+
+The build_everything_cmd.sh file, in building and installing serpent,
+will offer options to configure your system to run serpent. See
+`serpent/make_src_for_build_everything_cmd.sh` for details.
+
+The script will build *only* the test program `arco/apps/test/daserpent.app`.
+Follow the instructions printed by `build_everything_cmd.sh` to run the
+`daserpent` test program.
+
+Finally, you will probably want to develop with Xcode:
+ 1. Open `CMake.app`
+ 2. change "Where to build the binaries" to your `build/arco/apps/test`,
+    e.g. I would select `/Users/rbd/build/arco/apps/test`.
+ 3. In the main CMake menu bar, select "File:Delete Cache" (because the
+    `build_everything_cmd.sh` configured CMake to create a Unix makefile,
+    but you want CMake to build an Xcode project.)
+ 4. Check Advanced to see all the variables in CMake.
+ 5. Under `USE` you should have the following values:
+    - USE_GLCANVAS: TRUE
+    - USE_HID: ON
+    - USE_LIBSNDFILE_EXTERNALS: ON
+    - USE_MIDI: ON, USE_NETWORL: OFF
+    - USE_O2: TRUE
+    - USE_PROC: OFF
+    - USE_SHFILE: OFF
+    - USE_STATIC_LIBS: ON
+    - USE_ZEROMQ: OFF
+ 6. Push the Configure button
+ 7. Push the Generate button
+ 8. Push the Open Project button. Xcode should open and you can build
+    the project in Xcode.
+
+Note that every application in Arco is potentially linked with a
+different set of unit generators and has a separate Xcode project.
+
+### Manual Install
+These instructions explain more of what is going on when you install Arco.
+If/when the `build_everything_cmd.sh` script fails, you should try these
+step-by-step instructions.
 
 These instructions assume you want to run Arco as a library within Serpent.
 While Arco is under development, this is how we are all running Arco.

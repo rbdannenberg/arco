@@ -43,30 +43,7 @@ set(ARCO_SRC
     const.cpp const.h 
     upsample.cpp upsample.h 
     audioblock.cpp audioblock.h
-
-#    pwl.cpp pwl.h 
-#    pwlb.cpp pwlb.h
-#    delay.cpp delay.h
-#    mix.cpp mix.h
-
-
     testtone.cpp testtone.h
-    # NOTE: list of desired unit generators should be moved to
-    # CMakeLists for individual applications so that we do not
-    # drag in the whole world (could be large) for every application.
-    # But how do we know what unit generators are needed? It could
-    # be painful for users to specify, so we should find some way
-    # to scan the user's code to determine what unit generators are
-    # instantiated. For now, we're focused on a server that has all
-    # the code, and to keep things simple, the unit generators are here:
-
-
-#    ../../ugens/mult/mult.cpp ../../ugens/mult/mult.h 
-#    ../../ugens/mult/multb.cpp ../../ugens/mult/multb.h 
-#    ../../ugens/sine/sine.cpp ../../ugens/sine/sine.h 
-#    ../../ugens/sine/sineb.cpp ../../ugens/sine/sineb.h
-#    ../../ugens/reson/reson.cpp ../../ugens/reson/reson.h
-#    ../../ugens/reson/resonb.cpp ../../ugens/reson/resonb.h
 )
 
 if(APPLE) 
@@ -120,7 +97,8 @@ endif()
 # directory, then we run it. We can also set up dependencies
 # to run it at build time whenever something changes.
 #
-message(STATUS "CMAKE_SOURCE_DIR where to run dspmakefile: ${CMAKE_SOURCE_DIR}")
+message(STATUS
+        "CMAKE_SOURCE_DIR (where to run dspmakefile): ${CMAKE_SOURCE_DIR}")
 if(WIN32)
   add_custom_target(make_faust_ugens ALL
       COMMAND nmake /F dspmakefile
@@ -199,11 +177,11 @@ include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude")
 message(STATUS "ARCO_SRC: ${ARCO_SRC}") 
 
 register_target(arcolib)
-add_dependencies(arcolib make_faust_ugens) 
+add_dependencies(arcolib make_faust_ugens)
 
 #-----------------------------------------------------------------------
 #------ libsndfile and externals ---------------------------------------
-option(USE_LIBSNDFILE_EXTERNALS "Link with Ogg, Vorbis, and FLAC" FALSE)
+option(USE_LIBSNDFILE_EXTERNALS "Link with Ogg, Vorbis, and FLAC" ON)
 
 if(SNDFILE_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES ${SNDFILE_INCL})   
@@ -309,11 +287,12 @@ if(USE_LIBSNDFILE_EXTERNALS)
   message(STATUS "VORBISFILE_OPT_LIB is ${VORBISFILE_OPT_LIB}, "
                  "VORBISFILE_DBG_LIB is ${VORBISFILE_DBG_LIB}") 
 
+  message(STATUS "Adding compression libraries (OGG, FLAC, VORBIS) to arcolib")
   target_link_libraries(arcolib PRIVATE
     debug ${OGG_DBG_LIB} optimized ${OGG_OPT_LIB}
     debug ${FLAC_DBG_LIB} optimized ${FLAC_OPT_LIB}
     debug ${VORBIS_DBG_LIB} optimized ${VORBIS_OPT_LIB}
-    debug ${VORBISENC_DBG_LIB} optimized ${VORBISFILE_OPT_LIB}
+    debug ${VORBISENC_DBG_LIB} optimized ${VORBISENC_OPT_LIB}
     debug ${VORBISFILE_DBG_LIB} optimized ${VORBISFILE_OPT_LIB})
   # I don't think opus is necessarily required by libsndfile, so
   # if undefined, do not try to use it:
