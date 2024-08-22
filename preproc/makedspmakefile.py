@@ -140,12 +140,12 @@ def make_makefile(arco_path, manifest, outf):
     # nmake needs dspmakefile to be a target, even though we never use
     # make or nmake to make dspmakefile; we only want to depend on it
     # and regenerate allugens when dspmakefile changes:
-    print("dspmakefile. :", file=outf)
+    print("dspmakefile:", file=outf)
     print('\tdir dspmakefile', file=outf)
     print('\techo "ERROR: dspmakefile does not exist!"', file=outf)
     print("", file=outf)
 
-    print("allugens.srp: dspmakefile.", end="", file=outf)
+    print("allugens.srp: dspmakefile", end="", file=outf)
     for src in srp_srcs:
         print(" " + src, end="", file=outf)
     if WIN32:
