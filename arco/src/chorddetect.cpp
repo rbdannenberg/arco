@@ -14,7 +14,9 @@ void Chorddetect::real_run()
 {
     input_samps = input->run(current_block);
     
-    // Note: processAudioFrame assumes input_samps has length BL, so it only processes the first channel of input and the rest are ignored.
+    // Note: processAudioFrame assumes input_samps has length BL, so
+    // it only processes the first channel of input and the rest are
+    // ignored.
     chromagram.processAudioFrame(input_samps);
     if (chromagram.isReady()) { // only runs if we have enough samples
         

@@ -100,7 +100,8 @@ void ChordDetector::classifyChromagram()
 
 }
 
-void ChordDetector::compareAlgos(double a_fifth, double a_third, double b_fifth, double b_third, bool printChromas)
+void ChordDetector::compareAlgos(double a_fifth, double a_third,
+                                 double b_fifth, double b_third, bool printChromas)
 {
     int i;
     int third;
@@ -190,14 +191,19 @@ void ChordDetector::compareAlgos(double a_fifth, double a_third, double b_fifth,
     softmaxEntropyConfidence(chord2, &confidence2);
     minIndexToChord(chordindex2, &rootNote2, &quality2, &intervals2);
     
-    const char* qualities[] = {"Minor", "Major","Suspended", "Dominant","Diminished 5th", "Augmented 5th", "Half-Dim"};
-    const char* notes[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+    const char* qualities[] = {"Minor", "Major","Suspended", "Dominant",
+                               "Diminished 5th", "Augmented 5th", "Half-Dim"};
+    const char* notes[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab",
+                           "A", "Bb", "B"};
     
-    printf("Algo 1: %s %s %d, Confidence: %f \n", notes[rootNote1], qualities[quality1], intervals1, confidence1);
-    printf("Algo 2: %s %s %d, Confidence: %f \n", notes[rootNote2], qualities[quality2], intervals2, confidence2);
+    printf("Algo 1: %s %s %d, Confidence: %f \n", notes[rootNote1],
+           qualities[quality1], intervals1, confidence1);
+    printf("Algo 2: %s %s %d, Confidence: %f \n", notes[rootNote2],
+           qualities[quality2], intervals2, confidence2);
 }
 //=======================================================================
-void ChordDetector::calculateChordScores (double chord[NUM_CHORDS], double chromagram[12])
+void ChordDetector::calculateChordScores (double chord[NUM_CHORDS],
+                                          double chromagram[12])
 {
     int j;
     // major chords
@@ -263,7 +269,8 @@ void ChordDetector::calculateChordScores (double chord[NUM_CHORDS], double chrom
 }
 
 //=======================================================================
-void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals)
+void ChordDetector::minIndexToChord (int chordindex, int* rootNote,
+                                     int* quality, int* intervals)
 {
     // major
     if (chordindex < 12)
@@ -348,12 +355,14 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
 }
 
 //=======================================================================
-void ChordDetector::softmaxEntropyConfidence (double chord[NUM_CHORDS], double* confidence)
+void ChordDetector::softmaxEntropyConfidence (double chord[NUM_CHORDS],
+                                              double* confidence)
 {
     double probabilities[NUM_CHORDS];
     double newScores[NUM_CHORDS];
     
-    // Negate the scores then do softmax, since lower score means closer match to a chord.
+    // Negate the scores then do softmax, since lower score means
+    // closer match to a chord.
     for (int i = 0; i < NUM_CHORDS; i++) {
         newScores[i] = -chord[i];
     }
@@ -387,7 +396,8 @@ void ChordDetector::softmaxEntropyConfidence (double chord[NUM_CHORDS], double* 
 }
 
 //=======================================================================
-double ChordDetector::calculateChordScore (double* chroma, double* chordProfile, double biasToUse, double N)
+double ChordDetector::calculateChordScore (double* chroma, double* chordProfile,
+                                           double biasToUse, double N)
 {
 	double sum = 0;
 	double delta;

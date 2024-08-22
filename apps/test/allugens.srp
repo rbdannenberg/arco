@@ -1070,10 +1070,57 @@ def spectralcentroid(reply_addr):
     return SpectralCentroid(reply_addr)
 
 
+# ---- included from /Users/rbd/arco/serpent/srp/spectralcentroid.srp ----
+
+def spectralcentroid(reply_addr):
+    return SpectralCentroid(reply_addr)
+
 class SpectralCentroid (Ugen):
     def init(reply_addr)
         super.init(create_ugen_id(), "SpectralCentroid", 0, '', "s",
                    'reply_addr', reply_addr)
+
+    def start(reply_addr):
+        o2_send_cmd("/arco/spectralcentroid/start", 0, "Us", id, reply_addr)
+        this
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "SpectralCentroid set", id, value.id
+        o2_send_cmd("/arco/spectralcentroid/repl_input", 0, "UU", id, value.id)
+        this
+
+
+
+
+# ---- included from /Users/rbd/arco/serpent/srp/spectralrolloff.srp ----
+
+def spectralrolloff(reply_addr, threshold_):
+    return SpectralRolloff(reply_addr, threshold_)
+
+
+class SpectralRolloff (Ugen):
+    def init(reply_addr, threshold_)
+        super.init(create_ugen_id(), "SpectralRolloff", 0, '', "sf", 'reply_addr', reply_addr, 'threshold_', threshold_)
+
+    def start(reply_addr):
+        o2_send_cmd("/arco/spectralrolloff/start", 0, "Us", id, reply_addr)
+        this
+
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "SpectralRolloff set", id, value.id
+        o2_send_cmd("/arco/spectralrolloff/repl_input", 0, "UU", id, value.id)
+        this
+
+
+
+
+
+# ---- included from /Users/rbd/arco/serpent/srp/thru.srp ----
+>>>>>>> c64924d (Working on o2audioio.h. Made some cosmetic changes too.)
 
     def start(reply_addr):
         o2_send_cmd("/arco/spectralcentroid/start", 0, "Us", id, reply_addr)

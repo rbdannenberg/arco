@@ -23,8 +23,8 @@ public:
     int input_stride;
     Sample_ptr input_samps;
     
-    Chorddetect(int id, int chans, char *reply_addr) : Ugen(id, 0, 0), chromagram(BL, AR)
-                {
+    Chorddetect(int id, int chans, char *reply_addr) :
+            Ugen(id, 0, 0), chromagram(BL, AR) {
         printf("Chorddetect constructor id %d classname %s\n", id, classname());
         cd_reply_addr = NULL;
         input = NULL;

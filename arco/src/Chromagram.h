@@ -56,11 +56,12 @@ public:
     /** Destructor */
     ~Chromagram();
     
-    /** Process a single audio frame. This will determine whether enough samples
-     * have been accumulated and if so, will calculate the chromagram
-     * @param inputAudioFrame an array containing the input audio frame. This should be
-     * the length indicated by the input audio frame size passed to the constructor
-     * @see setInputAudioFrameSize
+    /** Process a single audio frame. This will determine whether
+     * enough samples have been accumulated and if so, will calculate
+     * the chromagram @param inputAudioFrame an array containing the
+     * input audio frame. This should be the length indicated by the
+     * input audio frame size passed to the constructor @see
+     * setInputAudioFrameSize
      */
     void processAudioFrame (float* inputAudioFrame);
     
@@ -74,20 +75,24 @@ public:
      */
     void setSamplingFrequency (int fs);
     
-    /** Set the interval at which the chromagram is calculated. As the algorithm requires
-     * a significant amount of audio to be accumulated, it may be desirable to have the algorithm
-     * not calculate the chromagram at every new audio frame. This function allows you to set the 
-     * interval at which the chromagram will be calculated, specified in the number of samples at
-     * the audio sampling frequency 
-     * @param numSamples the number of samples that the algorithm will receive before calculating a new chromagram
+    /** Set the interval at which the chromagram is calculated. As the
+     * algorithm requires a significant amount of audio to be
+     * accumulated, it may be desirable to have the algorithm not
+     * calculate the chromagram at every new audio frame. This
+     * function allows you to set the interval at which the chromagram
+     * will be calculated, specified in the number of samples at the
+     * audio sampling frequency
+     * @param numSamples the number of samples that the algorithm will
+     *     receive before calculating a new chromagram
      */
     void setChromaCalculationInterval (int numSamples);
     
     /** @returns the chromagram vector */
     float* getChromagram();
     
-    /** @returns true if a new chromagram vector has been calculated at the current iteration. This should
-     * be called after processAudioFrame
+    /** @returns true if a new chromagram vector has been calculated
+     * at the current iteration. This should be called after
+     * processAudioFrame
      */
     bool isReady();
     
