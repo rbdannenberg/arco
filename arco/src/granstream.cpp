@@ -39,8 +39,6 @@
 // end within the buffer, all intermediate reads will be within
 // the buffer.
 
-// DEBUG PRINTING:
-#define D if (0)
 
 #include "arcougen.h"
 #include "fastrand.h"

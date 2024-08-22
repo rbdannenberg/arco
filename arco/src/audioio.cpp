@@ -785,14 +785,21 @@ static void arco_open(O2SM_HANDLER_ARGS)
         actual_in_chans = 0;
     } else {
         const PaDeviceInfo *info = Pa_GetDeviceInfo(actual_in_id);
-        arco_print("Aura selects input device: %s\n", info->name);
-        actual_in_chans = in_chans;
-        if (info->maxInputChannels < in_chans) {
-            arco_print("\n    WARNING: only %d input channels available.\n",
-                       info->maxInputChannels);
-            actual_in_chans = info->maxInputChannels;
+        if (!info) {
+            arco_print("Aura has no actual input device\n");
+            actual_in_chans = 0;
+            suggested_latency = 0.01;
         }
-        suggested_latency = info->defaultLowInputLatency;
+        else {
+            arco_print("Aura selects input device: %s\n", info->name);
+            actual_in_chans = in_chans;
+           if (info->maxInputChannels < in_chans) {
+                arco_print("\n    WARNING: only %d input channels available.\n",
+                           info->maxInputChannels);
+                actual_in_chans = info->maxInputChannels;
+            }
+            suggested_latency = info->defaultLowInputLatency;
+        }
     }
 
 

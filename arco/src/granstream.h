@@ -49,6 +49,12 @@
 // file needs this:
 #include <new>
 
+// D is a debug macro to control debug printing. Maybe it is a bad idea
+// to define it or use it in this header because it conflicts with any
+// code that uses D as a symbol, e.g. winnt.h. To enable debug printing
+// change D to if (1):
+#define D if (0)
+
 extern const char *Granstream_name;
 
 class Granstream;
