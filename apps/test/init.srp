@@ -217,6 +217,16 @@ def arco_ready():
     Checkbox(win, "Chorddetect Test", 'S', 'D', 'S', 'S', 'chorddetectcheckbox')
     chorddetectcheckbox.add_target_method(nil, 'chorddetecttest')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'chorddetecttext')
+    
+    wxs_x = COLUMN_TWO
+    Checkbox(win, "Spectral Centroid Test", 'S', 'D', 'S', 'S', 'spectralcentroidcheckbox')
+    spectralcentroidcheckbox.add_target_method(nil, 'spectralcentroidtest')
+    Statictext(win, "----", 'R', 'S', 'S', 'S', 'spectralcentroidtext')
+    
+    wxs_x = COLUMN_TWO
+    Checkbox(win, "Spectral Rolloff Test", 'S', 'D', 'S', 'S', 'spectralrolloffcheckbox')
+    spectralrolloffcheckbox.add_target_method(nil, 'spectralrollofftest')
+    Statictext(win, "----", 'R', 'S', 'S', 'S', 'spectralrollofftext')
 
     wxs_x = COLUMN_TWO
     Checkbox(win, "Onset", 'S', 'D', 55, 'S', 'onsetcheckbox')
@@ -766,6 +776,50 @@ def chorddetecttest(obj, event, x, y):
     else:
         CD.unrun()
         CD = nil
+        
+########## SPECTRALCENTROID TEST #############
+
+spectralcentroid_handler_installed = false
+
+def actl_spectralcentroid(timestamp, address, types, centroid)
+    spectralcentroidtext.set_string(str(centroid))
+
+        
+def spectralcentroidtest(obj, event, x, y):
+    display "spectralcentroid", x
+    if x:
+        if not spectralcentroid_handler_installed:
+            o2_method_new("/actl/spectralcentroid", "f", 'actl_spectralcentroid', t)
+            print "installed spectralcentroid handler"
+            spectralcentroid_handler_installed = true
+        SC = spectralcentroid("/actl/spectralcentroid")
+        SC.set('input', input_ugen)
+        SC.run()
+    else:
+        SC.unrun()
+        SC = nil
+        
+########## SPECTRALROLLOFF TEST #############
+
+spectralrolloff_handler_installed = false
+
+def actl_spectralrolloff(timestamp, address, types, rolloff_freq)
+    spectralrollofftext.set_string(str(rolloff_freq))
+
+        
+def spectralrollofftest(obj, event, x, y):
+    display "spectralrolloff", x
+    if x:
+        if not spectralrolloff_handler_installed:
+            o2_method_new("/actl/spectralrolloff", "f", 'actl_spectralrolloff', t)
+            print "installed spectralrolloff handler"
+            spectralrolloff_handler_installed = true
+        SR = spectralrolloff("/actl/spectralrolloff", 0.5)
+        SR.set('input', input_ugen)
+        SR.run()
+    else:
+        SR.unrun()
+        SR = nil
 
 ########## TRIG TEST #############
 

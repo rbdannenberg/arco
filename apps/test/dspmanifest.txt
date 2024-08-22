@@ -23,3 +23,6 @@ trig
 route
 chorddetect
 onset
+spectralcentroid
+spectralrolloff
+

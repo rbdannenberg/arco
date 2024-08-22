@@ -101,6 +101,8 @@ static void lowpassb_init()
                     arco_lowpassb_set_cutoff, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
+    // "static" initialization code from faust:
+
 }
 
 Initializer lowpassb_init_obj(lowpassb_init);

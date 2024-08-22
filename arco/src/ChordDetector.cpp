@@ -56,12 +56,12 @@ void ChordDetector::classifyChromagram()
     double a_fifth = 0.05; // Original: 0.1
     double a_third = 0; // Original: 0
     
-    // To compare two algorithms side by side, uncomment the compareAlgos() blow
+    // To compare two algorithms side by side, uncomment the compareAlgos() below
     // Arguments are the constants to reduce fifths and thirds by for the two algorithms
     // For example, the current code uses 0.05, 0
     // Has optional final argument `bool printChromas` to print chromagrams
     
-//    compareAlgos(0.1, 0, 0.1, 0.05, false);
+    // compareAlgos(0.1, 0, 0.1, 0.05, false);
     
 	// remove some harmonics from chromagram
     for (i = 0; i < 12; i++)

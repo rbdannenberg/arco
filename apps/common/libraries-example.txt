@@ -66,12 +66,12 @@ set(FLSYN_INCL2 "/Users/Roger/research/arco/fluidsynth/include"
     CACHE PATH "Another include directory for Fluid Synth" FORCE)
 string(CONCAT FLSYN_OPT_LIB_PATH
         "/Users/rbd/fluidsynth-2.3.3/build/libfluidsynth-OBJ.build/"
-        "Release/libfluidsynth-static.a" FORCE)
+        "Release/libfluidsynth-static.a")
 set(FLSYN_OPT_LIB "${FLSYN_OPT_LIB_PATH}" CACHE PATH
         "Release version of Fluid Synth library" FORCE)
 string(CONCAT FLSYN_DBG_LIB_PATH
         "/Users/rbd/fluidsynth-2.3.3/build/libfluidsynth-OBJ.build/"
-        "Debug/libfluidsynth-static.a" FORCE)
+        "Debug/libfluidsynth-static.a")
 set(FLSYN_DBG_LIB "${FLSYN_DBG_LIB_PATH}" CACHE PATH
         "Debug version of Fluid Synth library" FORCE)
 # glib contains gio and is used by fluidsynth: 
