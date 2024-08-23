@@ -16,8 +16,8 @@
 #endif
 #include "sys/timeb.h"
 #include "sndfile.h"
-#include "o2atomic.h"
 #include "arcougen.h"
+#include "o2atomic.h"
 #include "sharedmemclient.h"
 #include "sharedmem.h"
 #include "audioio.h"
