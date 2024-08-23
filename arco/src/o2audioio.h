@@ -121,6 +121,8 @@ enqueued.
 
 */
 
+extern const char *O2audioio_name;
+
 void arco_o2audioio_init();
 
 class O2audioio : public Ugen {
@@ -220,11 +222,11 @@ public:
             buffsize = (buffsize + msgsize - 1) / msgsize;  // round up
             // buffsize is now number of msgsize that should fit in queue
             buffer.init(blocksize, buffsize);
-            buffer_frame_size = buffsize * msgsize
+            buffer_frame_size = buffsize * msgsize;
         }
 
         // <destdir>/prep "iiifi" id destchans recvchans samplerate sampletype
-        if (len(prepaddr) > addrlen - 6) {
+        if (strlen(prepaddr) > addrlen - 6) {
             arco_print("O2audioio: destination address \"%s\" too long.\n",
                        destaddr);
         } else {
@@ -243,7 +245,7 @@ public:
     ~O2audioio() { 
         if (dest_data_addr) O2_FREE(dest_data_addr);
         if (dest_enab_addr) O2_FREE(dest_enab_addr);
-        if (out_blob)           O2_FREE(blob);
+        if (out_blob)       O2_FREE(out_blob);
         // buffer is freed by destructor
     }
 
@@ -265,9 +267,9 @@ public:
         }
         assert(drop == 0);
         // insert data from message
-        assert(samps.size == frames_per_message * chans * 2 * (floattype + 1));
+        assert(samps->size == frames_per_message * chans * 2 * (floattype + 1));
         recv_frames += frames_per_message;
-        buffer.enqueue(samps.data);
+        buffer.enqueue(samps->data);
     }
 
 
@@ -284,10 +286,10 @@ public:
     // handle /arco/o2aud/enab message, which starts this Ugen
         if (running != enab) {
             running = enab;
-            o2ws_send_start();
-            o2ws_add_int32(id);
-            o2ws_add_int32(enab);
-            o2ws_send_finish(0, dest_enab_addr, true);
+            o2sm_send_start();
+            o2sm_add_int32(id);
+            o2sm_add_int32(enab);
+            o2sm_send_finish(0, dest_enab_addr, true);
         }
     }
             
@@ -296,8 +298,8 @@ public:
         if (has_input) {
             Sample_ptr input_samps = input->run(current_block);
             if (floattype) {
-                for (i = 0; i < input_chans; i++) {
-                    memcpy(((float *) out_blob.data) + out_blob_frames,
+                for (int i = 0; i < input_chans; i++) {
+                    memcpy(((float *) out_blob->data) + out_blob_frames,
                            input_samps, BLOCK_BYTES);
                     input_samps += input_stride;
                 }
@@ -308,12 +310,12 @@ public:
                         // have not received what we sent for too long
                         input_missing += frames_per_message;
                     } else {
-                        o2ws_send_start();
-                        o2ws_add_int32(id);
-                        o2ws_add_double(o2ws_time_get());
-                        o2ws_add_int32(input_missing);
-                        o2ws_add_blob(out_blob);
-                        o2ws_send_finish(0, dest_data_addr, true);
+                        o2sm_send_start();
+                        o2sm_add_int32(id);
+                        o2sm_add_double(o2sm_time_get());
+                        o2sm_add_int32(input_missing);
+                        o2sm_add_blob(out_blob);
+                        o2sm_send_finish(0, dest_data_addr, true);
                         sent_frames += frames_per_message + input_missing;
                         input_missing = 0;
                     }

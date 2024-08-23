@@ -36,7 +36,9 @@ void arco_o2audioio_new(O2SM_HANDLER_ARGS)
     int32_t msgsize = argv[7]->i;
     // end unpack message
 
-    new O2audioio(id, recvchans, input, destaddr, destchans, buffsize,
+    ANY_UGEN_FROM_ID(input_ugen, input, "arco_o2audioio_new");
+
+    new O2audioio(id, recvchans, input_ugen, destaddr, destchans, buffsize,
                   sampletype, msgsize);
 }
 
@@ -56,17 +58,19 @@ static void arco_o2aud_repl_input(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/o2aud/data double when, int32 drop, blob samps;
+/* O2SM INTERFACE: /arco/o2aud/data int32 id, double when,
+                                    int32 drop, blob samps;
  */
 void arco_o2audioio_data(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
-    double when = argv[0]->d;
-    int32_t drop = argv[1]->i;
-    O2blob_ptr samps = argv[2]->b;
+    int32_t id = argv[0]->i;
+    double when = argv[1]->d;
+    int32_t drop = argv[2]->i;
+    O2blob_ptr samps = &argv[3]->b;
     // end unpack message
 
-    O2audioio *o2audioio = (O2audioio *) addr;
+    UGEN_FROM_ID(O2audioio, o2audioio, id, "arco_o2audioio_data");
     o2audioio->data(when, drop, samps);
 }
 
@@ -94,7 +98,7 @@ void arco_o2aud_data(O2SM_HANDLER_ARGS)
     int32_t id = argv[0]->i;
     double when = argv[1]->d;
     int32_t drop = argv[2]->i;
-    O2blob_ptr samps = argv[3]->b;
+    O2blob_ptr samps = &argv[3]->b;
     // end unpack message
 
     UGEN_FROM_ID(O2audioio, o2audioio, id, "arco_o2aud_data");
@@ -107,7 +111,9 @@ static void o2audioio_init()
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/o2aud/new", "iisiiiii", arco_o2audioio_new, NULL,
                     true, true);
-    o2sm_method_new("/arco/o2aud/data", "dib", arco_o2audioio_data, NULL,
+    o2sm_method_new("/arco/o2aud/repl_input", "ii", arco_o2aud_repl_input,
+                    NULL, true, true);
+    o2sm_method_new("/arco/o2aud/data", "idib", arco_o2audioio_data, NULL,
                     true, true);
     o2sm_method_new("/arco/o2aud/enab", "iB", arco_o2audioio_enab, NULL,
                     true, true);

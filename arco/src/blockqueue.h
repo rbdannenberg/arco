@@ -22,7 +22,7 @@ class Blockqueue : public Vec<char> {
     int queuelen;   // how long is the logical queue in blocks?
 
     // size is the number of blocks that the queue can hold
-    Blockqueue(int blocksize, int size = 0, bool z = false) :
+    Blockqueue(int blocksize = 0, int size = 0, bool z = false) :
             Vec<char>(0) { init(blocksize, size, z); }
 
 
