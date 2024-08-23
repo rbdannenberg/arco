@@ -129,12 +129,6 @@ def arco_ready():
     pwlucheckbox.add_target_method(nil, 'pwlutest')
 
 
-    # start a 2nd column
-    COLUMN_TWO = 200
-    wxs_x = COLUMN_TWO
-
-    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
-
     Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
     pwecheckbox.add_target_method(nil, 'pwetest')
 
@@ -149,6 +143,12 @@ def arco_ready():
     
     Button(win, "File Play/Record", 'S', 'D', 'S', 'S', 'fprbutton')
     fprbutton.add_target_method(nil, 'file_play_record')
+
+    # start a 2nd column
+    COLUMN_TWO = 200
+    wxs_x = COLUMN_TWO
+
+    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
 
     Checkbox(win, "Yin", 'S', 'D', 55, 'S', 'yincheckbox')
     yincheckbox.add_target_method(nil, 'yintest')
@@ -236,6 +236,9 @@ def arco_ready():
     ONSET_OFF_TEXT = "◻ Onset"
     Statictext(win, ONSET_OFF_TEXT, 'R', wxs_y + 2, 55, 'S', 'onsettext')
 
+    wxs_x = COLUMN_TWO
+    Checkbox(win, "O2audioio Test", 'S', 'S', 'S', 'S', 'o2audioiocheckbox')
+    o2audioiocheckbox.add_target_method(nil, 'o2audioiotest')
     
     ui_initialized = true
     default_window.fit_to_children()
@@ -1107,6 +1110,18 @@ def qnttest(obj, event, x, y):
     else:
         qntout.mute()
         qntout = nil
+
+
+########## O2audioio Test ##############
+
+def o2audioiotest(obj, event, x, y):
+    display "o2audioiotest", x
+    if x:
+       o2audioioout = o2audioio(sine(1000, 0.1), "/audtest", 1, 1, 10, 0, 256)
+       o2audioioout.play()
+    else:
+        o2audioioout.mute()
+        o2audioioout = nil
 
 
 ########## Main Initialization ################

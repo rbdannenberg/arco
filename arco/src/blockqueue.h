@@ -23,7 +23,7 @@ class Blockqueue : public Vec<char> {
 
     // size is the number of blocks that the queue can hold
     Blockqueue(int blocksize, int size = 0, bool z = false) :
-            Vec<T>(0) { init(blocksize, size, z); }
+            Vec<char>(0) { init(blocksize, size, z); }
 
 
     // Create a circular buffer with capacity for size samples, a multiple of BL.
@@ -33,8 +33,8 @@ class Blockqueue : public Vec<char> {
         blocksize = blocksize_;
         head = 0;
         tail = (z ? size : 0);
-        Vec<T>::init(0);
-        Vec<T>::set_size(vec_len((size + 1) * blocksize), z);
+        Vec<char>::init(0);
+        Vec<char>::set_size((size + 1) * blocksize, z);
     }
 
     
@@ -53,7 +53,7 @@ class Blockqueue : public Vec<char> {
         // can hold a max of size() - blocksize:
         assert(get_fifo_len() + blocksize <= size() - blocksize);
 
-        memcopy(&((*this)[tail * blocksize]), s_ptr, blocksize);
+        memcpy(&((*this)[tail * blocksize]), s_ptr, blocksize);
         tail++;
         if (tail * blocksize == size()) {
             tail = 0;
@@ -94,7 +94,7 @@ class Blockqueue : public Vec<char> {
     void dequeue(char *s_ptr) {
     // dequeue n samples and copy them to s_ptr
         assert(get_fifo_len() > 0);
-        memcopy(s_ptr, &((*this)[head]), blocksize);
+        memcpy(s_ptr, &((*this)[head]), blocksize);
         head++;
         if (head * blocksize == size()) {
             head = 0;

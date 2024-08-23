@@ -41,7 +41,7 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
-            "mathugenb", "onset", "chorddetect", \
+            "mathugenb", "onset", "chorddetect", "o2audioio", \
             "spectralcentroid", "spectralrolloff"]
 
 MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \

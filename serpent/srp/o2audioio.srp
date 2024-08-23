@@ -1,0 +1,22 @@
+# o2audioio.srp -- overlap add pitch shift unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+class O2audioio(Ugen):
+    def init(input, destaddr, destchans, recvchans, buffsize,
+             sampletype, msgsize):
+        super.init(create_ugen_id(), "o2aud", recvchans, 'a', "Usiiii",
+	           'input', input, 'destaddr', destaddr,
+                   'destchans', destchans, 'buffsize', buffsize,
+                   'sampletype', sampletype, 'msgsize', msgsize)
+    
+    def enable(value):
+        o2_send_cmd("/arco/o2aud/enab", 0, "Ui", id, value)
+        this
+
+
+def o2audioio(input, destaddr, destchans, recvchans, buffsize,
+              sampletype, msgsize)
+    O2audioio(input, destaddr, destchans, recvchans, buffsize,
+              sampletype, msgsize)
