@@ -40,6 +40,7 @@ public:
 
     // insert operation takes a signal and a gain
     void ins(Ugen_ptr input) {
+        assert(input->chans > 0);
         if (input->rate != 'a') {
             arco_warn("sum_ins: input rate is not 'a', ignore insert");
             return;
@@ -48,6 +49,10 @@ public:
         if (i < 0) {  // input is not already in sum; append it
             inputs.push_back(input);
             input->ref();
+        }
+        printf("After insert, sum inputs (%p) has\n", inputs.get_array());
+        for (i = 0; i < inputs.size(); i++) {
+            printf("    %p: %s\n", inputs[i], inputs[i]->classname());
         }
     }
 

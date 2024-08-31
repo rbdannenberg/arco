@@ -147,6 +147,7 @@ class Ugen : public O2obj {
         }
         current_block = 0;
         action_id = 0;
+        printf("created ugen@%p\n", this);
     }
 
     // subclasses should override to unref inputs

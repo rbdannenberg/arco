@@ -12,6 +12,10 @@ class O2audioio(Ugen):
                    'sampletype', sampletype, 'msgsize', msgsize)
     
     def enable(value):
+        if value == true:
+            value = 1
+        elif value == false:
+            value = 0
         o2_send_cmd("/arco/o2aud/enab", 0, "Ui", id, value)
         this
 

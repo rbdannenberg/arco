@@ -237,7 +237,7 @@ def arco_ready():
     Statictext(win, ONSET_OFF_TEXT, 'R', wxs_y + 2, 55, 'S', 'onsettext')
 
     wxs_x = COLUMN_TWO
-    Checkbox(win, "O2audioio Test", 'S', 'S', 'S', 'S', 'o2audioiocheckbox')
+    Checkbox(win, "O2audioio Test", 'S', 'D', WIDTH, 'S', 'o2audioiocheckbox')
     o2audioiocheckbox.add_target_method(nil, 'o2audioiotest')
     
     ui_initialized = true
@@ -1117,8 +1117,10 @@ def qnttest(obj, event, x, y):
 def o2audioiotest(obj, event, x, y):
     display "o2audioiotest", x
     if x:
-       o2audioioout = o2audioio(sine(1000, 0.1), "/audtest", 1, 1, 10, 0, 256)
+       o2audioioout = o2audioio(sine(1000, 0.1), "/audtest", 1, 1,
+                                2048, 0, 256)
        o2audioioout.play()
+       o2audioioout.enable(true)
     else:
         o2audioioout.mute()
         o2audioioout = nil
@@ -1142,6 +1144,7 @@ def main():
     o2_debug_flags("") // ("SsBl")
     arco_set_input_files([sound_file_path])
     arco_init(latency = 60, network = false, title = "Arco Test")
+    o2lite_initialize()
     arco_run()
     sched_select(rtsched)
     var file_menu = default_window.get_menu("File")
