@@ -1,1 +1,0 @@
-Write file: /dev/null
