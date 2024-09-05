@@ -87,23 +87,19 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Mult::*new_run_channel)(Mult_state *state);
-        if (x1->rate == 'a' && x2->rate == 'a') {
-            new_run_channel = &Mult::chan_aa_a;
-        } else if (x1->rate == 'a' && x2->rate != 'a') {
-            new_run_channel = &Mult::chan_ab_a;
-        } else if (x1->rate != 'a' && x2->rate == 'a') {
-            new_run_channel = &Mult::chan_ba_a;
-        } else if (x1->rate != 'a' && x2->rate != 'a') {
-            new_run_channel = &Mult::chan_bb_a;
-        } else {
-            if (x1->rate != 'a') {
-                x1 = new Upsample(-1, x1->chans, x1);
+            if (x1->rate == 'a') {
+                if (x2->rate == 'a') {
+                    new_run_channel = &Mult::chan_aa_a;
+                } else {
+                    new_run_channel = &Mult::chan_ab_a;
+                }
+            } else {
+                if (x2->rate == 'a') {
+                    new_run_channel = &Mult::chan_ba_a;
+                } else {
+                    new_run_channel = &Mult::chan_bb_a;
+                }
             }
-            if (x2->rate != 'a') {
-                x2 = new Upsample(-1, x2->chans, x2);
-            }
-            new_run_channel = &Mult::chan_aa_a;
-        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;

@@ -117,3 +117,5 @@ CMakeCache.txt
 /apps/test/x64/
 
 /fluidsynth/
+
+/preproc/.vscode/

@@ -19,8 +19,8 @@ void arco_sine_new(O2SM_HANDLER_ARGS)
     int32_t amp = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(freq_ugen,freq, "arco_sine_new");
-    ANY_UGEN_FROM_ID(amp_ugen,amp, "arco_sine_new");
+    ANY_UGEN_FROM_ID(freq_ugen, freq, "arco_sine_new");
+    ANY_UGEN_FROM_ID(amp_ugen, amp, "arco_sine_new");
 
     new Sine(id, chans, freq_ugen, amp_ugen);
 }

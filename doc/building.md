@@ -101,7 +101,6 @@ multb(b, b): b
 
 FAUST
 
-declare name "mult";
 declare description "Mult(iply) Unit Generator for Arco";
 declare interpolated "x1 x2";
 
@@ -121,12 +120,16 @@ The next line indicates that there is another unit generator named
 for this are restricted to b-rate (indicated by `b` instead of `ab`).
 
 The line containing `FAUST` means that everything that follows is
-a FAUST program. See FAUST documentation for details. It is important
-that the declared name (`"mult"`) matches the meta-data above, except
-that when you append `b` to form `multb`, it means use the FAUST
-definition of `mult` to create a block-rate unit generator for Arco.
+a FAUST program. See FAUST documentation for details.
 
-Typical FAUST programs may not be one-liners like 
+The `description` declaration is purely for documentation and is
+ignored by Arco processing.
+
+If you want block-rate parameters to be interpolated to audio rate,
+you must declare `interpolated` as shown. Parameters are in a single
+string and separated by spaces.
+
+Typical FAUST programs might not be one-liners like 
 `process(x1, x2) = x1 * x2;` and there is no requirement to make such
 simple audio processors.
 

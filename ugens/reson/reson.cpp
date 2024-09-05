@@ -20,9 +20,9 @@ void arco_reson_new(O2SM_HANDLER_ARGS)
     int32_t q = argv[4]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(snd_ugen,snd, "arco_reson_new");
-    ANY_UGEN_FROM_ID(center_ugen,center, "arco_reson_new");
-    ANY_UGEN_FROM_ID(q_ugen,q, "arco_reson_new");
+    ANY_UGEN_FROM_ID(snd_ugen, snd, "arco_reson_new");
+    ANY_UGEN_FROM_ID(center_ugen, center, "arco_reson_new");
+    ANY_UGEN_FROM_ID(q_ugen, q, "arco_reson_new");
 
     new Reson(id, chans, snd_ugen, center_ugen, q_ugen);
 }

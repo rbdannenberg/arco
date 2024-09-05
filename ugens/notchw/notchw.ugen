@@ -12,7 +12,6 @@ FAUST
 declare name "notch";
 declare description "Notch Unit Generator for Arco";
 
-#import("stdfaust.lib");
 import("filters.lib");
 
 process(snd, center, bandwidth) = notchw(bandwidth, center, snd);

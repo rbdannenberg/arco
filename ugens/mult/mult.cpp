@@ -19,8 +19,8 @@ void arco_mult_new(O2SM_HANDLER_ARGS)
     int32_t x2 = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(x1_ugen,x1, "arco_mult_new");
-    ANY_UGEN_FROM_ID(x2_ugen,x2, "arco_mult_new");
+    ANY_UGEN_FROM_ID(x1_ugen, x1, "arco_mult_new");
+    ANY_UGEN_FROM_ID(x2_ugen, x2, "arco_mult_new");
 
     new Mult(id, chans, x1_ugen, x2_ugen);
 }

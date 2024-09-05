@@ -140,23 +140,19 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Sine::*new_run_channel)(Sine_state *state);
-        if (freq->rate != 'a' && amp->rate == 'a') {
-            new_run_channel = &Sine::chan_ba_a;
-        } else if (freq->rate != 'a' && amp->rate != 'a') {
-            new_run_channel = &Sine::chan_bb_a;
-        } else if (freq->rate == 'a' && amp->rate == 'a') {
-            new_run_channel = &Sine::chan_aa_a;
-        } else if (freq->rate == 'a' && amp->rate != 'a') {
-            new_run_channel = &Sine::chan_ab_a;
-        } else {
-            if (freq->rate != 'a') {
-                freq = new Upsample(-1, freq->chans, freq);
+            if (freq->rate == 'a') {
+                if (amp->rate == 'a') {
+                    new_run_channel = &Sine::chan_aa_a;
+                } else {
+                    new_run_channel = &Sine::chan_ab_a;
+                }
+            } else {
+                if (amp->rate == 'a') {
+                    new_run_channel = &Sine::chan_ba_a;
+                } else {
+                    new_run_channel = &Sine::chan_bb_a;
+                }
             }
-            if (amp->rate != 'a') {
-                amp = new Upsample(-1, amp->chans, amp);
-            }
-            new_run_channel = &Sine::chan_aa_a;
-        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;

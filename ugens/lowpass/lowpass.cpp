@@ -19,8 +19,8 @@ void arco_lowpass_new(O2SM_HANDLER_ARGS)
     int32_t cutoff = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(snd_ugen,snd, "arco_lowpass_new");
-    ANY_UGEN_FROM_ID(cutoff_ugen,cutoff, "arco_lowpass_new");
+    ANY_UGEN_FROM_ID(snd_ugen, snd, "arco_lowpass_new");
+    ANY_UGEN_FROM_ID(cutoff_ugen, cutoff, "arco_lowpass_new");
 
     new Lowpass(id, chans, snd_ugen, cutoff_ugen);
 }

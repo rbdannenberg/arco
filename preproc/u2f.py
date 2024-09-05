@@ -91,8 +91,8 @@ def main():
         for cn in classnames:
             print("python3 ../../preproc/f2a.py", cn, file=genf)
         for cn in classnames:
-            print("python3 ../../../o2/preproc/o2idc.py", cn + ".cpp",
-                  file=genf)
+            print("python3 ../../../o2/preproc/o2idc.py --nobackup",
+                  cn + ".cpp", file=genf)
     ### create class.srp
     serpentfilename = classnamelc + ".srp"
     print("**** Generating", serpentfilename)

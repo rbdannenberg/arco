@@ -101,26 +101,22 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Reson::*new_run_channel)(Reson_state *state);
-        if (snd->rate == 'a' && center->rate != 'a' && q->rate != 'a') {
-            new_run_channel = &Reson::chan_abb_a;
-        } else if (snd->rate == 'a' && center->rate != 'a' && q->rate == 'a') {
-            new_run_channel = &Reson::chan_aba_a;
-        } else if (snd->rate == 'a' && center->rate == 'a' && q->rate != 'a') {
-            new_run_channel = &Reson::chan_aab_a;
-        } else if (snd->rate == 'a' && center->rate == 'a' && q->rate == 'a') {
-            new_run_channel = &Reson::chan_aaa_a;
-        } else {
-            if (snd->rate != 'a') {
+            if (snd->rate == 'b') {
                 snd = new Upsample(-1, snd->chans, snd);
             }
-            if (center->rate != 'a') {
-                center = new Upsample(-1, center->chans, center);
+            if (center->rate == 'a') {
+                if (q->rate == 'a') {
+                    new_run_channel = &Reson::chan_aaa_a;
+                } else {
+                    new_run_channel = &Reson::chan_aab_a;
+                }
+            } else {
+                if (q->rate == 'a') {
+                    new_run_channel = &Reson::chan_aba_a;
+                } else {
+                    new_run_channel = &Reson::chan_abb_a;
+                }
             }
-            if (q->rate != 'a') {
-                q = new Upsample(-1, q->chans, q);
-            }
-            new_run_channel = &Reson::chan_aaa_a;
-        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;

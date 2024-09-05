@@ -19,8 +19,8 @@ void arco_sineb_new(O2SM_HANDLER_ARGS)
     int32_t amp = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(freq_ugen,freq, "arco_sineb_new");
-    ANY_UGEN_FROM_ID(amp_ugen,amp, "arco_sineb_new");
+    ANY_UGEN_FROM_ID(freq_ugen, freq, "arco_sineb_new");
+    ANY_UGEN_FROM_ID(amp_ugen, amp, "arco_sineb_new");
 
     new Sineb(id, chans, freq_ugen, amp_ugen);
 }

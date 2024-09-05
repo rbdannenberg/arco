@@ -94,19 +94,14 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Lowpass::*new_run_channel)(Lowpass_state *state);
-        if (snd->rate == 'a' && cutoff->rate != 'a') {
-            new_run_channel = &Lowpass::chan_ab_a;
-        } else if (snd->rate == 'a' && cutoff->rate == 'a') {
-            new_run_channel = &Lowpass::chan_aa_a;
-        } else {
-            if (snd->rate != 'a') {
+            if (snd->rate == 'b') {
                 snd = new Upsample(-1, snd->chans, snd);
             }
-            if (cutoff->rate != 'a') {
-                cutoff = new Upsample(-1, cutoff->chans, cutoff);
+            if (cutoff->rate == 'a') {
+                new_run_channel = &Lowpass::chan_aa_a;
+            } else {
+                new_run_channel = &Lowpass::chan_ab_a;
             }
-            new_run_channel = &Lowpass::chan_aa_a;
-        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;

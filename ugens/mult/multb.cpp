@@ -19,8 +19,8 @@ void arco_multb_new(O2SM_HANDLER_ARGS)
     int32_t x2 = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(x1_ugen,x1, "arco_multb_new");
-    ANY_UGEN_FROM_ID(x2_ugen,x2, "arco_multb_new");
+    ANY_UGEN_FROM_ID(x1_ugen, x1, "arco_multb_new");
+    ANY_UGEN_FROM_ID(x2_ugen, x2, "arco_multb_new");
 
     new Multb(id, chans, x1_ugen, x2_ugen);
 }
@@ -100,6 +100,8 @@ static void multb_init()
     o2sm_method_new("/arco/multb/set_x2", "iif", arco_multb_set_x2, NULL,
                     true, true);
     // END INTERFACE INITIALIZATION
+
+    // "static" initialization code from faust:
 
 }
 
