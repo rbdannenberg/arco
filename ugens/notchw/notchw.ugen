@@ -4,8 +4,8 @@
 # Jan 2023
 # notch(sound, center, bandwidth)
 
-notch(ab, ab, ab): a
-notchb(b, b, b): b
+notch(snd: ab, center: ab, bandwidth: ab): a
+notchb(snd: b, center: b, bandwidth: b): b
 
 FAUST
 

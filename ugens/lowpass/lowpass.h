@@ -44,6 +44,7 @@ extern const char *Lowpass_name;
 class Lowpass : public Ugen {
 public:
     struct Lowpass_state {
+        FAUSTFLOAT fEntry0;
         float fVec0[2];
         float fRec0[2];
     };
@@ -133,20 +134,21 @@ public:
         cutoff->const_set(chan, f, "Lowpass::set_cutoff");
     }
 
-    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, snd_stride); }
+    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, &snd_stride); }
 
-    void init_cutoff(Ugen_ptr ugen) { init_param(ugen, cutoff, cutoff_stride); }
+    void init_cutoff(Ugen_ptr ugen) { init_param(ugen, cutoff, &cutoff_stride); }
 
     void chan_ab_a(Lowpass_state *state) {
         FAUSTFLOAT* input0 = snd_samps;
-        float fSlow0 = 1.0f / std::tan(fConst0 * float(*cutoff_samps));
+        FAUSTFLOAT* output0 = out_samps;
+        float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
         float fSlow1 = 1.0f / (fSlow0 + 1.0f);
         float fSlow2 = 1.0f - fSlow0;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]);
             state->fVec0[0] = fTemp0;
             state->fRec0[0] = 0.0f - fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1]));
-            *out_samps++ = FAUSTFLOAT(state->fRec0[0]);
+            output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
         }
@@ -154,21 +156,23 @@ public:
 
     void chan_aa_a(Lowpass_state *state) {
         FAUSTFLOAT* input0 = snd_samps;
-        FAUSTFLOAT* input1 = cutoff_samps;
+        FAUSTFLOAT* output0 = out_samps;
+        float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
+        float fSlow1 = 1.0f / (fSlow0 + 1.0f);
+        float fSlow2 = 1.0f - fSlow0;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
-            float fTemp0 = 1.0f / std::tan(fConst0 * float(input1[i0]));
-            float fTemp1 = float(input0[i0]);
-            state->fVec0[0] = fTemp1;
-            state->fRec0[0] = 0.0f - (state->fRec0[1] * (1.0f - fTemp0) - (fTemp1 + state->fVec0[1])) / (fTemp0 + 1.0f);
-            *out_samps++ = FAUSTFLOAT(state->fRec0[0]);
+            float fTemp0 = float(input0[i0]);
+            state->fVec0[0] = fTemp0;
+            state->fRec0[0] = 0.0f - fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1]));
+            output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
         }
     }
 
     void real_run() {
-        snd_samps = snd->run(current_block); // update input
-        cutoff_samps = cutoff->run(current_block); // update input
+        snd_samps = snd->run(current_block);  // update input
+        cutoff_samps = cutoff->run(current_block);  // update input
         if (((snd->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate();
@@ -177,6 +181,7 @@ public:
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
             state++;
+            out_samps += BL;
             snd_samps += snd_stride;
             cutoff_samps += cutoff_stride;
         }

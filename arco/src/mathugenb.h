@@ -69,9 +69,9 @@ public:
         x2->const_set(chan, f, "Mathb::set_x2");
     }
 
-    void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, x1_stride); }
+    void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, &x1_stride); }
 
-    void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, x2_stride); }
+    void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, &x2_stride); }
 
     void real_run() {
         x1_samps = x1->run(current_block); // update input

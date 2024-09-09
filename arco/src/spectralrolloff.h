@@ -18,11 +18,14 @@ public:
     int input_stride;
     Sample_ptr input_samps;
     FFTCalculator fftcalc;
-    float threshold; // Percentage of spectral energy contained below the result frequency
+    float threshold;  // Percentage of spectral energy contained below
+                      // the result frequency
     
-    SpectralRolloff(int id, int chans, char *reply_addr, float threshold_ = 0.85) : Ugen(id, 0, 0), fftcalc(BL, AR), threshold(threshold_)
-                {
-        printf("SpectralRolloff constructor id %d classname %s\n", id, classname());
+    SpectralRolloff(int id, int chans, char *reply_addr,
+                    float threshold_ = 0.85) :
+            Ugen(id, 0, 0), fftcalc(BL, AR), threshold(threshold_) {
+        printf("SpectralRolloff constructor id %d classname %s\n",
+               id, classname());
         cd_reply_addr = NULL;
         input = NULL;
         start(reply_addr);
@@ -59,10 +62,11 @@ public:
             input->unref();
         }
         assert(ugen->rate == 'a');
-        init_param(ugen, input, input_stride);
+        init_param(ugen, input, &input_stride);
         chans = ugen->chans;
         if (chans > 1) {
-            printf("WARNING: Input has more than one channel, only the first channel is used for spectral rolloff calculation.\n");
+            printf("WARNING: Input has more than one channel, only the first "
+                   "channel is used for spectral rolloff calculation.\n");
         }
     }
 

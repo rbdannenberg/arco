@@ -110,7 +110,7 @@ class Pv: public Ugen {
 
 
     void init_input(Ugen_ptr ugen) {
-        init_param(ugen, input, input_stride);
+        init_param(ugen, input, &input_stride);
         use_stretch = (input->classname() == Fileplay_name);
     }
 

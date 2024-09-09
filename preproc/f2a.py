@@ -83,11 +83,7 @@ Then, the multiple .fh files are translated and merged to form
 a .cpp and a .h file. (Typically a single .dsp file is used to
 create 4 files, e.g., mult.h, mult.cpp, multb.h and multb.cpp.
 
-Faust keeps track of parameters but does not put them in a specific
-order. The main (at least) .dsp file should have a declaration like:
-    declare description "Sine(amp, freq) - Sine Ugen for Arco"
-where parameters are named in order, and anything after the parameter
-list is ignored to allow for a description.
+See arco/doc/building.md for more details on specification.
 
 Faust parameter interpolation is either a first-order filter or a
 sample-rate algorithm that allocates a 64K-sample delay line just
@@ -143,13 +139,12 @@ import os
 import sys
 import glob
 from pathlib import Path
+from implementation import prepare_implementation
+from params import get_signatures
 
-def generate_arco_cpp(classname, params_info, rate, initializer_code, outf):
+def generate_arco_cpp(classname, impl, rate, initializer_code, outf):
     """
     write the .cpp file to outf
-    params_info has the form [['x1', False, 'fEntry0'], ['x2', False, 'fEntry1']]
-        interpreted as [[arconame, interpolated, faust_b-rate_name], ...]
-        and where the 3rd element may be omitted for a-rate parameters
     rate is ? (currently not used)
     """
 
@@ -159,69 +154,65 @@ def generate_arco_cpp(classname, params_info, rate, initializer_code, outf):
     print('#include "arcougen.h"', file=outf)
     cnlc = classname.lower()
     print('#include "' + cnlc + '.h"\n', file=outf)
-    print("const char *" + classname + '_name = "' + classname + '";\n',
-          file=outf)
+    print(f'const char *{classname}_name = "{classname}";\n', file=outf)
 
     inputs = ""
-    for p in params_info:
-        inputs += ", int32 " + p[0]
-    print("/* O2SM INTERFACE: /arco/" + cnlc + "/new",
-          "int32 id, int32 chans" + inputs + ";\n */", file=outf)
-    print("void arco_" + cnlc + "_new(O2SM_HANDLER_ARGS)\n{", file=outf)
+    for name in impl.param_names:
+        inputs += ", int32 " + name
+    print(f"/* O2SM INTERFACE: /arco/{cnlc}/new",
+          f"int32 id, int32 chans{inputs};\n */", file=outf)
+    print(f"void arco_{cnlc}_new(O2SM_HANDLER_ARGS)\n{{", file=outf)
     print("    // begin unpack message (machine-generated):", file=outf)
     print("    // end unpack message\n", file=outf)
     parameters = ""
-    for p in params_info:
-        print("    ANY_UGEN_FROM_ID(" + p[0] + "_ugen, " + p[0] + ",",
-              '"arco_' + cnlc + '_new");', file=outf)
-        parameters += ", " + p[0] + "_ugen"
-    print("\n    new", classname + "(id, chans" + parameters + ");", file=outf)
+    for name in impl.param_names:
+        print(f'    ANY_UGEN_FROM_ID({name}_ugen, {name}, "arco_{cnlc}_new");',
+              file=outf)
+        parameters += f", {name}_ugen"
+    print(f"\n    new {classname}(id, chans{parameters});", file=outf)
     print("}\n\n", file=outf)
     
-    for p in params_info:
-        print("/* O2SM INTERFACE: /arco/" + cnlc + "/repl_" + p[0],
-              "int32 id, int32", p[0] + "_id;\n */", file=outf)
-        print('static void arco_' + cnlc + '_repl_' + p[0] +
-              '(O2SM_HANDLER_ARGS)\n{', file=outf)
+    for name in impl.param_names:
+        print(f"/* O2SM INTERFACE: /arco/{cnlc}/repl_{name}",
+              f"int32 id, int32 {name}_id;\n */", file=outf)
+        print(f'static void arco_{cnlc}_repl_{name} (O2SM_HANDLER_ARGS)\n{{',
+              file=outf)
         print("    // begin unpack message (machine-generated):", file=outf)
         print("    // end unpack message\n", file=outf)
         
-        print("    UGEN_FROM_ID(" + classname + ",", cnlc + ", id,",
-              '"arco_' + cnlc + '_repl_' + p[0] + '");', file=outf)
-        print("    ANY_UGEN_FROM_ID(" + p[0] + ",", p[0] + "_id,",
-              '"arco_' + cnlc + '_repl_' + p[0] + '");', file=outf)
-        print("    " + cnlc + "->repl_" + p[0] + "(" + p[0] + ");\n}\n\n",
-              file=outf)
+        print(f"    UGEN_FROM_ID({classname}, {cnlc}, id,",
+              f'"arco_{cnlc}_repl_{name}");', file=outf)
+        print(f"    ANY_UGEN_FROM_ID({name}, {name}_id,",
+              f'"arco_{cnlc}_repl_{name}");', file=outf)
+        print(f"    {cnlc}->repl_{name}({name});\n}}\n\n", file=outf)
 
-        print("/* O2SM INTERFACE: /arco/" + cnlc + "/set_" + p[0],
+        print(f"/* O2SM INTERFACE: /arco/{cnlc}/set_{name}",
               "int32 id, int32 chan, float val;\n */", file=outf)
-        print('static void arco_' + cnlc + '_set_' + p[0] +
-              '(O2SM_HANDLER_ARGS)\n{', file=outf)
+        print(f"static void arco_{cnlc}_set_{name}",
+              "(O2SM_HANDLER_ARGS)\n{", file=outf)
         print("    // begin unpack message (machine-generated):", file=outf)
         print("    // end unpack message\n", file=outf)
-        print("    UGEN_FROM_ID(" + classname + ",", cnlc + ", id,",
-              '"arco_' + cnlc + '_set_' + p[0] + '");', file=outf)
-        print("    " + cnlc + "->set_" + p[0] + "(chan, val);\n}\n\n",
-              file=outf)
+        print(f"    UGEN_FROM_ID({classname}, {cnlc}, id,",
+              f'"arco_{cnlc}_set_{name}");', file=outf)
+        print(f"    {cnlc}->set_{name}(chan, val);\n}}\n\n", file=outf)
 
-    print("static void", cnlc + "_init()\n{", file=outf)
+    print(f"static void {cnlc}_init()\n{{", file=outf)
     print("    // O2SM INTERFACE INITIALIZATION: (machine generated)",
           file=outf)
-    print('    o2sm_method_new("/arco/' + cnlc + \
-           '/new", "ii' + "i" * len(params_info) + '", arco_' + cnlc + \
-           "_new, NULL, true, true);", file=outf)
-    for p in params_info:
-        print('    o2sm_method_new("/arco/' + cnlc + '/repl_' + p[0] + \
-              '", "ii, arco_' + cnlc + '_repl_' + p[0] + 
-              ', NULL, true, true);', file=outf)
-        print('    o2sm_method_new("/arco/' + cnlc + '/set_' + p[0] + \
-              '", "if, arco_set_' + p[0] + ', NULL, true, true);', file=outf)
+    print(f'    o2sm_method_new("/arco/{cnlc}/new',
+          f'"ii{"i" * len(impl.param_names)}", arco_{cnlc}_new, NULL,'
+          "true, true);", file=outf)
+    for name in impl.param_names:
+        print(f'    o2sm_method_new("/arco/{cnlc}/repl_{name}",',
+              f'"ii", arco_{cnlc}_repl_{name}, NULL, true, true);', file=outf)
+        print(f'    o2sm_method_new("/arco/{cnlc}/set_{name}",',
+              f'"if", arco_{cnlc}set_{name}, NULL, true, true);', file=outf)
     print("    // END INTERFACE INITIALIZATION", file=outf)
 
     print(initializer_code, file=outf)
     print("}\n", file=outf)
 
-    print("Initializer", cnlc + "_init_obj(" + cnlc + "_init);", file=outf)
+    print(f"Initializer {cnlc}_init_obj({cnlc}_init);", file=outf)
 
     return
 
@@ -246,7 +237,7 @@ def find_matching_brace(fsrc, loc):
         return -1
 
 
-def extract_method(classname, methodname, src):
+def extract_method(classname, methodname, fimpl):
     """
     Extract the method from classname
     Algorithm: 
@@ -259,30 +250,30 @@ def extract_method(classname, methodname, src):
        extract the method.        
     Return: method as string or None if error occurs
     """
-    loc = src.find("class " + classname)
+    loc = fimpl.find("class " + classname)
     if loc < 0:
         print("Error: extract_method could not find class", classname)
         return None
-    loc = src.find(" " + methodname + "(", loc)
+    loc = fimpl.find(" " + methodname + "(", loc)
     if loc < 0:
         print('Note: could not find "' + methodname + '"')
         return None
-    loc2 = src.find("{", loc)
+    loc2 = fimpl.find("{", loc)
     if loc2 < 0:
         print("Error: could not find body of classInit")
         return None
-    loc2 = find_matching_brace(src, loc2)
+    loc2 = find_matching_brace(fimpl, loc2)
     if loc2 < 0: return None
     # capture to end of line (move loc2 just after newline)
-    while loc2 < len(src) and src[loc2 - 1] != '\n':
+    while loc2 < len(fimpl) and fimpl[loc2 - 1] != '\n':
         loc2 += 1
     # capture from beginning of line:
-    while loc > 0 and src[loc] != '\n':
+    while loc > 0 and fimpl[loc] != '\n':
         loc -= 1
-    return src[loc + 1 : loc2]
+    return fimpl[loc + 1 : loc2]
 
 
-def generate_initializer_code(impl, classname, rate):
+def generate_initializer_code(fimpl, classname, rate):
     """find classInit in Faust code and use it to create class_init for Arco
     returns True if there is an error, otherwise returns initializer code
     (a string).
@@ -292,7 +283,7 @@ def generate_initializer_code(impl, classname, rate):
     rate_name = "AR" if rate == "a" else "BR"
 
     # find classInit method
-    class_init = extract_method(classname, "classInit", impl)
+    class_init = extract_method(classname, "classInit", fimpl)
     if class_init != None:
         # print("---------classInit method:\n" + class_init + "-------")
         loc = class_init.find("(")
@@ -322,7 +313,7 @@ def generate_initializer_code(impl, classname, rate):
         print("initializer code", init_code)
 
     # repeat these steps + local var decls for staticInit method
-    static_init = extract_method(classname, "staticInit", impl)
+    static_init = extract_method(classname, "staticInit", fimpl)
     if static_init != None:
         # print("---------staticInit method:\n" +static_init + "-------")
         loc = static_init.find("(")
@@ -400,8 +391,8 @@ def generate_initializer_code(impl, classname, rate):
         decls = ""
         for local_var in local_vars.keys():
             var_type = "float" if local_var[0] == "f" else "int"
-            decls += "    " + var_type + " " + local_var + "[" + \
-                     str(local_vars[local_var]) + "];\n"
+            decls += f"    {var_type}" + \
+                             f" {local_var}[{str(local_vars[local_var])}];\n"
 
         head = "\n    // \"static\" initialization code from faust:\n"
 
@@ -507,10 +498,10 @@ def insert_interpolation(body, varlist):
     # now we have the slow variables to be interpolated in inner loop
     # and we know the inner loop begins at loc
     for var in slow_vars:
-        incr_decls = "        Sample " + var + "_incr = (" + \
-            var + " - state->" + var + "_prev) * BL_RECIP;\n" + \
-            "        Sample " + var + "_fast = state->" + var + "_prev;\n" + \
-            "        state->" + var + "_prev = " + var + ";\n"
+        incr_decls = f"        Sample {var}_incr = " + \
+                f"({var} - state->{var}_prev) * BL_RECIP;\n" + \
+                f"        Sample {var}_fast = state->{var}_prev;\n" + \
+                f"        state->{var}_prev = {var};\n"
         insert_loc = line_next(body, loc)
         body = string_insert(body, incr_decls, insert_loc)
         loc = insert_loc + len(incr_decls);
@@ -520,7 +511,7 @@ def insert_interpolation(body, varlist):
     loc = line_next(body, loc)  # skip to line after "for..."
     # now, loc is at the beginning of the inner loop body
     for var in slow_vars:
-        incr_stmt = "            " + var + "_fast += " + var + "_incr;\n"
+        incr_stmt = f"            {var}_fast += {var}_incr;\n"
         body = string_insert(body, incr_stmt, loc)
         loc += len(incr_stmt);
     # replace every slow var in the inner loop with fSlowN_fast:
@@ -531,7 +522,7 @@ def insert_interpolation(body, varlist):
     return (body_begin + body_end, slow_vars)
 
 
-def find_b_rate_parameter_faust_names(classname, params_info, src):
+def find_b_rate_parameter_faust_names(classname, impl, src):
     """ find b-rate parameter faust names from buildUserInterface
     method. For each parameter found, add an extra element to
     the corresponding parameter in params_info to the element
@@ -542,6 +533,7 @@ def find_b_rate_parameter_faust_names(classname, params_info, src):
     if bui == None: return True
     bui = bui.split("\n")
     printed_something = False
+    impl.param_faust_names = [None] * len(impl.param_names)
     for line in bui:
         loc = line.find("addNumEntry(")
         if loc >= 0:  # ... "amp", &fEntry0, ...
@@ -550,16 +542,15 @@ def find_b_rate_parameter_faust_names(classname, params_info, src):
             printed_something = True
             arco_name = args[0][0 : -1]  # remove trailing quote
             faust_name = args[1].strip()[1 : ]  # remove leading &
-            for p in params_info:  # make parameter[][2] be faust name
-                if p[0] == arco_name:
-                    p.append(faust_name)
-                    break;
+            i = impl.param_names.index(arco_name)
+            if i >= 0:
+                impl.param_faust_names[i] = faust_name
     if printed_something:  # print a separator for readability
         print("------\n")
 
 
-def generate_channel_method(fhfile, classname, instvars, params_info,
-                            src, rate):
+def generate_channel_method(fhfile, classname, signature,
+                            instvars, impl, src, rate):
     """Generate and return one channel method. Return True on error
     The method is returned in 5 parts:
         the declaration
@@ -570,44 +561,42 @@ def generate_channel_method(fhfile, classname, instvars, params_info,
     one channel method and don't need indirection of (this->*run_channel)(...)
 
     fhfile is [filename, signature (ab_b), output (classname)]
-    params_info has the form
-        [['x1', False, 'fEntry0'], ['x2', False, 'fEntry1']]
-    interpreted as [[arconame, interpolated, faust_b-rate_name], ...]
-    and where the 3rd element may be omitted for a-rate parameters
+    impl is an Implementation object
     """
-    print("generate_channel_method", classname, instvars, params_info, rate)
+    print("generate_channel_method", classname, signature, 
+          instvars, rate)
     param_types = fhfile[1][ : -2]  # e.g. ab_a -> ab
     print("------compute method for " + fhfile[2])
 
-    # full copy to avoid side effecting the original params_info list
-    params_info = [p.copy() for p in params_info]
+    # full copy to avoid side affecting the original impl
+    # params_info = [p.copy() for p in params_info]
     if 'b' in param_types or 'c' in param_types:  # update params_info
-        find_b_rate_parameter_faust_names(classname, params_info, src)
+        find_b_rate_parameter_faust_names(classname, impl, src)
     compute = extract_method(classname, "compute", src)
     print(compute + "-----")
     if compute == None: return True
     compute = compute.replace("\t", "    ")
-    print("params_info", repr(params_info))
+    # print("params_info", repr(params_info))
 
     ## The Declaration is stored in rslt[0]:
     rslt = ["    void chan" + fhfile[1] + "(" + classname + "_state *state) {"]
+ 
+    # remove the first line and the last 2 lines of compute
+    compute = "\n".join(compute.split("\n")[1 : -2])  
 
-    compute = compute.split("\n")[1 : -2]
-    # lines are separated; remove the line that gets output0
-    foundit = None
-    for i, line in enumerate(compute):
-        if line.find("FAUSTFLOAT* output0 = ") >= 0:
-            foundit = i
-            break;
-    if foundit != None:
-        print("found output0, deleting", compute[foundit], "line", foundit)
-        del compute[foundit]
-    compute = "\n".join(compute)
+    # replace outputs[0], outputs[1], etc. with out_samps, out_samps + BL, ...
+    # or if this is 'b'-rate, replace outputs[ with out_samps[
     if rate == 'a':
-        # change output0[i0] to *out_samps++;
-        compute = compute.replace("output0[i0]", "*out_samps++");
+        for i in range(signature.output.chans):
+            if i == 0:  # we don't need this special case or 0 ...
+                compute = compute.replace("outputs[0]", "out_samps")
+            elif i == 1:  # ... or this one either, but output is prettier
+                compute = compute.replace("outputs[1]", "out_samps + BL")
+            else:
+                compute = compute.replace(f"outputs[{str(i)}]", 
+                                          f"out_samps + BL * {str(i)}")
     else:  # change outputs[0] = ... to *out_samps = ...
-        compute = compute.replace("outputs[0]", "*out_samps++")
+        compute = compute.replace("outputs[", "out_samps[")
         # modify compute by pre-pending body of control() method after
         # fixing up references to fControl[] here and in compute
         control = extract_method(classname, "control", src)
@@ -639,37 +628,69 @@ def generate_channel_method(fhfile, classname, instvars, params_info,
         compute = control + compute  # prepend control stmts to compute
 
         i = 0
-        while compute.find("fControl[" + str(i) + "]") >= 0:
-            print("found fControl[" + str(i) + "]")
-            compute = compute.replace("fControl[" + str(i) + "]",
-                                      "tmp_" + str(i))
+        while compute.find(f"fControl[{str(i)}]") >= 0:
+            print(f"found fControl[{str(i)}]")
+            compute = compute.replace(f"fControl[{str(i)}]", f"tmp_{str(i)}")
             i += 1
         # add declarations for tmp_0, tmp_1, ...
         for j in range(i):
-            compute = compute.replace("    tmp_" + str(j) + " = ",
-                                      "    FAUSTFLOAT tmp_" + str(j) + " = ")
+            compute = compute.replace(f"    tmp_{str(j)} = ",
+                                      f"    FAUSTFLOAT tmp_{str(j)} = ")
         # there are references to fEntry0, etc., but these are replaced later
 
     # change count to BL
     compute = compute.replace("count", "BL")
 
-    # change each inputs[n] to <param>_samps:
+    # change each inputs[n] to <param>_samps + BL * N where <param> is an
+    # Arco parameter name and N is the channel number. To make things easier,
+    # we will expand Arco parameters into strings like "in_samps + in_stride"
+    # to correspond to the FAUST parameters (even though we will only use the
+    # expressions for a-rate parameters).
+    # Build the expressions:
+    expressions = []
+    i = 0
+  
+    for param in signature.params:
+        expressions.append(f"{param.name}_samps" + \
+                           ("[0]" if impl.param_faust_names[i] else ""))
+        i += 1
+        # note that if this is not fixed (channels) and we allow any number
+        # of channels, each with it's own state, then param.chans will be 1
+        # and the expression will  simply be <param>_samps, which is updated
+        # in the real_run per-channel loop, so it's always correct.
+        chans = param.chans 
+        if chans > 1:
+            if impl.param_faust_names[i]:
+                expr = f"{param.name}_samps[{param.name}_stride]"
+            else:
+                expr = f"{param.name}_samps + {param.name}_stride"
+            expressions.append(expr)
+            i += 1
+        for i in range(2, chans):
+            if impl.param_faust_names[i]:
+                expr = f"{param.name}_samps[{param.name}_stride * {str(i)}]"
+            else:
+                expr = f"{param.name}_samps + {param.name}_stride * {str(i)}"
+            expressions.append(expr)
+            i += 1
+
     # careful: n is the number of the a-rate input, so if inputs are ba,
     #   n will be 0 for the 2nd parameter
-    i = 0
-    for param in params_info:
-        arco_name = param[0] + "_samps"
-        if len(param) > 2:
-            faust_name = param[2]  # b-rate fEntry0, fEntry1, etc.
-            arco_name = "*" + arco_name  # substitute with float
+    param_names = [p.name for p in signature.params]
+    i = 0 # index into FAUST implementation (.fh) variable names
+    for j, name in enumerate(impl.param_names):
+        if impl.param_faust_names[j]:
+            faust_name = impl.param_faust_names[j]  # b-rate fEntry0, etc.
+            arco_name = expressions[j]
         else:
-            faust_name = "inputs[" + str(i) + "]"  # a-rate inputs[0], ...
+            faust_name = f"inputs[{str(i)}]"  # a-rate inputs[0], ...
+            arco_name = expressions[j]
             i += 1  # increment only for each a-rate parameter
         print("replace", faust_name, arco_name)  # substitute address of block
         compute = compute.replace(faust_name, arco_name)
         # also replace fControl[i] with arco_name
         if faust_name.find("fEntry") == 0:
-            faust_control_var = "fControl[" + faust_name[6 : ] + "]"
+            faust_control_var = f"fControl[{faust_name[6 : ]}]"
             print("replace", faust_control_var, arco_name)
             compute = compute.replace(faust_control_var, arco_name)
 
@@ -679,11 +700,11 @@ def generate_channel_method(fhfile, classname, instvars, params_info,
             compute = compute.replace(iv.name, "state->" + iv.name)
 
     # add code for interpolated parameters
-    print("add code for interpolation, params_info is", params_info)
+    print("add code for interpolation") # , params_info is", params_info)
     varlist = []
-    for i, p in enumerate(params_info):
-        if p[1] and fhfile[1][1 + i] != 'a':  # interpolated flag and b-rate
-            varlist.append(p[0])
+    for i, name in enumerate(impl.param_names):
+        if impl.param_interp[i] and fhfile[1][1 + i] != 'a':  # interpolated flag and b-rate
+            varlist.append(name)
 
     if len(varlist) > 0:
         (compute, slow_vars) = insert_interpolation(compute, varlist)
@@ -691,15 +712,15 @@ def generate_channel_method(fhfile, classname, instvars, params_info,
     else:
         slow_vars = []
 
-    print("** final compute method for " + fhfile[2] + "\n" + compute +\
-          "\n-----")
+    print(f"** final compute method for {fhfile[2]}\n{compute}\n-----")
     rslt.append(compute)
     rslt.append("    }\n")
-    print( "generate_channel_method", classname, "returns", rslt, slow_vars)
+    print(f"generate_channel_method {classname} returns", rslt, slow_vars)
     return (rslt, slow_vars)
 
 
-def generate_channel_methods(fhfiles, classname, instvars, params_info, rate):
+def generate_channel_methods(fhfiles, classname, signature,
+                             instvars, impl, rate):
     """
     create channel methods, which are specific inner loops that compute one
     channel of output assuming a specific combination of a-rate and b-rate
@@ -707,9 +728,7 @@ def generate_channel_methods(fhfiles, classname, instvars, params_info, rate):
 
     fhfiles is list of fhfile of the form
         [filename, signature (ab_b), output (classname)]
-    params_info has the form [['x1', False, 'fEntry0'], ['x2', False, 'fEntry1']]
-        interpreted as [[arconame, interpolated, faust_b-rate_name], ...]
-        and where the 3rd element may be omitted for a-rate parameters
+    impl is an Implementation object
     
     Return True on error or string containing all the methods on success
     """
@@ -719,8 +738,8 @@ def generate_channel_methods(fhfiles, classname, instvars, params_info, rate):
     for fhfile in fhfiles:
         with open(fhfile[2], "r") as inf:
             print("        ******* generate_channel_methods fhfile", fhfile)
-            cm, slow_vars = generate_channel_method(fhfile, classname, instvars,
-                                                   params_info, inf.read(), rate)
+            cm, slow_vars = generate_channel_method(fhfile, classname, 
+                                signature, instvars, impl, inf.read(), rate)
             if cm == True:
                 return True
             # accumulate the union of all slow_vars (interpolated variables)
@@ -739,8 +758,8 @@ class Vardecl:
         self.arrayspec = ""
 
     def __str__(self):
-        return "<Vardecl: " + self.type + " " + self.name + \
-               " " + self.arrayspec + " " + str(self.isconst) + ">"
+        return f"<Vardecl: {self.type} {self.name} {self.arrayspec} " + \
+               f"{str(self.isconst)}>"
 
     def __repr__(self):
         return str(self)
@@ -748,9 +767,9 @@ class Vardecl:
 
 def find_class_declaration(classname, fimpl):
     """Return the location of the class declaration"""
-    loc = fimpl.find("class " + classname + " ")
+    loc = fimpl.find(f"class {classname} ")
     if loc < 0:
-        loc = fimpl.find("class " + classname + ":")
+        loc = fimpl.find("class {classname}:")
         if loc < 0:
             print("Error: find_private_variables could not find class",
                   classname)
@@ -796,17 +815,10 @@ def find_private_variables(fimpl, classname):
     return rslt
 
 
-def generate_state_struct(classname, params_info):
+def generate_state_struct(classname):
     """
     Generate the state structure, which contains Ugen state for one channel.
     The state structure is replicated for each channel in the constructor.
-
-    params_info has the form 
-        [['x1', False, 'fEntry0'], ['x2', False, 'fEntry1']]
-    interpreted as [[arconame, interpolated, faust_b-rate_name], ...]
-    and where the 3rd element is added by find_b_rate_parameter_faust_names
-    as a side effect of this function, and 3rd element may be omitted 
-    for a-rate parameters.
 
     returns a tuple: (list of instance variables, code as a string) 
     """
@@ -815,38 +827,26 @@ def generate_state_struct(classname, params_info):
     state_struct = "    struct " + classname + "_state {\n"
     # find private variables which include Faust instance variables
     privates = find_private_variables(fimpl, classname)
-    #find_b_rate_parameter_faust_names(classname, params_info, fimpl)
-    #if privates == None:
-    #    return True
-    #b_rate_variables = [p[2] for p in params_info if len(p) > 2]
-    #print("b_rate_variables", b_rate_variables)
 
     # declare instance variables from Faust here:
     for p in privates:
         if not p.isconst: # and not p.name in b_rate_variables:
-            arrayspec = "[" + p.arrayspec + "];\n" if p.arrayspec != "" \
-                        else ";\n"
-            state_struct += "        " + p.type + " " + p.name + arrayspec
+            arrayspec = f"[{p.arrayspec}];" if p.arrayspec != "" \
+                        else ";"
+            state_struct += f"        {p.type} {p.name}{arrayspec}\n"
 
     # also declare a _prev variable for every interpolated parameter:
-    # print("gss params_info", params_info)
-    # for p in params_info:
-    #     if p[1]:
-    #         print("        float", p[0] + "_prev;", file=outf)
-    state_struct2 = "    };\n    Vec<" + classname + "_state> states;\n"
-    state_struct2 += "    void (" + classname + "::*run_channel)(" + \
-                     classname + "_state *state);\n\n"
+    state_struct2 = f"    }};\n    Vec<{classname}_state> states;\n"
+    state_struct2 += f"    void ({classname}::*run_channel)(" + \
+                                     f"{classname}_state *state);\n\n"
     return (privates, state_struct, state_struct2)
 
 
-def generate_state_init(classname, instvars, slow_vars, params_info):
+def generate_state_init(classname, instvars, slow_vars):
     """
     output loop body that initializes states[i], returns True if error
 
-    params_info has the form
-         [['x1', False, 'fEntry0'], ['x2', False, 'fEntry1']]
-    interpreted as [[arconame, interpolated, faust_b-rate_name], ...]
-    and where the 3rd element may be omitted for a-rate parameters
+    impl is an Implementation object
     """
     global fimpl
     clear_meth = extract_method(classname, "instanceClear", fimpl)
@@ -859,7 +859,7 @@ def generate_state_init(classname, instvars, slow_vars, params_info):
     # replace variable v with states[i].v
     for var in instvars:
         if not var.isconst:
-            clear_meth = clear_meth.replace(var.name, "states[i]." + var.name)
+            clear_meth = clear_meth.replace(var.name, f"states[i].{var.name}")
     print("** body of clear meth\n" + clear_meth + "\n------")
     
     state_init = "    void initialize_channel_states() {\n"
@@ -867,9 +867,9 @@ def generate_state_init(classname, instvars, slow_vars, params_info):
     state_init += clear_meth + "\n"
     # initialize _prev variables whether we use them or not:
     for p in slow_vars:
-        state_init += "            states[i]." + p + "_prev = 0.0f;\n"
+        state_init += f"            states[i].{p}_prev = 0.0f;\n"
     state_init += "        }\n    }\n\n"
-    print("** state_init\n" + state_init + "\n------")
+    print(f"** state_init\n{state_init}\n------")
     return state_init
 
 
@@ -898,7 +898,7 @@ def initialize_constants(classname, instvars, rate):
     return const_meth + "\n"
 
 
-def generate_update_run_channel(classname, fhfiles, params_info):
+def generate_update_run_channel(classname, fhfiles, names, signature):
     """The update method inspects all inputs and decides what specific inner
 
     loop should be called. Inner loops are in channel methods and real_run()
@@ -908,10 +908,9 @@ def generate_update_run_channel(classname, fhfiles, params_info):
 
     fhfiles is a list of fhfile of the form
         [filename, signature (ab_b), output (classname)]
-    params_info has the form
-        [['x1', False, 'fEntry0'], ['x2', False, 'fEntry1']]
-    interpreted as [[arconame, interpolated, faust_b-rate_name], ...]
-    and where the 3rd element may be omitted for a-rate parameters
+    names is a list of implementation (process) parameter names
+    signature is a Signature objects, the Arco type signature for this class
+
     returns a string defining update_run_channel()
 
     The "new" algorithm generates a decision tree based on parameter
@@ -942,9 +941,14 @@ def generate_update_run_channel(classname, fhfiles, params_info):
     This is naturally recursive so we have a helper function.
     """
 
-    def decision_tree(index, indent_level, fhfiles, params_info,
+    def decision_tree(index, indent_level, fhfiles, names, signature,
                       classname, urc):
-        """Recursive helper function to select implementation"""
+        """Recursive helper function to select implementation
+        names is a list of parameter names from process in the FAUST 
+        implementation. As decision_tree recurses, the names supplied
+        by the index'th parameter in signature are removed so the
+        first name in names corresponds to the index parameter in signature
+        """
         # split the fhfiles based on the rate at index
         audio_rate_files = []
         block_rate_files = []
@@ -955,90 +959,86 @@ def generate_update_run_channel(classname, fhfiles, params_info):
                 block_rate_files.append(fhfile)
             else:
                 raise Exception("bad fhfile signature? " + fhfile[1])
-        pname = params_info[index][0]
+        pname = signature.params[index].name
+        # remove the parameter names supplied by the index'th parameter
+        # in signature
+        names = names[signature.params[index].chans : ]
+        index += 1
+        indent = "    " * indent_level
         if len(audio_rate_files) == 0 or len(block_rate_files) == 0:
             if len(audio_rate_files) == 0:  # must downsample
-                urc += ("    " * indent_level) + \
-                       "if (" + pname + "->rate == 'a') {\n" + \
-                       ("    " * (indent_level + 1)) + \
-                       pname + " = new Dnsampleb(-1, " + pname + "->chans, " + \
-                           pname + ", LOWPASS500);\n" + \
-                       ("    " * indent_level) + "}\n"
+                urc += f"{indent}if ({pname}->rate == 'a') " + "{\n" + \
+                       f"{indent}    {pname} = " + \
+                               f"new Dnsampleb(-1, {pname}->chans, " + \
+                               f"{pname}, LOWPASS500);\n" + \
+                       indent + "}\n"
                 fhfiles = block_rate_files
             else:  # must upsample
-                pname = params_info[index][0]
-                urc += ("    " * indent_level) + \
-                       "if (" + pname + "->rate == 'b') {\n" + \
-                       ("    " * (indent_level + 1)) + \
-                       pname + " = new Upsample(-1, " + pname + "->chans, " + \
-                           pname + ");\n" + ("    " * indent_level) + "}\n"
+                urc += f"{indent}if ({pname}->rate == 'b') " + "{\n" + \
+                       f"{indent}    {pname} = " + \
+                               f"new Upsample(-1, {pname}->chans, " + \
+                               f"{pname });\n" + \
+                       indent + "}\n"
                 fhfiles = audio_rate_files
-
-            index += 1
-            if index == len(params_info):  # no more parameters, make a decision
+            if len(names) == 0:  # no more parameters, make a decision
                 assert len(fhfiles) == 1  # we should have a unique choice left
-                urc += ("    " * indent_level) + "new_run_channel = &" + \
-                       classname + "::chan" + fhfiles[0][1] + ";\n"
+                urc += f"{indent}new_run_channel = " + \
+                               f"&{classname}::chan{fhfiles[0][1]};\n"
             else:
-                urc = decision_tree(index, indent_level, fhfiles, params_info,
-                                    classname, urc)
+                urc = decision_tree(index, indent_level, fhfiles, names,
+                                    signature, classname, urc)
         else:  # handle left (a) branch and right (b) branch separately
             # first, the left (a) branch:
             if len(audio_rate_files) == 1:
-                urc += ("    " * indent_level) + \
-                       "if (" + pname + "->rate == 'a') {\n"
-                urc += ("    " * (indent_level + 1)) + \
-                       "new_run_channel = &" + classname + "::chan" + \
-                       audio_rate_files[0][1] + ";\n"
+                urc += f"{indent}if ({pname}->rate == 'a') {{\n"
+                urc += f"{indent}    new_run_channel = "
+                urc +=     f"&{classname}::chan{audio_rate_files[0][1]};\n"
             else:
-                urc += ("    " * indent_level) + \
-                       "if (" + pname + "->rate == 'a') {\n"
-                urc = decision_tree(index + 1, indent_level + 1,
-                              audio_rate_files, params_info, classname, urc)
-            urc += ("    " * indent_level) + "} else {\n"
+                urc += f"{indent}if ({pname}->rate == 'a') {{\n"
+                urc = decision_tree(index, indent_level + 1,
+                            audio_rate_files, names, signature, classname, urc)
+            # now, handle the right (b) branch:
+            urc += f"{indent}}} else {{\n"
             if len(block_rate_files) == 1:
-                urc += ("    " * (indent_level + 1)) + \
-                        "new_run_channel = &" + classname + "::chan" + \
-                        block_rate_files[0][1] + ";\n"
+                urc += f"{indent}    new_run_channel = "\
+                       f"&{classname}::chan{block_rate_files[0][1]};\n"
             else:
-                urc = decision_tree(index + 1, indent_level + 1,
-                              block_rate_files, params_info, classname, urc)
-            urc += ("    " * indent_level) + "}\n"
+                urc = decision_tree(index, indent_level + 1,
+                        block_rate_files, names, signature, classname, urc)
+            urc += f"{indent}}}\n"
 
         return urc
 
 
     urc = "    void update_run_channel() {\n"  # urc is "update run channel"
     urc += "        // initialize run_channel based on input types\n"
-    urc += "        void (" + classname + "::*new_run_channel)(" + \
-           classname + "_state *state);\n"
+    urc += f"        void ({classname}::*new_run_channel)(" + \
+                               f"{classname}_state *state);\n"
     print("fhfiles:", fhfiles)
     need_else = False
     cond = ""
 
-    if len(params_info) == 0:
+    if len(names) == 0:
         urc += "        new_run_channel = &chan_;"
     else:
-        urc = decision_tree(0, 3, fhfiles, params_info, classname, urc)
+        urc = decision_tree(0, 3, fhfiles, names, 
+                            signature, classname, urc)
     urc += "        if (new_run_channel != run_channel) {\n"
     urc += "            initialize_channel_states();\n"
     urc += "            run_channel = new_run_channel;\n        }\n    }\n\n"
     return urc
 
 
-def generate_arco_h(classname, params_info, rate, fhfiles, outf):
+def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
     """
     Write the .h file which is most of the ugen dsp code to outf.
 
     fhfiles is a list of fhfile of the form:
         [filename, signature (ab_b), output (classname)]
-    params_info has the form 
-        [['x1', False, 'fEntry0'], ['x2', False, 'fEntry1']]
-    interpreted as [[arconame, interpolated, faust_b-rate_name], ...]
-    and where the 3rd element may be omitted for a-rate parameters
+    impl is an Implementation object
     """
 
-    global fsrc, fimpl
+    global fsrc, fimpl  # faust .dsp file and faust-generated .fh file
     print("** generate_arco_h for", classname)
 
     print("/*", classname.lower(),  "-- unit generator for arco", file=outf)
@@ -1051,41 +1051,45 @@ def generate_arco_h(classname, params_info, rate, fhfiles, outf):
     print(fimpl[0 : loc], file=outf)
     print("/*-------------- END FAUST PREAMBLE --------------*/\n", file=outf)
 
-    print("extern const char *" + classname + "_name;\n", file=outf)
+    print(f"extern const char *{classname}_name;\n", file=outf)
 
     ## Declare the class
-    print("class", classname, ": public Ugen {\npublic:", file=outf)
+    print(f"class {classname} : public Ugen {{\npublic:", file=outf)
 
-    parameters = [p[0] for p in params_info]
-    print("parameters", parameters)
+    print("impl.param_names", impl.param_names)
     # from here, we do not write directly to outf because we need to alter
     # state_struct after generating the channel methods, so we accumulate
     # all the needed code in strings to write later...
 
-    instvars, state_struct, state_struct2 = \
-            generate_state_struct(classname, params_info)
+    instvars, state_struct, state_struct2 = generate_state_struct(classname)
     if instvars == True: return
 
     var_decls = ""
-    for p in parameters:
-        var_decls += "    Ugen_ptr " + p + ";\n    int " + p + "_stride;\n"
-        var_decls += "    Sample_ptr " + p + "_samps;\n\n"
+    sig_params = [p.name for p in signature.params]
+    for i, p in enumerate(sig_params):
+        var_decls += f"    Ugen_ptr {p};\n"
+        print("**** signature.params[i]", signature.params[i], 
+              signature.params[i].fixed)
+        # if only 1 channel or not fixed, we need stride
+        if signature.params[i].chans > 1 or not signature.params[i].fixed:
+            var_decls += f"    int {p}_stride;\n"
+        var_decls += f"    Sample_ptr {p}_samps;\n\n"
 
     for iv in instvars:
         if iv.isconst:
-            arrayspec = "[" + iv.arrayspec + "]" if iv.arrayspec != "" else ""
-            var_decls += "    " + iv.type + " " + iv.name + arrayspec + ";\n"
+            arrayspec = f"[{iv.arrayspec}]" if iv.arrayspec != "" else ""
+            var_decls += f"    {iv.type} {iv.name}{arrayspec};\n"
 
     ## Generate the constructor
-    constructor = "\n    " + classname + "(int id, int nchans"
-    for p in parameters:
-        constructor += ", Ugen_ptr " + p + "_"
-    constructor += ") :\n            Ugen(id, '" + rate + "', nchans) {\n"
+    constructor = f"\n    {classname}(int id, int nchans"
+    for p in sig_params:
+        constructor += f", Ugen_ptr {p}_"
+    constructor += f") :\n            Ugen(id, '{rate}', nchans) {{\n"
 
-    for p in parameters:
-        constructor += "        " + p + " = " + p + "_;\n"
+    for p in sig_params:
+        constructor += f"        {p} = {p}_;\n"
 
-    if len(parameters) > 0:
+    if len(sig_params) > 0:
         constructor += "        flags = CAN_TERMINATE;\n"
 
     # initialize states
@@ -1096,65 +1100,66 @@ def generate_arco_h(classname, params_info, rate, fhfiles, outf):
     constructor += constants
 
     # call init_<var> for every parameter
-    for p in parameters:
-        constructor += "        init_" + p + "(" + p + ");\n"
+    for p in sig_params:
+        constructor += f"        init_{p}({p});\n"
     if rate == 'a':
-        constructor += "        run_channel = (void (" + classname + \
-                       "::*)(" + classname + "_state *)) 0;\n"
+        constructor += f"        run_channel = (void ({classname}::*)("
+        constructor +=                          f"{classname}_state *)) 0;\n"
         constructor += "        update_run_channel();\n"
     constructor += "    }\n\n"
 
     ## Generate the destructor
-    constructor += "    ~" + classname + "() {\n"
-    for p in parameters:
-        constructor += "        " + p + "->unref();\n"
+    constructor += f"    ~{classname}() {{\n"
+    for p in sig_params:
+        constructor += f"        {p}->unref();\n"
     constructor += "    }\n\n"
 
     ## Generate name() method
-    constructor += "    const char *classname() { return " + classname + \
-                   "_name; }\n\n"
+    constructor += f"    const char *classname() {{"
+    constructor += f" return {classname}_name; }}\n\n"
 
     ## Generate update_run_channel method to set the run_channel
     update_run_channel = ""
     if rate == 'a':
         update_run_channel = generate_update_run_channel(classname, fhfiles,
-                                                         params_info)
+                                                impl.param_names, signature)
 
     pr_sources = ""
-    if len(parameters) > 0:
+    if len(sig_params) > 0:
         pr_sources += "    void print_sources(int indent, bool print_flag) {\n"
-        for p in parameters:
-            pr_sources += "        " + p + \
-                          '->print_tree(indent, print_flag, "' + p + '");\n'
+        for p in sig_params:
+            pr_sources += f'        {p}->print_tree(indent, print_flag,' + \
+                                                               f' "{p}");\n'
         pr_sources += "    }\n\n"
 
     methods = ""
     ## Generate repl_* methods to set inputs
-    for p in parameters:
-        methods += "    void repl_" + p + "(Ugen_ptr ugen) {\n"
-        methods += "        " + p + "->unref();\n"
-        methods += "        init_" + p + "(ugen);\n"
+    for p in sig_params:
+        methods += f"    void repl_{p}(Ugen_ptr ugen) {{\n"
+        methods += f"        {p}->unref();\n"
+        methods += f"        init_{p}(ugen);\n"
         if rate == 'a':
             methods += "        update_run_channel();\n"
         methods += "    }\n\n"
 
     ## Generate set_* methods to set constant rate input parameters
-    for p in parameters:
-        methods += "    void set_" + p + "(int chan, float f) {\n"
-        methods += "        " + p + "->const_set(chan, f, "
-        methods += '"' + classname + "::set_" + p + '");\n'
-        methods += "    }\n\n"
+    for p in sig_params:
+        methods += f"    void set_{p}(int chan, float f) {{\n"
+        methods += f'        {p}->const_set(chan, f, "{classname}::set_{p}");'
+        methods += "\n    }\n\n"
 
     ## Generate init_* methods shared by constructor and repl_* methods
-    for p in parameters:
-        methods += "    void init_" + p + \
-                   "(Ugen_ptr ugen) { init_param(ugen, " + p + ", " + \
-                   p + "_stride); }\n\n"
+    for i, p in enumerate(sig_params):
+        stride_expr = "0"
+        if signature.params[i].chans > 1 or not signature.params[i].fixed:
+            stride_expr = p + "_stride"
+        methods += f"    void init_{p}(Ugen_ptr ugen) {{ " + \
+                   f"init_param(ugen, {p}, &{stride_expr}); }}\n\n"
     
     ## Generate channel methods -- process one channel of input/output
     if rate == 'a':
         (channel_meths, slow_vars) = generate_channel_methods(fhfiles,
-                                classname, instvars, params_info, rate)
+                           classname, signature, instvars, impl, rate)
         if channel_meths == True:
             return
     else:
@@ -1163,14 +1168,13 @@ def generate_arco_h(classname, params_info, rate, fhfiles, outf):
 
     # Finish state_struct by declaring slow_vars
     for slow_var in slow_vars:
-        state_struct += "        Sample " + slow_var + "_prev;\n"
+        state_struct += f"        Sample {slow_var}_prev;\n"
 
     # Generate state initialization code (this will be inserted near
     # the top of the file within the constructor, but created here
     # after we've determined the state needed for interpolated
     # signals.
-    constr_init = generate_state_init(classname, instvars, slow_vars,
-                                      params_info)
+    constr_init = generate_state_init(classname, instvars, slow_vars)
     if constr_init == True: 
         return
 
@@ -1180,9 +1184,9 @@ def generate_arco_h(classname, params_info, rate, fhfiles, outf):
 
     ## Generate real_run method -- compute all output channels from inputs
     real_run = "    void real_run() {\n"
-    for p in parameters:
-        real_run += "        " + p + "_samps = " + \
-                    p + "->run(current_block); // update input\n"
+    for p in sig_params:
+        real_run += f"        {p}_samps = {p}->run(current_block);"
+        real_run += "  // update input\n"
 
     # add tests for termination
     if len(terminate_info) > 0:
@@ -1196,23 +1200,32 @@ def generate_arco_h(classname, params_info, rate, fhfiles, outf):
                     "            terminate();\n        }\n"
 
     # do the signal computation
-    real_run += "        " + classname + "_state *state = &states[0];\n"
-    real_run += "        for (int i = 0; i < chans; i++) {\n"
+    real_run += f"        {classname}_state *state = &states[0];\n"
+    if signature.output.fixed:   # just call run_channel once
+        indent = ""
+    else:  # create a loop to call run_channel for each channel
+        real_run += "        for (int i = 0; i < chans; i++) {\n"
+        indent = "    "
     if rate == 'a':
-        real_run += "            (this->*run_channel)(state);\n"
+        real_run += indent + "        (this->*run_channel)(state);\n"
     else:  # there is only one b-rate computation, so put the channel
            #     method inline:
-        cm, slow_vars = generate_channel_method(fhfiles[0], classname, instvars,
-                                                params_info, fimpl, rate)
+        cm, slow_vars = generate_channel_method(fhfiles[0], classname, 
+                               signature, instvars, impl, fimpl, rate)
         if cm == True:
             return
         # extract and indent the body of the compute function
         cm = ["    " + line for line in cm[1].split("\n")]
         real_run += "\n".join(cm)
-    real_run += "            state++;\n"
-    for p in parameters:
-        real_run += "            " + p + "_samps += " + p + "_stride;\n"
-    real_run += "        }\n"
+    if not signature.output.fixed:  # update input pointers and close the loop
+        real_run += "            state++;\n"
+        if rate == 'a':
+            real_run += "            out_samps += BL;\n"
+        else:
+            real_run += "            out_samps++;\n"
+        for p in impl.param_names:
+            real_run += f"            {p}_samps += {p}_stride;\n"
+        real_run += "        }\n"
     real_run += "    }\n"
     real_run += "};\n"
     real_run += "#endif\n"
@@ -1223,103 +1236,31 @@ def generate_arco_h(classname, params_info, rate, fhfiles, outf):
     return initializer_code
 
 
-def get_params_info(file, rate, ugen_params):
-    global fsrc, fimpl  # main faust source file (.dsp) and implementation (.fh)
+def get_params_info(classname, ugen_src, rate):
+    global fsrc, fimpl  # ugen file (.ugen) and implementation (.fh)
     """
-    extract parameter names and interpolated status from file
-    file: main .dsp file
+    read FAUST implementation from file
+    file: the .ugen file
     rate: ugen output rate
-    ugen_params: list of parameter names
-    returns: [[p1, False], [p2, True], ...] where boolean indicates
-        interpolation when the output is audio, or on error, True.
+    returns: Implementation object
     """
-    with open(file) as f:
-        fsrc = f.read()
-    fsrc = fsrc.replace("\t", "    ")
     if rate == None:
-        print("Error: no rate determined for", file)
-        return True
-    if rate == 'a':
-        return get_params_a(fsrc, ugen_params)
-    elif rate == 'b':
-        return get_params_b(fsrc)
-    else:
-        print("Error: rate for", file, "is invalid (" + rate + ")")
-        return True
+        print("Error: no rate determined for", classname)
+        return None
 
+    impl = prepare_implementation(ugen_src)
 
-def get_params_a(fsrc, ugen_params):
-    """
-    extract parameter names and interpolated status from file
-    fsrc: the input file, a FAUST .dsp file
-    ugen_params: list of parameter names derived from .ugen file
-    returns: [[p1, False], [p2, True], ...] where boolean indicates
-        interpolation when the output is audio, or on error, True
-    """
-    """
-    print("** get_params_a fsrc:\n", fsrc, "\n-------")
-    loc = fsrc.find("process(")
-    if loc < 0:
-        loc = fsrc.find("process")
-        if loc < 0:
-            print('Error: could not find "process"')
-            return True
-        # process = ... is legal, implies empty parameter list
-        loc = skip_to_non_space(fsrc, loc + 7)  # search after "process"
-        if fsrc[loc] != "=":
-            print('Erorr: did not find "=" after "process"')
-            return True
-        params = []
-    else:
-        loc2 = fsrc.find(")", loc)
-        if loc2 < 0:
-            print("Error: could not find ')' after \"process(\"")
-            return True
-        params = fsrc[loc + 8 : loc2]
-        params = params.replace(",", " ").split()
-    """
-    params = ugen_params
-    # now look for interpolated declaration
-    interpolated = []
-    loc = fsrc.find("declare interpolated")
-    print("interpolated declare at", loc, "SOURCE\n", fsrc, "\n--------")
-    if loc >= 0:
-        loc = fsrc.find('"', loc)  # first quote
-        if loc < 0:
-            print("Error: could not find string after declare interpolated")
-            return True
-        loc2 = fsrc.find('"', loc + 1)
-        print("interpolated loc", loc, "loc2", loc2)
-        interpolated = fsrc[loc + 1 : loc2].replace(",", " ").split()
-    print("interpolated", interpolated)
+    if rate == 'b':
+        # this is a bit of a hack, but block rate does no interpolation, so
+        # turn off all interpolation:
+        impl.param_interp = [False] * len(impl.param_names)
 
-    # build result
-    for i in range(len(params)):
-        params[i] = [params[i], params[i] in interpolated]
-    return params
+    elif rate != 'a':
+        print(f"Error: rate for {classname} is invalid ({rate})")
+        return None
 
+    return impl
 
-def get_params_b(fsrc):
-    """
-    extract parameter names from block-rate-output file
-    returns: [[p1, False], [p2, False], ...] where boolean indicates
-        interpolation, so always False; return True on error
-    """
-    # find the nentries to get the parameter list
-    loc = fsrc.find("nentry(")
-    params = []
-    while loc >= 0:
-        loc = fsrc.find('"', loc)
-        if loc < 0:
-            print('Error: get_params_b did not find \'"\' after "nentry("')
-            return True
-        loc2 = fsrc.find('"', loc + 1)
-        if loc2 < 0:
-            print('Error: get_params_b did not find 2nd \'"\' after "nentry("')
-            return True
-        params.append([fsrc[loc + 1 : loc2], False])
-        loc = fsrc.find("nentry(", loc2)
-    return params
 
 
 def run_faust(classname, file, outfile):
@@ -1328,8 +1269,8 @@ def run_faust(classname, file, outfile):
     if file.find("b.dsp") >= 0:
         blockrate = "-os "  # one sample if b-rate
     print("In f2a.py, PATH=" + os.environ['PATH'])
-    err = os.system("faust -light -cn " + classname + " " + blockrate +
-                    file + " -o " + outfile)
+    err = os.system(f"faust -light -cn {classname} {blockrate}{file}" + \
+                    f" -o {outfile}")
     if err != 0:
         print("Error: quit because of error reported by Faust")
         return True
@@ -1339,34 +1280,17 @@ def run_faust(classname, file, outfile):
 
 
 
-def extract_ugen_params(classname):
-    """Get the parameter names in a list from classname.ugen"""
-    filename = classname + '.ugen'
-    try:
-        with open(filename, 'r') as file:
-            content = file.read()
-        
-        # Find the word "process" followed by "("
-        process_index = content.find('process')
-        if process_index == -1:
-            print(f"No 'process(' found in {filename}")
-            return []
-        
-        # Find the opening and closing parentheses
-        start_index = content.find('(', process_index)
-        end_index = content.find(')', start_index)
-        
-        if start_index == -1 or end_index == -1:
-            print(f"No paren after 'process' in {filename}")
-            return []
-        
-        # Extract the comma-separated words between "(" and ")"
-        params_str = content[start_index + 1:end_index]
-        params = [param.strip() for param in params_str.split(',')]
-        return params
-    except FileNotFoundError:
-        print(f"File {filename} not found")
-        return []
+def get_signature_for(classname, src):
+    """Get the signature for classname from the .ugen file"""
+    signatures = get_signatures(src)
+    if signatures == None:
+        return None
+    for sig in signatures:
+        if sig.name == classname.lower():
+            return sig
+    print(f"Error: could not find signature for {classname}")
+    return None
+
 
 
 def main():
@@ -1395,8 +1319,8 @@ def main():
         path = Path(file)
         signature = str(path.with_suffix(""))[len(classname) : ]
         if output_rate and output_rate != signature[-1]:
-            print("Error: output rate is", output_rate,
-                  "but input file is", file)
+            print(f"Error: output rate is {output_rate} but input file is",
+                  file)
             return
         output_rate = signature[-1]
 
@@ -1438,14 +1362,37 @@ def main():
 
     print("** after translation, main file: ", main_file,
           "top signature", top_signature)
-            
-    # find params_info - "master" parameter list is in the .ugen file
-    #   but we also use the main_file
-    ugen_params = extract_ugen_params(classname)
-    print("extract_ugen_params:", ugen_params)
-    params_info = get_params_info(main_file, output_rate, ugen_params)
-    if params_info == True: return
-    print("get_params_info:", params_info)
+    
+    # get .ugen source lines
+    filename = classname + '.ugen'
+    src = None
+    try:
+        with open(filename, 'r') as file:
+            src = file.readlines()
+    except FileNotFoundError:
+        if output_rate == 'b' and classname[-1] == 'b':
+            filename = classname[:-1] + '.ugen'
+            try:
+                with open(filename, 'r') as file:
+                    src = file.readlines()
+            except FileNotFoundError:
+                pass
+        if not src:
+            print(f"File {filename} not found")
+            return None
+ 
+    # find signature corresponding to Arco signature, and params_info
+    # corresponding to FAUST "process" implementation.
+    signature = get_signature_for(classnamelc, src)
+    print("get_signature_for:", signature)
+    impl = get_params_info(classnamelc, src, output_rate)
+    if impl == None: return
+    print("impl:", impl)
+
+    # read the main_file into fsrc
+    with open(main_file) as f:
+        fsrc = f.read()
+    fsrc = fsrc.replace("\t", "    ")
 
     # find terminate_info
     loc = fsrc.find("declare terminate")
@@ -1471,9 +1418,9 @@ def main():
 
     # open and generate the Arco Ugen
     with open(classnamelc + ".h", "w") as outf:
-        init_code = generate_arco_h(classname, params_info, output_rate,
-                                    fhfiles, outf)
+        init_code = generate_arco_h(classname, impl, signature, output_rate,
+                                      fhfiles, outf)
     with open(classnamelc + ".cpp", "w") as outf:
-        generate_arco_cpp(classname, params_info, output_rate, init_code, outf)
+        generate_arco_cpp(classname, impl, output_rate, init_code, outf)
     
 main()

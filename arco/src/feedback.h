@@ -98,11 +98,11 @@ class Feedback : public Ugen {
         gain->const_set(chan, g, "Feedback::set_gain");
     }
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
 
-    void init_from(Ugen_ptr ugen) { init_param(ugen, from, from_stride); }
+    void init_from(Ugen_ptr ugen) { init_param(ugen, from, &from_stride); }
 
-    void init_gain(Ugen_ptr ugen) { init_param(ugen, gain, gain_stride); }
+    void init_gain(Ugen_ptr ugen) { init_param(ugen, gain, &gain_stride); }
 
     void chan_aa_a(Feedback_state *state) {
         for (int i = 0; i < BL; i++) {

@@ -73,7 +73,7 @@ class Windowed_input : public Ugen {
 
 
     void init_inp(Ugen_ptr ugen) {
-        init_param(ugen, inp, inp_stride);
+        init_param(ugen, inp, &inp_stride);
         // TODO: we should fail gracefully in this case:
         assert(inp->rate == 'a');
     }

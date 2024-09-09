@@ -119,3 +119,7 @@ CMakeCache.txt
 /fluidsynth/
 
 /preproc/.vscode/
+
+/ugens/sttest/sttest_abb_a.dsp
+
+/ugens/sttest/sttest_abb_a.fh

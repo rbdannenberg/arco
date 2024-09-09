@@ -14,12 +14,31 @@ import sys
 import subprocess
 import glob
 import os
+from params import Param, get_signatures
+from implementation import prepare_implementation
+    
 
 def has_upper(s):
     for c in s:
         if c.isupper():
             return True
     return False
+
+
+def line_wrap(s, indent):
+    """wrap a string s with indent spaces at the beginning of each line
+    Assume this is a long parameter list with ", " separators where we
+    can break lines.
+    """
+    result = ""
+    while len(s) > 80:
+        loc = s.rfind(", ", 0, 80)
+        if loc < 0:
+            loc = len(s)
+        result += s[0 : loc + 1] + "\n" + " " * indent
+        s = s[loc + 2 : ]
+    result += s
+    return result
 
 
 def main():
@@ -46,40 +65,39 @@ def main():
     print("**** Translating", source)
     with open(source, "r") as srcf:
         src = srcf.readlines()
-    signature_set = []
-    impl = None
+
+    # a signature set is a list of Signatures
+    signature_set = get_signatures(src)
+    print("got signature set", signature_set)
+
+    # find the FAUST line and the implementation that follows
+    impl_text = None
     for i, line in enumerate(src):
         line = line.strip()
-        if len(line) == 0:
-            continue
-        if line[0] == "#":
-            continue
         if line == "FAUST":
-            impl = src[i + 1 : ]
+            impl_text = src[i + 1 : ]
             break
-        # we found a signature line
-        loc = line.find("(")
-        name = line[0 : loc]
-        loc = loc + 1
-        params = []
-        line = line[loc : ].replace(" ", "").replace("\t", "")
-        pend = line.find(")")
-        params = line[0 : pend].split(",")
-        if line[pend : pend + 2] != "):":
-            print("Error in line", i, "Expected ): after parameters.")
-            return
-        outputtype = line[pend + 2 : ]
-        signature_set.append((name, params, outputtype))
-    if impl == None:
+
+    if impl_text == None:
         print("Error: did not find FAUST to begin implementation.")
         return
     classnames = []
-    parsed_impl = prepare_implementation(impl)
+    impl = prepare_implementation(impl_text)
+
     for s in signature_set:
-        expand_signature(s[0], s[1], s[2], "", parsed_impl)
+        if not s:
+            return  # error message already printed
+        # check signatures for consistency with implementation
+        s.check_signature(impl.param_names)
+   
+        # write .dsp file for each a and b type combination:
+        expand_signature(s, [], impl)
         # gather up all classnames, e.g. ["sine", "sineb"] for later:
-        if s[0] not in classnames:
-            classnames.append(s[0])
+        if s.name in classnames:
+            print("ERROR:", s[0], "signature is defined twice.")
+            return
+        else:
+            classnames.append(s.name)
 
     ### create generate_class.sh
     shellfilename = "generate_" + classnamelc + ".sh"
@@ -102,118 +120,140 @@ def main():
 
         for (c, s) in zip(classnames, signature_set):
             print(c, s)
-            params = parsed_impl[1]  # list of parameter names
-            param_rates = s[1]
-            rate = s[2]  # output rate
             decl = "def " + c + "("
-            paramlist = ""
+            srpparams = ""
             typestring = ""
-            for p in params:
-                decl += (p + ", ")
-                paramlist += ", '" + p + "', " + p
+            for p in s.params:
+                decl += (p.name + ", ")
+                srpparams += ", '" + p.name + "', " + p.name
                 typestring += "U"
-            decl += "optional chans):"
+
+            # allow optional chans parameter unless the inputs/outputs are
+            # fixed because of specified channel count(s):
+            if s.output.fixed:  # oops, we have an extra ", " at the end
+                decl = decl[0 : -2] + "):"
+            else:
+                decl += "optional chans):"
             print(decl, file=srpf)
+
             # Generate valid parameter rate tests and error messages
             # Also generate list of channels for max function
-            chans_list = "1"
-            for (p, r) in zip(params, param_rates):
-                if r == 'a':
-                    print("    if", p + ".rate != 'a':", file=srpf)
-                    print('        print "ERROR:', "'" + p + \
+            chans_list = "" if s.output.fixed else "1"
+            for p in s.params:
+                if p.abtype == 'a':
+                    print("    if", p.name + ".rate != 'a':", file=srpf)
+                    print('        print "ERROR:', "'" + p.name + \
                           "' input to Ugen '" + c + "'",
                           'must be audio rate"', file=srpf)
                     print("        return nil", file=srpf)
-                elif r == 'b':
-                    print("    if not isnumber(" + p + ") and",
-                          p + ".rate != 'b':", file=srpf)
-                    print('        print "ERROR:', "'" + p + \
+                elif p.abtype == 'b':
+                    print("    if not isnumber(" + p.name + ") and",
+                          p.name + ".rate != 'b':", file=srpf)
+                    print('        print "ERROR:', "'" + p.name + \
                           "' input to Ugen '" + c + "'",
                           'must be block rate"', file=srpf)
                     print("        return nil", file=srpf)
-                chans_list = "max_chans(" + chans_list + ", " + p + ")"
-            print("    if not chans:", file=srpf)
-            print("        chans = " + chans_list, file=srpf)
-            print("    Ugen(create_ugen_id(),", '"' + c + \
-                  '", chans,', "'" + rate + "', " + '"' + typestring + \
-                  '"' + paramlist + ")\n", file=srpf)
+                if p.fixed:
+                    achans = p.name + ".chans"
+                    if p.chans == 1:
+                        chans_list += "    if " + achans + " != 1:\n"
+                        chans_list += "        print \"ERROR: '" + p.name + \
+                                "' input to Ugen '" + c + \
+                                "' must be single channel\"\n"
+                        chans_list += "        return nil\n"
+                    else:
+                        chans_list += "    if " + achans + " != 1 and " +\
+                                achans + " != " + str(p.chans) + ":\n"
+                        chans_list += "        print \"ERROR: '" + p.name + \
+                                "' input to Ugen '" + c + \
+                                "' must have 1 or " + str(p.chans) + \
+                                ' channels"\n'
+                        chans_list += "        return nil\n"
+                else:
+                    chans_list = "max_chans(" + chans_list + ", " + \
+                                 p.name + ")"
+            if s.output.fixed:
+                print(chans_list, file=srpf)
+            else:  # check each input for required specified channel count or 1
+                print("    if not chans:", file=srpf)
+                print("        chans = " + chans_list, file=srpf)
+            ugen = f'    Ugen(create_ugen_id(), "{c}", chans, ' + \
+                   f"'{s.output.abtype}', " + f'"{typestring}"{srpparams})'
+            ugen = line_wrap(ugen, 9)
+            print(ugen, file=srpf)
+            print("", file=srpf)
 
 
-def prepare_implementation(impl):
+
+def expand_signature(signature, params, impl):
     """
-    extract the implementation, returning a tuple with:
-    - lines before the line with "process("
-    - a list of parameter names from process definition
-    - the remainder of the line with "process", beginning with "="
-    - the lines after the line with "process("
-    """
-    # first, get parameter names
-    params = None
-    for i, line in enumerate(impl):
-        if line.find("process") >= 0:
-            paramline = i
-            params = line
-            break
-    if params == None:
-        print("Error: Could not find process in Faust code")
-        exit(-1)
-    loc = params.find("process")
-    loc = params.find("(", loc + 7)
-    if loc < 0:
-        print('Error: Expected ( after "process"')
-        exit(-1)
-    loc2 = params.find(")", loc)
-    if loc2 < 0:
-        print('Error: Expected ) after "process("')
-        exit(-1)
-    loc3 = params.find("=", loc2)
-    if loc3 < 0:
-        print('Error: Expected = after "process(...)"')
-        exit(-1)
-    beyond_process = params[loc3 : ]
-    params = params[loc + 1 : loc2].replace(",", " ").split()
-    return (impl[0 : paramline], params, beyond_process, \
-            impl[paramline + 1 : ])
+    recursively generate all permutations of parameters in params
+    and write .dsp file.
+    signature is the ugen signature includingi the list of parameters
+        and their possible types
+    params is a list of Param objects representing specific choices: 'a' or 'b'
+    impl is an Implementation object with the FAUST implementation info
 
-
-
-def expand_signature(name, params, outputtype, types, parsed_impl):
+    The algorithm is recursive, appending each possible choice ('a' or 'b')
+    to params and calling itself with a the extended params list. When the
+    len(params) is len(signature.params), we have a full specification,
+    so generate a .dsp file for it.
     """
-    recursively generate all permutations of parameters and write .dsp file
-    indices is a string of indices into parameters. E.g., it could be 
-    "a" or "aba" if there are 3 parameters. If len(types) is 
-    len(params), we have a full specification, so generate. Otherwise,
-    recursively expand by passing indices + ab, where ab is each value
-    of the corresponding element in params  
-    """
-    if len(types) < len(params):
-        for typ in params[len(types)]:
-            expand_signature(name, params, outputtype, types + typ, parsed_impl)
+    print("expand_signature", signature, params)
+    if len(params) < len(signature.params):
+        next_param = signature.params[len(params)]
+        for typ in next_param.abtype:
+            param = Param(typ, next_param)
+            expand_signature(signature, params + [param], impl)
     else:  # base case: we have a specific signature to generate
         # first, get parameter names
-        (before_lines, params, beyond_process, after_lines) = parsed_impl
-
-        outfile = name + "_" + types + "_" + outputtype + ".dsp"
+        typestring = ''.join([p.abtype for p in params])
+        outfile = signature.name + "_" + typestring + "_" + \
+                  signature.output.abtype + ".dsp"
         with open(outfile, "w") as outf:
-            print('declare name "' + name + '";', file=outf)
-            for line in before_lines:
-                print(line, file=outf, end="")
+            print('declare name "' + signature.name + '";', file=outf)
+
             # insert control for each b-rate parameter
+            print("base case: types", signature.params, "params", params)
+            # for each element of types with N channels, process N params
+            # the sum of channel counts must equal the length of params
             plist = ""
-            for i, typ in enumerate(types):
-                if typ == 'a':
-                    plist = plist + ", " + params[i]
-                else:
-                    print(params[i], '= nentry("' + params[i] + \
-                          '", 0, 0, 1, 0.1);', file=outf)
-            if 'b' in types:  # blank line after nentry and before process
+            i = 0
+            for param in signature.params:
+                print("param", param.abtype, "param.chans", param.chans)
+                for j in range(param.chans):
+                    if i >= len(impl.param_names):
+                        print("ERROR: too many parameters in Arco signature\n"
+                              "    compared to FAUST process() definition.\n"
+                              "    Arco signature specifies", i)
+                        return
+                    if param.abtype == 'a':
+                        plist = plist + ", " + impl.param_names[i]
+                    else:
+                        print(impl.param_names[i], '= nentry("' + \
+                              impl.param_names[i] + \
+                              '", 0, 0, 1, 0.1);', file=outf)
+                    i += 1
+            if i != len(impl.param_names):
+                print("ERROR: too many parameters in FAUST process()\n"
+                      "    definition compared to Arco signature.\n"
+                      "    Arco signature specifies", i)
+                return
+
+            if 'b' in typestring:
+                # blank line after nentry and before process
                 print("", file=outf)
+
             processline = "process"
+            # plist looks like ", freq, amp" so ignore the first 2 chars
             if plist != "":
                 processline = processline + "(" + plist[2 : ] + ")"
-            processline = processline + " " + beyond_process
+            processline = processline + " " + impl.beyond_process
+
+            for line in impl.before_lines:
+                print(line, file=outf, end="")
             print(processline, file=outf, end="")
-            for line in after_lines:
+            for line in impl.after_lines:
                 print(line, file=outf, end="")
             
 main()

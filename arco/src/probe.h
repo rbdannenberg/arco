@@ -159,7 +159,7 @@ class Probe : public Ugen {
 
 
     void init_input(Ugen_ptr ugen) {
-        init_param(ugen, input, input_stride);
+        init_param(ugen, input, &input_stride);
         // TODO: we should fail gracefully in this case:
         assert(input->rate == 'a' || input->rate == 'b');
         stop();  // after input change we need another probe() to start again
