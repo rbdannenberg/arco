@@ -18,6 +18,9 @@ from params import Param, get_signatures
 from implementation import prepare_implementation
     
 
+WIN32 = (os.name == 'nt')
+PY = "python" if WIN32 else "python3"
+
 def has_upper(s):
     for c in s:
         if c.isupper():
@@ -44,7 +47,7 @@ def line_wrap(s, indent):
 def main():
     # find files
     if len(sys.argv) != 2:
-        print("Usage: python3 u2f.py classname[.ugen]")
+        print(f"Usage: {PY} u2f.py classname[.ugen]")
         exit(-1)
     source = sys.argv[1]  # can pass "sine.ugen" or just "sine"
     if source.find(".") < 0:
@@ -99,18 +102,19 @@ def main():
         else:
             classnames.append(s.name)
 
-    ### create generate_class.sh
-    shellfilename = "generate_" + classnamelc + ".sh"
+    ### create generate_class.sh (or .bat)
+    shellfilename = "generate_" + classnamelc + (".bat" if WIN32 else ".sh")
     print("**** Generating", shellfilename)
     with open(shellfilename, "w") as genf:
-        print("#!/bin/sh", file=genf)
-        print('echo "In', shellfilename, 'running python3, path=$PATH"',
+        if not WIN32:
+            print("#!/bin/sh", file=genf)
+        print('echo "In', shellfilename, 'running', PY, 'path=$PATH"',
               file=genf)
         for cn in classnames:
-            print("python3 ../../preproc/f2a.py", cn, file=genf)
+            print(PY, "../../preproc/f2a.py", cn, file=genf)
         for cn in classnames:
-            print("python3 ../../../o2/preproc/o2idc.py --nobackup",
-                  cn + ".cpp", file=genf)
+            print(PY, "../../../o2/preproc/o2idc.py --nobackup", cn + ".cpp",
+                  file=genf)
     ### create class.srp
     serpentfilename = classnamelc + ".srp"
     print("**** Generating", serpentfilename)

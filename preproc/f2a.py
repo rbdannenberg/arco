@@ -1269,8 +1269,10 @@ def run_faust(classname, file, outfile):
     if file.find("b.dsp") >= 0:
         blockrate = "-os "  # one sample if b-rate
     print("In f2a.py, PATH=" + os.environ['PATH'])
-    err = os.system(f"faust -light -cn {classname} {blockrate}{file}" + \
-                    f" -o {outfile}")
+    print(f"Running command: faust -light -cn {classname}",
+          f"{blockrate}{file} -o {outfile}")
+    err = os.system(f"faust -light -cn {classname} " +
+                    f"{blockrate}{file} -o {outfile}")
     if err != 0:
         print("Error: quit because of error reported by Faust")
         return True
@@ -1308,6 +1310,9 @@ def main():
     main_file = None  # where to look for parameter definitions
 
     # translate files
+    if len(files) == 0:
+        print("**** no .dsp files found for classname", classname)
+        exit(-1)
     output_rate = None
     # this is used to check for consistent .dsp files
     top_signature = None  # has a's or b's combined with c's
