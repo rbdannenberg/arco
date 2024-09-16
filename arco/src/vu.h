@@ -64,7 +64,7 @@ public:
             input->unref();
         }
         assert(ugen->rate == 'a');
-        init_param(ugen, input, input_stride);
+        init_param(ugen, input, &input_stride);
         chans = ugen->chans;
         peaks.set_size(chans);  // initialize, set size, zero fill
         running = (vu_reply_addr != NULL && ugen->classname() != Zero_name);

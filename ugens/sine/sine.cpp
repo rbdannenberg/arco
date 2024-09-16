@@ -19,8 +19,8 @@ void arco_sine_new(O2SM_HANDLER_ARGS)
     int32_t amp = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(freq_ugen,freq, "arco_sine_new");
-    ANY_UGEN_FROM_ID(amp_ugen,amp, "arco_sine_new");
+    ANY_UGEN_FROM_ID(freq_ugen, freq, "arco_sine_new");
+    ANY_UGEN_FROM_ID(amp_ugen, amp, "arco_sine_new");
 
     new Sine(id, chans, freq_ugen, amp_ugen);
 }
@@ -28,7 +28,7 @@ void arco_sine_new(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/sine/repl_freq int32 id, int32 freq_id;
  */
-static void arco_sine_repl_freq(O2SM_HANDLER_ARGS)
+static void arco_sine_repl_freq (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -43,7 +43,7 @@ static void arco_sine_repl_freq(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/sine/set_freq int32 id, int32 chan, float val;
  */
-static void arco_sine_set_freq(O2SM_HANDLER_ARGS)
+static void arco_sine_set_freq (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -58,7 +58,7 @@ static void arco_sine_set_freq(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/sine/repl_amp int32 id, int32 amp_id;
  */
-static void arco_sine_repl_amp(O2SM_HANDLER_ARGS)
+static void arco_sine_repl_amp (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -73,7 +73,7 @@ static void arco_sine_repl_amp(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/sine/set_amp int32 id, int32 chan, float val;
  */
-static void arco_sine_set_amp(O2SM_HANDLER_ARGS)
+static void arco_sine_set_amp (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;

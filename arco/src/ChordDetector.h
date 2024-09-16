@@ -63,30 +63,41 @@ public:
      *  For example, A minor is 1<<0 + 1<<4 + 1<<9 = 529 = 0x211
      */
     int pitches;
-    
-    /** Our current best attempt at a confidence value of the detected chord, calculated using entropy*/
+
+    /** Our current best attempt at a confidence value of the detected
+     * chord, calculated using entropy*/
     double confidence;
     
 	
 private:
 	void makeChordProfiles();
 	void classifyChromagram();
-	double calculateChordScore (double* chroma, double* chordProfile, double biasToUse, double N);
+	double calculateChordScore (double* chroma, double* chordProfile,
+                                    double biasToUse, double N);
 	int minimumIndex (double*array, int length);
     
-    /** Performs softmax on the chord scores array, then calculates the entropy of the probabilities. Finally, sets confidence to 1 - (normalized entropy).
-     *  This method results in very small confidence (less than 0.0001) for non-chord audio input and variable confidence (greater than 0.0005) for chords.
-     *  We have also tried another method of calculating confidence using the z-score of the predicted chord's chord score. However, there was not enough variability of confidence between chord and non-chord input audio.
+    /** Performs softmax on the chord scores array, then calculates
+     *  the entropy of the probabilities. Finally, sets confidence to
+     *  1 - (normalized entropy).  This method results in very small
+     *  confidence (less than 0.0001) for non-chord audio input and
+     *  variable confidence (greater than 0.0005) for chords.  We have
+     *  also tried another method of calculating confidence using the
+     *  z-score of the predicted chord's chord score. However, there
+     *  was not enough variability of confidence between chord and
+     *  non-chord input audio.
      */
     void softmaxEntropyConfidence (double* chord, double* confidence);
     void calculateChordScores (double* chord, double* chromagram);
-    void minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals, int* pitches);
     
     /** Encodes pitches of detected chord into an int by setting corresponding bits*/
     int encodePitches(int p1, int p2, int p3, int p4);
+    void minIndexToChord (int chordindex, int* rootNote, int* quality,
+                          int* intervals);
     
-    /** Compares two harmonic reduction algorithms, a and b, with reduction constants specified by the arguments. */
-    void compareAlgos(double a_fifth, double a_third, double b_fifth, double b_third, bool printChromas = false);
+    /** Compares two harmonic reduction algorithms, a and b, with
+     * reduction constants specified by the arguments. */
+    void compareAlgos(double a_fifth, double a_third, double b_fifth,
+                      double b_third, bool printChromas = false);
     
 	double chromagram[12];
 	double chordProfiles[NUM_CHORDS][12];

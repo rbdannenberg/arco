@@ -4,8 +4,8 @@
 # Nov 2022
 # reson(sound, center, bandwidth)
 
-reson(a, ab, ab): a
-resonb(b, b, b): b
+reson(snd: a, center: ab, q: ab): a
+resonb(snd: b, center: b, q: b): b
 
 FAUST
 

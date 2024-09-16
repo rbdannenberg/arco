@@ -147,6 +147,7 @@ class Ugen : public O2obj {
         }
         current_block = 0;
         action_id = 0;
+        printf("created ugen@%p\n", this);
     }
 
     // subclasses should override to unref inputs
@@ -168,9 +169,10 @@ class Ugen : public O2obj {
     // inherit print_sources if there are no inputs:
     virtual void print_sources(int indent, bool print_flag) { ; }
 
-    void init_param(Ugen_ptr newp, Ugen_ptr &p, int &pstride) {
+    void init_param(Ugen_ptr newp, Ugen_ptr &p, int *pstride = NULL) {
         // either map single channel output to all inputs, or map
-        // corresponding output channels to input channels
+        // corresponding output channels to input channels. Set pstride
+        // accordingly if it is non-null.
         p = newp;
         int n = p->chans;
         if (n != 1 && n < chans) {
@@ -179,7 +181,9 @@ class Ugen : public O2obj {
              n = 1;
         }
         // 0 for mono, BL for multichannel audio, 1 for multichannel block rate
-        pstride = (n == 1 ? 0 : (p->rate == 'a' ? BL : 1));
+        if (pstride) {
+            *pstride = (n == 1 ? 0 : (p->rate == 'a' ? BL : 1));
+        }
         // if an input to an a-rate Ugen is not a-rate, it is probably
         // interpolated to a-rate, which implies a 1-block "tail" while the
         // input is linearly interpolated to zero; if so, tail_blocks should be

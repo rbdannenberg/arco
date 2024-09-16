@@ -153,6 +153,16 @@ then
   mv_to_new_dir src/libfluidsynth-static.a Debug
   echo "===== made Debug ===="
   rm src/fluidsynth
+
+  # install soundfont
+  mkdir -p FluidR3_GM
+  curl -L "https://keymusician01.s3.amazonaws.com/FluidR3_GM.zip" > \
+       FluidR3_GM/FluidR3_GM.zip
+  cd FluidR3_GM
+  unzip FluidR3_GM.zip
+  # make soundfont.srp file loaded by daserpent in apps/test/init.srp:
+  echo "SOUNDFONT = \"$PWD/FluidR3_GM.zip\"" > \
+       ../../arco/apps/test/soundfont.srp
   popd
   echo "# After making fluidsynth, arco/build_everything_cmd.sh in $PWD"
 fi
@@ -416,7 +426,12 @@ cmake . -DCMAKE_BUILD_TYPE=Debug -DUSE_LIBSNDFILE_EXTERNALS=ON \
       -DUSE_O2=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=$OSX_VER
 make
 mv_to_new_dir daserpent.app Debug
+
+# create soundfile.srp
+
+
 popd
+
 
 echo "# After running $0 in $PWD and building apps/test, "
 echo "*---------------------------------"

@@ -86,7 +86,9 @@ extern const char *Sine_name;
 class Sine : public Ugen {
 public:
     struct Sine_state {
+        FAUSTFLOAT fEntry0;
         int iVec1[2];
+        FAUSTFLOAT fEntry1;
         float fRec1[2];
         Sample fSlow0_prev;
         Sample fSlow1_prev;
@@ -140,23 +142,19 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Sine::*new_run_channel)(Sine_state *state);
-        if (freq->rate != 'a' && amp->rate == 'a') {
-            new_run_channel = &Sine::chan_ba_a;
-        } else if (freq->rate != 'a' && amp->rate != 'a') {
-            new_run_channel = &Sine::chan_bb_a;
-        } else if (freq->rate == 'a' && amp->rate == 'a') {
-            new_run_channel = &Sine::chan_aa_a;
-        } else if (freq->rate == 'a' && amp->rate != 'a') {
-            new_run_channel = &Sine::chan_ab_a;
-        } else {
-            if (freq->rate != 'a') {
-                freq = new Upsample(-1, freq->chans, freq);
+            if (freq->rate == 'a') {
+                if (amp->rate == 'a') {
+                    new_run_channel = &Sine::chan_aa_a;
+                } else {
+                    new_run_channel = &Sine::chan_ab_a;
+                }
+            } else {
+                if (amp->rate == 'a') {
+                    new_run_channel = &Sine::chan_ba_a;
+                } else {
+                    new_run_channel = &Sine::chan_bb_a;
+                }
             }
-            if (amp->rate != 'a') {
-                amp = new Upsample(-1, amp->chans, amp);
-            }
-            new_run_channel = &Sine::chan_aa_a;
-        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;
@@ -188,26 +186,28 @@ public:
         amp->const_set(chan, f, "Sine::set_amp");
     }
 
-    void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, freq_stride); }
+    void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, &freq_stride); }
 
-    void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, amp_stride); }
+    void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, &amp_stride); }
 
     void chan_ba_a(Sine_state *state) {
-        FAUSTFLOAT* input0 = amp_samps;
-        float fSlow0 = fConst0 * float(*freq_samps);
+        FAUSTFLOAT* output0 = out_samps;
+        float fSlow0 = float(amp_samps[0]);
+        float fSlow1 = fConst0 * float(freq_samps[0]);
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             state->iVec1[0] = 1;
-            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow0 + state->fRec1[1]);
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            *out_samps++ = FAUSTFLOAT(float(input0[i0]) * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            output0[i0] = FAUSTFLOAT(fSlow0 * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }
 
     void chan_bb_a(Sine_state *state) {
-        float fSlow0 = float(*amp_samps);
-        float fSlow1 = fConst0 * float(*freq_samps);
+        FAUSTFLOAT* output0 = out_samps;
+        float fSlow0 = float(amp_samps[0]);
+        float fSlow1 = fConst0 * float(freq_samps[0]);
         Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
         Sample fSlow0_fast = state->fSlow0_prev;
         state->fSlow0_prev = fSlow0;
@@ -220,49 +220,56 @@ public:
             state->iVec1[0] = 1;
             float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1_fast + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            *out_samps++ = FAUSTFLOAT(fSlow0_fast * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            output0[i0] = FAUSTFLOAT(fSlow0_fast * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }
 
     void chan_aa_a(Sine_state *state) {
-        FAUSTFLOAT* input0 = freq_samps;
-        FAUSTFLOAT* input1 = amp_samps;
+        FAUSTFLOAT* output0 = out_samps;
+        float fSlow0 = float(amp_samps[0]);
+        float fSlow1 = fConst0 * float(freq_samps[0]);
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             state->iVec1[0] = 1;
-            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : state->fRec1[1] + fConst0 * float(input0[i0]));
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            *out_samps++ = FAUSTFLOAT(float(input1[i0]) * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            output0[i0] = FAUSTFLOAT(fSlow0 * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }
 
     void chan_ab_a(Sine_state *state) {
-        FAUSTFLOAT* input0 = freq_samps;
-        float fSlow0 = float(*amp_samps);
+        FAUSTFLOAT* output0 = out_samps;
+        float fSlow0 = float(amp_samps[0]);
+        float fSlow1 = fConst0 * float(freq_samps[0]);
         Sample fSlow0_incr = (fSlow0 - state->fSlow0_prev) * BL_RECIP;
         Sample fSlow0_fast = state->fSlow0_prev;
         state->fSlow0_prev = fSlow0;
+        Sample fSlow1_incr = (fSlow1 - state->fSlow1_prev) * BL_RECIP;
+        Sample fSlow1_fast = state->fSlow1_prev;
+        state->fSlow1_prev = fSlow1;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             fSlow0_fast += fSlow0_incr;
+            fSlow1_fast += fSlow1_incr;
             state->iVec1[0] = 1;
-            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : state->fRec1[1] + fConst0 * float(input0[i0]));
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1_fast + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            *out_samps++ = FAUSTFLOAT(fSlow0_fast * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            output0[i0] = FAUSTFLOAT(fSlow0_fast * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
     }
 
     void real_run() {
-        freq_samps = freq->run(current_block); // update input
-        amp_samps = amp->run(current_block); // update input
+        freq_samps = freq->run(current_block);  // update input
+        amp_samps = amp->run(current_block);  // update input
         Sine_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
             state++;
+            out_samps += BL;
             freq_samps += freq_stride;
             amp_samps += amp_stride;
         }

@@ -3,8 +3,8 @@
 # Roger B. Dannenberg
 # Jan 2022
 
-sine(ab, ab): a
-sineb(b, b): b
+sine(freq: ab, amp: ab): a
+sineb(freq: b, amp: b): b
 
 FAUST
 

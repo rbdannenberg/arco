@@ -22,13 +22,12 @@
 #include "Chromagram.h"
 #include "arcougen.h"
 //==================================================================================
-Chromagram::Chromagram (int frameSize, int fs)
- :  referenceFrequency (130.81278265),
-    bufferSize (8192),
-    numHarmonics (2),
-    numOctaves (2),
-    numBinsToSearch (2)
-{
+Chromagram::Chromagram (int frameSize, int fs) :
+        referenceFrequency (130.81278265),
+        bufferSize (8192),
+        numHarmonics (2),
+        numOctaves (2),
+        numBinsToSearch (2) {
     // calculate note frequencies
     for (int i = 0; i < 12; i++)
     {
@@ -112,7 +111,7 @@ Chromagram::~Chromagram()
 }
 
 
-//==================================================================================
+//==============================================================================
 void Chromagram::processAudioFrame (float* inputAudioFrame)
 {
     // our default state is that the chroma is not ready
@@ -141,7 +140,8 @@ void Chromagram::processAudioFrame (float* inputAudioFrame)
         // calculate the chromagram
         calculateChromagram();
         
-        // If buffer cannot take one more frame, shift it left by downSampledCalcInterval and update bufferIndex
+        // If buffer cannot take one more frame, shift it left by
+        // downSampledCalcInterval and update bufferIndex
         int downSampledCalcInterval = chromaCalculationInterval / 4;
         if (bufferIndex + downSampledAudioFrameSize >= bufferSize) {
             
@@ -201,9 +201,12 @@ void Chromagram::setupFFT()
 {
     // ------------------------------------------------------
 #ifdef USE_FFTW
-    complexIn = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);		// complex array to hold fft data
-    complexOut = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);	// complex array to hold fft data
-    p = fftw_plan_dft_1d (bufferSize, complexIn, complexOut, FFTW_FORWARD, FFTW_ESTIMATE);	// FFT plan initialisation
+    // complex array to hold fft data:
+    complexIn = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);
+    // complex array to hold fft data
+    complexOut = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);
+    // FFT plan initialisation
+    p = fftw_plan_dft_1d (bufferSize, complexIn, complexOut, FFTW_FORWARD, FFTW_ESTIMATE);
 #endif
 
     // ------------------------------------------------------
@@ -240,7 +243,8 @@ void Chromagram::calculateChromagram()
             
             for (int harmonic = 1; harmonic <= numHarmonics; harmonic++)
             {
-                int centerBin = round ((noteFrequencies[n] * octave * harmonic) / divisorRatio);
+                int centerBin = round((noteFrequencies[n] * octave * harmonic) /
+                                      divisorRatio);
                 int minBin = centerBin - (numBinsToSearch * harmonic);
                 int maxBin = centerBin + (numBinsToSearch * harmonic);
                 

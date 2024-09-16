@@ -3,9 +3,8 @@
 #include "FFTCalculator.h"
 #include "arcougen.h"
 //==================================================================================
-FFTCalculator::FFTCalculator (int frameSize, int fs)
- :
-    bufferSize (8192)
+FFTCalculator::FFTCalculator (int frameSize, int fs) :
+        bufferSize (8192)
 {
     
     // set up FFT
@@ -115,7 +114,8 @@ void FFTCalculator::processAudioFrame (float* inputAudioFrame)
         // calculate the chromagram
         calculateFFT();
         
-        // If buffer cannot take one more frame, shift it left by calculationInterval and update bufferIndex
+        // If buffer cannot take one more frame, shift it left by
+        // calculationInterval and update bufferIndex
         if (bufferIndex + inputAudioFrameSize >= bufferSize) {
             
             for (int i = 0; i < bufferSize - calculationInterval; i++)
@@ -181,9 +181,13 @@ void FFTCalculator::setupFFT()
 {
     // ------------------------------------------------------
 #ifdef USE_FFTW
-    complexIn = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);        // complex array to hold fft data
-    complexOut = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);    // complex array to hold fft data
-    p = fftw_plan_dft_1d (bufferSize, complexIn, complexOut, FFTW_FORWARD, FFTW_ESTIMATE);    // FFT plan initialisation
+    // complex array to hold fft data:
+    complexIn = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);
+    // complex array to hold fft data:
+    complexOut = (fftw_complex*) fftw_malloc (sizeof (fftw_complex) * bufferSize);
+    // FFT plan initialisation:
+    p = fftw_plan_dft_1d (bufferSize, complexIn, complexOut,
+                          FFTW_FORWARD, FFTW_ESTIMATE);
 #endif
 
     // ------------------------------------------------------

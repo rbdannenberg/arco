@@ -106,7 +106,7 @@ public:
                 return;
             }
         }
-        init_param(ugen, input, input_stride);
+        init_param(ugen, input, &input_stride);
     }
 
         

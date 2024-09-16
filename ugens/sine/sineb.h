@@ -121,23 +121,24 @@ public:
         amp->const_set(chan, f, "Sineb::set_amp");
     }
 
-    void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, freq_stride); }
+    void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, &freq_stride); }
 
-    void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, amp_stride); }
+    void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, &amp_stride); }
 
     void real_run() {
-        freq_samps = freq->run(current_block); // update input
-        amp_samps = amp->run(current_block); // update input
+        freq_samps = freq->run(current_block);  // update input
+        amp_samps = amp->run(current_block);  // update input
         Sineb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            FAUSTFLOAT tmp_0 = float(*amp_samps);
-            FAUSTFLOAT tmp_1 = fConst0 * float(*freq_samps);
+            FAUSTFLOAT tmp_0 = float(amp_samps[0]);
+            FAUSTFLOAT tmp_1 = fConst0 * float(freq_samps[0]);
             state->iVec1[0] = 1;
             float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : tmp_1 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            *out_samps++ = FAUSTFLOAT(tmp_0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            out_samps[0] = FAUSTFLOAT(tmp_0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];            state++;
+            out_samps++;
             freq_samps += freq_stride;
             amp_samps += amp_stride;
         }

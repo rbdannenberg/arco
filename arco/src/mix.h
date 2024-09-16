@@ -60,8 +60,8 @@ public:
 
         input_desc->name = o2_heapify(name);
         int ignore_stride;  // inputs are always audio and stride is always 1
-        init_param(input, input_desc->input, input_desc->input_stride);
-        init_param(gain, input_desc->gain, input_desc->gain_stride);
+        init_param(input, input_desc->input, &input_desc->input_stride);
+        init_param(gain, input_desc->gain, &input_desc->gain_stride);
         // initialize Vec of per-channel prev_gain value(s) and zero them:
         input_desc->prev_gain.set_size(MAX(input_desc->input->chans,
                                            input_desc->gain->chans), true);
@@ -113,7 +113,7 @@ public:
             } else if (chan == 0) {
                 gain_ugen->unref();
                 init_param(new Const(-1, 1, gain), input_desc->gain,
-                           input_desc->gain_stride);
+                           &input_desc->gain_stride);
                 input_desc->prev_gain.set_size(input_desc->input->chans, true);
                 // zero prev_gain if number of channels changes:
                 if (input_desc->input->chans != input_desc->prev_gain.size()) {
@@ -139,7 +139,7 @@ public:
                     return;
             }
             input_desc->gain->unref();
-            init_param(gain, input_desc->gain, input_desc->gain_stride);
+            init_param(gain, input_desc->gain, &input_desc->gain_stride);
             int new_chans = MAX(input_desc->input->chans, gain->chans);
             input_desc->prev_gain.set_size(new_chans, true);
             // zero prev_gain if number of channels changes:

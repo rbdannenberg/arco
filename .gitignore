@@ -117,3 +117,11 @@ CMakeCache.txt
 /apps/test/x64/
 
 /fluidsynth/
+
+/preproc/.vscode/
+
+/ugens/sttest/sttest_abb_a.dsp
+
+/ugens/sttest/sttest_abb_a.fh
+
+/preproc/__pycache__/

@@ -8,7 +8,8 @@ def reson(snd, center, q, optional chans):
         return nil
     if not chans:
         chans = max_chans(max_chans(max_chans(1, snd), center), q)
-    Ugen(create_ugen_id(), "reson", chans, 'a', "UUU", 'snd', snd, 'center', center, 'q', q)
+    Ugen(create_ugen_id(), "reson", chans, 'a', "UUU", 'snd', snd, 'center',
+         center, 'q', q)
 
 def resonb(snd, center, q, optional chans):
     if not isnumber(snd) and snd.rate != 'b':
@@ -22,5 +23,6 @@ def resonb(snd, center, q, optional chans):
         return nil
     if not chans:
         chans = max_chans(max_chans(max_chans(1, snd), center), q)
-    Ugen(create_ugen_id(), "resonb", chans, 'b', "UUU", 'snd', snd, 'center', center, 'q', q)
+    Ugen(create_ugen_id(), "resonb", chans, 'b', "UUU", 'snd', snd, 'center',
+         center, 'q', q)
 

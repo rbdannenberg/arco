@@ -55,8 +55,8 @@ public:
     bool expand;
     int action_id;  // send this when playback is stopped or finished
 
-   Fileplay(int id, const char *filename, int nchans, float start, float end,
-           bool cycle, bool mix_, bool expand_) : Ugen(id, 'a', nchans) {
+    Fileplay(int id, const char *filename, int nchans, float start, float end,
+             bool cycle, bool mix_, bool expand_) : Ugen(id, 'a', nchans) {
         started = false;
         stopped = false;
         mix = mix_;

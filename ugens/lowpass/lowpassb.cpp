@@ -19,8 +19,8 @@ void arco_lowpassb_new(O2SM_HANDLER_ARGS)
     int32_t cutoff = argv[3]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(snd_ugen,snd, "arco_lowpassb_new");
-    ANY_UGEN_FROM_ID(cutoff_ugen,cutoff, "arco_lowpassb_new");
+    ANY_UGEN_FROM_ID(snd_ugen, snd, "arco_lowpassb_new");
+    ANY_UGEN_FROM_ID(cutoff_ugen, cutoff, "arco_lowpassb_new");
 
     new Lowpassb(id, chans, snd_ugen, cutoff_ugen);
 }
@@ -28,7 +28,7 @@ void arco_lowpassb_new(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/lowpassb/repl_snd int32 id, int32 snd_id;
  */
-static void arco_lowpassb_repl_snd(O2SM_HANDLER_ARGS)
+static void arco_lowpassb_repl_snd (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -43,7 +43,7 @@ static void arco_lowpassb_repl_snd(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/lowpassb/set_snd int32 id, int32 chan, float val;
  */
-static void arco_lowpassb_set_snd(O2SM_HANDLER_ARGS)
+static void arco_lowpassb_set_snd (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -58,7 +58,7 @@ static void arco_lowpassb_set_snd(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/lowpassb/repl_cutoff int32 id, int32 cutoff_id;
  */
-static void arco_lowpassb_repl_cutoff(O2SM_HANDLER_ARGS)
+static void arco_lowpassb_repl_cutoff (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -73,7 +73,7 @@ static void arco_lowpassb_repl_cutoff(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/lowpassb/set_cutoff int32 id, int32 chan, float val;
  */
-static void arco_lowpassb_set_cutoff(O2SM_HANDLER_ARGS)
+static void arco_lowpassb_set_cutoff (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;

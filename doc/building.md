@@ -96,12 +96,11 @@ Here is `mult.ugen` followed by a description:
 # Roger B. Dannenberg
 # Jan 2022
 
-mult(ab, ab): a
-multb(b, b): b
+mult(x1: ab, x2: ab): a
+multb(x1: b, x2: b): b
 
 FAUST
 
-declare name "mult";
 declare description "Mult(iply) Unit Generator for Arco";
 declare interpolated "x1 x2";
 
@@ -120,15 +119,31 @@ The next line indicates that there is another unit generator named
 `multb` that produces a b-rate output. Notice the input parameters
 for this are restricted to b-rate (indicated by `b` instead of `ab`).
 
-The line containing `FAUST` means that everything that follows is
-a FAUST program. See FAUST documentation for details. It is important
-that the declared name (`"mult"`) matches the meta-data above, except
-that when you append `b` to form `multb`, it means use the FAUST
-definition of `mult` to create a block-rate unit generator for Arco.
+This description also indicates the Arco parameters. See below for
+Multichannel Processing.
 
-Typical FAUST programs may not be one-liners like 
+The line containing `FAUST` means that everything that follows is
+a FAUST program. See FAUST documentation for details.
+
+The `description` declaration is purely for documentation and is
+ignored by Arco processing.
+
+If you want block-rate parameters to be interpolated to audio rate,
+you must declare `interpolated` as shown. Parameters are in a single
+string and separated by commas or spaces. The parameter names
+correspond to parameters to "process" defined lower in the file.
+
+Note that in mulichannel processing (see the next section), the
+Arco Ugen parameter names may not match the "process" parameters
+in name or number, so it is important to use the parameter names
+declared by "process" and not those of the Arco signature above
+the line "FAUST".
+
+Typical FAUST programs might not be one-liners like 
 `process(x1, x2) = x1 * x2;` and there is no requirement to make such
-simple audio processors.
+simple audio processors. It is *required* that `process` contain all
+the parameters in it's parameter list, e.g. `process(x2) = *(x1)`
+might work in FAUST but is not valid in a `.ugen` file.
 
 This `mult.ugen` file must be placed in a directory named
 `arco/ugens/mult/`. `CMake` (or Linux's `ccmake`) will find all the
@@ -155,7 +170,113 @@ running FAUST on a single file if you wish. See the commands in
 `generate_mult.sh` and the `run_faust` function in
 `../../preporc/f2a.py` to see shell commands for these sub-steps.
 
-## CMake and `libraries.txt`
+## Multichannel Processing in Ugens
+
+Normally, a Ugen can automatically be accept multichannel inputs.
+When the Ugen is created, it is created with a fixed output rate
+(audio or block rate) and a fixed number of output channels. The
+default is to replicate the Ugen for each output channel. In other
+words, for N channels, there will be effectively N mono Ugens, but all
+are contained in a single Arco Ugen with a single ID. We will call
+these the "mono Ugens."
+
+Inputs should have either 1 or N channels. If less than N, only the
+first input channel will be used, and it will be replicated for each
+of the N "mono Ugens." (It is normal for an input to have only 1
+channel. For example, you can provide a 1-channel cutoff frequency to
+a stereo filter so that all channels get the same cutoff frequency.
+If an input has greater than N channels, only the first N are used.
+You can have multiple inputs, each with a different number of
+channels. For example, a stereo filter can have a stereo audio input
+and a mono cutoff frequency control. You can even provide a mono audio
+input and a 2-channel cutoff frequency so the two output channels have
+the same signal filtered with different cutoff frequencies.
+
+Many Arco unit generators do not follow these conventions. For
+example, `route` can arbitrarily route channels from an input to
+output, and `mix` treats mono inputs as a special case.
+
+The simple way to deal with FAUST algorithms is to define a mono
+process and let Arco code generation introduce the logic for producing
+multichannel output and handling multichannel inputs. An example is
+`lowpass`, defined in FAUST as a single channel Ugen, but usable in
+Arco for multichannel processing.
+
+However, some FAUST algorithms are designed for mulitple channels and
+are not equivalent to a mono process replicated N times to service N
+channels. Instead, they expect multiple input channels and process
+them differently. An example is a stereo reverb where the left and
+right outputs are each a different function of left and right inputs.
+For these cases, we create Arco Ugens with a fixed number of output
+channels that matches the FAUST implementation. Each input has a
+different expected number of channels, again matching the FAUST
+implementation. We specify this in the top part of a `.ugen` file. For
+example, a reverb with stereo input and output and two mono controls
+might be specified by:
+```
+strev(in: 2a, wetdry: b, gain: b): 2a
+```
+
+An integer preceding "a", "b" or "ab" means that the FAUST
+implementation expects some integer number of input signals and they
+are supplied by a single input to the Arco Ugen. In Arco, an input to
+a "2a" input must have 1 or 2 channels. A mono input is expanded to 2
+channels, 2 channels are passed in as 2 channels, and if there are
+more than 2 input channels, only the first 2 are used.
+
+If any input or output has an integer prefix (even "1"), *all* inputs
+and outputs are processed as having a fixed number of channels, so
+`strev(in: 2a, wetdry: b, gain:b): 2a` is just short for 
+`strev(in: 2a, wetdry: 1b, gain: 1b): 2a`.
+
+If follows that these three specifications are all different:
+```
+strev(in: 2a, wetdry: b, gain: b): 2a
+strev(in: 2a, wetdry: b, gain: b):  a
+strev(in:  a, wetdry: b, gain: b):  a
+```
+
+The first describes a FAUST process with stereo input and stereo
+output, and there are two block-rate control inputs. The second
+describes stereo input with mono output (equivalent to `1a`) and two
+control inputs. The third describes a mono process, with mono audio
+input and two control inputs. At creation time, the Ugen will receive
+a `chans` parameter and the Ugen will be replicated to create an
+N-channel Ugen (in the Arco scripting language, the default for
+`chans`, if not specified, will be the maximum number of channels of
+any of the input signals. (On the other hand, the first two versions
+will *not* be expandable at runtime, and there will be no `chans`
+parameter to replicate the Ugen to produce more output channels.)
+
+In the FAUST specification, each input must be listed as mono and the
+control inputs are specified *as if* they are audio rate since all FAUST
+signals are audio rate. For the first example,
+```
+strevb(in: 2a, wetdry: b, gain: b): 2a
+```
+the FAUST `process` line will be something like:
+```
+process(left, right, wetdry, gain) = ...
+```
+
+Notice that in terms of mono signals, there are 4 inputs, but in terms
+of Arco, there are 3 inputs. This is why we have the meta-data at the
+top of the `.ugen` file. The specifications there must be consistent
+with the number of parameters in `process`. Here, the Arco code
+generator will understand that `left` and `right` are channels 0 and 1
+of the 2-channel input named `snd`.
+
+In the `process` definition, you might wonder what `wetdry` and `gain`
+are doing as if they are audio rate signals when they are actually
+block-rate. This is mainly to create a correspondence between the Arco
+Ugen meta-data and the Faust implementation. The FAUST code will be
+modified by dropping the block-rate parameters so that process will
+become `process(left, right)`, and `wetdry` and `gain` will be defined
+as controls using FAUST's `nentry`.  This will allow FAUST to generate
+the right code, which will then be processed further and integrated
+into an Arco Ugen.
+
+## CMAKE and `libraries.txt`
 
 `apps/common/libraries.txt` tells CMake where to find libraries that
 are needed to build Arco and applications. This is not a standard

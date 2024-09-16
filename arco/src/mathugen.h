@@ -126,9 +126,9 @@ public:
         x2->const_set(chan, f, "Math::set_x2");
     }
 
-    void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, x1_stride); }
+    void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, &x1_stride); }
 
-    void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, x2_stride); }
+    void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, &x2_stride); }
 
     //----------------- mul ------------------
 

@@ -3,8 +3,8 @@
 # Roger B. Dannenberg
 # Jan 2022
 
-mult(ab, ab): a
-multb(b, b): b
+mult(x1: ab, x2: ab): a
+multb(x1: b, x2: b): b
 
 FAUST
 

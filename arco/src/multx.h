@@ -108,9 +108,9 @@ public:
         x2->const_set(chan, f, "Multx::set_x2");
     }
 
-    void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, x1_stride); }
+    void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, &x1_stride); }
 
-    void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, x2_stride); }
+    void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, &x2_stride); }
 
     void chan_aa_a(Multx_state *state) {
         for (int i = 0; i < BL; i++) {

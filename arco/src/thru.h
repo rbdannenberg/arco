@@ -50,7 +50,7 @@ public:
     }
 
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
 
 
     void real_run() {
@@ -85,7 +85,8 @@ public:
             int stride = (alternate->chans == 1 ? 0 : BL);
             int i;
             int chans_to_copy = MIN(chans, alternate->chans);
-            for (i = 0; i < chans_to_copy; i++) {  // does fan-out if 1 input channel
+            for (i = 0; i < chans_to_copy; i++) {
+                // does fan-out if 1 input channel
                 block_copy(out_samps, src);
                 src += stride;
                 out_samps += BL;

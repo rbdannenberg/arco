@@ -495,8 +495,10 @@ void copy_interleaved_with_zero_fill(Sample_ptr dst, int actual_out_chans,
 }
 
 
-// called for each block of BL * actual_in_chans samples input is
-// interleaved, output is computed with interleaving But input is
+static int in_audio_callback = 0;
+
+// called for each block of BL * actual_in_chans samples. Input is
+// interleaved, output is computed with interleaving. But input is
 // de-interleaved and copied to the first actual_in_chans of
 // aud_input_ug. For output, we compute BL * arco_out_chans. If we
 // have enough actual channels, then we interleave to output.  If we
@@ -508,6 +510,8 @@ static int callback_entry(float *input, float *output,
                           PaStreamCallbackFlags flags)
 {
     o2_ctx = &aud_o2_ctx;  // make thread context available to o2 functions
+    assert(!in_audio_callback);
+    in_audio_callback++;
     
     if (aud_state == RUNNING && !aud_close_request) {
         // arco time will suffer from audio computation time jitter, and
@@ -518,10 +522,12 @@ static int callback_entry(float *input, float *output,
         block_zero_n(output, actual_out_chans);
         if (aud_close_request) {
             if (aud_zero_fill_count >= ZERO_PAD_COUNT) {
-                 return paComplete;
+                in_audio_callback = false;
+                return paComplete;
             }
             aud_zero_fill_count += BL;
         }
+        in_audio_callback--;
         return paContinue;
     }
     // we are RUNNING on the callback
@@ -553,6 +559,7 @@ static int callback_entry(float *input, float *output,
     // audio thread's memory. That shouldn't happen, but did once, so this
     // safeguard stops the audio thread before more damage occurs.
     if (!ugen_table.bounds_check(INPUT_ID)) {
+        in_audio_callback--;
         return paAbort;
     }
     Ugen_ptr input_ug = ugen_table[INPUT_ID];
@@ -628,7 +635,7 @@ static int callback_entry(float *input, float *output,
     } else if (actual_out_chans > 0) {  // no synthesized output, so zero output
         block_zero_n(output, actual_out_chans);
     }
-
+    in_audio_callback--;
     return paContinue;
 }
 

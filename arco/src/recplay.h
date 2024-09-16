@@ -196,11 +196,11 @@ public:
 
     void init_input(Ugen_ptr ugen) {
         assert(ugen->rate == 'a');
-        init_param(ugen, input, input_stride);  }
+        init_param(ugen, input, &input_stride);  }
 
     void init_gain(Ugen_ptr ugen) {
         assert(ugen->rate != 'a');  // allow 'c' and (non-interpolated) 'b'
-        init_param(ugen, gain, gain_stride);  }
+        init_param(ugen, gain, &gain_stride);  }
 
     void record(bool record);
 

@@ -31,4 +31,4 @@ PROJECT(${ARCO_TARGET_NAME})
 
 # This command pulls in all the greatness of Arco (assumes we are in
 # <arco-root>/apps/<this-app-name>/):
-include(../../serpent/arco4.cmakeinclude)
+include(../../serpent/arco.cmakeinclude)

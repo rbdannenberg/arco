@@ -136,9 +136,9 @@ public:
         fb->const_set(chan, f, "Delay::set_fb");
     }
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, input_stride); }
-    void init_dur(Ugen_ptr ugen) { init_param(ugen, dur, dur_stride); }
-    void init_fb(Ugen_ptr ugen) { init_param(ugen, fb, fb_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_dur(Ugen_ptr ugen) { init_param(ugen, dur, &dur_stride); }
+    void init_fb(Ugen_ptr ugen) { init_param(ugen, fb, &fb_stride); }
         
     void chan_aaa_a(Delay_state *state) {
         Sample_ptr input = input_samps;

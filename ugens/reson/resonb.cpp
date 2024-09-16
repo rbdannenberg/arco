@@ -20,9 +20,9 @@ void arco_resonb_new(O2SM_HANDLER_ARGS)
     int32_t q = argv[4]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(snd_ugen,snd, "arco_resonb_new");
-    ANY_UGEN_FROM_ID(center_ugen,center, "arco_resonb_new");
-    ANY_UGEN_FROM_ID(q_ugen,q, "arco_resonb_new");
+    ANY_UGEN_FROM_ID(snd_ugen, snd, "arco_resonb_new");
+    ANY_UGEN_FROM_ID(center_ugen, center, "arco_resonb_new");
+    ANY_UGEN_FROM_ID(q_ugen, q, "arco_resonb_new");
 
     new Resonb(id, chans, snd_ugen, center_ugen, q_ugen);
 }
@@ -30,7 +30,7 @@ void arco_resonb_new(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/resonb/repl_snd int32 id, int32 snd_id;
  */
-static void arco_resonb_repl_snd(O2SM_HANDLER_ARGS)
+static void arco_resonb_repl_snd (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -45,7 +45,7 @@ static void arco_resonb_repl_snd(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/resonb/set_snd int32 id, int32 chan, float val;
  */
-static void arco_resonb_set_snd(O2SM_HANDLER_ARGS)
+static void arco_resonb_set_snd (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -60,7 +60,7 @@ static void arco_resonb_set_snd(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/resonb/repl_center int32 id, int32 center_id;
  */
-static void arco_resonb_repl_center(O2SM_HANDLER_ARGS)
+static void arco_resonb_repl_center (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -75,7 +75,7 @@ static void arco_resonb_repl_center(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/resonb/set_center int32 id, int32 chan, float val;
  */
-static void arco_resonb_set_center(O2SM_HANDLER_ARGS)
+static void arco_resonb_set_center (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -90,7 +90,7 @@ static void arco_resonb_set_center(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/resonb/repl_q int32 id, int32 q_id;
  */
-static void arco_resonb_repl_q(O2SM_HANDLER_ARGS)
+static void arco_resonb_repl_q (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -105,7 +105,7 @@ static void arco_resonb_repl_q(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/resonb/set_q int32 id, int32 chan, float val;
  */
-static void arco_resonb_set_q(O2SM_HANDLER_ARGS)
+static void arco_resonb_set_q (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;

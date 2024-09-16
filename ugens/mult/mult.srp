@@ -8,10 +8,10 @@ def mult(x1, x2, optional chans):
     Ugen(create_ugen_id(), "mult", chans, 'a', "UU", 'x1', x1, 'x2', x2)
 
 def multb(x1, x2, optional chans):
-    if x1.rate != 'b':
+    if not isnumber(x1) and x1.rate != 'b':
         print "ERROR: 'x1' input to Ugen 'multb' must be block rate"
         return nil
-    if x2.rate != 'b':
+    if not isnumber(x2) and x2.rate != 'b':
         print "ERROR: 'x2' input to Ugen 'multb' must be block rate"
         return nil
     if not chans:

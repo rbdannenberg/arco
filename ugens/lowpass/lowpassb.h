@@ -118,28 +118,29 @@ public:
         cutoff->const_set(chan, f, "Lowpassb::set_cutoff");
     }
 
-    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, snd_stride); }
+    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, &snd_stride); }
 
-    void init_cutoff(Ugen_ptr ugen) { init_param(ugen, cutoff, cutoff_stride); }
+    void init_cutoff(Ugen_ptr ugen) { init_param(ugen, cutoff, &cutoff_stride); }
 
     void real_run() {
-        snd_samps = snd->run(current_block); // update input
-        cutoff_samps = cutoff->run(current_block); // update input
+        snd_samps = snd->run(current_block);  // update input
+        cutoff_samps = cutoff->run(current_block);  // update input
         if (((snd->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate();
         }
         Lowpassb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            FAUSTFLOAT tmp_0 = 1.0f / std::tan(fConst0 * float(*cutoff_samps));
+            FAUSTFLOAT tmp_0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
             FAUSTFLOAT tmp_1 = 1.0f / (tmp_0 + 1.0f);
             FAUSTFLOAT tmp_2 = 1.0f - tmp_0;
-            FAUSTFLOAT tmp_3 = float(*snd_samps);
+            FAUSTFLOAT tmp_3 = float(snd_samps[0]);
             state->fVec0[0] = tmp_3;
             state->fRec0[0] = 0.0f - tmp_1 * (tmp_2 * state->fRec0[1] - (tmp_3 + state->fVec0[1]));
-            *out_samps++ = FAUSTFLOAT(state->fRec0[0]);
+            out_samps[0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];            state++;
+            out_samps++;
             snd_samps += snd_stride;
             cutoff_samps += cutoff_stride;
         }

@@ -22,6 +22,7 @@
 - PORTAUDIO_LIB is PortAudio library
 - O2_DBG_LIB and O2_OPT_LIB are O2 library
 - WxWidgets is used by wxserpent
+- FluidSynth is used by the flsyn unit generator in Arco
 
 ## General Installation Information
 
@@ -123,7 +124,6 @@ While Arco is under development, this is how we are all running Arco.
 
 - Install CMake (I prefer CMake.app, but you should be able to run ccmake 
 from a terminal if you prefer)
-- Clone and build o2 from https://github.com/rbdannenberg/o2
 - Checkout and build serpent from SourceForge (serpent project:
 `https://sourceforge.net/projects/serpent`, see 
 `serpent/doc/installation-mac64.htm` for installation guide. This will
@@ -135,6 +135,9 @@ take some time since you will need to build WxWidgets from sources.
   - **Note 2: Serpent installation instructions begin with installing from
     sources, but you are *building* from sources, so skip down to the
     section on building from osources.**
+  - Note also that to build Serpent, you will also clone and build
+    both o2 from https://github.com/rbdannenberg/o2 and portmidi
+    from https://github.com/portmidi/portmidi.
 - Serpent installation instructions (part 1) will show you how to put
   Serpent on your path so you can run it from a Terminal (command line/shell).
   This is optional, but you should at least make sure wxserpent64 runs. Once
@@ -142,8 +145,33 @@ take some time since you will need to build WxWidgets from sources.
   with Arco linked in.
 - Clone http://github.com/rbdannenberg/arco. My cloned repo is in `~/arco`,
   but we'll call it ARCODIR
-- Install `portaudio`
+- Build `portaudio`
 - Install or build `libsndfile`
+- Get FluidSynth sources (I used source code zip file for `fluidsynth-2.3.3`
+  from `https://github.com/FluidSynth/fluidsynth/releases` and follow
+  `https://github.com/FluidSynth/fluidsynth/wiki/BuildingWithCMake`
+  ("Building on OS X"). 
+  - I moved everything from fluidsynth-2.3.3 to just
+    ARCODIR/fluidsynth, so CMakeLists.txt is ARCODIR/fluidsynth/CMakeLists.txt
+  - run CMake on ARCODIR/fluidsynth, with "where to build binaries" in
+    ARCODIR/fluidsynth/build. I turned off most options, e.g. enable-aufile is
+    OFF; BUILD_SHARED_FILES is OFF. The only ON options (and I'm not
+    sure these are necessary either) are:
+    enable-libinstpatch, enable-libsndfile, enable-openmp,
+    enable-threads. In the summary at the end, the "Audio / MIDI driver support"
+    is "no" in *all* cases, and every other feature/option is "no" except for
+    "Support for SF3 files", "libsndfile", "getopt", "Samples type:
+    double", "Multithread rendering: yes" and "Debug Build: yes".
+  - Open ARCODIR/fluidsynth/build/FluidSynth.xcodeproj with Xcode.
+  - Build (at least) libfluidsynth
+- Install a soundfont and create `soundfont.srp`.
+  - get the soundfont,
+    e.g. https://keymusician01.s3.amazonaws.com/FluidR3_GM.zip.
+  - You can unzip it anywhere. I created `ARCODIR/../fluidsynth/FluidR3_GM`.
+  - Creates `ARCODIR/apps/test/soundfont.srp` with the following line:
+  `SOUNDFONT = "PATH_TO_BUILD_DIR/fluidsynth/FluidR3_GM/FluidR3_GM.sf2"`.
+  This file should end in a newline. It will be loaded when daserpent
+  runs and it tells the flsyn unit generator where to find a soundfont.
 - Edit `ARCODIR/apps/common/libraries.txt` (see
   `ARCODIR/apps/common/libraries/libraries-example.txt` for a template) --
   this "localizes" the build to your personal machine. Do not commit
@@ -165,15 +193,30 @@ take some time since you will need to build WxWidgets from sources.
 - Use Cmake's configure and generate commands to create an Xcode project
 - Build with Xcode (Build "Build-All" and initially, set
   COMMAND-< : Info : Build Configuration to Debug)
-- Source `ARCODIR/apps/common/setpath.sh` to set `SERPENTPATH` (must be
+- `source ARCODIR/apps/common/setpath.sh` to set `SERPENTPATH` (must be
   done once unless you switch or restart Terminal) You may have to edit 
-  `setpath.sh` to adjust to your local file structure
-- run the program from Xcode
+  `setpath.sh` to adjust to your local file structure, and be sure to
+  use `source` to run the script in the current shell. If you execute
+  by running `sh ARCODIR/apps/common/setpath.sh` (run in a shell), 
+  `setpath.sh` will set the environment for the shell and then the 
+  shell will terminate, taking the environment with it.
+- run the program from the `ARCODIR/apps/test` directory using
+  `Debug/daserpent.app/Contents/MacOS/daserpent`.
+- you can also run the program from Xcode, but you must set the
+  program's startup (working) directory to `ARCODIR/apps/test` and
+  set the environment variable SERPENTPATH to the paths string you
+  will find in `ARCODIR/apps/common/setpath.sh`.
+  
 
 ## Installation on Windows
 
 These instructions assume you want to run Arco as a library within Serpent. 
 While Arco is under development, this is how we are all running Arco.
+
+**Important:** You cannot build Arco in a path with a space
+character. E.g. if your home directory is "C:\Users\John Cage\" then
+do not even try to build Arco there. Instead make a new directory,
+e.g. "C:\dev\" and build there.
 
 - If you do not have Visual Studio 2019 Community Edition, install it
   (maybe you can use a later version).
@@ -206,11 +249,11 @@ While Arco is under development, this is how we are all running Arco.
 - Install `portaudio`
 - Install or build `libsndfile`
 - Install FluidSynth (I tried `fluidsynth-2.3.5-win10-x64.zip`
-  from `https://github.com/FluidSynth/fluidsynth/releases` but I could
-  not get it to link. It seems to have all options (and dependencies)
+  from `https://github.com/FluidSynth/fluidsynth/releases` but I could 
+  not get it to link. It seems to have all options (and dependencies) 
   turned on. Instead, follow 
   `https://github.com/FluidSynth/fluidsynth/wiki/BuildingWithCMake`
-  ("Building With Visual Studio on Windows").
+  ("Building With Visual Studio on Windows"). 
   - start with `vcpkg install glib`
   - install the sources. I moved everything from fluidsynth-2.3.5 to just
     ARCODIR/fluidsynth, so CMakeLists.txt is ARCODIR/fluidsynth/CMakeLists.txt
@@ -228,7 +271,8 @@ While Arco is under development, this is how we are all running Arco.
     (I added these right after `project ( FluidSynth C CXX )`)
   - run CMake on ARCODIR/fluidsynth, with "where to build binaries" in
     ARCODIR/fluidsynth/build. I turned off most options, e.g. enable-aufile is
-    OFF. The only ON options (and I'm not sure these are necessary either) are:
+    OFF; BUILD_SHARED_FILES is OFF. The only ON options (and I'm not
+    sure these are necessary either) are:
     enable-dbus, enable-libinstpatch, enable-libsndfile, enable-openmp,
     enable-threads. In the summary at the end, the "Audio / MIDI driver support"
     is "no" in *all* cases, and every other feature/option is "no" except for
@@ -252,10 +296,11 @@ While Arco is under development, this is how we are all running Arco.
   is therefore in the build directory, so my FLSYN_INCL is set to:
   `/Users/Roger/research/arco/fluidsynth/build/include` Make sure your
   fluidsynth.h is on this path.
-  For READLINE_OPT_LIB and READLINE_DBG_LIB,
-  the name `readline.lib` seems to be wired into fluidsynth's library,
-  so you need to refer specifically to `readline.lib` unless you build
-  your own fluidsynth.
+  [This should not apply because you are building your own fluidsynth:
+  For READLINE_OPT_LIB and READLINE_DBG_LIB, the name `readline.lib` 
+  seems to be wired into fluidsynth's library, so you need to refer
+  specifically to `readline.lib` unless you build your own fluidsynth.]
+  
 - Run CMake.app and go to `ARCODIR/apps/test`
 - Use configure to process files and offer options to set. Then set them
   as follows:
@@ -268,7 +313,13 @@ While Arco is under development, this is how we are all running Arco.
   - set USE_HID = OFF
   - leave OFF: USE_PROC, USE_SHFILE, USE_ZEROMQ, WXS_STDOUT_WINDOW
   - set WX_BASE_PATH to your top wxWidgets path, e.g.
-    `/home/rbd/wxWidgets`; there should be wx-build inside this directory
+    `/home/rbd/wxWidgets`; there should be wx-build inside this
+    directory
+  - set WXS_STDOUT_WINDOW = ON so you will get standard and error
+    output in a text window while running under the Visual Studio
+    debugger. (When running from a command prompt, you can get
+    text output to the command prompt window and you might prefer
+    WXS_STDOUT_WINDOW = OFF.
 - GLIB_DBG_LIB and GLIB_OPT_LIB should be the full path to glib-2.0.lib
 - INTL_DBG_LIB should be ignore
 - Use Cmake's configure and generate commands to create a Visual Studio
@@ -290,11 +341,23 @@ While Arco is under development, this is how we are all running Arco.
   `SP\lib;SP\programs;SP\wxslib;ARCODIR\serpent\srp`, where SP is the
   serpent directory, e.g. `C:\Users\Roger\research\serpent` and
   ARCODIR is the arco directory, e.g. `C:\Users\Roger\research\arco`
-- Download a soundfont, e.g. Google and download FluidR3__GM.sf2.
-- Create apps/test/soundfont.srp. It should contain at least:
-  `SOUNDFONT = "/Users/Roger/research/arco/fluidsynth/FluidR3_GM/FluidR3__GM.sf2"`
-  where the string is actually the full path to a soundfont on your machine.
+- Download a soundfont, e.g. Google and download FluidR3__GM.sf2. 
+- Create apps/test/soundfont.srp. It should contain at least: 
+  `SOUNDFONT = "C:\Users\Roger\research\arco\fluidsynth\FluidR3_GM\FluidR3__GM.sf2"`
+  where the string is actually the full path to a soundfont on your 
+  machine. <b>Note:</b> although Windows will work with forward- (/) 
+  or back- (\) slash separators, Fluidsynth on Windows requires the 
+  SOUNDFONT path to use back-slash separators as in this example. 
 - Run the compiled Arco program from the Command Prompt.
+  - If your program will not run because of missing DLL files, you
+    will have to make the DLLs available at runtime. A quick way to do
+    this is to find the DLLs on your system and copy them to your
+    arco/apps/test/Debug directory alongside your daserpent.exe file.
+  - A better way is (probably) to put the DLLs in C:\Windows\System32.
+    Be sure the DLL does not already exist there, as there might be a
+    conflict with some other installed program. If Arco DLLs are in
+    System32, they will be shared by all Arco applications, not just
+    arco/apps/test/daserpent.exe.
 
 ## Installation on Ubuntu Linux
 
