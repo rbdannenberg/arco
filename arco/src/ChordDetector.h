@@ -59,11 +59,14 @@ public:
     /** Any other intervals that describe the chord, e.g. 7th */
 	int intervals;
     
+    /** Pitches of the detected chord, bit mapped in an integer
+     *  For example, A minor is 1<<0 + 1<<4 + 1<<9 = 529 = 0x211
+     */
+    int pitches;
+    
     /** Our current best attempt at a confidence value of the detected chord, calculated using entropy*/
     double confidence;
     
-    /** If the detection result has a confidence above a specified threshold*/
-    bool shouldDisplay;
 	
 private:
 	void makeChordProfiles();
@@ -77,7 +80,10 @@ private:
      */
     void softmaxEntropyConfidence (double* chord, double* confidence);
     void calculateChordScores (double* chord, double* chromagram);
-    void minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals);
+    void minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals, int* pitches);
+    
+    /** Encodes pitches of detected chord into an int by setting corresponding bits*/
+    int encodePitches(int p1, int p2, int p3, int p4);
     
     /** Compares two harmonic reduction algorithms, a and b, with reduction constants specified by the arguments. */
     void compareAlgos(double a_fifth, double a_third, double b_fifth, double b_third, bool printChromas = false);

@@ -89,13 +89,7 @@ void ChordDetector::classifyChromagram()
     
     softmaxEntropyConfidence(chord, &confidence);
     
-    minIndexToChord(chordindex, &rootNote, &quality, &intervals);
-    
-    double displayThreshold = 0.0005;
-    shouldDisplay = false;
-    if (confidence > displayThreshold){
-        shouldDisplay = true;
-    }
+    minIndexToChord(chordindex, &rootNote, &quality, &intervals, &pitches);
     
 
 }
@@ -146,7 +140,7 @@ void ChordDetector::compareAlgos(double a_fifth, double a_third, double b_fifth,
     
     softmaxEntropyConfidence(chord1, &confidence1);
     
-    minIndexToChord(chordindex1, &rootNote1, &quality1, &intervals1);
+    minIndexToChord(chordindex1, &rootNote1, &quality1, &intervals1, &pitches);
     
     
     for (i = 0; i < 12; i++)
@@ -188,7 +182,7 @@ void ChordDetector::compareAlgos(double a_fifth, double a_third, double b_fifth,
     chordindex2 = minimumIndex(chord2, NUM_CHORDS);
     
     softmaxEntropyConfidence(chord2, &confidence2);
-    minIndexToChord(chordindex2, &rootNote2, &quality2, &intervals2);
+    minIndexToChord(chordindex2, &rootNote2, &quality2, &intervals2, &pitches);
     
     const char* qualities[] = {"Minor", "Major","Suspended", "Dominant","Diminished 5th", "Augmented 5th", "Half-Dim"};
     const char* notes[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
@@ -263,7 +257,7 @@ void ChordDetector::calculateChordScores (double chord[NUM_CHORDS], double chrom
 }
 
 //=======================================================================
-void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals)
+void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality, int* intervals, int* pitches)
 {
     // major
     if (chordindex < 12)
@@ -271,6 +265,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex;
         *quality = Major;
         *intervals = 0;
+        *pitches = encodePitches(*rootNote, (*rootNote + 4) % 12, (*rootNote + 7) % 12, -1);
     }
     
     // minor
@@ -279,6 +274,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-12;
         *quality = Minor;
         *intervals = 0;
+        *pitches = encodePitches(*rootNote, (*rootNote + 3) % 12, (*rootNote + 7) % 12, -1);
     }
     
     // diminished 5th
@@ -287,6 +283,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-24;
         *quality = Dimished5th;
         *intervals = 0;
+        *pitches = encodePitches(*rootNote, ((*rootNote) + 3) % 12, (*rootNote + 6) % 12, -1);
     }
     
     // augmented 5th
@@ -295,6 +292,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-36;
         *quality = Augmented5th;
         *intervals = 0;
+        *pitches = encodePitches(*rootNote, (*rootNote + 4) % 12, (*rootNote + 8) % 12, -1);
     }
     
     // sus2
@@ -303,6 +301,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-48;
         *quality = Suspended;
         *intervals = 2;
+        *pitches = encodePitches(*rootNote, (*rootNote + 2) % 12, (*rootNote + 7) % 12, -1);
     }
     
     // sus4
@@ -311,6 +310,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-60;
         *quality = Suspended;
         *intervals = 4;
+        *pitches = encodePitches(*rootNote, (*rootNote + 5) % 12, (*rootNote + 7) % 12, -1);
     }
     
     // major 7th
@@ -319,6 +319,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-72;
         *quality = Major;
         *intervals = 7;
+        *pitches = encodePitches(*rootNote, (*rootNote + 4) % 12, (*rootNote + 7) % 12, (*rootNote + 11) % 12);
     }
     
     // minor 7th
@@ -327,6 +328,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-84;
         *quality = Minor;
         *intervals = 7;
+        *pitches = encodePitches(*rootNote, (*rootNote + 3) % 12, (*rootNote + 7) % 12, (*rootNote + 10) % 12);
     }
     
     // dominant 7th
@@ -335,6 +337,7 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-96;
         *quality = Dominant;
         *intervals = 7;
+        *pitches = encodePitches(*rootNote, (*rootNote + 4) % 12, (*rootNote + 7) % 12, (*rootNote + 10) % 12);
     }
     
     // half-diminished chords
@@ -343,8 +346,19 @@ void ChordDetector::minIndexToChord (int chordindex, int* rootNote, int* quality
         *rootNote = chordindex-108;
         *quality = Half_Dim;
         *intervals = 7;
+        *pitches = encodePitches(*rootNote, (*rootNote + 3) % 12, (*rootNote + 6) % 12, (*rootNote + 10) % 12);
     }
     
+}
+
+//=======================================================================
+int ChordDetector::encodePitches(int p1, int p2, int p3, int p4){
+    if (p4 < 0) { // If chord has only 3 pitches
+        return (1<<p1) + (1<<p2) + (1<<p3);
+    }
+    else {
+        return (1<<p1) + (1<<p2) + (1<<p3) + (1<<p4);
+    }
 }
 
 //=======================================================================

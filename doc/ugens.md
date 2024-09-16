@@ -284,6 +284,44 @@ id `dur_id`.
 
 `/arco/allpass/set_fb id chan fb` - Set feedback to float value `fb`.
 
+### chorddetect
+```
+chorddetect(reply_addr)
+.set('input', ugen)
+```
+
+The `chorddetect` ugen classifies chords from the input audio. For every
+4096 samples, the ugen calculates a chromagram and identifies the most likely
+chord. A message of type string `"ssifii"` is sent to `reply_addr`, with values 
+being:
+  - `root_note_str`: root note of the detected chord using flats 
+  exclusively, e.g. `"Db"` but not `"C#"`
+  - `quality`: quality of the chord as one of: 
+  `{"Min", "Maj", "Sus", "Dom", "Dim 5th", "Aug 5th", "Half-Dim"}`.
+  - `interval`: interval of the chord, e.g. `7`
+  - `confidence`: confidence of the detection based on a softmax and entropy 
+  algorithm. See `softmaxEntropyConfidence` in `ChordDetector.h` for more 
+  details.
+  - `root_note_int`: the root note as an integer ranging from C = `0` to B = `12`
+  - `pitches`: an integer with with `i`th bits set for each pitch `i` in the
+  chord, e.g. A minor is `1<<0 + 1<<4 + 1<<9 = 529 = 0x211`
+
+The first three values are meant to be used for convenient display. Thus, if 
+confidence is lower than the threshold of 0.0005, `chorddetect` will send
+`"None", "None", 0` for these values. The last three values will always 
+represent the detected chord even if confidence is low.
+
+If the input has multiple channels, `chorddetect` only uses the first channel 
+and prints a warning message.
+
+Note that the input ugen must be set for detection to work.
+
+`/arco/chorddetect/new id reply_addr` - Creates a new `chorddetect` ugen
+
+`/arco/chorddetect/repl_input id input_id` - Set the input to object
+with id `input_id`.
+
+
 ### const
 ```
 const(x, [chans])  // x is number or array

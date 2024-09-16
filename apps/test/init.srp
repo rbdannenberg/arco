@@ -217,6 +217,7 @@ def arco_ready():
     Checkbox(win, "Chorddetect Test", 'S', 'D', 'S', 'S', 'chorddetectcheckbox')
     chorddetectcheckbox.add_target_method(nil, 'chorddetecttest')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'chorddetecttext')
+    Statictext(win, "----", 'S', 'D', 'S', 'S', 'chorddetectintdata')
     
     wxs_x = COLUMN_TWO
     Checkbox(win, "Spectral Centroid Test", 'S', 'D', 'S', 'S', 'spectralcentroidcheckbox')
@@ -754,20 +755,20 @@ def onsettest(obj, event, x, y):
 
 chorddetect_handler_installed = false
 
-def actl_chorddetect(timestamp, address, types, root_note, quality, interval, confidence, shouldDisplay)
+def actl_chorddetect(timestamp, address, types, root_note_str, quality, interval,
+                    confidence, root_note_int, pitches):
     # display root_note, quality, interval, confidence
-    if shouldDisplay == 0:
-        chorddetecttext.set_string("No strong chord detected")
-    else:
-        result = root_note + " " + quality + " " + str(interval) + ", " + str(confidence)
-        chorddetecttext.set_string(result)
+    result = root_note_str + " " + quality + " " + str(interval) + ", " + str(confidence)
+    int_result = str(root_note_int) + " " + str(pitches)
+    chorddetecttext.set_string(result)
+    chorddetectintdata.set_string(int_result)
 
         
 def chorddetecttest(obj, event, x, y):
     display "chorddetect", x
     if x:
         if not chorddetect_handler_installed:
-            o2_method_new("/actl/chorddetect", "ssifi", 'actl_chorddetect', t)
+            o2_method_new("/actl/chorddetect", "ssifii", 'actl_chorddetect', t)
             print "installed chorddetect handler"
             chorddetect_handler_installed = true
         CD = chorddetect("/actl/chorddetect")

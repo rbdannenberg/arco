@@ -23,11 +23,21 @@ void Chorddetect::real_run()
         chord_detector.detectChord(chroma);
         // send message with chord information
         o2sm_send_start();
-        o2sm_add_string(RootNoteToString(chord_detector.rootNote));
-        o2sm_add_string(ChordQualityToString(chord_detector.quality));
-        o2sm_add_int32(chord_detector.intervals);
+        if (chord_detector.confidence >= threshold) {
+            o2sm_add_string(RootNoteToString(chord_detector.rootNote));
+            o2sm_add_string(ChordQualityToString(chord_detector.quality));
+            o2sm_add_int32(chord_detector.intervals);
+        }
+        else{
+            o2sm_add_string("None");
+            o2sm_add_string("None");
+            o2sm_add_int32(0);
+        }
+        
         o2sm_add_float(chord_detector.confidence);
-        o2sm_add_bool(chord_detector.shouldDisplay);
+        o2sm_add_int32(chord_detector.rootNote);
+        o2sm_add_int32(chord_detector.pitches);
+        
         o2sm_send_finish(0, cd_reply_addr, false);
     }
     
@@ -45,7 +55,7 @@ void Chorddetect::start(const char *reply_addr) {
 // Converts chord quality enum to string message
 const char* Chorddetect::ChordQualityToString(int quality)
 {
-    const char* qualities[] = {"Min", "Maj","Sus", "Dom","Dim 5th", "Aug 5th", "Half-Dim"};
+    const char* qualities[] = {"Min", "Maj", "Sus", "Dom", "Dim 5th", "Aug 5th", "Half-Dim"};
     return qualities[quality];
 }
 
@@ -88,17 +98,16 @@ static void arco_chorddetect_repl_input(O2SM_HANDLER_ARGS)
 
 
 
-/* O2SM INTERFACE: /arco/chorddetect/new int32 id, int32 chans, string reply_addr;
+/* O2SM INTERFACE: /arco/chorddetect/new int32 id, string reply_addr;
  */
 static void arco_chorddetect_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t chans = argv[1]->i;
-    char *reply_addr = argv[2]->s;
+    char *reply_addr = argv[1]->s;
     // end unpack message
 
-    new Chorddetect(id, chans, reply_addr);
+    new Chorddetect(id, reply_addr);
 }
 
 
@@ -109,7 +118,7 @@ static void chorddetect_init()
                     NULL, true, true);
     o2sm_method_new("/arco/chorddetect/repl_input", "ii",
                     arco_chorddetect_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/chorddetect/new", "iis", arco_chorddetect_new,
+    o2sm_method_new("/arco/chorddetect/new", "is", arco_chorddetect_new,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
 }

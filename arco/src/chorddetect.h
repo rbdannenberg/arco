@@ -22,12 +22,14 @@ public:
     Ugen_ptr input;
     int input_stride;
     Sample_ptr input_samps;
+    float threshold;
     
-    Chorddetect(int id, int chans, char *reply_addr) : Ugen(id, 0, 0), chromagram(BL, AR)
+    Chorddetect(int id, char *reply_addr, double display_threshold = 0.0005) : Ugen(id, 0, 0), chromagram(BL, AR)
                 {
         printf("Chorddetect constructor id %d classname %s\n", id, classname());
         cd_reply_addr = NULL;
         input = NULL;
+        threshold = display_threshold;
         start(reply_addr);
     }
 
@@ -68,8 +70,7 @@ public:
         }
         assert(ugen->rate == 'a');
         init_param(ugen, input, input_stride);
-        chans = ugen->chans;
-        if (chans > 1) {
+        if (ugen->chans > 1) {
             printf("WARNING: Input has more than one channel, only the first channel is used for chord detection.\n");
         }
     }
