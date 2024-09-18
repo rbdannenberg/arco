@@ -1,7 +1,7 @@
 # Project Author: Chukwuemeka L. Nkama
 # Date: Aug 7, 2023
 
-class O_for_a_thousand:
+class O_for_a_thousand (Movement):
 # Instance variables
     var win, init_x, init_y // GUI params
     var gran_obj
@@ -9,29 +9,24 @@ class O_for_a_thousand:
 
     def init(window, x, y):
     # Initialization of instance variables
+        super.init("III", 8)
         win = window   // Main UI window
         init_x = x     // Starting x coord of movement
         init_y = y     // Starting y coord of Movement
-        this.set_ui()  // Setup UI
+        this.setup_ui()  // Setup UI
 
 
-    def set_ui():
+    def setup_ui():
     # Setting up Movement's UI
         // Create Checkbox
         Checkbox(win, "III. O For a Thousand \nTongues to Sing",
-                 init_x, init_y - 8, 200, 50, 'power_btn')
-        power_btn.add_target_method(this, 'pbtn_handler')
+                 init_x, init_y - 8, 200, 50, 'oftts_checkbox')
+        oftts_checkbox.add_target_method(this, 'ofttscheck_handler')
 
         Radiobox(win, "Section",
                  ["1", "2", "3", "4", "5", "6", "7"], 'S', 'D',
-                 200, 225, 'o_for_a_thousand')
-        o_for_a_thousand.add_target_method(this, 'th_hit') 
-
-
-    def get_control():
-    # Returns the currently selected control
-    # in the Radiobox
-        return o_for_a_thousand.value()
+                 200, 225, 'oftts_radiobutton')
+        oftts_radiobutton.add_target_method(this, 'oftts_state_handler') 
 
 
     def set_gran_controls(dur1, dur2, ratio1, ratio2, fb, delay, dens, env):
@@ -43,10 +38,8 @@ class O_for_a_thousand:
         gran_obj.set_env(env, env)
         
 
-    def th_hit(obj, event, x, y):
+    def oftts_state_handler(obj, event, x, y):
     # o_for_a_thousand hit events
-        display "Current control", get_control()
-
         if not gran_obj:
             print "Turn on the Movmement to initialize granular synth!"
             return
@@ -54,30 +47,44 @@ class O_for_a_thousand:
         var LODUR = 0.04
         var HIDUR = 0.07
         var HIRAT = 1.5  // high ratio - originally 2, but I like 1.5
-        if get_control() == 0:  // #1 button is clicked
+        if x == 0:  // #1 button is clicked
             set_gran_controls(LODUR, HIDUR, 0.5, 1.5, 0.1, 0.67, 5.0, 0.022)
-        elif get_control() == 1:  // #2
+        elif x == 1:  // #2
             set_gran_controls(LODUR, HIDUR, 0.98, 1.02, 0.0, 0.67, 5.0, 0.022)
-        elif get_control() == 2:  // #3
+        elif x == 2:  // #3
             set_gran_controls(LODUR, HIDUR, 1.0, 1.0, 0.0, 0.67, 5.0, 0.022)
-        elif get_control() == 3:  // #4
+        elif x == 3:  // #4
             set_gran_controls(LODUR, HIDUR, 0.5, HIRAT, 0.98, 0.67, 5.0, 0.022)
-        elif get_control() == 4:  // #5
+        elif x == 4:  // #5
             set_gran_controls(LODUR, HIDUR, 0.5, HIRAT, 0.3, 0.67, 5.0, 0.022)
-        elif get_control() == 5:
+        elif x == 5:  // #6
             set_gran_controls(LODUR, HIDUR, 0.5, HIRAT, 0.85, 0.67, 5.0, 0.022)
-        elif x == 6:
+        elif x == 6:  // #7
             set_gran_controls(LODUR, HIDUR, 0.5, HIRAT, 0.6, 0.67, 5.0, 0.022)
 
 
-    def pbtn_handler(obj, event, x, y):
+    def ofttscheck_handler(obj, event, x, y):
         if x:
             gran_obj = granstream(input_ugen, 2, 0.714, true, 2)
             gran_obj.set_gain(0.25)
             delay_obj = delay(gran_obj, [0.6, 0.7], 0.1, 0.7, 2)
-            th_hit(this, nil, nil, nil)  // simulate/force selection
+            oftts_radiobutton.set_and_act(0)  // simulate/force selection
             delay_obj.play()
         else:
             delay_obj.mute() // Immediate stop
             gran_obj = nil // Eventual cleanup
             delay_obj = nil
+
+    // def enable_real() - handled by state_change when state == 0
+
+    def state_change():
+        if state == 0:
+            oftts_checkbox.set_and_act(true)
+        else:
+            oftts_radiobutton.set_and_act(state - 1)
+
+    def disable_real():
+        oftts_checkbox.set_and_act(false)
+        
+
+        

@@ -15,10 +15,25 @@ public:
         Ugen_ptr gain;
         int gain_stride;
         Vec<float> prev_gain;
+
+        // fade-in/fade-out state - see fader for more comments
+        // the implementation of fade here is taken from the
+        // fader implementation, and most of these state variables
+        // correspond to fader instance variables:
+        int fade_mode;
+        float fade_goal;
+        float fade_delta;
+        float fade_factor;
+        float fade_base;
+        float fade_phase;
+        float fade_count;
+        float fade_dest;
+        bool ar_smooth;  // there is a special case for short
+                // FADE_SMOOTH fades where we compute the
+                // envelope at the audio rate
     };
     Vec<Input> inputs;
     bool wrap;
-    
 
     Mix(int id, int nchans, int wrap_) : Ugen(id, 'a', nchans) {
         tail_blocks = 1;  // because gain inputs are b-rate
@@ -32,7 +47,8 @@ public:
     void print_sources(int indent, bool print_flag);
 
     // insert operation takes a signal and a gain
-    void ins(const char *name, Ugen_ptr input, Ugen_ptr gain) {
+    void ins(const char *name, Ugen_ptr input, Ugen_ptr gain,
+             float dur, int mode) {
         if (input->rate != 'a') {
             arco_warn("mix_ins: input rate is not 'a', ignore insert");
             return;
@@ -65,6 +81,43 @@ public:
         // initialize Vec of per-channel prev_gain value(s) and zero them:
         input_desc->prev_gain.set_size(MAX(input_desc->input->chans,
                                            input_desc->gain->chans), true);
+        input_desc->fade_dest = 1.0;
+        input_desc->fade_count = MAX(1, (int) (dur * BR + 0.5));
+        input_desc->ar_smooth = false;
+        input_desc->fade_mode = mode;
+        if (input_desc->fade_count > 0) {
+            switch (mode) {
+                case FADE_LINEAR:
+                    input_desc->fade_phase = 0;  // represents current fade val
+                    input_desc->fade_delta = 1.0f / input_desc->fade_count;
+                    break;
+                case FADE_EXPONENTIAL:
+                    input_desc->fade_phase = 0;  // represents current fade val
+                    input_desc->fade_factor =
+                            pow(101.0, 1.0 / input_desc->fade_count);
+                    break;
+                case FADE_LOWPASS:
+                    input_desc->fade_base = 1.01;
+                    input_desc->fade_delta = -1.01;
+                    input_desc->fade_factor =
+                            pow(0.01 / 1.01, 1.0 / input_desc->fade_count);
+                    break;
+                case FADE_SMOOTH:
+                default: {
+                    input_desc->fade_delta = float(-COS_TABLE_SIZE) /
+                                                   input_desc->fade_count;
+                    input_desc->fade_factor = 1.0;
+                    input_desc->fade_base = 1.0;
+                    input_desc->fade_phase = 2 + COS_TABLE_SIZE;
+                    if (input_desc->fade_count < 0.01 * BR) {
+                        // shorter than 10msec, needs special case
+                        input_desc->ar_smooth = true;
+                        input_desc->fade_delta *= BL_RECIP;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
 
@@ -84,10 +137,47 @@ public:
         
 
     // remove operation finds the signal and removes it and its gain
-    void rem(char *name) {
+    void rem(char *name, float dur, int mode) {
         int i = find(name);
         if (i >= 0) {
-            remove_input(i, &inputs[i]);
+            Input &input_desc = inputs[i];
+            input_desc.fade_dest = 0.0;
+            input_desc.fade_count = MAX(1, (int) (dur * BR + 0.5));
+            if (input_desc.fade_count > 0) {
+                switch (mode) {
+                    case FADE_LINEAR:
+                        input_desc.fade_phase = 1;  // represents current fade val
+                        input_desc.fade_delta = -1.0f / input_desc.fade_count;
+                        break;
+                    case FADE_EXPONENTIAL:
+                        input_desc.fade_phase = 1;  // represents current fade val
+                        input_desc.fade_factor =
+                                pow(1.0 / 101.0, 1.0 / input_desc.fade_count);
+                        break;
+                    case FADE_LOWPASS:
+                        input_desc.fade_base = -0.01;
+                        input_desc.fade_delta = 1.01;
+                        input_desc.fade_factor =
+                                pow(0.01 / 1.01, 1.0 / input_desc.fade_count);
+                        break;
+                    case FADE_SMOOTH:
+                    default: {
+                        input_desc.fade_delta = float(-COS_TABLE_SIZE) /
+                                                      input_desc.fade_count;
+                        input_desc.fade_factor = -1.0;
+                        input_desc.fade_base = 0.0;
+                        input_desc.fade_phase = 2 + COS_TABLE_SIZE;
+                        if (input_desc.fade_count < 0.01 * BR) {
+                            // shorter than 10msec, needs special case
+                            input_desc.ar_smooth = true;
+                            input_desc.fade_delta *= BL_RECIP;
+                        }
+                        break;
+                    }
+                }
+            } else {  // no fade-out, no wait:
+                remove_input(i, &inputs[i]);
+            }
         }
     }
 
@@ -127,6 +217,7 @@ public:
         }
     }
 
+
     void repl_gain(char *name, Ugen_ptr gain) {
         int i = find(name);
         if (i >= 0) {
@@ -157,31 +248,86 @@ public:
         // zero the outputs
         block_zero_n(out_samps, chans);
 
-        while (i < inputs.size()) {
-            Input *input_desc = &inputs[i];
-            float *gain_ptr = input_desc->gain->run(current_block);
-            float *gprev_ptr = &(input_desc->prev_gain[0]);
-            Sample_ptr input_ptr = input_desc->input->run(current_block);
+        while (i < inputs.size()) {  // use while loop because size can change
+            Input &input_desc = inputs[i];
+            float *gain_ptr = input_desc.gain->run(current_block);
+            float *gprev_ptr = &(input_desc.prev_gain[0]);
+            Sample_ptr input_ptr = input_desc.input->run(current_block);
             float *out = out_samps;
 
-            if ((input_desc->input->flags & TERMINATED) ||
-                (input_desc->gain->flags & TERMINATED)) {
-                remove_input(i, input_desc);
+            if ((input_desc.input->flags & TERMINATED) ||
+                (input_desc.gain->flags & TERMINATED)) {
+                remove_input(i, &input_desc);
                 continue;
             }
             i++;
-            assert(input_desc->prev_gain.size() ==
-                   MAX(input_desc->input->chans, input_desc->gain->chans));
-            for (int ch = 0; ch < input_desc->prev_gain.size(); ch++) {
-                float gain = *gprev_ptr;
-                float gincr = (*gain_ptr - gain) * BL_RECIP;
-            
-                if (gincr > -1e-6 && gincr < 1e-6) {
-                    // gain is constant, no interpolation:
-                    for (int j = 0; j < BL; j++) {
-                        *out++ += gain * input_ptr[j];
+            assert(input_desc.prev_gain.size() ==
+                   MAX(input_desc.input->chans, input_desc.gain->chans));
+
+            // compute the next fade value (or fade_dest if not fading)
+            float fade = input_desc.fade_dest;
+            if (input_desc.fade_count > 0) {
+                switch (input_desc.fade_mode) {
+                    case FADE_LINEAR:
+                        input_desc.fade_phase += input_desc.fade_delta;
+                        fade = input_desc.fade_phase;
+                        break;
+                    case FADE_EXPONENTIAL:
+                        fade = input_desc.fade_phase;
+                        fade = (fade + 0.01) * input_desc.fade_factor - 0.01;
+                        input_desc.fade_phase = fade;
+                        break;
+                    case FADE_LOWPASS:
+                        input_desc.fade_delta *= input_desc.fade_factor;
+                        fade = input_desc.fade_base + input_desc.fade_delta;
+                        break;
+                    case FADE_SMOOTH:
+                    default: {
+                      if (!input_desc.ar_smooth) {
+                          input_desc.fade_phase += input_desc.fade_delta;
+                          int phasei = (int) input_desc.fade_phase;
+                          fade = raised_cosine[phasei];
+                          // linear interpolation
+                          fade += (raised_cosine[phasei + 1] - fade) *
+                                  (input_desc.fade_phase - phasei);
+                          fade = input_desc.fade_base -
+                                 input_desc.fade_factor * fade;
+                      }  // otherwise, ar_smooth case is handled below
+                      break;
                     }
-                } else {  // gain is changing; do interpolation
+                }
+                input_desc.fade_count--;
+            } else if (fade == 0) {  // fade-out completed
+                remove_input(i, &input_desc);
+                continue;
+            } else if (input_desc.ar_smooth) {  // convert from audio rate
+                // to block rate after fade-in completes.
+                // *gprev_ptr is previous gain before multiplying by fade
+                // but in the normal block-rate processing, *gprev_ptr
+                // includes the factor of fade:
+                *gprev_ptr *= fade;
+                input_desc.ar_smooth = false;
+            }
+
+            for (int ch = 0; ch < input_desc.prev_gain.size(); ch++) {
+                float gain = *gprev_ptr;
+                if (input_desc.ar_smooth) {  // compute fade at audio rate
+                    float gincr = (*gain_ptr - gain) * BL_RECIP;
+                    float phase = input_desc.fade_phase;
+                    for (int j = 0; j < BL; j++) {
+                        gain += gincr;
+                        phase += input_desc.fade_delta;
+                        int phasei = (int) phase;
+                        fade = raised_cosine[phasei];
+                        fade += (raised_cosine[phasei + 1] - fade) *
+                                (phase - phasei);
+                        fade = input_desc.fade_base -
+                               input_desc.fade_factor * fade;
+                        *out++ += gain * fade * input_ptr[j];
+                    }
+                    *gprev_ptr = gain;
+                } else {
+                    float gincr = (*gain_ptr * fade - gain) * BL_RECIP;
                     for (int j = 0; j < BL; j++) {
                         gain += gincr;
                         *out++ += gain * input_ptr[j];
@@ -197,8 +343,8 @@ public:
                     }
                 }
                 // advance to the next channel of this input:
-                input_ptr += input_desc->input_stride;
-                gain_ptr += input_desc->gain_stride;
+                input_ptr += input_desc.input_stride;
+                gain_ptr += input_desc.gain_stride;
                 gprev_ptr++;  // we have a prev_gain for each generated channel
                         // even if gain is single channel (gain_stride == 0)
             }

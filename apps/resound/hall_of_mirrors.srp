@@ -22,25 +22,12 @@ class Shift_delay_bank:
     # Sets the ratio of the ith pitch shift object
         shift_objs[i].set_ratio(ratio_value)
     
-    def get_shiftobjs():
-    # Getter method to access pitch-shift objects
-        return shift_objs
-    
-    def get_delayobjs():
-    # Getter method to access delay objects
-        return delay_objs
-    
-    def get_len():
-    # Getter method to access length of objects
-        return len_objs
 
 
-
-class Hall_of_mirrors:
+class Hall_of_mirrors (Movement):
 # Instance variables
     var win, init_x, init_y // GUI params
     var shift_delay_bank // bank containing shift and delay units
-    var active // Checks if the mixer is currently playing
     var mixer // Mixer containing delay and pitch-shifted ugens
     var played_once
     var latency
@@ -48,6 +35,7 @@ class Hall_of_mirrors:
 
     def init(window, x, y):
     # Initialization of instance variables
+        super.init("II", 6)
         win = window // Main UI window
         init_x = x // Starting x coord of movement
         init_y = y // Starting y coord of movement
@@ -62,19 +50,18 @@ class Hall_of_mirrors:
 
         // insert shift objects into the mixer
         for i = 0 to 5:
-            mixer.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0, 0])
+            mixer.ins(str(i), shift_delay_bank.shift_objs[i], [0, 0])
         
-        // Setup UI
-        this.set_ui()
+        setup_ui()
 
 
-    def set_ui():
+    def setup_ui():
     # Setting up Movement's UI
         // Create Radiobox
         Radiobox(win, "II. Hall of Mirrors",
                 ["off", "1", "2", "3", "4", "5"], init_x, init_y,
                 150, 200, 'hallmirror')
-        hallmirror.add_target_method(this, 'sd_hit')
+        hallmirror.add_target_method(this, 'hallmirror_handler')
         latency_slider.add_target_method(this, 'lshandler')
 
 
@@ -82,32 +69,21 @@ class Hall_of_mirrors:
     # Latency slider handler
         latency = x / 1000
 
-    
-    def get_control():
-    # Returns the currently selected control
-    # in the Radiobox
-        return hallmirror.value()
 
-
-    def play(flag):
+    def enable_real():
     # Play shift-delays depending on radiobox selection
-        if active != flag and active == nil:
-            // If movement has been played once, restart it 
-            if played_once:
-              restart_hall()
-            mixer.play() // Play mixer if it was inactive
-            active = flag
-        elif active == flag: // Do nothing
-            display "Current state", active
-        else:
-            // if off is clicked after
-            // playing movement, turn off everything
-            if active:
-                active = nil
-                sched_select(rtsched) // select scheduler
-                sched_cause(1.0, this, 'finish_hall') 
-                // Since movement has been played once, note it
-                played_once = t
+        // If movement has been played once, restart it 
+        if played_once:
+            restart_hall()
+        mixer.play() // Play mixer if it was inactive
+
+
+    def disable_real():
+        // if off is clicked after playing movement, turn off everything
+        sched_select(rtsched) // select scheduler
+        sched_cause(1.0, this, 'finish_hall') 
+        // Since movement has been played once, note it
+        played_once = true
 
 
     def finish_hall():
@@ -129,7 +105,7 @@ class Hall_of_mirrors:
 
       // insert shift objects into the mixer
       for i = 0 to 5:
-        mixer.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0, 0])
+        mixer.ins(str(i), shift_delay_bank.shift_objs[i], [0, 0])
         
     
     def freq_ratio(semi_arr):
@@ -142,29 +118,26 @@ class Hall_of_mirrors:
         return result
 
 
-    def sd_hit(obj, event, x, y):
+    def hallmirror_handler(obj, event, x, y):
     # Shift delay hit events
-        display "Current control", get_control()
-
-         // play mixer based on Radiobox selection
-        this.play(get_control() != 0)
-
         // Setup shift-delays by passing delay and semitone
         // array
         tempo = 60 / 50 // seconds per beat at 50 BPM
-        if get_control() == 1:
+        if x == 0:
+            disable()
+        elif x == 1:
             semitone_arr = [2]
             set_shift_delay(tempo / 2, freq_ratio(semitone_arr))
-        elif get_control() == 2:
+        elif x == 2:
             semitone_arr = [2, 7]
             set_shift_delay(tempo / 3, freq_ratio(semitone_arr))
-        elif get_control() == 3:
+        elif x == 3:
             semitone_arr = [2, 4, 11]
             set_shift_delay(tempo / 4, freq_ratio(semitone_arr))
-        elif get_control() == 4:
+        elif x == 4:
             semitone_arr = [2, 4, 11, 8]
             set_shift_delay(tempo / 5, freq_ratio(semitone_arr))
-        elif get_control() == 5:
+        elif x == 5:
             semitone_arr = [-14, 9, 2, 5, 12]
             set_shift_delay(tempo / 6, freq_ratio(semitone_arr))
 
@@ -173,7 +146,7 @@ class Hall_of_mirrors:
     # Sets up the delay and shift values 
     # in the shift-delay bank
         # turn off shift units that are to be inactive
-        for i = len(shift_arr) to shift_delay_bank.get_len():
+        for i = len(shift_arr) to shift_delay_bank.len_objs:
             mixer.set_gain(str(i), 0, 0) // set gain for left channel
             mixer.set_gain(str(i), 0, 1) // set gain for right channel 
 
@@ -184,3 +157,9 @@ class Hall_of_mirrors:
             // Adjust gains of active delay and pitch-shift objects
             mixer.set_gain(str(i), 1, 0) // set gain for left channel
             mixer.set_gain(str(i), 1, 1) // set gain for right channel
+
+
+    def state_change():
+        // initially 0, values end at len(mvt2_seq)
+        hallmirror.set_and_act(state)
+

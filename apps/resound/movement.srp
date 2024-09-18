@@ -1,0 +1,55 @@
+# movement.srp - superclass for all movements
+# 
+# Roger B. Dannenberg
+# Sep 2024
+
+class Movement:
+    var state
+    var state_count
+    var enabled
+    var roman_numeral
+
+    def init(rn, sc):
+        roman_numeral = rn
+        state_count = sc
+        state = 0
+        enabled = false
+
+    def enable():
+    # turn on dsp
+        if enabled:
+            return
+        state = 0
+        state_change()
+        enable_real()
+        enabled = true
+        active_movement = this
+
+    def enable_real():
+    # turn on dsp - default here is do nothing because we have already
+    # called state_change() with state == 0, and some movements will
+    # have already turned on dsp processing
+        return
+
+    def state_change():
+    # handle state change - default here is to do nothing; e.g. if the
+    # movement does nothing but enable/disable, there is one state (0)
+    # and it is handled by enable().
+        return
+
+    def disable():
+    # turn off dsp
+        if enabled:
+            disable_real()
+            enabled = false
+            active_movement = nil
+
+    def advance():
+    # advance state if enabled
+        if enabled:
+            state = state + 1
+            if state < state_count:
+                state_change()
+            else:
+                disable()
+                state = 0

@@ -37,7 +37,9 @@ public:
 
    
     void real_run() {
-        if (seg_togo == 0) { // set up next segment
+        // using while allows durations of zero so that we can have an
+        // initial non-zero value by setting initial duration to 0:
+        while (seg_togo == 0) { // set up next segment
             current = final_value;  // make output value exact
             if (next_point_index >= points.size()) {
                 seg_togo = INT_MAX;
@@ -57,16 +59,19 @@ public:
         seg_togo--;
     }
     
+
     void start() {
         next_point_index = 0;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
     }
 
+
     void stop() {
         seg_togo = INT_MAX;
         seg_incr = 0.0f;
     }
+
 
     void decay(float d) {
         seg_togo = (int) d;
@@ -75,10 +80,12 @@ public:
         final_value = 0.0f;
     }
 
+
     void set(float y) {
         current = y;
     }
     
+
     void point(float f) { points.push_back(f); }
 };
 

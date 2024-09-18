@@ -49,7 +49,8 @@ void arco_mix_new(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/mix/ins int32 id, string name, int32 input, int32 gain;
+/* O2SM INTERFACE: /arco/mix/ins int32 id, string name, int32 input, int32 gain, 
+                                           float dur, int32 mode;
  */
 void arco_mix_ins(O2SM_HANDLER_ARGS)
 {
@@ -58,27 +59,31 @@ void arco_mix_ins(O2SM_HANDLER_ARGS)
     char *name = argv[1]->s;
     int32_t input = argv[2]->i;
     int32_t gain = argv[3]->i;
+    float dur = argv[4]->f;
+    int32_t mode = argv[5]->i;
     // end unpack message
 
     UGEN_FROM_ID(Mix, mix,id,  "arco_mix_ins");
     ANY_UGEN_FROM_ID(ugen, input, "arco_mix_ins");
     ANY_UGEN_FROM_ID(gain_ugen, gain, "arco_mix_ins");
 
-    mix->ins(name, ugen, gain_ugen);
+    mix->ins(name, ugen, gain_ugen, dur, mode);
 }
 
-/* O2SM INTERFACE: /arco/mix/rem int32 id, string name;
+/* O2SM INTERFACE: /arco/mix/rem int32 id, string name, float dur, int32 mode;
  */
 void arco_mix_rem(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     char *name = argv[1]->s;
+    float dur = argv[2]->f;
+    int32_t mode = argv[3]->i;
     // end unpack message
 
     UGEN_FROM_ID(Mix, mix,id,  "arco_mix_rem");
 
-    mix->rem(name);
+    mix->rem(name, dur, mode);
 }
 
 /* O2SM INTERFACE: /arco/mix/set_gain int32 id, string name, int32 chan, float gain;
@@ -117,10 +122,13 @@ static void mix_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/mix/new", "iii", arco_mix_new, NULL, true, true);
-    o2sm_method_new("/arco/mix/ins", "isii", arco_mix_ins, NULL, true, true);
-    o2sm_method_new("/arco/mix/rem", "is", arco_mix_rem, NULL, true, true);
-    o2sm_method_new("/arco/mix/set_gain", "isif", arco_mix_set_gain, NULL, true, true);
-    o2sm_method_new("/arco/mix/repl_gain", "isi", arco_mix_repl_gain, NULL, true, true);
+    o2sm_method_new("/arco/mix/ins", "isiifi", arco_mix_ins, NULL, true,
+                    true);
+    o2sm_method_new("/arco/mix/rem", "isfi", arco_mix_rem, NULL, true, true);
+    o2sm_method_new("/arco/mix/set_gain", "isif", arco_mix_set_gain, NULL,
+                    true, true);
+    o2sm_method_new("/arco/mix/repl_gain", "isi", arco_mix_repl_gain, NULL,
+                    true, true);
     // END INTERFACE INITIALIZATION
 }
 

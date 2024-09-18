@@ -714,6 +714,8 @@ class Ugen:
         chans = chans_
         rate = rate_
         inputs = {}  // mapping from input name (symbol) to a ugen
+        // in the case of Mix and perhaps others, inputs is an array
+        // containing an input name, input ugen and gain ugen
         if no_msg:
             return
         // calling const() if needed will send a message, so
@@ -767,13 +769,14 @@ class Ugen:
         var fader = fade_in_lookup.get(this)
         if fader:  // fade_in is in progress; convert to fade out
             fade_in_lookup.remove(this)
-            fader.set_mode(mode)
             fader.set_dur(dur)
             fader.set_goal(0)
+            fader.set_mode(mode)
             return fader
         else:
-            var faded = fader(this, 1, dur, 0, mode = mode).term()
+            var faded = fader(this, 1, dur, 0).term()
             output_ugen.swap(this, faded)
+            faded.set_mode(mode)
             return faded   // return the new fader ugen
 
 
@@ -787,21 +790,24 @@ class Ugen:
     # the fade-in or after the fade-in, you can call the
     # fade method to fade back out and remove this ugen from
     # the output_ugen.
-        var fader = fader(this, 0, dur, 1, mode = mode)
+        var fader = fader(this, 0, dur, 1)
         if term: fader.term()
         fade_in_lookup[this] = fader
         sched_select(rtsched)
-        sched_cause(dur + 0.1, fader, 'fade_in_complete', this)
+        fader.set_mode(mode)
         fader.play()
+        sched_cause(dur + 0.1, fader, 'fade_in_complete', this)
 
 
-    def smooth_disconnect(input_name, ugen, fade_time):
+    def smooth_disconnect(input_name, ugen, fade_time, 
+                          keyword mode = FADE_SMOOTH):
     # fade to nothing over fade_time (seconds); then disconnect from
     # some unit generator at fade_time + 0.1. This must be connected
     # to ugen, which must support a call to the set method as follows:
     #         ugen.set(input_name, zero_ugen)
-        var faded = fader(this, 1, 1).set_dur(fade_time).set_goal(0)
+        var faded = fader(this, 1, fade_time, 0)
         ugen.set(input_name, faded)
+        faded.set_mode(mode)
         sched_select(rtsched)
         sched_cause(fade_time + 0.1, ugen, 'set', input_name, zero_ugen)
 

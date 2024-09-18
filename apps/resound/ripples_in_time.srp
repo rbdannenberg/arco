@@ -1,7 +1,9 @@
 # Project Author: Roger B. Dannenberg
 # Date: July 26, 2023
 
-class Ripples_in_time:
+mvt6_seq = [0, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 2, 7]
+
+class Ripples_in_time (Movement):
 # Instance variables 
     var win, init_x, init_y
     var shift_delay_bank
@@ -9,6 +11,7 @@ class Ripples_in_time:
 
     def init(window, x, y):
     # Initialization of instance variables 
+        super.init("VI", 18)
         win = window
         init_x = x 
         init_y = y
@@ -19,10 +22,10 @@ class Ripples_in_time:
         for i = 0 to 5:
             m1.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0, 0])
 
-        this.set_ui()
+        setup_ui()
     
 
-    def set_ui():
+    def setup_ui():
         Radiobox(win, "VI. Ripples in Time", 
                  ["off", "1", "2", "3", "4", "5", "6", "7", "8"],
                  init_x, init_y, 175, 300, 'ripp_radio')
@@ -30,26 +33,26 @@ class Ripples_in_time:
     
 
     def ripple_handler(obj, event, x, y):
-        if x == 0:
-            m1.mute()
-        else:
-            if x == 1:
-                set_shift_delay(0.25, freq_ratio([-2, -5, -7, -12, -14]))
-            elif x == 2:
-                set_shift_delay(0.25, freq_ratio([-5, -7, -10, -12, -17]))
-            elif x == 3:
-                set_shift_delay(0.25, freq_ratio([-7, -9, -12, -16, -23]))
-            elif x == 4:
-                set_shift_delay(0.25, freq_ratio([-2, -3, -5, -7, -5]))
-            elif x == 5:
-                set_shift_delay(0.25, freq_ratio([-5, -7, -8, -10, -15]))
-            elif x == 6:
-                set_shift_delay(0.25, freq_ratio([-5, -9, -10, -14, -21]))
-            elif x == 7:
-                set_shift_delay(0.25, freq_ratio([-7, -12, -14, -19, -26]))
-            else: // x == 8
-                set_shift_delay(0.25, freq_ratio([-3, -5, -7, -8, -12]))
+        if not enabled and x != 0:
             m1.play()
+        if x == 0 and enabled:
+            m1.mute()
+        if x == 1:
+            set_shift_delay(0.25, freq_ratio([-2, -5, -7, -12, -14]))
+        elif x == 2:
+            set_shift_delay(0.25, freq_ratio([-5, -7, -10, -12, -17]))
+        elif x == 3:
+            set_shift_delay(0.25, freq_ratio([-7, -9, -12, -16, -23]))
+        elif x == 4:
+            set_shift_delay(0.25, freq_ratio([-2, -3, -5, -7, -5]))
+        elif x == 5:
+            set_shift_delay(0.25, freq_ratio([-5, -7, -8, -10, -15]))
+        elif x == 6:
+            set_shift_delay(0.25, freq_ratio([-5, -9, -10, -14, -21]))
+        elif x == 7:
+            set_shift_delay(0.25, freq_ratio([-7, -12, -14, -19, -26]))
+        elif x == 8:
+            set_shift_delay(0.25, freq_ratio([-3, -5, -7, -8, -12]))
 
 
     def freq_ratio(semi_arr): # From Hall of Mirrors
@@ -71,9 +74,17 @@ class Ripples_in_time:
             m1.set_gain(str(i), 0, 1) // set gain for right channel 
 
         for i = 0 to len(shift_arr):
-            shift_delay_bank.set_delay(i, (i+1)*delay) // Do I include latency? Confirm!!
+            shift_delay_bank.set_delay(i, (i + 1) * delay - resound_latency)
             shift_delay_bank.set_ratio(i, shift_arr[i]) // Set freq ratio
             
             // Adjust gains of active delay and pitch-shift objects
             m1.set_gain(str(i), (i + 1) % 2, 0) // set gain for left channel
             m1.set_gain(str(i), i % 2, 1) // set gain for right channel
+
+
+    def state_change():
+        ripp_radio.set_and_act(mvt6_seq[state])
+
+
+    def disable_real():
+        ripp_radio.set_and_act(0)

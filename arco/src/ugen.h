@@ -32,6 +32,12 @@ const int UGENTRACE = 32;     // print debugging info on this ugen. Mainly
 const int ZERO_ID = 0;
 const int ZEROB_ID = 1;
 
+// fade-in and fade-out types, used in Mix and Fader
+const int FADE_LINEAR = 0;        // linear fade
+const int FADE_EXPONENTIAL = 1;   // exponential (linear in dB) fade
+const int FADE_LOWPASS = 2;       // 1st-order low-pass smoothed fade
+const int FADE_SMOOTH = 3;        // raised-cosine (S-curve) fade
+
 extern char control_service_addr[64];  // where to send messages
         // this is set in audioio.cpp by /arco/open messages and is
         // "!" followed by the service followed by "/" so that you can

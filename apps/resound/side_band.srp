@@ -2,7 +2,7 @@
 # Date: June 7, 2023
 
 
-class The_side_band:
+class The_side_band (Movement):
 # Instance variables
     var mod_freq
     var sin1
@@ -12,14 +12,14 @@ class The_side_band:
 
     def init(window, x, y):
     # Initialization of instance variables
+        super.init("V", 1)
         win = window // Main UI window
 
-        // Setup UI
-        this.set_ui(x, y)
+        setup_ui(x, y)
         mod_freq = freq_slide.value()
 
 
-    def set_ui(x, y):
+    def setup_ui(x, y):
     # Setting up Movement1's UI
         Checkbox(win, "V. The Side Band", x + 5, y + 5, 
                  300, 'H', 'mod_check') // checkbox doubling as title
@@ -51,3 +51,11 @@ class The_side_band:
         mod_freq = x
         if sin1:
             sin1.set('freq', x)
+
+
+    def enable_real():
+        mod_check.set_and_act(true)
+
+
+    def disable_real():
+        mod_check.set_and_act(false)

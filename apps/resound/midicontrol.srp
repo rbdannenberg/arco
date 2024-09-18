@@ -1,0 +1,40 @@
+# midicontrol.srp -- control Separation Logic from MIDI pedals
+
+require "mididevice"
+
+DEBOUNCE = 1.0 // second
+
+class Resound_midi_handler (Midi_handler_default):
+    var last_time
+
+    def init():
+        last_time = 0
+        super.init()
+
+    def bounce():
+        var now = time_get()
+        if now > last_time + DEBOUNCE:
+           last_time = now
+           return false
+        return true
+
+    def note_on(ch, p, v):
+        if not bounce():
+            print "midicontrol: note_on", ch, p, v
+            resound_advance()
+            
+    def note_off(ch, p):
+        if not bounce():
+            print "midicontrol: note_off", ch, p
+
+    def control(ch, c, val):
+        if not bounce():
+            print "midicontrol: control", ch, c, val
+            resound_advance()
+
+
+def midi_control_init():
+    midi_devices = Midi_devices(prefs, open_later = true)
+    midi_devices.open_midi(device = 'midi_in_device')
+    midi_handler_default = Resound_midi_handler()
+    print "Resound midi control installed"

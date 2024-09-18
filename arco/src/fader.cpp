@@ -15,7 +15,7 @@ const char *Fader_name = "Fader";
 
 
 /* O2SM INTERFACE: /arco/fader/new int32 id, int32 chans, int32 input,
-                                   float current, int32 mode;
+                                   float current;
  */
 void arco_fader_new(O2SM_HANDLER_ARGS)
 {
@@ -24,11 +24,10 @@ void arco_fader_new(O2SM_HANDLER_ARGS)
     int32_t chans = argv[1]->i;
     int32_t input = argv[2]->i;
     float current = argv[3]->f;
-    int32_t mode = argv[4]->i;
     // end unpack message
 
     ANY_UGEN_FROM_ID(input_ugen, input, "arco_fader_new");
-    new Fader(id, chans, input_ugen, current, mode);
+    new Fader(id, chans, input_ugen, current);
 }
 
 
@@ -108,7 +107,7 @@ static void arco_fader_mode(O2SM_HANDLER_ARGS)
 static void fader_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/fader/new", "iiifi", arco_fader_new, NULL, true,
+    o2sm_method_new("/arco/fader/new", "iiif", arco_fader_new, NULL, true,
                     true);
     o2sm_method_new("/arco/fader/repl_input", "ii", arco_fader_repl_input,
                     NULL, true, true);

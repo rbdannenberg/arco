@@ -2,7 +2,7 @@
 # Date: June 7, 2023
 
 
-class Someone_is_following_you:
+class Someone_is_following_you (Movement):
 # Instance variables
     var dly1, dly2
     var dly1_value, dly2_value
@@ -12,17 +12,18 @@ class Someone_is_following_you:
     var mult1
     var pwe1
     var win, init_x, init_y
-    var state  // nil, 'running' or 'ending'
+    var fade_lock
 
 
     def init(window, x, y):
     # Initialization of instance variables
+        super.init("VII", 1)
         win = window // Main UI window
         init_x = x // set the starting x coord of the movement
         init_y = y // set the starting y coord of the movement
 
         // Setup UI
-        this.set_ui()
+        this.setup_ui()
 
         latency_value = latency_slider.value() * 0.001
         dly1_value = max(0, d1_slide.value() - latency_value)
@@ -34,11 +35,11 @@ class Someone_is_following_you:
         latency_slider.add_target_method(this, 'latency_handler')
 
 
-    def set_ui():
+    def setup_ui():
     # Setting up Movement1's UI
-        Checkbox(win, "VII. Someone is Following You", init_x+5, init_y+5, 
-                 300, 'H', 'd_check') // checkbox doubling as title
-        d_check.add_target_method(this, 'delay_handler')
+        Checkbox(win, "VII. Someone is Following You", init_x + 5, init_y + 5, 
+                 300, 'H', 'followcheck') // checkbox doubling as title
+        followcheck.add_target_method(this, 'followcheck_handler')
 
         // Sliders
         Labeled_slider(win, "del1", init_x+5, init_y + 50, 250, 28, 65,
@@ -65,16 +66,17 @@ class Someone_is_following_you:
             dly2.set('dur', dly2_value)
                 
 
-    def delay_handler(obj, event, x, y)
-        display "delay_handler", x, dly1_value, dly2_value
-        if x and state == 'ending':  // we're busy, so retry later
-            sched_select(rtsched)
-            sched_cause(0.1, this, 'delay_handler', obj, event, x, y)
-        elif x and state == nil:    // ready to create ugens
-            start_delays()
-        elif not x and state == 'running':
-            state = 'ending'
-            display "sify delay_handler", x, state, fade_value
+    def followcheck_handler(obj, event, x, y)
+        display "followcheck_handler", x, dly1_value, dly2_value
+        if x:
+            if fade_lock:  // we're busy, so retry later
+                sched_select(rtsched)
+                sched_cause(0.1, this, 'followcheck_handler', obj, event, x, y)
+            else:    // ready to create ugens
+                start_delays()
+        elif not x:
+            fade_lock = true
+            display "followcheck_handler", x, fade_lock, fade_value
             pwe1 = pweb(init = 1, fade_value, 0)
             mult1.set('x2', pwe1)
             sched_select(rtsched)
@@ -82,7 +84,6 @@ class Someone_is_following_you:
 
     
     def start_delays()
-        state = 'running'
         mix1 = mix(2)
         # delay gets left channel only if input is multichannel:
         dly1 = delay(input_ugen, dly1_value, 0.0, 2.0, 1)
@@ -94,14 +95,14 @@ class Someone_is_following_you:
 
 
     def finish_delays()
-        display "sify finish_delays"
+        display "finish_delays"
         mult1.mute()
         mult1 = nil
         pwe1 = nil
         mix1 = nil
         dly1 = nil
         dly2 = nil
-        state = nil  // all done
+        fade_lock = false  // all done
 
 
     def delay1_handler(obj, x)
@@ -118,3 +119,12 @@ class Someone_is_following_you:
 
     def fadelen_handler(obj, x)
         fade_value = x
+
+
+    def enable_real():
+        followcheck.set_and_act(true)
+
+
+    def disable_real():
+        followcheck.set_and_act(false)
+            

@@ -5,12 +5,15 @@ class Bell_obj:
 # Implements one of the bells and its user interface
     var bell_recplay  // recplay bell obj
     var radiobox  // the control
+    var number  // 0 to 3 index of this bell
     var name    // symbol used as identifier of mixer input
 
 
-    def init(win, name_):
-        name = name_
-        radiobox = Radiobox(win, "Bell 1", ["reset", "record", "play"],
+    def init(win, num_):
+        number = num_
+        name = intern("bell" + str(number + 1))
+        var title = "Bell " + str(number + 1)
+        radiobox = Radiobox(win, title, ["reset", "record", "play"],
                             'S', 'D', 175, 125, name)
         radiobox.add_target_method(this, 'bell_handler')
 
@@ -38,38 +41,43 @@ class Bell_obj:
         else:
             bell_recplay.record(false)
             bell_recplay.unrun()
-            bell_recplay.start(resound_latency)
+            // assume latency is small and doesn't matter here. Note that
+            // resound_latency is end-to-end audio latency, whereas any
+            // latency compensation here is unavailable, since it would be
+            // click-time vs. audio-input-time.
+            bell_recplay.start(0)
 
 
 
-class The_bell_tower:
-    var bells
+class The_bell_tower (Movement):
+    var bells  # array of 3 Bell_objs
     var bell_wet, mic_wet 
     var rvb
     var bell_mixer, rvb_mixer
     var final_mix, output
  
     def init(window, x, y):
-    # Initialization of instance variables
+        super.init("IV", 8)
         wxs_x = x
         wxs_y = y
 
         // main audio on/off checkbox, y - 4 to align with other text:
-        Checkbox(window, "IV. The Bell Tower", x, y - 4, 175, 'H', 'audio_on')
-        audio_on.add_target_method(this, 'audio_on_handler')
+        Checkbox(window, "IV. The Bell Tower", x, y - 4, 175, 'H',
+                 'btcheckbox')
+        btcheckbox.add_target_method(this, 'btcheckbox_handler')
 
-        # passes symbols 'bell1', 'bell2', 'bell3' as names:
-        bells = [Bell_obj(window, intern("bell" + str(i + 1))) for i = 0 to 3]
+        # Creates global with Bell_obj's for bell1, bell2, bell3:
+        bells = [Bell_obj(window, i) for i = 0 to 3]
 
         // setup remaining UI elements: sliders and fadeout button
-        this.set_ui(window)
+        setup_ui(window)
 
 
     def audio_init():
         // bell_mixer is the main mix for stereo output
-        bell_mixer = Mix(2)
+        bell_mixer = mix(2)
         // rvb_mixer combines bells and mic to form reverb input
-        rvb_mixer = Mix(1)
+        rvb_mixer = mix(1)
         // ~4.5dB pan law for bell1 (left), bell2 (right), bell3 (center):
         var pans = [[0.88, 0.22], [0.22, 0.88], [0.6, 0.6]]
 
@@ -81,13 +89,13 @@ class The_bell_tower:
         rvb.set_cutoff(filter_slider.value())
 
         // final_mix combines reverb and bells
-        final_mix = Mix(2)
+        final_mix = mix(2)
         final_mix.ins('rvb', rvb, [1, 1])  // expand to stereo
         final_mix.ins('bells', bell_mixer, 1)
 
         // final fade uses multiplier on finalmix output:
-        output = mult(final_mix, 1, 2)
-        output.play()
+        output = mult(final_mix, 1, 2)  // 2 channels (already implied
+        output.play()                   //             by final_mix)
 
 
     def audio_finish():
@@ -103,7 +111,7 @@ class The_bell_tower:
         bell_mixer = nil
 
 
-    def set_ui(win):
+    def setup_ui(win):
     # Setting up The_bell_tower's UI
         // Micwet
         Labeled_slider(win, "micwet", 'S', 'D', 275, 30, 75, 0, 1, 0.1,
@@ -126,8 +134,8 @@ class The_bell_tower:
         filter_slider.add_target_method(this, 'filter_handler')
 
         // Fadeout
-        Checkbox(win, "fadeout", 'S', 'D', 150, 'H', 'fadeout')
-        fadeout.add_target_method(this, 'fadeout_handler')
+        Checkbox(win, "fadeout", 'S', 'D', 150, 'H', 'btfadeout')
+        btfadeout.add_target_method(this, 'fadeout_handler')
 
         // Fadelength
         Labeled_slider(win, "fadelen", 'S', 'D', 275, 30, 75, 0, 30, 30,
@@ -146,7 +154,7 @@ class The_bell_tower:
             output.set('x2', 1)
 
 
-    def audio_on_handler(obj, event, x, y):
+    def btcheckbox_handler(obj, event, x, y):
         if x and not bell_mixer:
             audio_init()
         else:
@@ -176,3 +184,28 @@ class The_bell_tower:
     # Change the frequency of the lowpass filter
         if rvb:
             rvb.set_cutoff(x)
+
+
+    def enable_real():
+        btcheckbox.set_and_act(true)
+
+
+    def state_change():
+        # state bell value
+        #   1     0    1
+        #   2     0    2
+        #   3     1    1
+        #   4     1    2
+        #   5     2    1
+        #   6     2    2
+        if state > 0 and state < 7:
+            n = state - 1
+            belltower.bells[idiv(n, 2)].radiobox.set_and_act(n % 2 + 1)
+        elif state == 7:
+            btfadeout.set_and_act(t)
+        else:
+            print "INTERNAL ERROR: the_bell_tower.state_change(", state, ")"
+
+
+    def disable_real():
+        btcheckbox.set_and_act(false)

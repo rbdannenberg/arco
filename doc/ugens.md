@@ -176,11 +176,24 @@ Stop running `ugen` in the audio processing loop. The opposite of
 `run`. If `ugen` is not running, no actions is taken, and if `quiet`
 is false (the default), a warning is printed.
 
-### ugen.fade(dur)
+### ugen.fade(dur [, mode = FADE_SMOOTH])
 Fade the output of `ugen` to zero. `dur` is the fade time. This
 method inserts a fader between `ugen` and the audio output, so it
 does not affect other uses, such as connecting `ugen` to a mixer
-(see `mix()`).
+(see `mix()`). The `mode` can be FADE_LINEAR, FADE_EXPONENTIAL,
+FADE_LOWPASS, or FADE_SMOOTH. (See `fader` ugen for details).
+Initially, ugen should be playing (connected to audiot output.)
+When the fade completes, the ugen is disconnected so it can be
+freed.
+
+### ugen.fade_in(dur [, mode = FADE_SMOOTH] [,term = true])
+Similer to `ugen.play()` but the ugen is faded in. During or
+after the fade-in, `ugen.fade` can be called to fade out and
+disconnect the ugen from audio_output. For `mode`, see
+`ugen.fade` and `fader`. If `term` is true, the fader will
+be bypassed and deleted after the fade-in completes. After
+that, you can still call `ugen.fade` and it will create a
+new fader.
 
 ### ugen.get(name)
 Unit generators have named inputs. E.g. the `allpass` ugen has
@@ -429,37 +442,40 @@ apply to all channels in multi-channel instances.
 
 ### fader
 ```
-fader(input, current [, dur] [, goal] [, mode] [, chans])
+fader(input, current [, dur] [, goal] [, chans])
 .set_current(val [,chan]) // val can be an array of numbers
 .set_dur(dur)  // if not set, default is 0.1 seconds
-.set_mode(mode)
+.set_mode(mode)  // starts fade with latest parameters
 .set_goal(goal [, chan])  // goal can be an array of numbers
-// omitting chan sends to all channels, setting last channel
-// causes the fade to start.
+// omitting chan sends to all channels
 ```
 
 **Fader** is used as a smoothly varying gain control. See also
 **Smooth**.
 
-`/arco/fader/new id chans input current mode` - Create an
+`/arco/fader/new id chans input current` - Create an
 envelope-controlled multiplier. The initial gain is `current`
-(replicated if there are more than one channel). The `mode`
-is either 0 (linear), 1 (exponential), or 2 (relaxation),
-where exponential has a bias of 0.01, and relaxation uses
-a first-order low-pass filter that converges 99% in `dur`.
+(replicated if there are more than one channel).
 
 `/arco/fader/cur id chan val` - Set the current gain
 for the given channel (`chan`) to `val` (float). Setting
-a gain terminates any envelope in progress on that channel.
+a gain terminates any envelope in progress on that channel,
+which "freezes" the current value on other channels.
 
-`/arco/fader/dur id dur` - Set the fade duration (fora all
+`/arco/fader/dur id dur` - Set the fade duration (for all
 channels) to `dur`.
 
-`/arco/fader/mode id mode` - Change the mode to `mode`.
+`/arco/fader/mode id mode` - Set the mode to `mode` and start the
+fade. The `mode` is either 0 (FADE_LINEAR, linear), 1
+(FADE_EXPONENTIAL, exponential), 2 (FADE_LOWPASS, relaxation), or
+3 (FADE_SMOOTH, raised cosine), where exponential has a bias of
+0.01, and relaxation uses a first-order low-pass filter that
+converges 99% in `dur`. Raised cosine is an "S" curve with a half
+period cosine shape.
 
 `/arco/fader/goal id chan goal` - Set the goal for channel
-`chan` to `goal`. If `chan` is the *last* channel, the
-fade is started on all channels.
+`chan` to `goal`. This has no effect on the current fade if
+any, and takes effect when `/arco/fader/mode` is sent.
 
 ### feedback
 ```
@@ -835,8 +851,9 @@ The `mathb` messages begin with `/arco/mathb` and output is b-rate.
 ### mix
 ```
 mix([chans], wrap = true)
-.ins(name, ugen, gain [, at_end]) // name is a symbol
-.rem(name)
+.ins(name, ugen, gain [, dur] [, mode] [, at_end = fnsym])
+    // name is a symbol
+.rem(name, [, dur] [, mode])
 .find_name_of(ugen)
 .set_gain(name, gain [, chan])
 ```
@@ -845,6 +862,16 @@ Mix accepts any number of inputs. Each input has a name and an
 associated gain, which must be b-rate or c-rate. You can change the
 gain at any time. To change the input signal, insert a new input and
 gain using the same name.
+
+On insert, you can optionally fade in the gain from 0 using the
+`mode` of 0 (FADE_LINEAR, linear), 1 (FADE_EXPONENTIAL, exponential),
+2 (FADE_LOWPASS, relaxation) or 3 (FADE_SMOOTH, raised cosine) as in
+`fader`. To avoid fade in, you can set `dur` to 0. The default mode
+is FADE_SMOOTH (raised cosine).
+
+On remove, you can optionally fade out the gain to 0 using the
+same modes as fading in by setting dur to non-zero. The
+default mode is FADE_SMOOTH (raised cosine).
 
 Multiple channels are handled as follows: First, each mixer input
 consists of both an input signal and a gain. If both are single
@@ -875,12 +902,14 @@ which could be as simple as a Const Ugen with values [0.7, 0.7].
 `/arco/mix/new id chans wrap` - Create a new mixer with `chans` output
 channels. The mixer will "wrap" extra channels if wrap (integer) is non-zero.
 
-`/arco/mix/ins id name input gain` - Insert an input to the mixer. The
-`name` must not match the name of another input, or the existing input
-will be replaced.
+`/arco/mix/ins id name input gain dur mode` - Insert an input to the
+mixer. The `name` must not match the name of another input, or the
+existing input will be replaced. If `dur` is non-zero, the gain will
+fade in from zero according to `mode` (see above).
 
-`/arco/mix/rem id name` - Remove an input matching `name` from the
-mixer.
+`/arco/mix/rem id name dur mode` - Remove an input matching `name`
+from the mixer. If `dur` is non-zero, the gain will fade out to zero
+according to `mode` (see above).
 
 `/arco/repl_gain id name gain_id` - Set the gain for input `name` to
 object with id `gain_id`.

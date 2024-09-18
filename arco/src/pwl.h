@@ -21,7 +21,7 @@ public:
     Pwl(int id) : Ugen(id, 'a', 1) {
         current = 0.0f;        // real_run() will compute the first envelope
         seg_togo = INT_MAX;    //     after start(); initial output is 0
-        seg_incr = 0.0;
+        seg_incr = 0.0f;
         final_value = 0.0f;    // if no envelope is loaded, output will
         next_point_index = 0;  //     become constant zero.
         action_id = 0;
@@ -38,7 +38,10 @@ public:
             if (n > togo) n = togo;
             // n = number of samples to compute in this segment and this
             //     iteration, or 0 if we need to move to next segment
-            if (n == 0) { // set up next segment
+            // while is used so that durations of zero samples can be used
+            // to allow starting at a non-zero value using initial segment
+            // duration of zero.
+            while (n == 0) { // set up next segment
                 current = final_value;  // make output value exact
                 if (next_point_index >= points.size()) {
                     stop();
@@ -46,6 +49,8 @@ public:
                     if (current == 0 && (flags & CAN_TERMINATE)) {
                         terminate();
                     }
+                    seg_incr = 0.0f;
+                    n = togo;  // finish the block by filling with current
                 } else {
                     seg_togo = (int) points[next_point_index++];
                     final_value = points[next_point_index++];

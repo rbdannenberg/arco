@@ -1,14 +1,17 @@
-# Project Author: Roger B. Dannenberg
-# Date: June 7, 2023
+# four_of_a_kind.srp - implementation of first movement
+# 
+# Roger Dannenberg
+# jun 2023, revised sep 2024
 
 
-class Four_of_a_kind:
+class Four_of_a_kind (Movement)
 # Instance variables
     var recplay1, recplay2, recplay3 // recplay objects
     var win, init_x, init_y, latency // GUI params
 
     def init(window, x, y):
     # Initialization of instance variables
+        super.init("I", 9)
         // Recplay checkboxes
         recplay1 = nil
         recplay2 = nil
@@ -21,10 +24,6 @@ class Four_of_a_kind:
         // Setup UI
         this.set_ui()
 
-        // Initialize latency value in milliseconds
-        latency = latency_slider.value()/1000 
-        latency = 0 // Remove this after interpolation bug has been fixed.
-
 
     def set_ui():
     # Setting up Movement1's UI
@@ -36,25 +35,16 @@ class Four_of_a_kind:
         r1check.add_target_method(this, 'rec1handler')
 
         // Setting up rec2's checkbox and target
-        Checkbox(win, "rec2", init_x+5, 'D', 'S', 'S', 'r2check')
+        Checkbox(win, "rec2", 'S', 'D', 'S', 'S', 'r2check')
         r2check.add_target_method(this, 'rec2handler')
 
         // Setting up rec3's checkbox and target
-        Checkbox(win, "rec3", init_x+5, 'D', 'S', 'S', 'r3check')
+        Checkbox(win, "rec3", 'S', 'D', 'S', 'S', 'r3check')
         r3check.add_target_method(this, 'rec3handler')
 
         // Setting up the all checkbox and target
-        Checkbox(win, "all", init_x+5, 'D', 'S', 'S', 'allcheck')
+        Checkbox(win, "all", 'S', 'D', 'S', 'S', 'allcheck')
         allcheck.add_target_method(this, 'rec4handler')
-
-        latency_slider.add_target_method(this, 'lshandler')
-
-
-    def lshandler(obj, x):
-    # latency slider handler, note that Latency_slider is not a wxserpent
-    # built-in control and it has a different signature for the handler
-        display "four_of_a_kind lshandler latency (ms)", x
-        latency = x / 1000
 
 
     def rec1handler(obj, event, x, y):
@@ -73,7 +63,7 @@ class Four_of_a_kind:
 
     def rec2handler(obj, event, x, y):
     # Handler for rec2 checkbox
-        display "rec2handler", x, latency
+        display "rec2handler", x, resound_latency
 
         if x and recplay1:
             if not recplay2: // long fade time to test this feature
@@ -83,10 +73,7 @@ class Four_of_a_kind:
 
             # Play recplay1
             recplay1.play().atend(MUTE)
-
-            // Bug Alert: Latency causes distortion on audio chans (set to 0 instead)
-            // Tested this in apps/test as well. Highly suspect its due to interpolation
-            recplay1.start(latency) 
+            recplay1.start(0)  // start from beginning, player syncs to recplay1
         elif not recplay1:
             print "WARNING: There is no recplay1 Ugen!"
         else:
@@ -97,7 +84,7 @@ class Four_of_a_kind:
 
     def rec3handler(obj, event, x, y):
     # Handler for rec3 checkbox
-        display "rec3handler", x, latency
+        display "rec3handler", x, resound_latency
 
         if x and recplay1 and recplay2:
             if not recplay3: // long fade time to test this feature
@@ -107,9 +94,11 @@ class Four_of_a_kind:
 
             # Play recplay1 and recplay2
             recplay1.play().atend(MUTE)
-            recplay1.start(latency)
+            recplay1.start(0)
             recplay2.play().atend(MUTE)
-            recplay2.start(latency)
+            // when recplay2 recorded, it was "late" by resound_latency
+            // relatived to recplay1 playback, so start with an offset:
+            recplay2.start(resound_latency)
         elif not recplay1 or not recplay2:
             print "WARNING: Missing recplay1 or/and recplay2 Ugen!"
         else:
@@ -121,21 +110,47 @@ class Four_of_a_kind:
 
     def rec4handler(obj, event, x, y):
     # Handler for all checkbox
-        display "rec4handler", x, latency
+        display "rec4handler", x, resound_latency
 
         if x and recplay1 and recplay2 and recplay3:
             recplay1.play().atend(MUTE)
-            recplay1.start(latency)
+            recplay1.start(0)
             recplay2.play().atend(MUTE)
-            recplay2.start(latency)
+            recplay2.start(resound_latency)  // see latency notes above
             recplay3.play().atend(MUTE)
-            recplay3.start(latency)
+            recplay3.start(resound_latency)
         elif (not x) and recplay1 and recplay2 and recplay3:
-            recplay1.stop()
-            recplay2.stop()
-            recplay3.stop()
-            recplay1 = nil
-            recplay2 = nil
-            recplay3 = nil
+            disable_real()
         else:
             print "WARNING: Missing recplay1 or recplay2 or recplay3 Ugen!"
+
+
+    def state_change():
+        // note: state 0 does nothing
+        if state == 1:
+            r1check.set_and_act(t)
+        elif state == 2:
+            r1check.set_and_act(nil)
+        elif state == 3
+            r2check.set_and_act(t)
+        elif state == 4
+            r2check.set_and_act(nil)
+        elif state == 5
+            r3check.set_and_act(t)
+        elif state == 6
+            r3check.set_and_act(nil)
+        elif state == 7
+            allcheck.set_and_act(t)
+        elif state == 8
+            allcheck.set_and_act(nil)
+
+
+    def disable_real():
+        if recplay1: recplay1.stop()
+        if recplay2: recplay2.stop()
+        if recplay3: recplay3.stop()
+        recplay1 = nil
+        recplay2 = nil
+        recplay3 = nil
+        enabled = false
+        active_movement = nil

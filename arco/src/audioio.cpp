@@ -582,6 +582,7 @@ static int callback_entry(float *input, float *output,
         }
     }
 
+    
     Ugen_ptr arco_output = ugen_table[OUTPUT_ID];
     // The commented conditions will stop computation of audio output
     // when there is no real output stream to write to. It seems

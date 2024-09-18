@@ -18,12 +18,11 @@ print "INCLUDING fader.srp"
 fade_in_lookup = {}  // maps ugen to its fader
 
 
-def fader(input, current, optional dur, goal, chans,
-          keyword mode = FADE_SMOOTH):
+def fader(input, current, optional dur, goal, chans):
 # Create a Fader, with optional intialization. Example:
 #     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
 #     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
-    var fader = Fader(input, current, mode, chans)
+    var fader = Fader(input, current, chans)
     if dur:
         fader.set_dur(dur)
     if goal:
@@ -32,11 +31,11 @@ def fader(input, current, optional dur, goal, chans,
 
 
 class Fader (Ugen):
-    def init(input, current, optional mode = FADE_SMOOTH, chans):
+    def init(input, current, chans):
         if not chans:
             chans = max_chans(1, input)
         super.init(create_ugen_id(), "fader", chans, 'a', "Ufi",
-                   'input', input, 'current', current, 'mode', mode)
+                   'input', input, 'current', current)
 
 
     def set_current(current, optional chan):

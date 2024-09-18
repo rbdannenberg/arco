@@ -33,9 +33,6 @@ static void arco_pwlb_env(O2SM_HANDLER_ARGS)
     int index = 0;
     while ((ap = o2_get_next(O2_FLOAT))) {
         float f = ap->f;
-        if ((index & 1) == 0 && f < 1) {  // even index -> duration in samples
-            f = 1.0f;  // minimum segment length is 1 sample
-        }
         pwlb->point(f);
         index++;
     }
