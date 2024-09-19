@@ -92,7 +92,7 @@ private:
     /** Encodes pitches of detected chord into an int by setting corresponding bits*/
     int encodePitches(int p1, int p2, int p3, int p4);
     void minIndexToChord (int chordindex, int* rootNote, int* quality,
-                          int* intervals);
+                          int* intervals, int* pitches);
     
     /** Compares two harmonic reduction algorithms, a and b, with
      * reduction constants specified by the arguments. */

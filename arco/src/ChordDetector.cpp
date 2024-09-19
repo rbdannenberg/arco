@@ -264,7 +264,7 @@ void ChordDetector::calculateChordScores (double chord[NUM_CHORDS],
 
 //=======================================================================
 void ChordDetector::minIndexToChord (int chordindex, int* rootNote,
-                                     int* quality, int* intervals)
+                                     int* quality, int* intervals, int* pitches)
 {
     // major
     if (chordindex < 12)

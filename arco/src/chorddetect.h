@@ -69,7 +69,7 @@ public:
             input->unref();
         }
         assert(ugen->rate == 'a');
-        init_param(ugen, input, input_stride);
+        init_param(ugen, input, &input_stride);
         if (ugen->chans > 1) {
             printf("WARNING: Input has more than one channel, only the first channel is used for chord detection.\n");
         }
