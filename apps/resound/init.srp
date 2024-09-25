@@ -4,7 +4,6 @@
 
 require "debug"
 require "wxserpent"
-require "prob"
 require "arco"
 require "allugens"
 require "slider"
@@ -43,9 +42,12 @@ require "midicontrol.srp"
 //       called, state_change(0) is called.
 // - advance() is superclass method to advance to the next state
 // - concert_order - the order of movements for a concert with
-//       multiple movements: // either nil or ['mvt1', 'mvt2', ...] where
-//       symbols are bound to objects
-// - concert_index - index to current movement in concert mode, nil otherwise
+//       multiple movements: // either nil or [nil, 'mvt1', 'mvt2', ...] where
+//       symbols are bound to objects, e.g. symbol_value('mvt1') is an instance
+//       of Four_of_a_kind, a subclass of Movement.
+// - concert_index - index to current movement in concert mode, nil otherwise;
+//       if concert_index = 0, we are in concert mode but have not started
+//       the first movement of the concert, which will be at index 1.
 // - active_movement - the enabled movement if any, whether or not we are in
 //       concert mode
 //
@@ -71,9 +73,9 @@ mvt_name_y = 200
 
 
 def menu_from_concert_order(order):
-# produce a string like "Concert: " + VII, VI, IV, III, II", from
+# produce a string like "Start Concert: " + VII, VI, IV, III, II", from
 # ['mvt7', 'mvt6', 'mvt4', 'mvt3', 'mvt2']
-    var s = "Concert: "
+    var s = "Start Concert: "
     var needs_comma = false
     for mvt in order:
         if mvt:  # skip the initial nil
@@ -91,7 +93,8 @@ def mvt_menu_setup():
     mvt_menu = default_window.get_menu("Movement")
     mvt_menu.item("I. Four of a Kind", "", nil, nil, 'start_mvt1')
     mvt_menu.item("II. Hall of Mirrors", "", nil, nil, 'start_mvt2')
-    mvt_menu.item("III. O For a Thousand Tongues to Sing", "", nil, nil, 'start_mvt3')
+    mvt_menu.item("III. O For a Thousand Tongues to Sing", "", nil, nil,
+                  'start_mvt3')
     mvt_menu.item("IV. The Bell Tower", "", nil, nil, 'start_mvt4')
     mvt_menu.item("V. The Side Band", "", nil, nil, 'start_mvt5')
     mvt_menu.item("VI. Ripples in Time", "", nil, nil, 'start_mvt6')
@@ -102,7 +105,7 @@ def mvt_menu_setup():
 
 
 def update_concert_menu_item():
-# create or set "Concert: ..." menu item
+# create or set "Start Concert: ..." menu item
     if concert_menu_index:  // remove menu item so we can change it
         mvt_menu.delete(concert_menu_index)
         concert_menu_index = nil
@@ -127,7 +130,7 @@ mvt6 = "VI"
 def start_mvt7(rest ignore): start_movement('mvt7')
 mvt7 = "VII"
 
-concert_mode = false
+concert_index = nil  // integer means we are in concert mode
 // [nil, 'mvt7', 'mvt6', 'mvt4', 'mvt3', 'mvt2']
 // test: concert_order = [nil, 'mvt3', 'mvt2']
 
@@ -154,7 +157,6 @@ def set_concert_order(rest ignore):
     var mvts = [nil]
     var sp = String_parse(order)
     sp.skip_space()
-    sp.skip_over(",")
     while sp.remaining_len() > 0:
         // now, we must be at a roman numeral
         var rn = sp.get_alnum()
@@ -165,7 +167,8 @@ def set_concert_order(rest ignore):
             return concert_order_input_parse_error(order)
         mvts.append(mvt)
         sp.skip_space()
-        sp.skip_over(",")
+        sp.skip(",")  // skip comma if any
+        sp.skip_space()
     if len(mvts) > 0:
         concert_order = mvts
         prefs.set('concert_order', concert_order, true)
@@ -174,7 +177,14 @@ def set_concert_order(rest ignore):
 
 
 def start_concert(rest ignore):
-    concert_mode = 0
+# sets concert mode and indexes first movement in concert order
+    // shut down any movement that's already running:
+    if active_movement and active_movement.enabled:
+        active_movement.disable()  // sets active_movement to nil
+    // set to 0 indicating we haven't started the first movement
+    concert_index = 0
+    resound_advance()  // enable first movement of concert
+
 
 mvmt_disp = Statictext(default_window, "", mvt_name_x, mvt_name_y, 100, 100)
 mvmt_disp.set_font(72, WXS_FONT_ROMAN, 0, 0, nil, "")
@@ -190,27 +200,43 @@ def start_movement(m):
     movement.enable()
 
     // display the current movement
+    print "start_movement", movement.roman_numeral
     mvmt_disp.set_string(movement.roman_numeral)
 
 
 def resound_advance():
-    display "resound_advance", active_movement, concert_mode
     if active_movement:
-        active_movement.advance()
-        if not active_movement.enabled:  // must have just ended
-            active_movement = nil  // no longer an active movement
-            if concert_index:  // in concert mode, so go to next movement
-                concert_index = concert_index + 1
-                if len(concert_order) > concert_index:
-                    active_movement = symbol_value(concert_order[concert_index])
-                    active_movement.enable()
-                else:
-                    concert_index = nil  // end of concert order
-        if active_movement:
-            var disp = active_movement
-            if active_movement.state > 0:
-                disp = disp + chr(ord("`") + active_movement.state)
-            mvmt_disp.set_string(disp)
+        print "resound_advance", active_movement.roman_numeral, 
+        print "mvt#", concert_index, "state", active_movement.state
+    else:
+        print "resound_advance - no active_movement" 
+    if active_movement:
+        active_movement.advance()  // may disable() and clear active_movement
+        update_state_display()
+        if active_movement and active_movement.enabled:
+            return  // movement is still in progress
+        active_movement = nil  // no longer an active movement
+
+    // at this point, we have no active movement. Time to start one?
+    if concert_index:  // in concert mode, so go to next movement
+        concert_index = concert_index + 1
+        if len(concert_order) > concert_index:
+            active_movement = symbol_value(concert_order[concert_index])
+            active_movement.enable()
+        else:
+            concert_index = nil  // end of concert order
+        update_state_display()
+
+
+def update_state_display():
+    var disp = ""
+    if active_movement:
+        disp = active_movement.roman_numeral
+        if active_movement.state > 0:
+            disp = disp + chr(ord("`") + active_movement.state)
+    print "update_state_display to", disp, "mvt", active_movement
+    mvmt_disp.set_string(disp)
+
 
 
 ######################### END OF PEDAL CONTROL CODE ######################

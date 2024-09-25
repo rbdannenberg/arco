@@ -7,20 +7,26 @@ class Ripples_in_time (Movement):
 # Instance variables 
     var win, init_x, init_y
     var shift_delay_bank
-    var m1
+    var mixer
+    var mixer_on  // tells whether mixer is playing or not
+    var mix_gain  // smoothb objects to smooth mixer gain control
+
 
     def init(window, x, y):
     # Initialization of instance variables 
-        super.init("VI", 18)
+        super.init("VI", len(mvt6_seq))
         win = window
         init_x = x 
         init_y = y
 
         shift_delay_bank = Shift_delay_bank(5)
-        m1 = mix(2)
+        mixer = mix(2)
+        mix_gain = []
 
         for i = 0 to 5:
-            m1.ins(str(i), shift_delay_bank.get_shiftobjs()[i], [0, 0])
+            var mg = smoothb(0, 10, 2)
+            mix_gain.append(mg)
+            mixer.ins(str(i), shift_delay_bank.shift_objs[i], mg)
 
         setup_ui()
     
@@ -33,10 +39,15 @@ class Ripples_in_time (Movement):
     
 
     def ripple_handler(obj, event, x, y):
-        if not enabled and x != 0:
-            m1.play()
-        if x == 0 and enabled:
-            m1.mute()
+        if not mixer_on and x != 0:
+            print "ripple_handler: mixer.fade_in(0.2)"
+            mixer.fade_in(0.2)
+            mixer_on = true
+            print "ripple_handler: mixer.play()"
+        if x == 0 and mixer_on:
+            mixer.fade(0.2)
+            mixer_on = false
+            print "ripple_handler: mixer.mute()"
         if x == 1:
             set_shift_delay(0.25, freq_ratio([-2, -5, -7, -12, -14]))
         elif x == 2:
@@ -69,17 +80,17 @@ class Ripples_in_time (Movement):
     # Sets up the delay and shift values  
     # in the shift-delay bank
         # turn off shift units that are to be inactive
-        for i = len(shift_arr) to shift_delay_bank.get_len():
-            m1.set_gain(str(i), 0, 0) // set gain for left channel
-            m1.set_gain(str(i), 0, 1) // set gain for right channel 
+        for i = len(shift_arr) to shift_delay_bank.len_objs:
+            mix_gain[i].set_chan(0, 0)  // set gain for left channel
+            mix_gain[i].set_chan(1, 0)  // set gain for right channel 
 
         for i = 0 to len(shift_arr):
             shift_delay_bank.set_delay(i, (i + 1) * delay - resound_latency)
             shift_delay_bank.set_ratio(i, shift_arr[i]) // Set freq ratio
             
             // Adjust gains of active delay and pitch-shift objects
-            m1.set_gain(str(i), (i + 1) % 2, 0) // set gain for left channel
-            m1.set_gain(str(i), i % 2, 1) // set gain for right channel
+            mix_gain[i].set_chan(0, (i + 1) % 2)  // set gain for left channel
+            mix_gain[i].set_chan(1, i % 2)  // set gain for right channel
 
 
     def state_change():

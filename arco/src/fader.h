@@ -134,7 +134,6 @@ public:
                 } else {
                     run_channel = &Fader::chan_smooth_ar;
                 }
-                run_channel = &Fader::chan_smooth_br;
                 for (int i = 0; i < chans; i++) {
                     Fader_state &state = states[i];
                     // start where cos table is 1 and read it backwards

@@ -17,7 +17,7 @@ class Someone_is_following_you (Movement):
 
     def init(window, x, y):
     # Initialization of instance variables
-        super.init("VII", 1)
+        super.init("VII", 2)
         win = window // Main UI window
         init_x = x // set the starting x coord of the movement
         init_y = y // set the starting y coord of the movement
@@ -86,10 +86,13 @@ class Someone_is_following_you (Movement):
     def start_delays()
         mix1 = mix(2)
         # delay gets left channel only if input is multichannel:
+        # maybe input_ugen should fade-in, but it should be quiet
+        # when the movement starts, and if there's any audible pop,
+        # it should happen before the trumpet plays:
         dly1 = delay(input_ugen, dly1_value, 0.0, 2.0, 1)
         dly2 = delay(input_ugen, dly2_value, 0.0, 2.0, 1)
-        mix1.ins('inp1', dly1, [1, 0])
-        mix1.ins('inp2', dly2, [0, 1])
+        mix1.ins('inp1', dly1, [1, 0], 1.0)
+        mix1.ins('inp2', dly2, [0, 1], 1.0)
         mult1 = mult(mix1, 1, 2)
         mult1.play()
 
@@ -121,10 +124,10 @@ class Someone_is_following_you (Movement):
         fade_value = x
 
 
-    def enable_real():
-        followcheck.set_and_act(true)
-
-
     def disable_real():
         followcheck.set_and_act(false)
-            
+
+
+    def state_change():
+        if state == 1:
+            followcheck.set_and_act(true)

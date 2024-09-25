@@ -87,14 +87,14 @@ Ugen::~Ugen() {
     send_action_id();
     // special case: check for run set or output set references
     assert((flags & IN_RUN_SET) == 0);
-    printf("Ugen delete %d\n", id);
+    // printf("Ugen delete %d\n", id);
 }
 
 
 void Ugen::unref() {
     refcount--;
-    printf("Ugen::unref id %d %s new refcount %d\n",
-           id, classname(), refcount);
+    // printf("Ugen::unref id %d %s new refcount %d\n",
+    //        id, classname(), refcount);
     if (refcount == 0) {
         terminate();  // notify `atend` mechanism if it is pending
         // this should be in destructor, but destructors cannot call
@@ -233,7 +233,7 @@ void arco_free(O2SM_HANDLER_ARGS)
         ANY_UGEN_FROM_ID(ugen, id, "arco_free");
         if (ugen) {
             // printf("arco_free handler freeing %d #%d\n", id, ugen->refcount);
-            printf("arco_free %d (%s)\n", id, ugen->classname());
+            // printf("arco_free %d (%s)\n", id, ugen->classname());
             ugen->unref();
             ugen_table[id] = NULL;  // must happen *after* destructor
         }

@@ -76,10 +76,17 @@ def arco_ready():
     Checkbox(win, "Simple test", 5, 5, WIDTH, 20, 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
 
-    Checkbox(win, "Mixer test", 'S', 'D', 'S', 'S', 'mtcheckbox')
+    Checkbox(win, "Mixer test", 'S', 'D', idiv(WIDTH, 2), 'S', 'mtcheckbox')
     mtcheckbox.add_target_method(nil, 'play_mixer_test')
 
-    Checkbox(win, "Atonal sequence", 'S', 'D', 'S', 'S', 'atcheckbox')
+    Choice(win, 'R', 'S', 'S', 'S', 'mixmodechoice')
+    mixmodechoice.append("a. linear")
+    mixmodechoice.append("b. exponential")
+    mixmodechoice.append("c. lowpass")
+    mixmodechoice.append("d. smooth")
+
+    wxs_x = 5
+    Checkbox(win, "Atonal sequence", 'S', 'D', WIDTH, 'S', 'atcheckbox')
     atcheckbox.add_target_method(nil, 'play_atone_test')
 
     Button(win, "Play sound file", 'S', 'D', 'S', 'S', 'psfbutton')
@@ -168,9 +175,27 @@ def arco_ready():
     Statictext(win, ONOFF_OFF_TEXT, 'R', 'S', 'S', 'S', 'onofftext')
 
     wxs_x = COLUMN_TWO
-    Checkbox(win, "Fade", 'S', 'D', WIDTH, 'S', 'fadecheckbox')
+    Checkbox(win, "Fade", 'S', 'D', 60, 'S', 'fadecheckbox')
     fadecheckbox.add_target_method(nil, 'fadetest')
 
+    Choice(win, 'R', 'S', WIDTH, 'S', 'fadechoice')
+    fadechoice.append("a. 1.000 sec, linear")
+    fadechoice.append("b. 1.000 sec, exponential")
+    fadechoice.append("c. 1.000 sec, lowpass")
+    fadechoice.append("d. 1.000 sec, smooth")
+    fadechoice.append("e. 0.009 sec, linear")
+    fadechoice.append("f. 0.009 sec, exponential")
+    fadechoice.append("g. 0.009 sec, lowpass")
+    fadechoice.append("h. 0.009 sec, smooth")
+// These send in an audio signal where every sample is 1 so if
+// you print the result during fade, you'll see exactly the
+// fade curve.
+//    fadechoice.append("i. 0.009 sec, linear step")
+//    fadechoice.append("j. 0.009 sec, exponential step")
+//    fadechoice.append("k. 0.009 sec, lowpass step")
+//    fadechoice.append("l. 0.009 sec, smooth step")
+
+    wxs_x = COLUMN_TWO
     Checkbox(win, "Add Test", 'S', 'D', 'S', 'S', 'addcheckbox')
     addcheckbox.add_target_method(nil, 'addtest')
 
@@ -306,19 +331,22 @@ def play_simple_test(obj, event, x, y):
 
 // handler for mtcheckbox: play/stop some sine tones
 def play_mixer_test(obj, event, x, y):
+    var which = mixmodechoice.value()
+    var mode = ord(which) - ord("a")
     if x:
         m1 = mix(2)
 
         ms1 = sine(440.0, 0.01)
-        m1.ins('inp1', ms1, [1, 0])
+        m1.ins('inp1', ms1, [1, 0], 0.1, mode)
 
         ms2 = sine(880.0, 0.01)
+        ms3 = sine(1320.0, 0.007)
         sched_select(rtsched)
-        sched_cause(0.2, m1, 'ins', 'inp2', ms2, [0, 1])
+        sched_cause(0.2, m1, 'ins', 'inp2', ms2, [0, 1], 0.1, mode)
 
-        sched_cause(0.4, m1, 'ins', 'inp3', sine(1320.0, 0.007), 1)
+        sched_cause(0.4, m1, 'ins', 'inp3', ms3, 1, 0.1, mode)
 
-        sched_cause(0.6, m1, 'ins', 'inp4', sine(1760.0, 0.005), 1)
+        sched_cause(0.6, m1, 'ins', 'inp4', sine(1760.0, 0.005), 1, 0.1, mode)
 
         m1.play()
 
@@ -326,10 +354,21 @@ def play_mixer_test(obj, event, x, y):
         sched_cause(1.6, nil, 'mixer_gain_change_1')
         sched_cause(2.6, nil, 'mixer_gain_change_2')
     else:
-        m1.fade(1) // test for stereo fade output to silence:
+        // There is a bug here: if you stop before all sines are created
+        // and inserted, a .rem() call will fail, and later the sine will
+        // be inserted, so that sine will play forever. A fix would be to
+        // schedule a smarter insert operation that checks to make sure
+        // we haven't turned this mix test off before doing an .ins().
+        m1.rem('inp1', 1.0, mode) // test for stereo fade output to silence
+        m1.rem('inp2', 1.0, mode)
+        m1.rem('inp3', 1.0, mode)
+        m1.rem('inp4', 1.0, mode)
+
         m1 = nil  // delete references
         ms1 = nil
         ms2 = nil
+        ms3 = nil
+
 
 def mixer_gain_change_1():
     if m1:  // user has not stopped test yet
@@ -892,13 +931,18 @@ to_be_faded = nil
 
 def fadetest(obj, event, x, y):
     display "fadetest", x
+    var which = fadechoice.value()
+    which = ord(which) - ord("a")
+    var dur = 1 if which < 4 else 0.009
+    var mode = which % 4
     if x:
-        if to_be_faded:
-            to_be_faded.fade(1.0)
-        to_be_faded = sine(880, [0.3, 0.3])
-        to_be_faded.fade_in(0.9)  // starts playing
+        if which < 8:
+            to_be_faded = sine(880, [0.3, 0.3])
+        else:
+            to_be_faded = ugen_powi(zero_ugen, [0, 0])
+        to_be_faded.fade_in(dur, mode = mode)  // starts playing
     else:
-        to_be_faded.fade(0.9)
+        to_be_faded.fade(dur, mode = mode)
         to_be_faded = nil
 
 

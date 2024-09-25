@@ -260,7 +260,6 @@ public:
                 remove_input(i, &input_desc);
                 continue;
             }
-            i++;
             assert(input_desc.prev_gain.size() ==
                    MAX(input_desc.input->chans, input_desc.gain->chans));
 
@@ -348,6 +347,7 @@ public:
                 gprev_ptr++;  // we have a prev_gain for each generated channel
                         // even if gain is single channel (gain_stride == 0)
             }
+            i++;
         }
         if (inputs.size() == 0 && starting_size > 0 &&
             (flags & CAN_TERMINATE)) {

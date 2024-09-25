@@ -12,7 +12,7 @@ class The_side_band (Movement):
 
     def init(window, x, y):
     # Initialization of instance variables
-        super.init("V", 1)
+        super.init("V", 2)
         win = window // Main UI window
 
         setup_ui(x, y)
@@ -53,9 +53,13 @@ class The_side_band (Movement):
             sin1.set('freq', x)
 
 
-    def enable_real():
-        mod_check.set_and_act(true)
+    // def enable_real():
+    //     mod_check.set_and_act(true)
 
 
     def disable_real():
         mod_check.set_and_act(false)
+
+    def state_change():
+        if state == 1:
+            mod_check.set_and_act(true)

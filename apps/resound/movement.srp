@@ -20,8 +20,8 @@ class Movement:
         if enabled:
             return
         state = 0
-        state_change()
         enable_real()
+        state_change()
         enabled = true
         active_movement = this
 
@@ -46,6 +46,7 @@ class Movement:
 
     def advance():
     # advance state if enabled
+        display "advance", enabled, state, state_count
         if enabled:
             state = state + 1
             if state < state_count:

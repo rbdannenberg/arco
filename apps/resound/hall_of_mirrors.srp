@@ -29,29 +29,20 @@ class Hall_of_mirrors (Movement):
     var win, init_x, init_y // GUI params
     var shift_delay_bank // bank containing shift and delay units
     var mixer // Mixer containing delay and pitch-shifted ugens
+    var mix_gain // smoothb objects to adjust mixer gains smoothly
     var played_once
     var latency
     
 
     def init(window, x, y):
     # Initialization of instance variables
-        super.init("II", 6)
+        super.init("II", 7)
         win = window // Main UI window
         init_x = x // Starting x coord of movement
         init_y = y // Starting y coord of movement
         played_once = nil
         latency = latency_slider.value() / 1000
-
-        // Create shift delay bank
-        shift_delay_bank = Shift_delay_bank(5)
-
-        // Initialize mixer
-        mixer = mix(2)
-
-        // insert shift objects into the mixer
-        for i = 0 to 5:
-            mixer.ins(str(i), shift_delay_bank.shift_objs[i], [0, 0])
-        
+        mixer = nil
         setup_ui()
 
 
@@ -70,44 +61,43 @@ class Hall_of_mirrors (Movement):
         latency = x / 1000
 
 
-    def enable_real():
-    # Play shift-delays depending on radiobox selection
-        // If movement has been played once, restart it 
-        if played_once:
-            restart_hall()
-        mixer.play() // Play mixer if it was inactive
-
-
     def disable_real():
-        // if off is clicked after playing movement, turn off everything
-        sched_select(rtsched) // select scheduler
-        sched_cause(1.0, this, 'finish_hall') 
-        // Since movement has been played once, note it
-        played_once = true
+        dispose_dsp()
 
 
-    def finish_hall():
+    def dispose_dsp():
     # Mutes mixer, shift and delay objects and set to nil
-        // Do I delete mixer?
-        // What if the movement is played more than once?
-        mixer.mute()  
+        if not mixer:
+            return  // already removed mixer and dsp
+        print "dispose_dsp - removing all ugens"
+        mixer.fade(0.2)
         mixer = nil
         shift_delay_bank = nil
+        mix_gain = nil
+        hallmirror.set_value(0)
 
 
-    def restart_hall():
-    # Restart the hall of mirror movement
-      // Create shift delay bank
-      shift_delay_bank = Shift_delay_bank(5)
+    def create_dsp()
+    # Restart the hall of mirror movement if not already started
+        if mixer:
+            return  // already started
+        print "create_dsp - creating all ugens"
+        // Create shift delay bank
+        shift_delay_bank = Shift_delay_bank(5)
 
-      // Initialize mixer
-      mixer = mix(2)
+        // Initialize mixer
+        mixer = mix(2)
+        mix_gain = []
 
-      // insert shift objects into the mixer
-      for i = 0 to 5:
-        mixer.ins(str(i), shift_delay_bank.shift_objs[i], [0, 0])
+        // insert shift objects into the mixer
+        for i = 0 to 5:
+            var mg = smoothb(0, 10, 2)
+            mix_gain.append(mg)
+            mixer.ins(str(i), shift_delay_bank.shift_objs[i], mg)
         
-    
+        mixer.play()
+
+
     def freq_ratio(semi_arr):
     # returns an array of freq_ratios from 
     # semi_arr (semitone array)
@@ -124,8 +114,11 @@ class Hall_of_mirrors (Movement):
         // array
         tempo = 60 / 50 // seconds per beat at 50 BPM
         if x == 0:
-            disable()
-        elif x == 1:
+            dispose_dsp()
+        else:
+            create_dsp()  // normally remains on until disable_real()
+
+        if x == 1:
             semitone_arr = [2]
             set_shift_delay(tempo / 2, freq_ratio(semitone_arr))
         elif x == 2:
@@ -145,21 +138,24 @@ class Hall_of_mirrors (Movement):
     def set_shift_delay(delay, shift_arr):
     # Sets up the delay and shift values 
     # in the shift-delay bank
+        print "set_shift_delay with shift_arr", shift_arr
         # turn off shift units that are to be inactive
         for i = len(shift_arr) to shift_delay_bank.len_objs:
-            mixer.set_gain(str(i), 0, 0) // set gain for left channel
-            mixer.set_gain(str(i), 0, 1) // set gain for right channel 
+            mix_gain[i].set_chan(0, 0) // set gain for left channel
+            mix_gain[i].set_chan(1, 0) // set gain for right channel 
 
         for i = 0 to len(shift_arr):
             shift_delay_bank.set_delay(i, (i + 1) * delay - latency) 
             shift_delay_bank.set_ratio(i, shift_arr[i]) // Set freq ratio
             
             // Adjust gains of active delay and pitch-shift objects
-            mixer.set_gain(str(i), 1, 0) // set gain for left channel
-            mixer.set_gain(str(i), 1, 1) // set gain for right channel
+            mix_gain[i].set_chan(0, 1) // set gain for left channel
+            mix_gain[i].set_chan(1, 1) // set gain for right channel
 
 
     def state_change():
         // initially 0, values end at len(mvt2_seq)
-        hallmirror.set_and_act(state)
+        // both state 0 and state 1 invoke choice 0 = "off":
+        // state 2 invokes choice 1, etc.
+        hallmirror.set_and_act(max(state - 1, 0))
 

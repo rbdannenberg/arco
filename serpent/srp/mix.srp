@@ -46,6 +46,7 @@ class Mix (Ugen):
             if not mode:
                 mode = FADE_SMOOTH
             o2_send_cmd("/arco/mix/rem", 0, "Usfi", id, str(name), dur, mode)
+            display "/arco/mix/rem", id, str(name), dur, mode
             inputs.remove(name)
         return this
 

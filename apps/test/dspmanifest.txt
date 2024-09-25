@@ -26,3 +26,4 @@ onset
 spectralcentroid
 spectralrolloff
 o2audioio
+zitarev

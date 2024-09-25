@@ -57,7 +57,7 @@ class The_bell_tower (Movement):
     var final_mix, output
  
     def init(window, x, y):
-        super.init("IV", 8)
+        super.init("IV", 9)
         wxs_x = x
         wxs_y = y
 
@@ -101,7 +101,7 @@ class The_bell_tower (Movement):
     def audio_finish():
         for bell in bells:
             bell.audio_finish()
-        output.mute()
+        output.fade(0.2)
         output = nil
         final_mix = nil
         rvb_mixer = nil
@@ -109,6 +109,7 @@ class The_bell_tower (Movement):
         mic_wet = nil
         bell_wet = nil
         bell_mixer = nil
+        btfadeout.set_value(false)
 
 
     def setup_ui(win):
@@ -186,23 +187,28 @@ class The_bell_tower (Movement):
             rvb.set_cutoff(x)
 
 
-    def enable_real():
-        btcheckbox.set_and_act(true)
+    // def enable_real():  // do nothing
+    //     btcheckbox.set_and_act(true)
 
 
     def state_change():
         # state bell value
-        #   1     0    1
-        #   2     0    2
-        #   3     1    1
-        #   4     1    2
-        #   5     2    1
-        #   6     2    2
-        if state > 0 and state < 7:
-            n = state - 1
-            belltower.bells[idiv(n, 2)].radiobox.set_and_act(n % 2 + 1)
-        elif state == 7:
-            btfadeout.set_and_act(t)
+        #   1 (enable reverb)
+        #   2     0    1
+        #   3     0    2
+        #   4     1    1
+        #   5     1    2
+        #   6     2    1
+        #   7     2    2
+        #   8 (fade out)
+        #   9 (disable reverb)
+        if state == 1:
+            btcheckbox.set_and_act(true)
+        elif state > 1 and state < 8:
+            n = state - 2
+            bells[idiv(n, 2)].radiobox.set_and_act(n % 2 + 1)
+        elif state == 8:
+            btfadeout.set_and_act(true)
         else:
             print "INTERNAL ERROR: the_bell_tower.state_change(", state, ")"
 

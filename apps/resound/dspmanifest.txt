@@ -15,3 +15,4 @@ allpass
 olapitchshift
 feedback
 granstream
+smoothb

@@ -1,0 +1,59 @@
+# build_resound.srp -- build full stand-alone application
+#
+# Roger B. Dannenberg
+# Sep 2024
+
+# This script will only work if run in the same directory, and if
+# the serpent directory is in ../../../serpent/
+
+require "build_application"
+# now SERPENT is where to find lib, wxslib, etc.
+
+LIB = SERPENT + "lib/"
+PROG = SERPENT + "programs/"
+WXS = SERPENT + "wxslib/"
+ARCO = "../../serpent/srp/"
+
+SERPENTSOURCES = [
+    "allugens.srp",
+    "four_of_a_kind.srp",
+    "hall_of_mirrors.srp",
+    "init.srp",
+    "midicontrol.srp",
+    "movement.srp",
+    "o_for_a_thousand.srp",
+    "ripples_in_time.srp",
+    "side_band.srp",
+    "someone_is_following_you.srp",
+    "the_bell_tower.srp",
+
+    PROG + "midi-io.srp",
+    PROG + "mididevice.srp",
+    LIB + "debug.srp",
+    WXS + "wxserpent.srp",
+    WXS + "vumeter.srp",
+    WXS + "evlight.srp",
+    WXS + "scope.srp",
+    LIB + "prefs.srp",
+    LIB + "sched.srp",
+    LIB + "timemap.srp",
+    LIB + "utils.srp",
+    LIB + "precision.srp",
+    ARCO + "o2util.srp",
+    ARCO + "arco.srp",
+    ARCO + "windowmgr.srp",
+    ARCO + "arcoslider.srp",
+    ARCO + "arcoscope.srp",
+    ARCO + "vu.srp",
+    WXS + "slider.srp",
+    ARCO + "audiodev.srp",
+    ARCO + "reverb.srp",
+    ARCO + "constraint.srp",
+    LIB + "strparse.srp",
+    LIB + "termcolor.srp" ]
+#    ARCO + "pan.srp",
+
+
+APPFULLNAME = "Resound"
+build_release()
+exit()

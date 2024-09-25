@@ -16,16 +16,17 @@ class Resound_midi_handler (Midi_handler_default):
         if now > last_time + DEBOUNCE:
            last_time = now
            return false
+        print "bounce detected, event ignored"
         return true
 
-    def note_on(ch, p, v):
+    def noteon(ch, p, v):
         if not bounce():
-            print "midicontrol: note_on", ch, p, v
+            print "midicontrol: noteon", ch, p, v
             resound_advance()
             
-    def note_off(ch, p):
+    def noteoff(ch, p, v):
         if not bounce():
-            print "midicontrol: note_off", ch, p
+            print "midicontrol: noteoff", ch, p
 
     def control(ch, c, val):
         if not bounce():
@@ -36,5 +37,6 @@ class Resound_midi_handler (Midi_handler_default):
 def midi_control_init():
     midi_devices = Midi_devices(prefs, open_later = true)
     midi_devices.open_midi(device = 'midi_in_device')
-    midi_handler_default = Resound_midi_handler()
+    Resound_midi_handler()
     print "Resound midi control installed"
+    display "midi_control_init()", midi_handler_default

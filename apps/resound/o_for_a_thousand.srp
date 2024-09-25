@@ -41,7 +41,7 @@ class O_for_a_thousand (Movement):
     def oftts_state_handler(obj, event, x, y):
     # o_for_a_thousand hit events
         if not gran_obj:
-            print "Turn on the Movmement to initialize granular synth!"
+            print "Turn on the Movement to initialize granular synth!"
             return
 
         var LODUR = 0.04
@@ -65,23 +65,30 @@ class O_for_a_thousand (Movement):
 
     def ofttscheck_handler(obj, event, x, y):
         if x:
+            if gran_obj:  // in case of automated check when checked
+                return
+            print "O For 1K Tongues to Sing: creating gran_obj"
             gran_obj = granstream(input_ugen, 2, 0.714, true, 2)
             gran_obj.set_gain(0.25)
             delay_obj = delay(gran_obj, [0.6, 0.7], 0.1, 0.7, 2)
             oftts_radiobutton.set_and_act(0)  // simulate/force selection
             delay_obj.play()
         else:
-            delay_obj.mute() // Immediate stop
+            if not delay_obj:  // in case of automated uncheck when unchecked
+                return
+            print "O For 1K Tongues to Sing: quick fade and delete gran_obj"
+            delay_obj.fade(1.0) // Stop with fairly quick fade at end
             gran_obj = nil // Eventual cleanup
             delay_obj = nil
 
     // def enable_real() - handled by state_change when state == 0
 
     def state_change():
-        if state == 0:
-            oftts_checkbox.set_and_act(true)
+        oftts_checkbox.set_and_act(state > 0)
+        if state < 8:
+            oftts_radiobutton.set_and_act(max(state - 1, 0))
         else:
-            oftts_radiobutton.set_and_act(state - 1)
+            disable_real()
 
     def disable_real():
         oftts_checkbox.set_and_act(false)
