@@ -19,7 +19,7 @@ public:
     Sample_ptr input_samps;
     FFTCalculator fftcalc;
     
-    SpectralCentroid(int id, int chans, char *reply_addr) : Ugen(id, 0, 0), fftcalc(BL, AR)
+    SpectralCentroid(int id, char *reply_addr) : Ugen(id, 0, 0), fftcalc(BL, AR)
                 {
         printf("SpectralCentroid constructor id %d classname %s\n", id, classname());
         cd_reply_addr = NULL;
@@ -59,8 +59,7 @@ public:
         }
         assert(ugen->rate == 'a');
         init_param(ugen, input, &input_stride);
-        chans = ugen->chans;
-        if (chans > 1) {
+        if (ugen->chans > 1) {
             printf("WARNING: Input has more than one channel, only the first channel is used for spectral centroid calculation.\n");
         }
     }

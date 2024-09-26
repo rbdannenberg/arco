@@ -99,18 +99,17 @@ static void arco_spectralrolloff_repl_input(O2SM_HANDLER_ARGS)
 
 
 
-/* O2SM INTERFACE: /arco/spectralrolloff/new int32 id, int32 chans, string reply_addr, float threshold_;
+/* O2SM INTERFACE: /arco/spectralrolloff/new int32 id, int32 chans, string reply_addr, float threshold;
  */
 static void arco_spectralrolloff_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t chans = argv[1]->i;
-    char *reply_addr = argv[2]->s;
-    float threshold_ = argv[3]->f;
+    char *reply_addr = argv[1]->s;
+    float threshold = argv[2]->f;
     // end unpack message
 
-    new SpectralRolloff(id, chans, reply_addr, threshold_);
+    new SpectralRolloff(id, reply_addr, threshold);
 }
 
 
@@ -121,7 +120,7 @@ static void spectralrolloff_init()
                     NULL, true, true);
     o2sm_method_new("/arco/spectralrolloff/repl_input", "ii",
                     arco_spectralrolloff_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/spectralrolloff/new", "iisf", arco_spectralrolloff_new,
+    o2sm_method_new("/arco/spectralrolloff/new", "isf", arco_spectralrolloff_new,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
 }

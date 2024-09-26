@@ -86,11 +86,10 @@ static void arco_spectralcentroid_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t chans = argv[1]->i;
-    char *reply_addr = argv[2]->s;
+    char *reply_addr = argv[1]->s;
     // end unpack message
 
-    new SpectralCentroid(id, chans, reply_addr);
+    new SpectralCentroid(id, reply_addr);
 }
 
 
@@ -101,7 +100,7 @@ static void spectralcentroid_init()
                     NULL, true, true);
     o2sm_method_new("/arco/spectralcentroid/repl_input", "ii",
                     arco_spectralcentroid_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/spectralcentroid/new", "iis", arco_spectralcentroid_new,
+    o2sm_method_new("/arco/spectralcentroid/new", "is", arco_spectralcentroid_new,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
 }

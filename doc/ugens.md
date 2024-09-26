@@ -1381,6 +1381,45 @@ smoothly.)
 `/arco/smoothb/cutoff id cutoff` - set the cuoff frequency of the filter
 (same cutoff for all channels).
 
+### spectralcentroid
+```
+spectralcentroid(reply_addr)
+.set('input', ugen)
+```
+
+Calculates the spectral centroid every 1024 samples and sends it to 
+`reply_addr` as a float.
+
+`/arco/spectralcentroid/new id reply_addr` - Creates a new `spectralcentroid` 
+ugen
+
+`/arco/spectralcentroid/repl_input id input_id` - Set the input to object
+
+with id `input_id`.
+
+
+
+
+### spectralrolloff
+
+```
+spectralrolloff(reply_addr, threshold)
+.set('input', ugen)
+```
+
+Calculates the spectral rolloff, which is the frequency below which a 
+specified percentage (threshold) of the total spectral energy is contained. 
+The threshold should be a float between 0 and 1, representing a percentage.
+Calculations occur every 1024 samples, and `spectralrolloff` sends the result 
+as a float to `reply_addr`.
+
+
+
+`/arco/spectralrolloff/new id reply_addr` - Creates a new `spectralrolloff` ugen
+
+`/arco/spectralrolloff/repl_input id input_id` - Set the input to object
+with id `input_id`.
+
 ### sum, sumb
 ```
 sum([chans], wrap = true)
