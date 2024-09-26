@@ -160,29 +160,31 @@ def main():
                 if p.fixed:
                     achans = p.name + ".chans"
                     if p.chans == 1:
-                        chans_list += "    if " + achans + " != 1:\n"
-                        chans_list += "        print \"ERROR: '" + p.name + \
-                                "' input to Ugen '" + c + \
-                                "' must be single channel\"\n"
+                        chans_list += f"    if not isnumber({p.name}) and " + \
+                                      f"{achans} != 1:\n"
+                        chans_list += f"        print \"ERROR: '{p.name}' "+ \
+                                "input to Ugen '{c}' must be single channel\"\n"
                         chans_list += "        return nil\n"
                     else:
-                        chans_list += "    if " + achans + " != 1 and " +\
-                                achans + " != " + str(p.chans) + ":\n"
-                        chans_list += "        print \"ERROR: '" + p.name + \
-                                "' input to Ugen '" + c + \
-                                "' must have 1 or " + str(p.chans) + \
-                                ' channels"\n'
+                        chans_list += f"    if {achans} != 1 and " + \
+                                      f"{achans} != {str(p.chans)}:\n"
+                        chans_list += f"        print \"ERROR: '{p.name}' " + \
+                                      f"input to Ugen '{c}' must have 1 or " + \
+                                      f'{str(p.chans)} channels"\n'
                         chans_list += "        return nil\n"
                 else:
-                    chans_list = "max_chans(" + chans_list + ", " + \
-                                 p.name + ")"
+                    chans_list = f"max_chans({chans_list}, {p.name})"
             if s.output.fixed:
                 print(chans_list, file=srpf)
             else:  # check each input for required specified channel count or 1
                 print("    if not chans:", file=srpf)
-                print("        chans = " + chans_list, file=srpf)
-            ugen = f'    Ugen(create_ugen_id(), "{c}", chans, ' + \
-                   f"'{s.output.abtype}', " + f'"{typestring}"{srpparams})'
+                print("        chans =", chans_list, file=srpf)
+            omit_chans = ", omit_chans = true" if s.output.fixed else ""
+            chans = s.output.chans if s.output.fixed else "chans"
+
+            ugen = f'    Ugen(create_ugen_id(), "{c}", {chans}, ' + \
+                   f"'{s.output.abtype}', " + \
+                   f'"{typestring}"{omit_chans}{srpparams})'
             ugen = line_wrap(ugen, 9)
             print(ugen, file=srpf)
             print("", file=srpf)

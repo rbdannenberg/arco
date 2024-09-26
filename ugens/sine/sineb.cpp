@@ -28,7 +28,7 @@ void arco_sineb_new(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/sineb/repl_freq int32 id, int32 freq_id;
  */
-static void arco_sineb_repl_freq (O2SM_HANDLER_ARGS)
+static void arco_sineb_repl_freq(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -58,7 +58,7 @@ static void arco_sineb_set_freq (O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/sineb/repl_amp int32 id, int32 amp_id;
  */
-static void arco_sineb_repl_amp (O2SM_HANDLER_ARGS)
+static void arco_sineb_repl_amp(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;

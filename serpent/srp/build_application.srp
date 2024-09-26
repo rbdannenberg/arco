@@ -61,9 +61,9 @@ def readint():
     return i
 
 
-def removefile(path):
+def removefile(path, optional warn = true):
     var err = unlink(path)
-    if err:
+    if err and warn:
         display "WARNING (removefile)", path, err
 
 
@@ -115,7 +115,7 @@ def changeplist(plist, attr, value):
 
 
 def system_check(cmd):
-    print cmd
+    print "RUN COMMAND:", cmd
     var rslt = system(cmd)
     if rslt != t:
         display "system_check", rslt, cmd
@@ -147,20 +147,53 @@ def build_release():
 
     print
 
-    removefile(APPNAME + ".zip")
-
     var rp = REL + APPDIRNAME + "/Contents/"
     var rl = rp + "Resources/"
     var macos = rp + "MacOS/"
+    var frameworks = rp + "/Frameworks/"
+
     removedir(rp + "_CodeSignature")
     copyfiles(rl, SERPENTSOURCES)
     copyfile(rl + APPNAME + ".icns", ICONNAME)
+
     var plist = rp + "Info.plist"
     make_plist(plist)
     make_launch_file(rp + "MacOS/srp_launch")
+    # now APPBINARY is defined
+
+    # apparently, wxWidgets depends on a regular expression library,
+    # so we are going to ship it in the Frameworks directory and 
+    # set it up to be searched by dyld:
+    createdir(frameworks)
+    var dylib = "libpcre2-32.0.dylib"
+    var orig_path = "/opt/homebrew/opt/pcre2/lib/" + dylib
+    var binary_path = macos + APPBINARY
+    copyfile(frameworks + dylib, orig_path)
+
+    # not sure if this is necessary, but messing with binary seems to
+    # invalidate signature, but who knows if it is needed ...
+    # system_check("codesign --remove-signature " + binary_path)
+             
+    # change install name of the .dylib to use @rpath
+    system_check("install_name_tool -id @executable_path/../Frameworks/" + 
+                 dylib + " " + frameworks + dylib)
+    # the dylib needs to be signed since we changed its "install name":
+    system_check("codesign -f -s - " + frameworks + dylib)
+    # modify app to look for .dylib in the Frameworks directory
+    system_check("install_name_tool -change " + orig_path + 
+                 " @rpath/" + dylib + " " + binary_path)
+    # add @rpath to the executable
+    system_check("install_name_tool -add_rpath " + 
+                 "@executable_path/../Frameworks " + binary_path)
+    # now that we mucked with the binary, let's pretend to sign it:
+    system_check("codesign -f -s - " + binary_path)
+    # this is just a diagnostic to see if @rpath includes Frameworks
+    print("Here is the @rpath from the adjusted binary:")
+    system_check("otool -l " + binary_path + " | grep RPATH -A2")
 
     print
     print "----------------- make zip file ------------------"    
+    removefile(APPFULLNAME + ".zip", false)  // suppress warning
     makezipfile(REL, APPFULLNAME + VERSION, [APPDIRNAME])
     print "==================== ALL DONE ==================="
 

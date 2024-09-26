@@ -266,6 +266,9 @@ def arco_ready():
     Checkbox(win, "O2audioio Test", 'S', 'D', WIDTH, 'S', 'o2audioiocheckbox')
     o2audioiocheckbox.add_target_method(nil, 'o2audioiotest')
     
+    Checkbox(win, "Zitarev Test", 'S', 'D', WIDTH, 'S', 'zitarevcheckbox')
+    zitarevcheckbox.add_target_method(nil, 'zitarevtest')
+
     ui_initialized = true
     default_window.fit_to_children()
 
@@ -571,7 +574,7 @@ def rvbtest(obj, event, x, y):
 // Creates a long PWE, but when you uncheck, it decays to zero
 
 def pweutest(obj, event, x, y):
-    display "pweutest - test a reverb with noise input", x
+    display "pweutest - test pweb noise envelope", x
     if x:
         var noise = ugen_rand(-0.5, 0.5)
         pweu1 = pweb(0.1, 0.05, 10, 1, 11, 0)
@@ -1169,6 +1172,21 @@ def o2audioiotest(obj, event, x, y):
     else:
         o2audioioout.mute()
         o2audioioout = nil
+
+
+########## Zitarev Test ##############
+
+def zitarevtest(obj, event, x, y):
+    display "zitarevtest", x
+    if x:
+        var noise = ugen_rand(-0.1, 0.1)
+        zrev = zitarev(noise, 0.5, 0.5)  // snd, wet, gain
+        zrev.play()
+    else:
+        zrev.set('snd', zero_ugen)
+        sched_select(rtsched)
+        sched_cause(6, zrev, 'mute')
+        zrev = nil  // rvb1 and noise should be freed in 6 sec
 
 
 ########## Main Initialization ################

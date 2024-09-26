@@ -22,5 +22,6 @@ def sttest(in, hz1, hz2):
         print "ERROR: 'hz2' input to Ugen 'sttest' must be single channel"
         return nil
 
-    Ugen(create_ugen_id(), "sttest", chans, "UUU", 'in', in, 'hz1', hz1, 'hz2',
-         hz2)
+    Ugen(create_ugen_id(), "sttest", chans, 'a', "UUU", 'in', in, 'hz1', hz1,
+         'hz2', hz2)
+

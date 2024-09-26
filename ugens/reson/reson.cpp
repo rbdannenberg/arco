@@ -30,7 +30,7 @@ void arco_reson_new(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/reson/repl_snd int32 id, int32 snd_id;
  */
-static void arco_reson_repl_snd (O2SM_HANDLER_ARGS)
+static void arco_reson_repl_snd(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -60,7 +60,7 @@ static void arco_reson_set_snd (O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/reson/repl_center int32 id, int32 center_id;
  */
-static void arco_reson_repl_center (O2SM_HANDLER_ARGS)
+static void arco_reson_repl_center(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -90,7 +90,7 @@ static void arco_reson_set_center (O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/reson/repl_q int32 id, int32 q_id;
  */
-static void arco_reson_repl_q (O2SM_HANDLER_ARGS)
+static void arco_reson_repl_q(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;

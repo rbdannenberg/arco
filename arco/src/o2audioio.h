@@ -218,7 +218,7 @@ public:
 
     // Keep track of minimum input buffer content
     int min_buffer_len;
-    int last_report_frame_count;
+    int64_t last_report_frame_count;
 
 
     const char *classname() { return O2audioio_name; }

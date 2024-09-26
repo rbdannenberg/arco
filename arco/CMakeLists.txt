@@ -42,6 +42,7 @@ set(ARCO_SRC
     multx.cpp multx.h
     const.cpp const.h 
     upsample.cpp upsample.h 
+    dnsampleb.cpp dnsampleb.h
     audioblock.cpp audioblock.h
     testtone.cpp testtone.h
 )

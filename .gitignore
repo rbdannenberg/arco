@@ -127,3 +127,5 @@ CMakeCache.txt
 /preproc/__pycache__/
 
 /apps/resound/Release/
+
+/ugens/zitarev/zitarev_abb_a.fh

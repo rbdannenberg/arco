@@ -138,11 +138,12 @@ inner loop computation we just substitute fSlowN_prev for fSlowN.
 import os
 import sys
 import glob
+import re
 from pathlib import Path
 from implementation import prepare_implementation
 from params import get_signatures
 
-def generate_arco_cpp(classname, impl, rate, initializer_code, outf):
+def generate_arco_cpp(classname, impl, signature, rate, initializer_code, outf):
     """
     write the .cpp file to outf
     rate is ? (currently not used)
@@ -155,46 +156,50 @@ def generate_arco_cpp(classname, impl, rate, initializer_code, outf):
     cnlc = classname.lower()
     print('#include "' + cnlc + '.h"\n', file=outf)
     print(f'const char *{classname}_name = "{classname}";\n', file=outf)
-
+    print("generate_arco_cpp: class", classname, "signature:", signature)
     inputs = ""
-    for name in impl.param_names:
-        inputs += ", int32 " + name
-    print(f"/* O2SM INTERFACE: /arco/{cnlc}/new",
-          f"int32 id, int32 chans{inputs};\n */", file=outf)
+    for param in signature.params:
+        inputs += ", int32 " + param.name
+    print(f"/* O2SM INTERFACE: /arco/{cnlc}/new int32 id", file=outf, end="")
+    if not signature.output.fixed:
+        print(", int32 chans", file=outf, end="")
+    print(f"{inputs};\n */", file=outf)
     print(f"void arco_{cnlc}_new(O2SM_HANDLER_ARGS)\n{{", file=outf)
     print("    // begin unpack message (machine-generated):", file=outf)
     print("    // end unpack message\n", file=outf)
     parameters = ""
-    for name in impl.param_names:
-        print(f'    ANY_UGEN_FROM_ID({name}_ugen, {name}, "arco_{cnlc}_new");',
-              file=outf)
-        parameters += f", {name}_ugen"
-    print(f"\n    new {classname}(id, chans{parameters});", file=outf)
+    for param in signature.params:
+        print(f'    ANY_UGEN_FROM_ID({param.name}_ugen, {param.name},',
+              f'"arco_{cnlc}_new");', file=outf)
+        parameters += f", {param.name}_ugen"
+    chans = "" if signature.output.fixed else ", chans"
+    print(f"\n    new {classname}(id{chans}{parameters});", file=outf)
     print("}\n\n", file=outf)
     
-    for name in impl.param_names:
-        print(f"/* O2SM INTERFACE: /arco/{cnlc}/repl_{name}",
-              f"int32 id, int32 {name}_id;\n */", file=outf)
-        print(f'static void arco_{cnlc}_repl_{name} (O2SM_HANDLER_ARGS)\n{{',
-              file=outf)
+    for param in signature.params:
+        print(f"/* O2SM INTERFACE: /arco/{cnlc}/repl_{param.name}",
+              f"int32 id, int32 {param.name}_id;\n */", file=outf)
+        print(f'static void arco_{cnlc}_repl_{param.name}' + \
+              "(O2SM_HANDLER_ARGS)\n{", file=outf)
         print("    // begin unpack message (machine-generated):", file=outf)
         print("    // end unpack message\n", file=outf)
         
         print(f"    UGEN_FROM_ID({classname}, {cnlc}, id,",
-              f'"arco_{cnlc}_repl_{name}");', file=outf)
-        print(f"    ANY_UGEN_FROM_ID({name}, {name}_id,",
-              f'"arco_{cnlc}_repl_{name}");', file=outf)
-        print(f"    {cnlc}->repl_{name}({name});\n}}\n\n", file=outf)
+              f'"arco_{cnlc}_repl_{param.name}");', file=outf)
+        print(f"    ANY_UGEN_FROM_ID({param.name}, {param.name}_id,",
+              f'"arco_{cnlc}_repl_{param.name}");', file=outf)
+        print(f"    {cnlc}->repl_{param.name}({param.name});\n}}\n\n",
+              file=outf)
 
-        print(f"/* O2SM INTERFACE: /arco/{cnlc}/set_{name}",
+        print(f"/* O2SM INTERFACE: /arco/{cnlc}/set_{param.name}",
               "int32 id, int32 chan, float val;\n */", file=outf)
-        print(f"static void arco_{cnlc}_set_{name}",
+        print(f"static void arco_{cnlc}_set_{param.name}",
               "(O2SM_HANDLER_ARGS)\n{", file=outf)
         print("    // begin unpack message (machine-generated):", file=outf)
         print("    // end unpack message\n", file=outf)
         print(f"    UGEN_FROM_ID({classname}, {cnlc}, id,",
-              f'"arco_{cnlc}_set_{name}");', file=outf)
-        print(f"    {cnlc}->set_{name}(chan, val);\n}}\n\n", file=outf)
+              f'"arco_{cnlc}_set_{param.name}");', file=outf)
+        print(f"    {cnlc}->set_{param.name}(chan, val);\n}}\n\n", file=outf)
 
     print(f"static void {cnlc}_init()\n{{", file=outf)
     print("    // O2SM INTERFACE INITIALIZATION: (machine generated)",
@@ -202,11 +207,13 @@ def generate_arco_cpp(classname, impl, rate, initializer_code, outf):
     print(f'    o2sm_method_new("/arco/{cnlc}/new',
           f'"ii{"i" * len(impl.param_names)}", arco_{cnlc}_new, NULL,'
           "true, true);", file=outf)
-    for name in impl.param_names:
-        print(f'    o2sm_method_new("/arco/{cnlc}/repl_{name}",',
-              f'"ii", arco_{cnlc}_repl_{name}, NULL, true, true);', file=outf)
-        print(f'    o2sm_method_new("/arco/{cnlc}/set_{name}",',
-              f'"if", arco_{cnlc}set_{name}, NULL, true, true);', file=outf)
+    for param in signature.params:
+        print(f'    o2sm_method_new("/arco/{cnlc}/repl_{param.name}",',
+              f'"ii", arco_{cnlc}_repl_{param.name}, NULL, true, true);',
+              file=outf)
+        print(f'    o2sm_method_new("/arco/{cnlc}/set_{param.name}",',
+              f'"if", arco_{cnlc}set_{param.name}, NULL, true, true);',
+              file=outf)
     print("    // END INTERFACE INITIALIZATION", file=outf)
 
     print(initializer_code, file=outf)
@@ -518,7 +525,7 @@ def insert_interpolation(body, varlist):
     body_begin = body[0 : loc]
     body_end = body[loc : ]
     for var in slow_vars:
-        body_end = body_end.replace(var, var + "_fast")
+        body_end = replace_symbols(body_end, var, var + "_fast")
     return (body_begin + body_end, slow_vars)
 
 
@@ -697,7 +704,7 @@ def generate_channel_method(fhfile, classname, signature,
     # change each instvar to state->instvar
     for iv in instvars:
         if not iv.isconst:
-            compute = compute.replace(iv.name, "state->" + iv.name)
+            compute = replace_symbols(compute, iv.name, "state->" + iv.name)
 
     # add code for interpolated parameters
     print("add code for interpolation") # , params_info is", params_info)
@@ -755,6 +762,7 @@ class Vardecl:
     def __init__(self, type, isconst):
         self.type = type
         self.isconst = isconst
+        self.name = None
         self.arrayspec = ""
 
     def __str__(self):
@@ -780,10 +788,10 @@ def find_class_declaration(classname, fimpl):
 def find_private_variables(fimpl, classname):
     """
     Find the private variables in the declaration of classname.
-    remove fsampleRate, fConst*
-    Return: list of dictionaries with type, name, arrayspec, e.g. 
-              [{"type": "float", "name": "fRec1", "arraylen": "2"}, 
-               {"type": "float", "name": "f2", "arraylen": ""}, ...]
+    remove fsampleRate
+    Return: list of Vardecl with type, isconst, name, arrayspec, e.g. 
+              [<Vardecl "float" False "fRec1" "2">, 
+               <Vardecl "float" True "fConst1" "">, ...]
             or return None on error.
     """
     loc = find_class_declaration(classname, fimpl)
@@ -802,8 +810,9 @@ def find_private_variables(fimpl, classname):
     for p in privates:
         if p.find("fSampleRate") < 0:
             decl = p.strip().split()  # [type, var;]
-            # initialize with type and const
-            instvar = Vardecl(decl[0], p.find("fConst") >= 0)
+            # initialize with type and isconst
+            instvar = Vardecl(decl[0], 
+                              p.find("fConst") >= 0 or p.find("iConst") >= 0)
             bracket = decl[1].find("[")
             if bracket < 0:
                 instvar.name = decl[1][0 : -1]  # remove semicolon
@@ -842,6 +851,18 @@ def generate_state_struct(classname):
     return (privates, state_struct, state_struct2)
 
 
+def replace_symbols(src, sym, replacement):
+    """Replace all symbols in src that match sym with replacement.
+    Similar to src.replace(sym, replacement), but for example,
+    "fRec1" will not match or replace "fRec10".
+    """
+    # Escape the symbol to handle any special characters
+    escaped_sym = re.escape(sym)
+    # Use word boundaries to match the exact symbol
+    pattern = r'\b' + escaped_sym + r'\b'
+    return re.sub(pattern, replacement, src)
+
+
 def generate_state_init(classname, instvars, slow_vars):
     """
     output loop body that initializes states[i], returns True if error
@@ -859,7 +880,8 @@ def generate_state_init(classname, instvars, slow_vars):
     # replace variable v with states[i].v
     for var in instvars:
         if not var.isconst:
-            clear_meth = clear_meth.replace(var.name, f"states[i].{var.name}")
+            clear_meth = replace_symbols(clear_meth, var.name, 
+                                         f"states[i].{var.name}")
     print("** body of clear meth\n" + clear_meth + "\n------")
     
     state_init = "    void initialize_channel_states() {\n"
@@ -1081,10 +1103,13 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
             var_decls += f"    {iv.type} {iv.name}{arrayspec};\n"
 
     ## Generate the constructor
-    constructor = f"\n    {classname}(int id, int nchans"
+    chan_param = "" if signature.output.fixed else ", int nchans"
+    constructor = f"\n    {classname}(int id{chan_param}"
     for p in sig_params:
         constructor += f", Ugen_ptr {p}_"
-    constructor += f") :\n            Ugen(id, '{rate}', nchans) {{\n"
+    chan_param = str(signature.output.chans) if signature.output.fixed \
+                 else "nchans"
+    constructor += f") :\n            Ugen(id, '{rate}', {chan_param}) {{\n"
 
     for p in sig_params:
         constructor += f"        {p} = {p}_;\n"
@@ -1150,11 +1175,16 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
 
     ## Generate init_* methods shared by constructor and repl_* methods
     for i, p in enumerate(sig_params):
-        stride_expr = "0"
+        # with "fixed" channel counts, we only use stride when the input
+        # has multiple channels. NULL means there is no stride variable
+        # because there is no loop over a variable number of channels
+        # (channel counts are fixed) and since there is only one channel,
+        # we do not have to step by stride to access successive channels.
+        stride_expr = "NULL"
         if signature.params[i].chans > 1 or not signature.params[i].fixed:
-            stride_expr = p + "_stride"
+            stride_expr = "&" + p + "_stride"
         methods += f"    void init_{p}(Ugen_ptr ugen) {{ " + \
-                   f"init_param(ugen, {p}, &{stride_expr}); }}\n\n"
+                   f"init_param(ugen, {p}, {stride_expr}); }}\n\n"
     
     ## Generate channel methods -- process one channel of input/output
     if rate == 'a':
@@ -1426,6 +1456,6 @@ def main():
         init_code = generate_arco_h(classname, impl, signature, output_rate,
                                       fhfiles, outf)
     with open(classnamelc + ".cpp", "w") as outf:
-        generate_arco_cpp(classname, impl, output_rate, init_code, outf)
+        generate_arco_cpp(classname, impl, signature, output_rate, init_code, outf)
     
 main()

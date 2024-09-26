@@ -5,7 +5,6 @@
  */
 
 #include "arcougen.h"
-#include "dnsampleb.h"
 
 const char *Dnsampleb_name = "Dnsampleb";
 

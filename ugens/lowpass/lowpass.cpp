@@ -28,7 +28,7 @@ void arco_lowpass_new(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/lowpass/repl_snd int32 id, int32 snd_id;
  */
-static void arco_lowpass_repl_snd (O2SM_HANDLER_ARGS)
+static void arco_lowpass_repl_snd(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -58,7 +58,7 @@ static void arco_lowpass_set_snd (O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/lowpass/repl_cutoff int32 id, int32 cutoff_id;
  */
-static void arco_lowpass_repl_cutoff (O2SM_HANDLER_ARGS)
+static void arco_lowpass_repl_cutoff(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;

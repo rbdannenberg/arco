@@ -9,3 +9,4 @@
 #include <cmath>
 #include "ugen.h"
 #include "upsample.h"
+#include "dnsampleb.h"
