@@ -2,17 +2,17 @@
 #
 # Roger B. Dannenberg
 # Nov 2022
-# reson(sound, center, bandwidth)
+# reson(input, center, bandwidth)
 
-reson(snd: a, center: ab, q: ab): a
-resonb(snd: b, center: b, q: b): b
+reson(input: a, center: ab, q: ab): a
+resonb(input: b, center: b, q: b): b
 
 FAUST
 
 declare description "Reson Unit Generator for Arco";
-declare terminate "snd";
+declare terminate "input";
 
 import("stdfaust.lib");
 import("filters.lib");
 
-process(snd, center, q) = snd : resonlp(max(center, 0.1), max(q, 0.1), 1);
+process(input, center, q) = input : resonlp(max(center, 0.1), max(q, 0.1), 1);

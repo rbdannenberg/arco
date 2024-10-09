@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "sineb"
-Code generated with Faust 2.59.6 (https://faust.grame.fr)
-Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Sineb -es 1 -mcd 16 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -os -light -ct 1 -cn Sineb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Sineb_H__
@@ -22,8 +22,6 @@ Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Sineb -es 1
 #include <cmath>
 #include <cstdint>
 #include <math.h>
-
-static float ftbl0SinebSIG0[65536];
 
 #ifndef FAUSTCLASS 
 #define FAUSTCLASS Sineb
@@ -40,8 +38,47 @@ static float ftbl0SinebSIG0[65536];
 #define RESTRICT __restrict__
 #endif
 
-#define FAUST_INT_CONTROLS 0
-#define FAUST_REAL_CONTROLS 2
+class SinebSIG0 {
+    
+  private:
+    
+    int iVec0[2];
+    int iRec0[2];
+    
+  public:
+    
+    int getNumInputsSinebSIG0() {
+        return 0;
+    }
+    int getNumOutputsSinebSIG0() {
+        return 1;
+    }
+    
+    void instanceInitSinebSIG0(int sample_rate) {
+        for (int l0 = 0; l0 < 2; l0 = l0 + 1) {
+            iVec0[l0] = 0;
+        }
+        for (int l1 = 0; l1 < 2; l1 = l1 + 1) {
+            iRec0[l1] = 0;
+        }
+    }
+    
+    void fillSinebSIG0(int count, float* table) {
+        for (int i1 = 0; i1 < count; i1 = i1 + 1) {
+            iVec0[0] = 1;
+            iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
+            table[i1] = std::sin(9.58738e-05f * float(iRec0[0]));
+            iVec0[1] = iVec0[0];
+            iRec0[1] = iRec0[0];
+        }
+    }
+
+};
+
+static SinebSIG0* newSinebSIG0() { return (SinebSIG0*)new SinebSIG0(); }
+static void deleteSinebSIG0(SinebSIG0* dsp) { delete dsp; }
+
+static float ftbl0SinebSIG0[65536];
 /*-------------- END FAUST PREAMBLE --------------*/
 
 extern const char *Sineb_name;
@@ -53,8 +90,6 @@ public:
         int iVec1[2];
         FAUSTFLOAT fEntry1;
         float fRec1[2];
-        int iVec0[2];
-        int iRec0[2];
     };
     Vec<Sineb_state> states;
     void (Sineb::*run_channel)(Sineb_state *state);
@@ -130,14 +165,16 @@ public:
         amp_samps = amp->run(current_block);  // update input
         Sineb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            FAUSTFLOAT tmp_0 = float(amp_samps[0]);
-            FAUSTFLOAT tmp_1 = fConst0 * float(freq_samps[0]);
+            float fSlow0 = float(amp_samps[0]);
+            float fSlow1 = fConst0 * float(freq_samps[0]);
             state->iVec1[0] = 1;
-            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : tmp_1 + state->fRec1[1]);
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            out_samps[0] = FAUSTFLOAT(tmp_0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            out_samps[0] = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
-            state->fRec1[1] = state->fRec1[0];            state++;
+            state->fRec1[1] = state->fRec1[0];
+    
+            state++;
             out_samps++;
             freq_samps += freq_stride;
             amp_samps += amp_stride;

@@ -8,44 +8,44 @@
 
 const char *Reson_name = "Reson";
 
-/* O2SM INTERFACE: /arco/reson/new int32 id, int32 chans, int32 snd, int32 center, int32 q;
+/* O2SM INTERFACE: /arco/reson/new int32 id, int32 chans, int32 input, int32 center, int32 q;
  */
 void arco_reson_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
-    int32_t snd = argv[2]->i;
+    int32_t input = argv[2]->i;
     int32_t center = argv[3]->i;
     int32_t q = argv[4]->i;
     // end unpack message
 
-    ANY_UGEN_FROM_ID(snd_ugen, snd, "arco_reson_new");
+    ANY_UGEN_FROM_ID(input_ugen, input, "arco_reson_new");
     ANY_UGEN_FROM_ID(center_ugen, center, "arco_reson_new");
     ANY_UGEN_FROM_ID(q_ugen, q, "arco_reson_new");
 
-    new Reson(id, chans, snd_ugen, center_ugen, q_ugen);
+    new Reson(id, chans, input_ugen, center_ugen, q_ugen);
 }
 
 
-/* O2SM INTERFACE: /arco/reson/repl_snd int32 id, int32 snd_id;
+/* O2SM INTERFACE: /arco/reson/repl_input int32 id, int32 input_id;
  */
-static void arco_reson_repl_snd(O2SM_HANDLER_ARGS)
+static void arco_reson_repl_input(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    int32_t snd_id = argv[1]->i;
+    int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Reson, reson, id, "arco_reson_repl_snd");
-    ANY_UGEN_FROM_ID(snd, snd_id, "arco_reson_repl_snd");
-    reson->repl_snd(snd);
+    UGEN_FROM_ID(Reson, reson, id, "arco_reson_repl_input");
+    ANY_UGEN_FROM_ID(input, input_id, "arco_reson_repl_input");
+    reson->repl_input(input);
 }
 
 
-/* O2SM INTERFACE: /arco/reson/set_snd int32 id, int32 chan, float val;
+/* O2SM INTERFACE: /arco/reson/set_input int32 id, int32 chan, float val;
  */
-static void arco_reson_set_snd (O2SM_HANDLER_ARGS)
+static void arco_reson_set_input (O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
@@ -53,8 +53,8 @@ static void arco_reson_set_snd (O2SM_HANDLER_ARGS)
     float val = argv[2]->f;
     // end unpack message
 
-    UGEN_FROM_ID(Reson, reson, id, "arco_reson_set_snd");
-    reson->set_snd(chan, val);
+    UGEN_FROM_ID(Reson, reson, id, "arco_reson_set_input");
+    reson->set_input(chan, val);
 }
 
 
@@ -123,10 +123,10 @@ static void reson_init()
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/reson/new", "iiiii", arco_reson_new, NULL, true,
                     true);
-    o2sm_method_new("/arco/reson/repl_snd", "ii", arco_reson_repl_snd, NULL,
-                    true, true);
-    o2sm_method_new("/arco/reson/set_snd", "iif", arco_reson_set_snd, NULL,
-                    true, true);
+    o2sm_method_new("/arco/reson/repl_input", "ii", arco_reson_repl_input,
+                    NULL, true, true);
+    o2sm_method_new("/arco/reson/set_input", "iif", arco_reson_set_input,
+                    NULL, true, true);
     o2sm_method_new("/arco/reson/repl_center", "ii", arco_reson_repl_center,
                     NULL, true, true);
     o2sm_method_new("/arco/reson/set_center", "iif", arco_reson_set_center,

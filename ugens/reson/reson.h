@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "reson"
-Code generated with Faust 2.59.6 (https://faust.grame.fr)
-Compilation options: -lang cpp -light -ct 1 -cn Reson -es 1 -mcd 16 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Reson -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Reson_H__
@@ -55,9 +55,9 @@ public:
     Vec<Reson_state> states;
     void (Reson::*run_channel)(Reson_state *state);
 
-    Ugen_ptr snd;
-    int snd_stride;
-    Sample_ptr snd_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     Ugen_ptr center;
     int center_stride;
@@ -69,15 +69,15 @@ public:
 
     float fConst0;
 
-    Reson(int id, int nchans, Ugen_ptr snd_, Ugen_ptr center_, Ugen_ptr q_) :
+    Reson(int id, int nchans, Ugen_ptr input_, Ugen_ptr center_, Ugen_ptr q_) :
             Ugen(id, 'a', nchans) {
-        snd = snd_;
+        input = input_;
         center = center_;
         q = q_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
-        init_snd(snd);
+        init_input(input);
         init_center(center);
         init_q(q);
         run_channel = (void (Reson::*)(Reson_state *)) 0;
@@ -85,7 +85,7 @@ public:
     }
 
     ~Reson() {
-        snd->unref();
+        input->unref();
         center->unref();
         q->unref();
     }
@@ -103,22 +103,22 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Reson::*new_run_channel)(Reson_state *state);
-            if (snd->rate == 'b') {
-                snd = new Upsample(-1, snd->chans, snd);
-            }
-            if (center->rate == 'a') {
-                if (q->rate == 'a') {
-                    new_run_channel = &Reson::chan_aaa_a;
-                } else {
-                    new_run_channel = &Reson::chan_aab_a;
-                }
+        if (input->rate == 'b') {
+            input = new Upsample(-1, input->chans, input);
+        }
+        if (center->rate == 'a') {
+            if (q->rate == 'a') {
+                new_run_channel = &Reson::chan_aaa_a;
             } else {
-                if (q->rate == 'a') {
-                    new_run_channel = &Reson::chan_aba_a;
-                } else {
-                    new_run_channel = &Reson::chan_abb_a;
-                }
+                new_run_channel = &Reson::chan_aab_a;
             }
+        } else {
+            if (q->rate == 'a') {
+                new_run_channel = &Reson::chan_aba_a;
+            } else {
+                new_run_channel = &Reson::chan_abb_a;
+            }
+        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;
@@ -126,14 +126,14 @@ public:
     }
 
     void print_sources(int indent, bool print_flag) {
-        snd->print_tree(indent, print_flag, "snd");
+        input->print_tree(indent, print_flag, "input");
         center->print_tree(indent, print_flag, "center");
         q->print_tree(indent, print_flag, "q");
     }
 
-    void repl_snd(Ugen_ptr ugen) {
-        snd->unref();
-        init_snd(ugen);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
         update_run_channel();
     }
 
@@ -149,8 +149,8 @@ public:
         update_run_channel();
     }
 
-    void set_snd(int chan, float f) {
-        snd->const_set(chan, f, "Reson::set_snd");
+    void set_input(int chan, float f) {
+        input->const_set(chan, f, "Reson::set_input");
     }
 
     void set_center(int chan, float f) {
@@ -161,21 +161,21 @@ public:
         q->const_set(chan, f, "Reson::set_q");
     }
 
-    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, &snd_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
 
     void init_center(Ugen_ptr ugen) { init_param(ugen, center, &center_stride); }
 
     void init_q(Ugen_ptr ugen) { init_param(ugen, q, &q_stride); }
 
     void chan_abb_a(Reson_state *state) {
-        FAUSTFLOAT* input0 = snd_samps;
+        FAUSTFLOAT* input0 = input_samps;
         FAUSTFLOAT* output0 = out_samps;
-        float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
-        float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
-        float fSlow2 = 1.0f / fSlow1;
-        float fSlow3 = 1.0f / ((fSlow0 + fSlow2) / fSlow1 + 1.0f);
-        float fSlow4 = (fSlow2 - fSlow0) / fSlow1 + 1.0f;
-        float fSlow5 = 2.0f * (1.0f - 1.0f / Reson_faustpower2_f(fSlow1));
+        float fSlow0 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
+        float fSlow1 = 1.0f / fSlow0;
+        float fSlow2 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
+        float fSlow3 = 1.0f / ((fSlow1 + fSlow2) / fSlow0 + 1.0f);
+        float fSlow4 = (fSlow1 - fSlow2) / fSlow0 + 1.0f;
+        float fSlow5 = 2.0f * (1.0f - 1.0f / Reson_faustpower2_f(fSlow0));
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             state->fRec0[0] = float(input0[i0]) - fSlow3 * (fSlow4 * state->fRec0[2] + fSlow5 * state->fRec0[1]);
             output0[i0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
@@ -185,7 +185,7 @@ public:
     }
 
     void chan_aba_a(Reson_state *state) {
-        FAUSTFLOAT* input0 = snd_samps;
+        FAUSTFLOAT* input0 = input_samps;
         FAUSTFLOAT* output0 = out_samps;
         float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
         float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
@@ -202,7 +202,7 @@ public:
     }
 
     void chan_aab_a(Reson_state *state) {
-        FAUSTFLOAT* input0 = snd_samps;
+        FAUSTFLOAT* input0 = input_samps;
         FAUSTFLOAT* output0 = out_samps;
         float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
         float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
@@ -219,27 +219,27 @@ public:
     }
 
     void chan_aaa_a(Reson_state *state) {
-        FAUSTFLOAT* input0 = snd_samps;
+        FAUSTFLOAT* input0 = input_samps;
         FAUSTFLOAT* output0 = out_samps;
-        float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
-        float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
-        float fSlow2 = 1.0f / fSlow1;
-        float fSlow3 = 1.0f / ((fSlow0 + fSlow2) / fSlow1 + 1.0f);
-        float fSlow4 = (fSlow2 - fSlow0) / fSlow1 + 1.0f;
-        float fSlow5 = 2.0f * (1.0f - 1.0f / Reson_faustpower2_f(fSlow1));
+        float fSlow0 = std::tan(fConst0 * std::max<float>(float(q_samps[0]), 0.1f));
+        float fSlow1 = 1.0f / fSlow0;
+        float fSlow2 = 1.0f / std::max<float>(float(center_samps[0]), 0.1f);
+        float fSlow3 = 1.0f / ((fSlow1 + fSlow2) / fSlow0 + 1.0f);
+        float fSlow4 = (fSlow1 - fSlow2) / fSlow0 + 1.0f;
+        float fSlow5 = 2.0f * (1.0f - 1.0f / Reson_faustpower2_f(fSlow0));
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             state->fRec0[0] = float(input0[i0]) - fSlow3 * (fSlow4 * state->fRec0[2] + fSlow5 * state->fRec0[1]);
-            output0[i0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
+            output0[i0] = FAUSTFLOAT(fSlow3 * (2.0f * state->fRec0[1] + state->fRec0[2] + state->fRec0[0]));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }
     }
 
     void real_run() {
-        snd_samps = snd->run(current_block);  // update input
+        input_samps = input->run(current_block);  // update input
         center_samps = center->run(current_block);  // update input
         q_samps = q->run(current_block);  // update input
-        if (((snd->flags) & TERMINATED) &&
+        if (((input->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate();
         }
@@ -248,7 +248,7 @@ public:
             (this->*run_channel)(state);
             state++;
             out_samps += BL;
-            snd_samps += snd_stride;
+            input_samps += input_stride;
             center_samps += center_stride;
             q_samps += q_stride;
         }

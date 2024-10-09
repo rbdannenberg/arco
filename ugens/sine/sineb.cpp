@@ -101,22 +101,11 @@ static void sineb_init()
                     true, true);
     // END INTERFACE INITIALIZATION
 
-    // "static" initialization code from faust:
-    int iVec0[2];
-    int iRec0[2];
-    for (int l0_re0 = 0; l0_re0 < 2; l0_re0 = l0_re0 + 1) {
-        iVec0[l0_re0] = 0;
-    }
-    for (int l1_re0 = 0; l1_re0 < 2; l1_re0 = l1_re0 + 1) {
-        iRec0[l1_re0] = 0;
-    }
-    for (int i1_re0 = 0; i1_re0 < 65536; i1_re0 = i1_re0 + 1) {
-        iVec0[0] = 1;
-        iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
-        ftbl0SinebSIG0[i1_re0] = std::sin(9.58738e-05f * float(iRec0[0]));
-        iVec0[1] = iVec0[0];
-        iRec0[1] = iRec0[0];
-    }
+    // class initialization code from faust:
+    SinebSIG0* sig0 = newSinebSIG0();
+    sig0->instanceInitSinebSIG0(BR);
+    sig0->fillSinebSIG0(65536, ftbl0SinebSIG0);
+    deleteSinebSIG0(sig0);
 }
 
 Initializer sineb_init_obj(sineb_init);

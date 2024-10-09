@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "lowpass"
-Code generated with Faust 2.59.6 (https://faust.grame.fr)
-Compilation options: -lang cpp -light -ct 1 -cn Lowpass -es 1 -mcd 16 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Lowpass -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Lowpass_H__
@@ -51,9 +51,9 @@ public:
     Vec<Lowpass_state> states;
     void (Lowpass::*run_channel)(Lowpass_state *state);
 
-    Ugen_ptr snd;
-    int snd_stride;
-    Sample_ptr snd_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     Ugen_ptr cutoff;
     int cutoff_stride;
@@ -61,21 +61,21 @@ public:
 
     float fConst0;
 
-    Lowpass(int id, int nchans, Ugen_ptr snd_, Ugen_ptr cutoff_) :
+    Lowpass(int id, int nchans, Ugen_ptr input_, Ugen_ptr cutoff_) :
             Ugen(id, 'a', nchans) {
-        snd = snd_;
+        input = input_;
         cutoff = cutoff_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
-        init_snd(snd);
+        init_input(input);
         init_cutoff(cutoff);
         run_channel = (void (Lowpass::*)(Lowpass_state *)) 0;
         update_run_channel();
     }
 
     ~Lowpass() {
-        snd->unref();
+        input->unref();
         cutoff->unref();
     }
 
@@ -95,14 +95,14 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Lowpass::*new_run_channel)(Lowpass_state *state);
-            if (snd->rate == 'b') {
-                snd = new Upsample(-1, snd->chans, snd);
-            }
-            if (cutoff->rate == 'a') {
-                new_run_channel = &Lowpass::chan_aa_a;
-            } else {
-                new_run_channel = &Lowpass::chan_ab_a;
-            }
+        if (input->rate == 'b') {
+            input = new Upsample(-1, input->chans, input);
+        }
+        if (cutoff->rate == 'a') {
+            new_run_channel = &Lowpass::chan_aa_a;
+        } else {
+            new_run_channel = &Lowpass::chan_ab_a;
+        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;
@@ -110,13 +110,13 @@ public:
     }
 
     void print_sources(int indent, bool print_flag) {
-        snd->print_tree(indent, print_flag, "snd");
+        input->print_tree(indent, print_flag, "input");
         cutoff->print_tree(indent, print_flag, "cutoff");
     }
 
-    void repl_snd(Ugen_ptr ugen) {
-        snd->unref();
-        init_snd(ugen);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
         update_run_channel();
     }
 
@@ -126,20 +126,20 @@ public:
         update_run_channel();
     }
 
-    void set_snd(int chan, float f) {
-        snd->const_set(chan, f, "Lowpass::set_snd");
+    void set_input(int chan, float f) {
+        input->const_set(chan, f, "Lowpass::set_input");
     }
 
     void set_cutoff(int chan, float f) {
         cutoff->const_set(chan, f, "Lowpass::set_cutoff");
     }
 
-    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, &snd_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
 
     void init_cutoff(Ugen_ptr ugen) { init_param(ugen, cutoff, &cutoff_stride); }
 
     void chan_ab_a(Lowpass_state *state) {
-        FAUSTFLOAT* input0 = snd_samps;
+        FAUSTFLOAT* input0 = input_samps;
         FAUSTFLOAT* output0 = out_samps;
         float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
         float fSlow1 = 1.0f / (fSlow0 + 1.0f);
@@ -147,7 +147,7 @@ public:
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]);
             state->fVec0[0] = fTemp0;
-            state->fRec0[0] = 0.0f - fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1]));
+            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (state->fVec0[1] + fTemp0)));
             output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
@@ -155,7 +155,7 @@ public:
     }
 
     void chan_aa_a(Lowpass_state *state) {
-        FAUSTFLOAT* input0 = snd_samps;
+        FAUSTFLOAT* input0 = input_samps;
         FAUSTFLOAT* output0 = out_samps;
         float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
         float fSlow1 = 1.0f / (fSlow0 + 1.0f);
@@ -163,7 +163,7 @@ public:
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]);
             state->fVec0[0] = fTemp0;
-            state->fRec0[0] = 0.0f - fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1]));
+            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1])));
             output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
@@ -171,9 +171,9 @@ public:
     }
 
     void real_run() {
-        snd_samps = snd->run(current_block);  // update input
+        input_samps = input->run(current_block);  // update input
         cutoff_samps = cutoff->run(current_block);  // update input
-        if (((snd->flags) & TERMINATED) &&
+        if (((input->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate();
         }
@@ -182,7 +182,7 @@ public:
             (this->*run_channel)(state);
             state++;
             out_samps += BL;
-            snd_samps += snd_stride;
+            input_samps += input_stride;
             cutoff_samps += cutoff_stride;
         }
     }

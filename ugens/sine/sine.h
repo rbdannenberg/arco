@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "sine"
-Code generated with Faust 2.59.6 (https://faust.grame.fr)
-Compilation options: -lang cpp -light -ct 1 -cn Sine -es 1 -mcd 16 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Sine -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Sine_H__
@@ -142,19 +142,19 @@ public:
     void update_run_channel() {
         // initialize run_channel based on input types
         void (Sine::*new_run_channel)(Sine_state *state);
-            if (freq->rate == 'a') {
-                if (amp->rate == 'a') {
-                    new_run_channel = &Sine::chan_aa_a;
-                } else {
-                    new_run_channel = &Sine::chan_ab_a;
-                }
+        if (freq->rate == 'a') {
+            if (amp->rate == 'a') {
+                new_run_channel = &Sine::chan_aa_a;
             } else {
-                if (amp->rate == 'a') {
-                    new_run_channel = &Sine::chan_ba_a;
-                } else {
-                    new_run_channel = &Sine::chan_bb_a;
-                }
+                new_run_channel = &Sine::chan_ab_a;
             }
+        } else {
+            if (amp->rate == 'a') {
+                new_run_channel = &Sine::chan_ba_a;
+            } else {
+                new_run_channel = &Sine::chan_bb_a;
+            }
+        }
         if (new_run_channel != run_channel) {
             initialize_channel_states();
             run_channel = new_run_channel;

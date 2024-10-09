@@ -2,15 +2,15 @@
 #
 # Roger B. Dannenberg
 # Sep 2024
-# sttest(stereo_input, cutoff1, cutoff2)->stereo_output
+# sttest(input, cutoff1, cutoff2)->output -- input and output are stereo
 
 # new notation for multi-channel input/output:
-sttest(in: 2a, hz1: c, hz2: c): 2a
+sttest(input: 2a, hz1: c, hz2: c): 2a
 
 FAUST
 
 declare description "Stereo Lowpass Unit Generator for Arco";
-declare terminate "snd";
+declare terminate "input";
 
 import("filters.lib");
 

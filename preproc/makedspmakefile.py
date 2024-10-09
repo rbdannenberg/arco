@@ -63,10 +63,16 @@ for ugclass in NONFAUST:
 
 print(NONEXIST)
 
-def append_to_srp_srcs(spec, path):
-    """add a Serpent source file to be included in allugens.srp"""
+def append_to_srp_srcs(spec, path, nonfaust):
+    """add a Serpent source file to be included in allugens.srp.
+    spec - the specification (ugen name) in manifest.txt
+    path - the path for the .srp file
+    nonfaust - is this a non-Faust Ugen? If so, the .srp file should
+        already exist. Otherwise, the .srp file will be created by
+        the dspmakefile.
+    """
     global srp_srcs
-    if not os.path.isfile(path):
+    if nonfaust and not os.path.isfile(path):
         print('ERROR: dspmanifest.txt specifies "', spec, '" but "', \
               path, '" does not exist.', sep = "", file=sys.stderr)
     else:
@@ -105,15 +111,15 @@ def make_makefile(arco_path, manifest, outf):
                 else:
                     basename = "mathugen"
             source = srp_path + basename + ".srp"
-            append_to_srp_srcs(ugen, source)
+            append_to_srp_srcs(ugen, source, True)
         else:
             sources.append(ugens_path + basename + "/" + basename + ".cpp")
             if basename == "mult":  # get "mult" code from srp_path,
                                     # not ugens_path:
-                append_to_srp_srcs(ugen, srp_path + "mult.srp")
+                append_to_srp_srcs(ugen, srp_path + "mult.srp", True)
             elif basename != "fader":  # fader is included by arco.srp
                 append_to_srp_srcs(ugen, ugens_path + basename + "/" + \
-                                         basename + ".srp")
+                                         basename + ".srp", False)
 
     print("all:  ", end="", file=outf)
     for source in sources:

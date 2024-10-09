@@ -256,7 +256,7 @@ def find_matching_brace(fsrc, loc):
         return -1
 
 
-def extract_method(classname, methodname, fimpl):
+def extract_method(classname, methodname, fimpl, alternates = None):
     """
     Extract the method from classname
     Algorithm: 
@@ -274,6 +274,16 @@ def extract_method(classname, methodname, fimpl):
         print("Error: extract_method could not find class", classname)
         return None
     loc = fimpl.find(" " + methodname + "(", loc)
+    # In Faust version 2.75, "control" was changed to "frame", but otherwise
+    # output is still compatible with this f2a.py translator, so now we just
+    # search for "frame" first but if we do not find it, we look for "control"
+    # to be backward compatible. This is generalized so we can look for a 
+    # list of alternates for any method.
+    if loc < 0 and alternates:
+        for alternate in alternates:
+            loc = fimpl.find(" " + alternate + "(", loc)
+            if loc >= 0:
+                break
     if loc < 0:
         print('Note: could not find "' + methodname + '"')
         return None
@@ -581,6 +591,7 @@ def generate_channel_method(fhfile, classname, signature,
 
     fhfile is [filename, signature (ab_b), output (classname)]
     impl is an Implementation object
+    rate is the output rate of the Arco ugen
     """
     print("generate_channel_method", classname, signature, 
           instvars, rate)
@@ -615,10 +626,10 @@ def generate_channel_method(fhfile, classname, signature,
                 compute = compute.replace(f"outputs[{str(i)}]", 
                                           f"out_samps + BL * {str(i)}")
     else:  # change outputs[0] = ... to *out_samps = ...
-        compute = compute.replace("outputs[", "out_samps[")
         # modify compute by pre-pending body of control() method after
         # fixing up references to fControl[] here and in compute
-        control = extract_method(classname, "control", src)
+        control = extract_method(classname, "frame", src, 
+                                 alternates=["control"])
         print(control + "-----")
         if control == None:
             control = "    ignore me {\n    }\n"  # will be removed
@@ -645,6 +656,8 @@ def generate_channel_method(fhfile, classname, signature,
         control = control[0 : loc]
 
         compute = control + compute  # prepend control stmts to compute
+
+        compute = compute.replace("outputs[", "out_samps[")
 
         i = 0
         while compute.find(f"fControl[{str(i)}]") >= 0:
@@ -1290,10 +1303,11 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
         cm = ["    " + line for line in cm[1].split("\n")]
         real_run += "\n".join(cm)
     if not signature.output.fixed:  # update input pointers and close the loop
-        real_run += "            state++;\n"
         if rate == 'a':
+            real_run += "            state++;\n"
             real_run += "            out_samps += BL;\n"
         else:
+            real_run += "\n            state++;\n"
             real_run += "            out_samps++;\n"
         for p in impl.param_names:
             real_run += f"            {p}_samps += {p}_stride;\n"
@@ -1404,7 +1418,7 @@ def main():
         # top_signature has a, b, or c for each parameter. It has a
         # if *any* variant has an a for that parameter; it has b if
         # *no* variant has an a for that parameter; it has c if *all*
-        # variants have c for that parameter. It *any* variant has a
+        # variants have c for that parameter. If *any* variant has a
         # c for a parameter, then *every* variant and the top_signature
         # must have c or an Error is printed. 
         if not top_signature:

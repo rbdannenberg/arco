@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "lowpassb"
-Code generated with Faust 2.59.6 (https://faust.grame.fr)
-Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Lowpassb -es 1 -mcd 16 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -os -light -ct 1 -cn Lowpassb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Lowpassb_H__
@@ -22,7 +22,6 @@ Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Lowpassb -e
 #include <cmath>
 #include <cstdint>
 #include <math.h>
-
 
 #ifndef FAUSTCLASS 
 #define FAUSTCLASS Lowpassb
@@ -38,9 +37,6 @@ Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Lowpassb -e
 #else
 #define RESTRICT __restrict__
 #endif
-
-#define FAUST_INT_CONTROLS 0
-#define FAUST_REAL_CONTROLS 4
 /*-------------- END FAUST PREAMBLE --------------*/
 
 extern const char *Lowpassb_name;
@@ -56,9 +52,9 @@ public:
     Vec<Lowpassb_state> states;
     void (Lowpassb::*run_channel)(Lowpassb_state *state);
 
-    Ugen_ptr snd;
-    int snd_stride;
-    Sample_ptr snd_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     Ugen_ptr cutoff;
     int cutoff_stride;
@@ -66,19 +62,19 @@ public:
 
     float fConst0;
 
-    Lowpassb(int id, int nchans, Ugen_ptr snd_, Ugen_ptr cutoff_) :
+    Lowpassb(int id, int nchans, Ugen_ptr input_, Ugen_ptr cutoff_) :
             Ugen(id, 'b', nchans) {
-        snd = snd_;
+        input = input_;
         cutoff = cutoff_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
-        init_snd(snd);
+        init_input(input);
         init_cutoff(cutoff);
     }
 
     ~Lowpassb() {
-        snd->unref();
+        input->unref();
         cutoff->unref();
     }
 
@@ -96,13 +92,13 @@ public:
     }
 
     void print_sources(int indent, bool print_flag) {
-        snd->print_tree(indent, print_flag, "snd");
+        input->print_tree(indent, print_flag, "input");
         cutoff->print_tree(indent, print_flag, "cutoff");
     }
 
-    void repl_snd(Ugen_ptr ugen) {
-        snd->unref();
-        init_snd(ugen);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
     }
 
     void repl_cutoff(Ugen_ptr ugen) {
@@ -110,38 +106,40 @@ public:
         init_cutoff(ugen);
     }
 
-    void set_snd(int chan, float f) {
-        snd->const_set(chan, f, "Lowpassb::set_snd");
+    void set_input(int chan, float f) {
+        input->const_set(chan, f, "Lowpassb::set_input");
     }
 
     void set_cutoff(int chan, float f) {
         cutoff->const_set(chan, f, "Lowpassb::set_cutoff");
     }
 
-    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, &snd_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
 
     void init_cutoff(Ugen_ptr ugen) { init_param(ugen, cutoff, &cutoff_stride); }
 
     void real_run() {
-        snd_samps = snd->run(current_block);  // update input
+        input_samps = input->run(current_block);  // update input
         cutoff_samps = cutoff->run(current_block);  // update input
-        if (((snd->flags) & TERMINATED) &&
+        if (((input->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate();
         }
         Lowpassb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            FAUSTFLOAT tmp_0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
-            FAUSTFLOAT tmp_1 = 1.0f / (tmp_0 + 1.0f);
-            FAUSTFLOAT tmp_2 = 1.0f - tmp_0;
-            FAUSTFLOAT tmp_3 = float(snd_samps[0]);
-            state->fVec0[0] = tmp_3;
-            state->fRec0[0] = 0.0f - tmp_1 * (tmp_2 * state->fRec0[1] - (tmp_3 + state->fVec0[1]));
+            float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
+            float fSlow1 = 1.0f / (fSlow0 + 1.0f);
+            float fSlow2 = 1.0f - fSlow0;
+            float fSlow3 = float(input_samps[0]);
+            state->fVec0[0] = fSlow3;
+            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (fSlow3 + state->fVec0[1])));
             out_samps[0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
-            state->fRec0[1] = state->fRec0[0];            state++;
+            state->fRec0[1] = state->fRec0[0];
+    
+            state++;
             out_samps++;
-            snd_samps += snd_stride;
+            input_samps += input_stride;
             cutoff_samps += cutoff_stride;
         }
     }

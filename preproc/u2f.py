@@ -130,7 +130,7 @@ def main():
             for p in s.params:
                 decl += (p.name + ", ")
                 srpparams += ", '" + p.name + "', " + p.name
-                typestring += "U"
+                typestring += ("f" if p.abtype == 'c' else "U")
 
             # allow optional chans parameter unless the inputs/outputs are
             # fixed because of specified channel count(s):

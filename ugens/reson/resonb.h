@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "resonb"
-Code generated with Faust 2.59.6 (https://faust.grame.fr)
-Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Resonb -es 1 -mcd 16 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -os -light -ct 1 -cn Resonb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Resonb_H__
@@ -22,10 +22,6 @@ Compilation options: -lang cpp -os0 -fpga-mem 10000 -light -ct 1 -cn Resonb -es 
 #include <cmath>
 #include <cstdint>
 #include <math.h>
-
-static float Resonb_faustpower2_f(float value) {
-    return value * value;
-}
 
 #ifndef FAUSTCLASS 
 #define FAUSTCLASS Resonb
@@ -42,8 +38,9 @@ static float Resonb_faustpower2_f(float value) {
 #define RESTRICT __restrict__
 #endif
 
-#define FAUST_INT_CONTROLS 0
-#define FAUST_REAL_CONTROLS 7
+static float Resonb_faustpower2_f(float value) {
+    return value * value;
+}
 /*-------------- END FAUST PREAMBLE --------------*/
 
 extern const char *Resonb_name;
@@ -59,9 +56,9 @@ public:
     Vec<Resonb_state> states;
     void (Resonb::*run_channel)(Resonb_state *state);
 
-    Ugen_ptr snd;
-    int snd_stride;
-    Sample_ptr snd_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
     Ugen_ptr center;
     int center_stride;
@@ -73,21 +70,21 @@ public:
 
     float fConst0;
 
-    Resonb(int id, int nchans, Ugen_ptr snd_, Ugen_ptr center_, Ugen_ptr q_) :
+    Resonb(int id, int nchans, Ugen_ptr input_, Ugen_ptr center_, Ugen_ptr q_) :
             Ugen(id, 'b', nchans) {
-        snd = snd_;
+        input = input_;
         center = center_;
         q = q_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
-        init_snd(snd);
+        init_input(input);
         init_center(center);
         init_q(q);
     }
 
     ~Resonb() {
-        snd->unref();
+        input->unref();
         center->unref();
         q->unref();
     }
@@ -103,14 +100,14 @@ public:
     }
 
     void print_sources(int indent, bool print_flag) {
-        snd->print_tree(indent, print_flag, "snd");
+        input->print_tree(indent, print_flag, "input");
         center->print_tree(indent, print_flag, "center");
         q->print_tree(indent, print_flag, "q");
     }
 
-    void repl_snd(Ugen_ptr ugen) {
-        snd->unref();
-        init_snd(ugen);
+    void repl_input(Ugen_ptr ugen) {
+        input->unref();
+        init_input(ugen);
     }
 
     void repl_center(Ugen_ptr ugen) {
@@ -123,8 +120,8 @@ public:
         init_q(ugen);
     }
 
-    void set_snd(int chan, float f) {
-        snd->const_set(chan, f, "Resonb::set_snd");
+    void set_input(int chan, float f) {
+        input->const_set(chan, f, "Resonb::set_input");
     }
 
     void set_center(int chan, float f) {
@@ -135,35 +132,37 @@ public:
         q->const_set(chan, f, "Resonb::set_q");
     }
 
-    void init_snd(Ugen_ptr ugen) { init_param(ugen, snd, &snd_stride); }
+    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
 
     void init_center(Ugen_ptr ugen) { init_param(ugen, center, &center_stride); }
 
     void init_q(Ugen_ptr ugen) { init_param(ugen, q, &q_stride); }
 
     void real_run() {
-        snd_samps = snd->run(current_block);  // update input
+        input_samps = input->run(current_block);  // update input
         center_samps = center->run(current_block);  // update input
         q_samps = q->run(current_block);  // update input
-        if (((snd->flags) & TERMINATED) &&
+        if (((input->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate();
         }
         Resonb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
-            FAUSTFLOAT tmp_0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
-            FAUSTFLOAT tmp_1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
-            FAUSTFLOAT tmp_2 = 1.0f / tmp_1;
-            FAUSTFLOAT tmp_3 = 1.0f / ((tmp_0 + tmp_2) / tmp_1 + 1.0f);
-            FAUSTFLOAT tmp_4 = float(snd_samps[0]);
-            FAUSTFLOAT tmp_5 = (tmp_2 - tmp_0) / tmp_1 + 1.0f;
-            FAUSTFLOAT tmp_6 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(tmp_1));
-            state->fRec0[0] = tmp_4 - tmp_3 * (tmp_5 * state->fRec0[2] + tmp_6 * state->fRec0[1]);
-            out_samps[0] = FAUSTFLOAT(tmp_3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
+            float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
+            float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
+            float fSlow2 = 1.0f / fSlow1;
+            float fSlow3 = 1.0f / ((fSlow0 + fSlow2) / fSlow1 + 1.0f);
+            float fSlow4 = float(input_samps[0]);
+            float fSlow5 = (fSlow2 - fSlow0) / fSlow1 + 1.0f;
+            float fSlow6 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(fSlow1));
+            state->fRec0[0] = fSlow4 - fSlow3 * (fSlow5 * state->fRec0[2] + fSlow6 * state->fRec0[1]);
+            out_samps[0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
             state->fRec0[2] = state->fRec0[1];
-            state->fRec0[1] = state->fRec0[0];            state++;
+            state->fRec0[1] = state->fRec0[0];
+    
+            state++;
             out_samps++;
-            snd_samps += snd_stride;
+            input_samps += input_stride;
             center_samps += center_stride;
             q_samps += q_stride;
         }

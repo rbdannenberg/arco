@@ -4,14 +4,14 @@
 # Nov 2022
 # lowpass(sound, cutoff)
 
-lowpass(snd: a, cutoff: ab): a
-lowpassb(snd: b, cutoff: b): b
+lowpass(input: a, cutoff: ab): a
+lowpassb(input: b, cutoff: b): b
 
 FAUST
 
 declare description "Lowpass Unit Generator for Arco";
-declare terminate "snd";
+declare terminate "input";
 
 import("filters.lib");
 
-process(snd, cutoff) = snd : lowpass(1, cutoff);
+process(input, cutoff) = input : lowpass(1, cutoff);

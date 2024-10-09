@@ -269,6 +269,9 @@ def arco_ready():
     Checkbox(win, "Zitarev Test", 'S', 'D', WIDTH, 'S', 'zitarevcheckbox')
     zitarevcheckbox.add_target_method(nil, 'zitarevtest')
 
+    Checkbox(win, "sttest", 'S', 'D', WIDTH, 'S', 'sttestcheckbox')
+    sttestcheckbox.add_target_method(nil, 'sttesttest')
+
     ui_initialized = true
     default_window.fit_to_children()
 
@@ -1185,10 +1188,31 @@ def zitarevtest(obj, event, x, y):
         zrev = zitarev(noise, 0.5, 0.5)  // snd, wet, gain
         zrev.play()
     else:
-        zrev.set('snd', zero_ugen)
+        zrev.set('input', zero_ugen)
         sched_select(rtsched)
         sched_cause(6, zrev, 'mute')
         zrev = nil  // rvb1 and noise should be freed in 6 sec
+
+
+########## Sttest Test ##############
+
+def sttesttest(obj, event, x, y):
+    display "sttesttest", x
+    if x:  # play unfiltered noise followed by stereo lowpass with
+           # cutoffs of 200 and 4000
+        var noise = ugen_rand(-0.1, 0.1)
+        sttest_ugen = sttest(noise, 200, 4000)  // snd, wet, gain
+        stlp = lowpass(noise, 200, 2)
+        stlp.play()
+        sched_select(rtsched)
+        sched_cause(2, stlp, 'mute')
+        sched_cause(2, sttest_ugen, 'play')
+    else:  # after delay to make sure we're playing filtered noise
+           # mute the filtered noise
+        sched_select(rtsched)
+        sched_cause(2, sttest_ugen, 'mute')
+        sttest_ugen = nil  // free the muted ugens
+        stlp = nil
 
 
 ########## Main Initialization ################
