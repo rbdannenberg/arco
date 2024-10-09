@@ -204,6 +204,9 @@ def expand_signature(signature, params, impl):
     to params and calling itself with a the extended params list. When the
     len(params) is len(signature.params), we have a full specification,
     so generate a .dsp file for it.
+
+    Constant parameters ('c') are converted to 'b' parameters for Faust
+    code generation.
     """
     print("expand_signature", signature, params)
     if len(params) < len(signature.params):
@@ -235,7 +238,7 @@ def expand_signature(signature, params, impl):
                         return
                     if param.abtype == 'a':
                         plist = plist + ", " + impl.param_names[i]
-                    else:
+                    else:  # 'b' or 'c'
                         print(impl.param_names[i], '= nentry("' + \
                               impl.param_names[i] + \
                               '", 0, 0, 1, 0.1);', file=outf)
@@ -246,7 +249,7 @@ def expand_signature(signature, params, impl):
                       "    Arco signature specifies", i)
                 return
 
-            if 'b' in typestring:
+            if 'b' in typestring or 'c' in typestring:
                 # blank line after nentry and before process
                 print("", file=outf)
 

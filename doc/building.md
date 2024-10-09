@@ -276,6 +276,34 @@ as controls using FAUST's `nentry`.  This will allow FAUST to generate
 the right code, which will then be processed further and integrated
 into an Arco Ugen.
 
+## Constant Parameters
+
+In addition to audio rate (`a`) and block rate (`b`) parameters, you
+can declare parameters that are set when the Ugen is instantiated and
+never change. These are called *constant* parameters and are indicated
+by `c`. For example, in the previous section, we defined `strevb`. If
+we want `strevb` to have an additional parameter to control pre-delay,
+we could specify it as follows:
+```
+strevb(in: 2a, wetdry: b, gain: b, predly: c): 2a
+```
+Some rules must be followed when using "c-rate" parameters:
+- A parameter can be a, b, ab, or c, but not ac, bc, or abc.
+- While a, b, and ab parameters can have channel counts, e.g.
+you can write 2a, 2b, or 2ab, constant parameters are always
+single-channel.
+- Constant parameters must be provided in the `new` message
+and have type *32-bit float*. The parameter cannot be changed
+once the Ugen is instantiated.
+- Constant parameters are more efficient than providing block-rate
+input from an instance of Constant (a built-in Ugen). A Constant
+Ugen has a block-rate (b) output and exists as a separate object
+that could be replaced by another input at any time. Therefore,
+the Constant output must be "updated" (a no-op) and fetched
+every sample block, adding overhead, whereas a constant parameter
+(c) is a float value stored within the unit generator instance.
+It can be accessed much more easily.
+
 ## CMAKE and `libraries.txt`
 
 `apps/common/libraries.txt` tells CMake where to find libraries that

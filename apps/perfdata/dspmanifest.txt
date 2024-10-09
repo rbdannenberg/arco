@@ -1,0 +1,7 @@
+# manifest for perfdata
+vu
+probe
+yin
+onset
+spectralcentroid
+spectralrolloff

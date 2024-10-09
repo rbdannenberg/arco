@@ -771,6 +771,7 @@ def yintest(obj, event, x, y):
         yin = nil
         yininp = nil
 
+
 ########## ONSET TEST #############
 
 onset_handler_installed = false
@@ -795,7 +796,8 @@ def onsettest(obj, event, x, y):
     else:
         onset.unrun()
         onset = nil
-        
+
+
 ########## CHORDDETECT TEST #############
 
 chorddetect_handler_installed = false
@@ -838,12 +840,12 @@ def spectralcentroidtest(obj, event, x, y):
             o2_method_new("/actl/spectralcentroid", "f", 'actl_spectralcentroid', t)
             print "installed spectralcentroid handler"
             spectralcentroid_handler_installed = true
-        SC = spectralcentroid("/actl/spectralcentroid")
-        SC.set('input', input_ugen)
-        SC.run()
+        sc_ugen = spectralcentroid("/actl/spectralcentroid")
+        sc_ugen.set('input', input_ugen)
+        sc_ugen.run()
     else:
-        SC.unrun()
-        SC = nil
+        sc_ugen.unrun()
+        sc_ugen = nil
         
 ########## SPECTRALROLLOFF TEST #############
 
@@ -860,12 +862,12 @@ def spectralrollofftest(obj, event, x, y):
             o2_method_new("/actl/spectralrolloff", "f", 'actl_spectralrolloff', t)
             print "installed spectralrolloff handler"
             spectralrolloff_handler_installed = true
-        SR = spectralrolloff("/actl/spectralrolloff", 0.5)
-        SR.set('input', input_ugen)
-        SR.run()
+        sr_ugen = spectralrolloff("/actl/spectralrolloff", 0.5)
+        sr_ugen.set('input', input_ugen)
+        sr_ugen.run()
     else:
-        SR.unrun()
-        SR = nil
+        sr_ugen.unrun()
+        sr_ugen = nil
 
 ########## TRIG TEST #############
 

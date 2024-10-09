@@ -5,7 +5,7 @@
 # sttest(stereo_input, cutoff1, cutoff2)->stereo_output
 
 # new notation for multi-channel input/output:
-sttest(in: 2a, hz1: b, hz2: b): 2a
+sttest(in: 2a, hz1: c, hz2: c): 2a
 
 FAUST
 
@@ -16,4 +16,3 @@ import("filters.lib");
 
 process(left, right, cutoff1, cutoff2) = left, right :
                 lowpass(1, cutoff1), lowpass(1, cutoff2);
-

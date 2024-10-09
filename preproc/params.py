@@ -14,7 +14,7 @@ class Param:
         """param is a string that describes a parameter. Syntax is
         <name>:[<count>]<ab>, where <name> is a parameter name (string),
         <count> is digits that specify the number of channels, and
-        <ab> is one of 'a', 'b', or 'ab' that give possible signal rates.
+        <ab> is one of 'a', 'b', 'c' or 'ab' that give possible signal rates.
         If source is provided, the new Param object will inherit the name
         and channel count and fixedness from source, and the initial
         <name>: can be omitted. This is to simplify the derivation of
@@ -95,22 +95,40 @@ class Signature:
         the FAUST "process" definition. If output is fixed, then all
         parameters must be fixed, and len(param_names) must match the number
         implied by this signature.
+        Also check that constant parameters ('c') do not have channel count
+        other than one and are not paired with 'a' or 'b'.
         """
         print("check_signature: ", self, "param_names", param_names)
         # check for consistent fixed properties. All Params should match output:
         for p in self.params:
             if p.fixed != self.output.fixed:
-                print("Error: inconsistent fixed properties in params or output:")
+                print("Error: inconsistent fixed properties in",
+                      "params or output:")
                 print("    params for", self.name, "are", self.params)
-                print("    output for", self.naem, "is", self.output)
+                print("    output for", self.name, "is", self.output)
                 break
         # check for consistent count
         count = sum([p.chans for p in self.params])
         if count != len(param_names):
-            print("Error: signature for", self.name, "(", self.params, ") implies",
-                  count, "process parameters, but process has", len(param_names),
-                  "parameters.")
-
+            print("Error: signature for", self.name, "(", self.params,
+                  ") implies", count, "process parameters, but process has",
+                  len(param_names), "parameters.")
+        # check for constant parameters and non-abc parameter specs.
+        for p in self.params:
+            if p.abtype.find('c') > -1 and len(p.abtype) != 1:
+                print("Error: signature for", self.name, "(", self.params,
+                      ") combines constant spec ('c') with other rates.")
+                break;
+            if p.abtype == 'c' and p.chans != 1:
+                print("Error: signature for", self.name, "(", self.params,
+                      ") has constant spec ('c') that is not single channel.")
+                break;
+            for rate in p.abtype:
+                if rate != 'a' and rate != 'b' and rate != 'c':
+                    print("Error: signature for", self.name, "(", self.params,
+                          ") has spec that is not a, b, or c.")
+                    return;
+                    
 
 
 def get_signatures(src):
@@ -188,8 +206,8 @@ def update_params(params, output_param):
 def parse_arco_signature(line):
     ""Find quoted string of arco parameters in line and construct a list
     of Params. A signature looks like "sine(freq: a, amp: b): a" where a 
-    and b mean "audio" or "block" (rate), and "ab" is also allowed. The 
-    signature can also be "sine(freq: 2a, amp: b): 2a" where digits
+    and b mean "audio" or "block" (rate), and "c" and "ab" are also allowed.
+    The signature can also be "sine(freq: 2a, amp: b): 2a" where digits
     indicate a fixed number of channels.
     ""
     loc = line.find('"')

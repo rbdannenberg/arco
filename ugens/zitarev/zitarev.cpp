@@ -8,7 +8,7 @@
 
 const char *Zitarev_name = "Zitarev";
 
-/* O2SM INTERFACE: /arco/zitarev/new int32 id, int32 snd, int32 wetdry, int32 gain;
+/* O2SM INTERFACE: /arco/zitarev/new int32 id, int32 snd, int32 wetdry, int32 gain, int32 t60m;
  */
 void arco_zitarev_new(O2SM_HANDLER_ARGS)
 {
@@ -17,13 +17,15 @@ void arco_zitarev_new(O2SM_HANDLER_ARGS)
     int32_t snd = argv[1]->i;
     int32_t wetdry = argv[2]->i;
     int32_t gain = argv[3]->i;
+    int32_t t60m = argv[4]->i;
     // end unpack message
 
     ANY_UGEN_FROM_ID(snd_ugen, snd, "arco_zitarev_new");
     ANY_UGEN_FROM_ID(wetdry_ugen, wetdry, "arco_zitarev_new");
     ANY_UGEN_FROM_ID(gain_ugen, gain, "arco_zitarev_new");
+    ANY_UGEN_FROM_ID(t60m_ugen, t60m, "arco_zitarev_new");
 
-    new Zitarev(id, snd_ugen, wetdry_ugen, gain_ugen);
+    new Zitarev(id, snd_ugen, wetdry_ugen, gain_ugen, t60m_ugen);
 }
 
 
@@ -117,10 +119,40 @@ static void arco_zitarev_set_gain (O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/zitarev/repl_t60m int32 id, int32 t60m_id;
+ */
+static void arco_zitarev_repl_t60m(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t t60m_id = argv[1]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Zitarev, zitarev, id, "arco_zitarev_repl_t60m");
+    ANY_UGEN_FROM_ID(t60m, t60m_id, "arco_zitarev_repl_t60m");
+    zitarev->repl_t60m(t60m);
+}
+
+
+/* O2SM INTERFACE: /arco/zitarev/set_t60m int32 id, int32 chan, float val;
+ */
+static void arco_zitarev_set_t60m (O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t chan = argv[1]->i;
+    float val = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Zitarev, zitarev, id, "arco_zitarev_set_t60m");
+    zitarev->set_t60m(chan, val);
+}
+
+
 static void zitarev_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/zitarev/new", "iiii", arco_zitarev_new, NULL,
+    o2sm_method_new("/arco/zitarev/new", "iiiii", arco_zitarev_new, NULL,
                     true, true);
     o2sm_method_new("/arco/zitarev/repl_snd", "ii", arco_zitarev_repl_snd,
                     NULL, true, true);
@@ -133,6 +165,10 @@ static void zitarev_init()
     o2sm_method_new("/arco/zitarev/repl_gain", "ii", arco_zitarev_repl_gain,
                     NULL, true, true);
     o2sm_method_new("/arco/zitarev/set_gain", "iif", arco_zitarev_set_gain,
+                    NULL, true, true);
+    o2sm_method_new("/arco/zitarev/repl_t60m", "ii", arco_zitarev_repl_t60m,
+                    NULL, true, true);
+    o2sm_method_new("/arco/zitarev/set_t60m", "iif", arco_zitarev_set_t60m,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
 

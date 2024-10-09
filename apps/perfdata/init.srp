@@ -1,0 +1,199 @@
+# init.srp -- for perfdata application to record performance data
+#
+# Roger B. Dannenberg
+# Sep 2024
+
+require "debug"
+require "wxserpent"
+require "arco"
+require "allugens"
+require "utils"
+
+SIMPLE = false
+
+ui_initialized = false
+ready_count = 0
+
+def arco_ready():
+# called when arco is intialized and ready to make sound or when
+# arco audio stream has been reopened
+    display "**** arco audio is running! ****", ready_count
+    ready_count = ready_count + 1
+    if ready_count > 1:
+        display "arco_ready called again", ready_count
+        breakpoint()
+    var win = default_window
+    if ui_initialized:
+        return
+
+    display "arco_ready", wxs_h, wxs_space,
+    display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
+    var WIDTH = 170
+    var SLWIDTH = 270
+
+    Checkbox(win, "Collect Data", 5, 5, WIDTH, 20, 'cdcheckbox')
+    cdcheckbox.add_target_method(nil, 'collect_data')
+    Statictext(win, "", 'R', wxs_y + 2, 100, wxs_h - 2, 'yintext')
+
+
+def actl_yin(timestamp, address, types, pitch, harmonicity, rms)
+    var text = ""
+    if harmonicity < 0.1 and rms > 0.01:
+        text = str(pitch)
+    yintext.set_string(text)
+    save_data("yin", pitch, harmonicity, rms)
+    
+
+yin_handler_installed = false
+
+// handler for yincheckbox: play/stop yin analysis of input
+def yin_start(x):
+    display "yintest", x
+    if x:
+        if not yin_handler_installed:
+            o2_method_new("/actl/yin", "fff", 'actl_yin', t)
+            print "installed yin handler"
+            yin_handler_installed = true
+        yininp = input_ugen
+
+        yin = yin(yininp, 51, 87, 882, "/actl/yin")
+        yin.run()
+    else:
+        yin.unrun()
+        yin = nil
+        yininp = nil
+
+
+onset_handler_installed = false
+
+def actl_onset(timestamp, address, types, idnum, channel) //idnum, rms are paremeters
+    display "ONSET DETECTED:", idnum, channel
+    save_data("onset")
+        
+    
+// handler for onsetcheckbox: play/stop onset analysis of input
+def onset_start(x):
+    if x:
+        if not onset_handler_installed:
+            o2_method_new("/actl/onset", "if", 'actl_onset', t)
+            print "installed onset handler"
+            onset_handler_installed = true
+        onset = onset(input_ugen, "/actl/onset")
+        onset.run()
+    else:
+        onset.unrun()
+        onset = nil
+
+
+spectralcentroid_handler_installed = false
+
+def actl_spectralcentroid(timestamp, address, types, centroid)
+    save_data("centroid", centroid)
+
+        
+def spectralcentroid_start(x):
+    if x:
+        if not spectralcentroid_handler_installed:
+            o2_method_new("/actl/spectralcentroid", "f", 'actl_spectralcentroid', t)
+            print "installed spectralcentroid handler"
+            spectralcentroid_handler_installed = true
+        sc_ugen = spectralcentroid("/actl/spectralcentroid")
+        sc_ugen.set('input', input_ugen)
+        sc_ugen.run()
+    else:
+        sc_ugen.unrun()
+        sc_ugen = nil
+
+
+spectralrolloff_handler_installed = false
+
+def actl_spectralrolloff(timestamp, address, types, rolloff_freq)
+    save_data("rolloff", rolloff_freq)
+
+        
+def spectralrolloff_start(x):
+    if x:
+        if not spectralrolloff_handler_installed:
+            o2_method_new("/actl/spectralrolloff", "f", 'actl_spectralrolloff', t)
+            print "installed spectralrolloff handler"
+            spectralrolloff_handler_installed = true
+        sr_ugen = spectralrolloff("/actl/spectralrolloff", 0.5)
+        sr_ugen.set('input', input_ugen)
+        sr_ugen.run()
+    else:
+        sr_ugen.unrun()
+        sr_ugen = nil
+
+
+def save_data(id, rest data):
+# save a row to data_file (a .csv file). Row contains time, id, and data.
+# The fast way shown here to build a string is to make an array of strings
+# and flatten it. It saves copying the string so far to append something.
+    if not data_file:
+        display "save_data", id, data
+        return
+    var row = [str(o2_time_get()), ",", id]
+    for d in data:
+        row.append(",")
+        row.append(str(d))
+    row.append("\n")
+    data_file.write(flatten(row))
+
+
+data_file = nil
+data_file_id = 1
+
+// handler for cdcheckbox: start/stop analysis
+def collect_data(obj, event, x, y):
+    display "collect_data", x
+    yin_start(x)
+    onset_start(x)
+    spectralcentroid_start(x)
+    spectralrolloff_start(x)
+    if x:
+        if not data_file:
+            data_file_name = "perfdata" + leftpad(data_file_id, 3, "0") + ".csv"
+            data_file = open(data_file_name, "r")
+            while data_file:
+                data_file.close()
+                data_file_id = data_file_id + 1
+                data_file_name = "perfdata" + leftpad(data_file_id, 3, "0") +
+                                 ".csv"
+                data_file = open(data_file_name, "r")
+            # now, data_file_name does not already exist, so safe to write
+            data_file = open(data_file_name, "w")
+    else:
+        data_file.close()
+        data_file = nil
+        print "------------------------------"
+        print "Wrote", data_file_name
+        print "------------------------------"
+
+
+def arco_prugens_handler(rest ignore):
+    // this tells Arco to print the Ugen tree -- it can be useful for
+    //     debugging.
+    o2_send_cmd("/arco/prtree", 0, "")
+    // also print the list of Ugens accessible by integer ID:
+    o2_send_cmd("/arco/prugens", 0, "")
+
+
+def arco_ugen_gc_info_handler(rest ignore):
+    arco_ugen_gc_info()
+
+
+def main():
+    o2_debug_flags("") // ("SsBl")
+    arco_init(ensemble = "rbdperfdata", latency = 60, network = false,
+              title = "Performance Data", ins = 1)
+    arco_run()
+    sched_select(rtsched)
+
+    var file_menu = default_window.get_menu("File")
+    file_menu.item("Print Ugen Info", "print Ugen tree and table",
+                   nil, nil, 'arco_prugens_handler')
+    file_menu.item("Arco Ugen GC Info", "print info about Ugen IDs",
+                   nil, nil, 'arco_ugen_gc_info_handler')
+
+
+main()

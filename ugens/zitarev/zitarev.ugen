@@ -1,7 +1,9 @@
 # zitarev.ugen -- Reverb Unit Generator
 #
+# Vivek Mohan
+# September 2024
 
-zitarev(snd: 2a, wetdry: b, gain: b): 2a
+zitarev(snd: 2a, wetdry: b, gain: b, t60m: b): 2a
 
 FAUST
 
@@ -17,7 +19,6 @@ with{
     rdel = 60;    
     f1 = 200;
     t60dc = 3;
-    t60m = 2;
     f2 = 6000;
     out_eq = pareq_stereo(eq1f,eq1l,eq1q) : pareq_stereo(eq2f,eq2l,eq2q);
     pareq_stereo(eqf,eql,Q) = fi.peak_eq_rm(eql,eqf,tpbt), fi.peak_eq_rm(eql,eqf,tpbt)
@@ -42,4 +43,4 @@ with{
     out_level = *(gainsmooth),*(gainsmooth);
 };
 
-process(left, right, drywet, gain) = left,right:zitarev;
+process(left, right, drywet, gain, t60m) = left,right:zitarev;
