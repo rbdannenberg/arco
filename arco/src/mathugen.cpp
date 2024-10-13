@@ -780,26 +780,100 @@ void Math::qnt_bb_a(Math_state *state)
 }
 
 
+/* RLI = random linear interpolation: linearly interpolate from one
+   random point to the next. The time to the next breakpoint is 1/x1
+   and the range of values is -x2 to +x2.
+   State required is the number of samples remaining to compute before
+   the next breakpoint (state->count), the last value output (state->prev)
+   and the increment per output sample (state->hold).
+ */
+void Math::rli_aa_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        if (state->count == 0) {
+            state->count = (int) (AR / x1_samps[i]);
+            if (state->count == 0) {  // avoid divide by zero
+                state->count = 1;
+            }
+            float x2 = x2_samps[i];
+            float target = unifrand_range(-x2, x2);
+            state->hold = (target - state->prev) / state->count; // increment
+        }
+        state->count--;
+        *out_samps++ = (state->prev += state->hold);
+    }
+}
+
+void Math::rli_ab_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        if (state->count == 0) {
+            state->count = (int) (AR / x1_samps[i]);
+            if (state->count == 0) {  // avoid divide by zero
+                state->count = 1;
+            }
+            float target = unifrand_range(-*x2_samps, *x2_samps);
+            state->hold = (target - state->prev) / state->count; // increment
+        }
+        state->count--;
+        *out_samps++ = (state->prev += state->hold);
+    }
+}
+
+void Math::rli_ba_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        if (state->count == 0) {
+            state->count = (int) (AR / *x1_samps);
+            if (state->count == 0) {  // avoid divide by zero
+                state->count = 1;
+            }
+            float x2 = x2_samps[i];
+            float target = unifrand_range(-x2, x2);
+            state->hold = (target - state->prev) / state->count; // increment
+        }
+        state->count--;
+        *out_samps++ = (state->prev += state->hold);
+    }
+}
+
+void Math::rli_bb_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        if (state->count == 0) {
+            state->count = (int) (AR / *x1_samps);
+            if (state->count == 0) {  // avoid divide by zero
+                state->count = 1;
+            }
+            float target = unifrand_range(-*x2_samps, *x2_samps);
+            state->hold = (target - state->prev) / state->count; // increment
+        }
+        state->count--;
+        *out_samps++ = (state->prev += state->hold);
+    }
+}
+
+
 void (Math::*run_aa_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_aa_a, &Math::add_aa_a, &Math::sub_aa_a, &Math::div_aa_a,
     &Math::max_aa_a, &Math::min_aa_a, &Math::clp_aa_a, &Math::pow_aa_a,
     &Math::lt_aa_a, &Math::gt_aa_a, &Math::scp_aa_a,  &Math::pwi_aa_a,
-    &Math::rnd_aa_a, &Math::sh_aa_a, &Math::qnt_aa_a };
+    &Math::rnd_aa_a, &Math::sh_aa_a, &Math::qnt_aa_a, &Math::rli_aa_a };
 void (Math::*run_ab_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_ab_a, &Math::add_ab_a, &Math::sub_ab_a, &Math::div_ab_a,
     &Math::max_ab_a, &Math::min_ab_a, &Math::clp_ab_a, &Math::pow_ab_a,
     &Math::lt_ab_a, &Math::gt_ab_a, &Math::scp_ab_a, &Math::pwi_ab_a,
-    &Math::rnd_ab_a, &Math::sh_ab_a, &Math::qnt_ab_a };
+    &Math::rnd_ab_a, &Math::sh_ab_a, &Math::qnt_ab_a, &Math::rli_ab_a };
 void (Math::*run_ba_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_ba_a, &Math::add_ba_a, &Math::sub_ba_a, &Math::div_ba_a,
     &Math::max_ba_a, &Math::min_ba_a, &Math::clp_ba_a, &Math::pow_ba_a,
     &Math::lt_ba_a, &Math::gt_ba_a, &Math::scp_ba_a, &Math::pwi_ba_a,
-    &Math::rnd_ba_a, &Math::sh_ba_a, &Math::qnt_ba_a };
+    &Math::rnd_ba_a, &Math::sh_ba_a, &Math::qnt_ba_a, &Math::rli_ba_a };
 void (Math::*run_bb_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_bb_a, &Math::add_bb_a, &Math::sub_bb_a, &Math::div_bb_a,
     &Math::max_bb_a, &Math::min_bb_a, &Math::clp_bb_a, &Math::pow_bb_a,
     &Math::lt_bb_a, &Math::gt_bb_a, &Math::scp_bb_a, &Math::pwi_bb_a,
-    &Math::rnd_bb_a, &Math::sh_bb_a, &Math::qnt_bb_a };
+    &Math::rnd_bb_a, &Math::sh_bb_a, &Math::qnt_bb_a, &Math::rli_bb_a };
 
 
 /* O2SM INTERFACE: /arco/math/new int32 id, int32 chans, 

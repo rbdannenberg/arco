@@ -1,0 +1,79 @@
+# synth.srp -- "synthesizer" manager for playing notes
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+class Synth (Instrument):
+    var notes  // dictionary of sounding notes
+        // notes with symbolic ids use the mapping id->Instrument
+        // notes with pitch ids use both pitch->id and id->Instrument
+    var free_note_names  // array of names no longer in use
+    var prev_name_number  // integer for generating a new note name
+    var mixer  // output
+    
+    def init(optional chans = 1):
+        notes = {}
+        free_note_names = []
+        prev_name_number = 0
+        instr_begin()
+        mixer = member(mix(chans), 'mixer')
+        super.init("Synth", mixer)
+
+
+    def get_instr_name(pitch):
+    # get a symbol to name the instrument in the mixer. If this method
+    # is called, no id was provided so we need to create or recycle one
+    # if pitch is an integer, it will be used for noteoff, and we need
+    # to insert a mapping from pitch to the new id:
+        var id
+        if len(free_note_names) > 0:
+            id = free_note_names.unappend()
+        else:
+            prev_name_number = prev_name_number + 1
+            id = mix_name(prev_name_number)
+        if isinteger(pitch):  // instrument will be identified by pitch
+            notes[pitch] = id
+        display "synth.get_instr_name", pitch, repr(id)
+        return id
+
+
+    def free_instr_name(name):
+    # (private) remove name from notes. If name is an integer (pitch),
+    # then the actual unique instrument name is notes[name], so remove
+    # that AND the instrument name from notes
+        display "synth.free_instr_name", name, time_get()
+        if isinteger(name):
+            var note = notes[name]
+            notes.remove(name)
+            name = note
+        notes.remove(name)
+
+
+    def note(instr_spec, pitch, vel, optional dur,
+             keyword id, pan, gain, dictionary params):
+        if not id:
+            id = get_instr_name(pitch)
+        if not pan and chans > 1:
+            pan = instr_spec.get('pan', 64)
+        if not gain:
+            gain = instr_spec.get('gain', 1)
+        var instr = funcall(instr_spec['instrument'], instr_spec, pitch,
+                            vel, params)
+        notes[id] = instr
+        display "synth.note after creating instr", notes, time_get()
+        if chans > 1:
+            gain = pan_45(pan / 127, gain)
+        mixer.ins(id, instr, gain)
+        if dur:
+            sched_select(rtsched)
+            sched_cause(dur, this, 'noteoff', pitch)
+
+
+    def noteoff(pitch_or_id):
+        display "synth.noteoff", id, pitch_or_id, notes, time_get()
+        var id = pitch_or_id
+        if isinteger(pitch_or_id):
+            id = notes[pitch_or_id]
+        var instr = notes[id]
+        instr.noteoff()
+        free_instr_name(id)

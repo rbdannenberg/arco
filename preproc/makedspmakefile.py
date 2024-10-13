@@ -42,7 +42,7 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
             "mathugenb", "onset", "chorddetect", "o2audioio", \
-            "spectralcentroid", "spectralrolloff"]
+            "spectralcentroid", "spectralrolloff", "tableosc", "tableoscb"]
 
 MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
              "ugen_clip", "ugen_less", "ugen_greater", "ugen_soft_clip"]
@@ -201,6 +201,7 @@ def make_inclfile(arco_path, manifest, outf):
     need_dcblocker = False # need to compile and link with dcblocker.h
     need_audioblob = False  # need to compile and link with audioblob.h
                             # (for o2audioio)
+    need_wavetables = False  # need to compile and link with wavetables.{cpp,h}
     
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
@@ -261,16 +262,18 @@ def make_inclfile(arco_path, manifest, outf):
     # add chromagram and chord detection implementation files:
     if "chorddetect" in manifest:
         print("    src/Chromagram.cpp src/Chromagram.h\n",
-              "    src/ChordDetector.cpp src/ChordDetector.h\n", file=outf)
+              "    src/ChordDetector.cpp src/ChordDetector.h", file=outf)
         need_fft = True
     
     if "spectralcentroid" in manifest:  # add FFTCalculator implementation files
-        print("    src/FFTCalculator.cpp src/FFTCalculator.h\n", file=outf)
         need_fft = True
     
     if "spectralrolloff" in manifest:  # add FFTCalculator implementation files
-        print("    src/FFTCalculator.cpp src/FFTCalculator.h\n", file=outf)
         need_fft = True
+
+    if "tableosc" in manifest or "tableoscb" in manifest or \
+       "tableosc*" in manifest:
+        need_wavetables = True
 
     ## Include source files to satisfy dependencies
     if need_ringbuf:
@@ -284,7 +287,7 @@ def make_inclfile(arco_path, manifest, outf):
             print("    " + arco_path + "/pffft/pffft.c",
                           arco_path + "/pffft/pffft.h\n",
                   "    " + arco_path + "/pffft/ffts_compat.cpp",
-                          arco_path + "/pffft/ffts_compat.h\n",                          
+                          arco_path + "/pffft/ffts_compat.h",
                   file=outf)
         else:
             print("    " + arco_path + "/ffts/src/fftext.c",
@@ -292,8 +295,9 @@ def make_inclfile(arco_path, manifest, outf):
                   "    " + arco_path + "/ffts/src/fftlib.c",
                           arco_path + "/ffts/src/fftlib.h\n",
                   "    " + arco_path + "/ffts/src/matlib.c",
-                          arco_path + "/ffts/src/matlib.h\n",
+                          arco_path + "/ffts/src/matlib.h",
                   file=outf)
+        print("    src/FFTCalculator.cpp src/FFTCalculator.h", file=outf)
 
     if need_windowed_input:
         print("    src/windowedinput.h", file=outf)
@@ -303,6 +307,9 @@ def make_inclfile(arco_path, manifest, outf):
 
     if need_audioblob:
         print("    src/audioblob.h src/audioblob.cpp", file=outf)
+
+    if need_wavetables:
+        print("    src/wavetables.cpp src/wavetables.h", file=outf)
 
     ## Add source files for specified ugens
     print("Adding these unit generator implementations to the executable:")

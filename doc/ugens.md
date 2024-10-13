@@ -240,13 +240,15 @@ most unit generators so that `TERMINATED` will propagate from
 input signals to consumers. `CAN_TERMINATE` is *not* the default for
 signal generators such as `pwl`, `pwe` and `recplay` (when playing).
 Thus, you can typically mark only the determining unit generator
-such as an envelope by claling its `.term` method in order to
+such as an envelope by calling its `.term` method in order to
 cause an entire sound to terminate. When an input to a `Sum` or
 `Mix` terminates, the input is automatically removed, so the
-typical application of `.term` is to indicate that when an
-envelope completes, the sound it modulates (e.g. using a `Mult`)
+typical application of `.term` is to indicate that *when an
+envelope completes*, the sound it modulates (e.g. using a `Mult`)
 should be detached from a mix or sum, and through reference
-counting, the entire sound should be freed.
+counting, the entire sound should be freed. If there is a tail,
+then the delay starts when the envelope finishes, where "finish"
+means there are no more breakpoints and the envelope value is zero.
 
 In addition to the possibility of releasing a tree of unit
 generators, any `atend` action is performed when `TERMINATED`
@@ -783,6 +785,7 @@ ugen_powi, ugen_powib(x1, x2 [, chans])
 ugen_rand, ugen_randb(x1, x2 [, chans])
 sample_hold, sample_holdb(x1, x2 [, chans])
 ugen_quantize, ugen_quantizeb(x1, x2 [, chans])
+ugen rli, ugen_rlib(x1, x2 [ chans])
 ```
 The `math` function and unit generator is a general binary operation
 used to implement a variety of functions. Although each operation is
@@ -825,7 +828,7 @@ perform a binary operation. The value of `op` can be:
  - `MATH_OP_PWI` = 11, for raising x1 to an integer power round(x2).
    A b-rate or c-rate `x2` is not interpolated,
  - `MATH_OP_RND` = 12, outputs a random number with uniform distribution
-   between x1 and x2, which at b-rate and c-rate are not interpolated,
+   between x1 and x2,
  - `MATH_OP_SH` = 13, is a "sample and hold" operation that samples x1
    at each positive zero crossing of x2. x1 and x2 are not
    interpolated,
@@ -833,8 +836,16 @@ perform a binary operation. The value of `op` can be:
    quantization levels is given by x2 * 2^16, where x2 is between 0
    and 1. If the number of levels is 1 or less, zero is output. No
    dithering is performed, but of course dithering noise can be added
-   upstream to x1.
-   
+   upstream to x1,
+ - `MATH_OP_RLI` = 15, performs random linear interpolation. x1 is the
+   breakpoint frequency in Hz, and x2 is the amplitude. The RLI function
+   computes a random number from -x2 to +x2 every 1/x1 seconds. The
+   output is a linear interpolation between these points. Changes in
+   amplitude and frequency take effect at the next breakpoint so that
+   the output is continuous, and periods are rounded to the nearest
+   sample (audio-rate) or block length (block-rate).
+
+
 
 `/arco/math/set_x1 id chan x1` - Set channel `chan` of input to float
 value `x1`.
@@ -868,6 +879,14 @@ On insert, you can optionally fade in the gain from 0 using the
 2 (FADE_LOWPASS, relaxation) or 3 (FADE_SMOOTH, raised cosine) as in
 `fader`. To avoid fade in, you can set `dur` to 0. The default mode
 is FADE_SMOOTH (raised cosine).
+
+Fromo the Serpent API, optional `at_end` can be SIGNAL (value is
+'signal') meaning that if `ugen` is an Instrument with a member
+named 'envelope', then an action is attached to the envelope so
+that when it ends, this ugen is removed from the mix. Alternatively,
+`at_end` can be GAIN (value is 'gain') meaning that if `gain` is
+a Ugen, then an action is attached to the gain so that when it ends,
+this ugen is removed from the mix.
 
 On remove, you can optionally fade out the gain to 0 using the
 same modes as fading in by setting dur to non-zero. The
@@ -1184,7 +1203,8 @@ audio output. `id` is the object id.
 function shape for object with id. All remaining parameters are
 floats, alternating segment durations (in samples) and segment final
 values. The envelope starts at the current output value and ends at
-yn-1 (defaults to 0).
+yn-1 (defaults to 0). (In the Serpent functions, durations are in
+seconds.)
 
 `/arco/pwl/start id` - starts object with id.
 
@@ -1196,7 +1216,7 @@ fade to zero (without replacing the current envelope). You can also
 use `set` to change the envelope output value discontinuously.
 
 `/arco/pwl/decay id dur` - decay from the current value of object with
-id to zero in `dur` samples.
+id to zero in `dur` samples. (Or seconds in the Serpent method.)
 
 `/arco/pwl/set id y` - sets current output value to `y` (float). If
 the unit generator is in the middle of an envelope, this will create a
@@ -1444,6 +1464,65 @@ this message is ignored.
 `/arco/sum/set_gain id gain` -- Set an overall gain applied to
 the sum of inputs. Changes to gain are smoothed.
 
+### tableosc, tableoscb
+```
+tableosc(freq, amp [, chans])
+.set('freq', freq)
+.set('amp', amp)
+.select(index)
+.borrow(ugen)
+.create_tas(index, tlen, ampspec)
+.create_tcs(index, teln, spec)
+.create_ttd(index, samps)
+```
+
+`/arco/tableosc/new id chans freq amp` -- Create a new tableosc
+table-lookup oscillator. The table is specified separately (see
+the create methods for details).
+
+`/arco/tableosc/select id index` -- Select a waveform by index.
+(See create methods to create wavefoms.)
+
+`/arco/tableosc/repl_freq id freq_id` -- Replace the frequency
+control input with another unit generator.
+
+`/arco/tableosc/set_freq id chan freq` -- Set the frequency
+constant to a floating point value. Only the specifid channel
+is changed.
+
+`/arco/tableosc/repl_amp id freq_id` -- Replace the amplitude
+control input with another unit generator.
+
+`/arco/tableosc/set_amp id chan amp` -- Set the amplitude
+constant to a floating point value. Only the specifid channel
+is changed.
+
+`/arco/tableosc/sel in index` -- select table at index.
+
+`/arco/tableosc/borrow id lender` -- Use tables from lender
+(another tableosc).
+
+`/arco/tableosc/createtas id index tlen ampspec` -- specify
+wavetable at the given index to have length tlen. Ampspec is
+a vector of floats (typecode "vf") representing harmonic
+amplitudes for harmonics 1, 2, 3, etc. ("tas" is for table
+amplitude spectrum.)
+
+`/arco/tableosc/createtcs id index tlen spec` -- specify
+wavetable at the given index to have length tlen. Spec is
+a vector of floats (typecode "vf" ) containing alternating
+amplitude and phase (in radians) for harmonics 1, 2, 3, etc.
+("tcs" is for table complex spectrum.)
+
+`/arco/tableosc/createttd id index samps` -- specify
+wavetable at the given index to be samps, a vector of
+floats (typecode "vf"). Note that the table length is
+given by the length of the vector. ("ttd" is for table
+time domain.)
+
+When a waveform is selected, all channels use the same
+waveform. However, each channel can have a separate
+frequency and amplitude.
 
 ### thru, fanout
 ```

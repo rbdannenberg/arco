@@ -28,9 +28,9 @@ class Mix (Ugen):
         o2_send_cmd("/arco/mix/ins", 0, "UsUUfi", id, str(name), ugen.id, 
                                                       gain.id, dur, mode)
         if atend:
-            if atend == SIGNAL and issubclass(ugen, Instrument) and 
-               ugen.get['envelope']:
-                create_action(ugen.envelope, this, 'rem', ugen)
+            var env = ugen.get['envelope']
+            if atend == SIGNAL and issubclass(ugen, Instrument) and env:
+                create_action(env, this, 'rem', ugen)
             elif atend == GAIN and issubclass(gain, Pwlb):
                 create_action(gain, this, 'rem', ugen)
             else:

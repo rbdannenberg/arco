@@ -22,6 +22,7 @@
 extern const char *Math_name;
 
 typedef struct Math_state {
+    int count;
     Sample prev;
     Sample hold;
 } Math_state;
@@ -52,7 +53,7 @@ public:
             Ugen(id, 'a', nchans) {
         op = op_;
         if (op < 0) op = 0;
-        if (op >= NUM_MATH_OPS) op = NUM_MATH_OPS - 1;
+        if (op >= NUM_MATH_OPS) op = MATH_OP_ADD;
         x1 = x1_;
         x2 = x2_;
         flags = CAN_TERMINATE;
@@ -73,7 +74,7 @@ public:
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
-
+            states[i].count = 0;
             states[i].prev = 0.0f;
             states[i].hold = 0.0f;
         }
@@ -247,6 +248,14 @@ public:
     void qnt_ab_a(Math_state *state);
     void qnt_ba_a(Math_state *state);
     void qnt_bb_a(Math_state *state);
+
+    //----------------- RLI ------------------
+    // random linear interpolation at x1 Hz from -x2 to +x2
+
+    void rli_aa_a(Math_state *state);
+    void rli_ab_a(Math_state *state);
+    void rli_ba_a(Math_state *state);
+    void rli_bb_a(Math_state *state);
 
 
 

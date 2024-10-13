@@ -12,12 +12,15 @@ const char *Mix_name = "Mix";
 
 Mix::~Mix()
 {
-    Input *input = &inputs[0];
-    for (int i = 0; i < inputs.size(); i++) {
-        input->input->unref();
-        input->gain->unref();
-        input->prev_gain.finish();
-        input++;
+    int n = inputs.size();
+    if (n > 0) {
+        Input *input = &inputs[0];
+        for (int i = 0; i < n; i++) {
+            input->input->unref();
+            input->gain->unref();
+            input->prev_gain.finish();
+            input++;
+        }
     }
     // inputs, gains, input_strides, gain_strides are all freed
 }

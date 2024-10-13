@@ -17,6 +17,7 @@ require "allugens"
 require "reverb"
 require "soundfont"
 require "pan"
+require "supersaw"
 
 SIMPLE = false
 
@@ -238,6 +239,9 @@ def arco_ready():
     Checkbox(win, "Quantization Test", 'S', 'D', 'S', 'S', 'qntcheckbox')
     qntcheckbox.add_target_method(nil, 'qnttest')
     
+    Checkbox(win, "RandLinInterp Test", 'S', 'D', 'S', 'S', 'rlicheckbox')
+    rlicheckbox.add_target_method(nil, 'rlitest')
+    
     
     Checkbox(win, "Chorddetect Test", 'S', 'D', 'S', 'S', 'chorddetectcheckbox')
     chorddetectcheckbox.add_target_method(nil, 'chorddetecttest')
@@ -271,6 +275,12 @@ def arco_ready():
 
     Checkbox(win, "sttest", 'S', 'D', WIDTH, 'S', 'sttestcheckbox')
     sttestcheckbox.add_target_method(nil, 'sttesttest')
+
+    Checkbox(win, "tableosc", 'S', 'D', WIDTH, 'S', 'tableosccheckbox')
+    tableosccheckbox.add_target_method(nil, 'tableosctest')
+
+    Checkbox(win, "supersaw", 'S', 'D', WIDTH, 'S', 'supersawcheckbox')
+    supersawcheckbox.add_target_method(nil, 'supersawtest')
 
     ui_initialized = true
     default_window.fit_to_children()
@@ -1165,6 +1175,22 @@ def qnttest(obj, event, x, y):
         qntout = nil
 
 
+########## RLI Test ################
+# This test uses RLI for frequency modulation
+# rate is 6hz and depth is 523.251Hz +/- 50Hz
+
+rliout = nil
+
+def rlitest(obj, event, x, y):
+    display "rlitest", x
+    if x:
+        var freq = addb(523.251, ugen_rlib(6, 50))
+        rliout = sine(freq, 0.2).play()
+    else:
+        rliout.mute()
+        rliout = nil
+
+
 ########## O2audioio Test ##############
 
 def o2audioiotest(obj, event, x, y):
@@ -1213,6 +1239,33 @@ def sttesttest(obj, event, x, y):
         sched_cause(2, sttest_ugen, 'mute')
         sttest_ugen = nil  // free the muted ugens
         stlp = nil
+
+
+########## Tableosc Test ##############
+
+def tableosctest(obj, event, x, y):
+    display "tableosctest", x
+    if x:  # make/play tone with tableosc borrowing from another
+        var tblosc0 = tableosc(1, 1)
+        tblosc0.create_tas(0, 100,
+                [0.5 * i ** -1.5 for i = 1 to 15])  // make a waveform
+        tblosc = tableosc(100.0, 0.2)
+        tblosc.borrow(tblosc0)
+        // tblosc0 is now "owned" by tblosc, so it should be freed later
+        tblosc.select(0)  // select waveform 0
+        tblosc.play()
+    else:
+        tblosc.mute()
+        tblosc = nil
+
+########## Tableosc Test ##############
+
+def supersawtest(obj, event, x, y):
+    display "supersawtest", x
+    if x:  # make/play tone with Supersaw
+        supersaw_example_start()
+    else:
+        supersaw_example_stop()
 
 
 ########## Main Initialization ################

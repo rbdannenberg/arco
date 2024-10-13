@@ -274,11 +274,12 @@ def extract_method(classname, methodname, fimpl, alternates = None):
         print("Error: extract_method could not find class", classname)
         return None
     loc = fimpl.find(" " + methodname + "(", loc)
-    # In Faust version 2.75, "control" was changed to "frame", but otherwise
-    # output is still compatible with this f2a.py translator, so now we just
-    # search for "frame" first but if we do not find it, we look for "control"
-    # to be backward compatible. This is generalized so we can look for a 
-    # list of alternates for any method.
+    # In Faust version 2.75, "control" was changed to "frame" when -os
+    # (= one sample) is used (this is the case for Arco block-rate
+    # output ugens, but otherwise output is still compatible with this
+    # f2a.py translator, so now we just search for "frame" first but
+    # if we do not find it, we look for "control". This is generalized
+    # so we can look for a list of alternates for any method.
     if loc < 0 and alternates:
         for alternate in alternates:
             loc = fimpl.find(" " + alternate + "(", loc)

@@ -41,12 +41,12 @@ class Pwl (Ugen):
 
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
-        o2_snd_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
+        o2_send_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
         this
 
     def set(y):
     # set current value to y
-        o2_snd_cmd("/arco/pwl/set", 0, "Uf", id, y)
+        o2_send_cmd("/arco/pwl/set", 0, "Uf", id, y)
         this
 
 
@@ -115,7 +115,7 @@ class Pwlb (Ugen):
 
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
-        o2_snd_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
+        o2_send_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
         this
 
 

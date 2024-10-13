@@ -5,9 +5,9 @@
 
 # A constraint is an object with instance variables and a method to
 # compute an "output" from instance variables, thus implementing a
-# one-way constraint.  The method is invoked when a variable is set
-# using set(name, value). The val instance variable is reserved and
-# is effectively constrained to a function of other variables.
+# one-way constraint.  The compute() method is invoked when a variable
+# is set using set(name, value). The val instance variable is reserved
+# and is effectively constrained to a function of other variables.
 #
 # The value can be a number or an array of numbers, and it can be
 # directed to a Const.
@@ -184,9 +184,12 @@ class Constraint:
         set(name, 1 if x else 0)
 
 
-    def control_change_1(control, rest args): control_change(control, args, name1)
-    def control_change_2(control, rest args): control_change(control, args, name2)
-    def control_change_3(control, rest args): control_change(control, args, name3)
+    def control_change_1(control, rest args): 
+        control_change(control, args, name1)
+    def control_change_2(control, rest args):
+        control_change(control, args, name2)
+    def control_change_3(control, rest args):
+        control_change(control, args, name3)
     def control_change(control, args, name):
     # this is a callback for numerical control change events
     # args will be simply [value] if the control is Labeled_slider,

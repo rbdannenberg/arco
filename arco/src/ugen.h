@@ -64,7 +64,8 @@ const int MATH_OP_PWI = 11;
 const int MATH_OP_RND = 12;
 const int MATH_OP_SH = 13;
 const int MATH_OP_QNT = 14;
-#define NUM_MATH_OPS 15
+const int MATH_OP_RLI = 15;
+#define NUM_MATH_OPS 16
 
 extern const char *OP_TO_STRING[NUM_MATH_OPS];
 

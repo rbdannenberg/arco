@@ -1,0 +1,74 @@
+# tableosc.srp -- table-lookup oscillator with frequency control
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+class Wavetables (Ugen):
+    var address_prefix  // e.g. "/arco/tableosc/"
+
+    def init(freq, amp, chans, classname):
+        if not chans:
+            chans = max_chans(max_chans(1, freq), amp)
+        super.init(create_ugen_id(), classname, chans, A_RATE,
+                   "UU", 'freq', freq, 'amp', amp)
+        address_prefix = "/arco/" + tolower(classname) + "/"
+
+
+    def create_table(index, tlen, data, method_name):
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_int32(index)
+        if tlen:  // omit length in case of time-domain data
+            o2_add_int32(tlen)
+        o2_add_vector(data, "f")
+        o2_send_finish(0, address_prefix + method_name, true)
+
+    def create_tas(index, tlen, ampspec):
+    # table from amplitude spectrum
+        create_table(index, tlen, ampspec, "createtas")
+
+    def create_tcs(index, tlen, spec):
+    # table from complex spectrum (amplitude and phase pairs)
+        create_table(index, tlen, spec, "createtcs")
+
+    def create_ttd(index, samps):
+    # table from time-domain data (table length is len(samps))
+        create_table(index, nil, samps, "createttd")
+
+    def borrow(lender):
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_int32(arco_ugen_id(lender.id))
+        o2_send_finish(0, address_prefix + "borrow", true)
+
+    def select(index):
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_int32(index)
+        o2_send_finish(0, address_prefix + "sel", true)
+
+
+class Tableosc (Wavetables):
+    def init(freq, amp, chans):
+        super.init(freq, amp, chans, "Tableosc")
+    
+
+class Tableoscb (Wavetables):
+    def init(freq, amp, chans):
+        super.init(freq, amp, chans, "Tableoscb")
+
+
+def tableosc(freq, amp, optional chans):
+    Tableosc(freq, amp, chans)
+
+
+def tableoscb(freq, amp, optional chans):
+    if not isnumber(freq) and freq.rate != 'b':
+        print "ERROR: 'freq' input to Ugen 'tableoscb' must be block rate"
+        return nil
+    if not isnumber(amp) and amp.rate != 'b':
+        print "ERROR: 'amp' input to Ugen 'tableoscb' must be block rate"
+        return nil
+    if not chans:
+        chans = max_chans(max_chans(1, freq), amp)
+    Tableoscb(freq, amp, chans)

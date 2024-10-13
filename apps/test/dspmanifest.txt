@@ -28,3 +28,4 @@ spectralrolloff
 o2audioio
 sttest
 # zitarev
+tableosc*

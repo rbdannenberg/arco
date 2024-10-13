@@ -146,11 +146,11 @@ public:
             if (input_desc.fade_count > 0) {
                 switch (mode) {
                     case FADE_LINEAR:
-                        input_desc.fade_phase = 1;  // represents current fade val
+                        input_desc.fade_phase = 1;  // current fade val
                         input_desc.fade_delta = -1.0f / input_desc.fade_count;
                         break;
                     case FADE_EXPONENTIAL:
-                        input_desc.fade_phase = 1;  // represents current fade val
+                        input_desc.fade_phase = 1;  // current fade val
                         input_desc.fade_factor =
                                 pow(1.0 / 101.0, 1.0 / input_desc.fade_count);
                         break;
@@ -356,5 +356,3 @@ public:
     }
 };
 
-
-    

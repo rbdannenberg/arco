@@ -7,6 +7,7 @@
 extern const char *Mathb_name;
 
 typedef struct Mathb_state {
+    int count;
     Sample prev;
     Sample hold;
 } Mathb_state;
@@ -29,7 +30,7 @@ public:
             Ugen(id, 'b', nchans) {
         op = op_;
         if (op < 0) op = 0;
-        if (op >= NUM_MATH_OPS) op = NUM_MATH_OPS - 1;
+        if (op >= NUM_MATH_OPS) op = MATH_OP_ADD;
         x1 = x1_;
         x2 = x2_;
         flags = CAN_TERMINATE;
@@ -145,6 +146,32 @@ public:
                     state->prev = x2;
                 }
                 break;
+
+              case MATH_OP_QNT: {
+                    Mathb_state *state = &states[i];
+                    Sample x2 = x2_samps[i];
+                    Sample q = x2 * 0x8000;
+                    *out_samps++ = x2 <= 0 ? 0 : 
+                            round((x1_samps[i] + 1) * q) / q - 1;
+                }
+                break;
+
+              case MATH_OP_RLI: {
+                    Mathb_state *state = &states[i];
+                    if (state->count == 0) {
+                        state->count = (int) (BR / x1_samps[i]);
+                        if (state->count == 0) {
+                            state->count = 1;
+                        }
+                        Sample x2 = x2_samps[i];
+                        Sample target = unifrand_range(-x2, x2);
+                        state->hold = (target - state->prev) / state->count;
+                    }
+                    state->count--;
+                    *out_samps++ = (state->prev += state->hold);
+                }
+                break;
+
               default: break;
             }
             x1_samps += x1_stride;

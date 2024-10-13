@@ -941,6 +941,7 @@ class Instrument (Ugen):
                   "instr_begin() at the beginning of your Instrument " +
                   "subclass's init() function")
         parameter_bindings = instr_stack.unappend()
+        display "Instrument.init", name, parameter_bindings
 
 
     def get(input):
