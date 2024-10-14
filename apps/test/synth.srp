@@ -47,6 +47,12 @@ class Synth (Instrument):
             notes.remove(name)
             name = note
         notes.remove(name)
+        // the mixer keeps a reference to the ugen even after the
+        // ugen terminates, so we explicitly remove it here; however,
+        // we depend on the Instrument terminating to remove it from
+        // the mixer and do not call mixer.rem(name)
+        mixer.inputs.remove(name)
+        display "after synth.free_instr_name", name, notes
 
 
     def note(instr_spec, pitch, vel, optional dur,
@@ -76,4 +82,4 @@ class Synth (Instrument):
             id = notes[pitch_or_id]
         var instr = notes[id]
         instr.noteoff()
-        free_instr_name(id)
+        free_instr_name(pitch_or_id)

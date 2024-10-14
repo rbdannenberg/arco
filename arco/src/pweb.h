@@ -17,6 +17,8 @@ public:
     float final_value; // target value that will be first sample of next segment
     int next_point_index;  // index into point of the next segment
     int action_id;         // send this when envelope is done
+    bool linear_attack;    // first segment is linear
+    bool linear_mode;      // first segment is linear and we're in the first segment
     Vec<float> points;     // envelope breakpoints (seg_len, final_value)
 
     Pweb(int id) : Ugen(id, 'b', 1) {
@@ -28,6 +30,8 @@ public:
         next_point_index = 0;  //     become constant zero.
         action_id = 0;
         points.init(0);   // initially empty, so size = 0
+        linear_attack = false;
+        linear_mode = false;   // set to linear_attack at beginning of envelope
     }
 
     const char *classname() { return Pweb_name; }
@@ -36,41 +40,51 @@ public:
         if (seg_togo == 0) { // set up next segment
             current = final_value;  // make output value exact
             if (next_point_index >= points.size()) {
-                seg_togo = INT_MAX;
-                seg_factor = 1.0f;
+                stop();
                 send_action_id();
                 if (current == bias && (flags & CAN_TERMINATE)) {
                     terminate();
                 }
-                printf("Pweb: done\n");
             } else {
+                linear_mode &= (next_point_index == 0);  // clear after 1st segment
                 seg_togo = (int) points[next_point_index++];
                 final_value = points[next_point_index++] + bias;
-                seg_factor = exp(log(final_value / current) / seg_togo);
-                printf("Pweb: togo %d final %g\n", seg_togo, final_value);
+                if (linear_mode) {
+                    seg_factor = (final_value - current) / seg_togo;
+                } else {
+                    seg_factor = exp(log(final_value / current) / seg_togo);
+                }
             }
         }
+        current = (linear_mode ? current + seg_factor : current * seg_factor);
         *out_samps = current - bias;
-        current *= seg_factor;
         seg_togo--;
     }
     
     void start() {
         next_point_index = 0;
+        linear_mode = linear_attack;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
         printf("pweb start: final_value %g\n", final_value - bias);
     }
 
+
     void stop() {
-        next_point_index = 0;
         seg_togo = INT_MAX;
-        seg_factor = 1.0f;
+        seg_factor = !linear_mode;  // 1 if exp, 0 if linear
     }
+
+
+    void linatk(bool linear) {
+        linear_attack = linear;
+    }
+
 
     void decay(int d) {
         seg_togo = d;
         final_value = bias;
+        linear_mode = false;  // always exponential decay
         seg_factor = exp(log(final_value / current) / seg_togo);
         next_point_index = points.size();  // end of envelope
     }

@@ -75,6 +75,20 @@ static void arco_pweb_stop(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/pweb/linatk int32 id, bool lin;
+ */
+static void arco_pweb_linatk(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    bool lin = argv[1]->B;
+    // end unpack message
+
+    UGEN_FROM_ID(Pweb, pweb, id, "arco_pwe_linatk");
+    pweb->linatk(lin);
+}
+
+
 /* O2SM INTERFACE: /arco/pweb/decay int32 id, int32 d;
  */
 static void arco_pweb_decay(O2SM_HANDLER_ARGS)
@@ -113,8 +127,10 @@ static void pweb_init()
                     true);
     o2sm_method_new("/arco/pweb/stop", "i", arco_pweb_stop, NULL, true,
                     true);
+    o2sm_method_new("/arco/pweb/linatk", "iB", arco_pweb_linatk, NULL, true,
+                    true);
     o2sm_method_new("/arco/pweb/decay", "ii", arco_pweb_decay, NULL, true,
-                     true);
+                    true);
     o2sm_method_new("/arco/pweb/set", "if", arco_pweb_set, NULL, true, true);
     // END INTERFACE INITIALIZATION
     // arco_pweb_env has a variable number of parameters:

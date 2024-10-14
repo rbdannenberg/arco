@@ -1136,6 +1136,7 @@ pwe(d0, y0, d1, y1, ..., [init=0], [start=true])
 .set_points(d0, y0, d1, y1, ...)
 .start()
 .stop()
+.linear_attack([lin=true])
 .decay(dur)
 .set(y)
 ```
@@ -1147,11 +1148,16 @@ are increased by 0.01. The exponential interpolation occurs between
 these biased breakpoints. Then, 0.01 is subtracted to obtain the
 output. This allows envelopes to decay all the way to zero, but for
 very small breakpoint values, the curves are close to linear.
+Unlike `pwl` and `pwlb`, breakpoints cannot be less than zero, so
+that when bias is added, the exponential curves interpolate between
+values greater than zero.
 
-The starting value can be given by the `init` keyword.
+The starting value can be given by the `init` keyword, allowing for,
+e.g., an exponential fade from 1 to 0.
 
-Note that the default for `start` is true. When false, the output
-will remain at the initial value until the `.start()` method is called.
+Note that the default for `start` is true in the Seprent API. When
+false, the output will remain at the initial value until the
+`.start()` method is called.
 
 `/arco/pwe/new id` - Create a new piece-wise linear generator with
 audio output. `id` is the object id. Envelope does not start until
@@ -1173,6 +1179,11 @@ envelope can be optionally specified. Next, the envelope can be started
 starting with the current value. Alternatively, `decay` can be used to
 fade to zero (without replacing the current envelope). You can also
 use `set` to change the envelope output value discontinuously.
+
+`/arco/pwl/linatk id lin` - `lin` is a Boolean ("B" typecode in O2) and
+indicates whether the first segment of the envelope should be *linear*
+instead of *exponential*. Linear onsets have a different and often more
+natural sound.
 
 `/arco/pwe/decay id dur` - decay from the current value of object with
 id to zero in `dur` (int32) blocks.
@@ -1506,7 +1517,9 @@ is changed.
 wavetable at the given index to have length tlen. Ampspec is
 a vector of floats (typecode "vf") representing harmonic
 amplitudes for harmonics 1, 2, 3, etc. ("tas" is for table
-amplitude spectrum.)
+amplitude spectrum.) The phase of each harmonic is computed
+from Schroeder's formula: φ(n) = π * n * (n - 1) / N, which is
+a heuristic to reduce the peak amplitude or crest factor (CR).
 
 `/arco/tableosc/createtcs id index tlen spec` -- specify
 wavetable at the given index to have length tlen. Spec is

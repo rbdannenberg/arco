@@ -282,6 +282,9 @@ def arco_ready():
     Checkbox(win, "supersaw", 'S', 'D', WIDTH, 'S', 'supersawcheckbox')
     supersawcheckbox.add_target_method(nil, 'supersawtest')
 
+    Checkbox(win, "sssynth erase", 'S', 'D', WIDTH, 'S', 'sssynthcheckbox')
+    sssynthcheckbox.add_target_method(nil, 'sssynthtest')
+
     ui_initialized = true
     default_window.fit_to_children()
 
@@ -1266,6 +1269,10 @@ def supersawtest(obj, event, x, y):
         supersaw_example_start()
     else:
         supersaw_example_stop()
+
+def sssynthtest(obj, event, x, y):
+    display "sssynthtest sssynth = nil"
+    sssynth = nil
 
 
 ########## Main Initialization ################

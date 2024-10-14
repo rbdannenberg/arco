@@ -210,7 +210,7 @@ def pwlb(keyword init, start = true, rest points):
 
 # ---- included from /Users/rbd/arco/serpent/srp/pwe.srp ----
 
-# pwe.srp -- piece-wise linear envelope
+# pwe.srp -- piece-wise exponential envelope
 #
 # Roger B. Dannenberg
 # May 2023
@@ -249,6 +249,10 @@ class Pwe (Ugen):
 
     def stop():
         o2_send_cmd("/arco/pwe/stop", 0, "U", id)
+        this
+
+    def linear_attack(lin):
+        o2_send_cmd("/arco/pwe/linatk", 0, "UB", id, lin)
         this
 
     def decay(dur):
@@ -323,11 +327,14 @@ class Pweb (Ugen):
         o2_send_cmd("/arco/pweb/stop", 0, "U", id)
         this
 
+    def linear_attack(optional lin = true):
+        o2_send_cmd("/arco/pweb/linatk", 0, "UB", id, lin)
+        this
+
     def decay(dur):
     # end envelope with decay to zero over given duration (seconds)
         o2_send_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
         this
-
 
     def set(y):
     # set current value to y

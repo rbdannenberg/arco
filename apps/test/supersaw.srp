@@ -57,7 +57,7 @@ class Sawtooth_waveforms:
 
 class Supersaw (Instrument):
     var decay
-    var amp
+    var env
 
     def init(step, fmod, n, detune, width, mono, antialias, rolloff,
              animate, attack, amp_, decay_, cutoff):
@@ -74,18 +74,17 @@ class Supersaw (Instrument):
                                 mono, sawtooth_waveforms.tables, table_index,
                                 rolloff, animate, mixer)
             power = power + ro * ro  // sum of squares of amplitudes
-        var env = pwlb(attack, amp)
+        env = pweb(attack, amp).linear_attack().term()
         var out = mult(lowpass(mixer, cutoff), env)
         env.start()
         super.init("Supersaw", out)
+
 
     def noteoff():
         display "supersaw.noteoff"
         // replace pwlb with pweb for decay. This has a problem in that
         // if we get a noteoff during attack, there will be a discontinuity
-        var decay_env = pweb(decay, init=amp)
-        output.set('x2', decay_env)
-        decay_env.term()
+        env.decay(decay)
 
 
     def supersaw_component(i, step, fmod, n, detune, width, 
@@ -143,8 +142,8 @@ SUPERSAW1 = {'instrument': 'supersaw', 'rolloff': 0.5, 'animate': t, 'n': 16}
 def supersaw_example_start()
     sssynth = Synth()
     sssynth.play()
-    sspitch = 48
-    sssynth.note(SUPERSAW1, sspitch, 80, cutoff = 500.0)
+    sspitch = 36
+    sssynth.note(SUPERSAW1, sspitch, 80, cutoff = 1000.0, decay = 1)
 
 def supersaw_example_stop():
     sssynth.noteoff(sspitch)

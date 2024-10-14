@@ -32,6 +32,8 @@ public:
                        // target value includes bias
     int next_point_index;  // index into point of the next segment
     int action_id;      // send this when the envelope is done
+    bool linear_attack; // first segment is linear
+    bool linear_mode;   // first segment is linear and we're in first segment
     Vec<float> points;  // envelope breakpoints (seg_len, final_value)
 
     Pwe(int id) : Ugen(id, 'a', 1) {
@@ -43,6 +45,8 @@ public:
         next_point_index = 0;  //     become constant zero.
         action_id = 0;
         points.init(0);        // initially empty, so size = 0
+        linear_attack = false;
+        linear_mode = false;   // set to linear_attack at beginning of envelope
     }
     
     const char *classname() { return Pwe_name; }
@@ -64,18 +68,30 @@ public:
                         terminate();
                     }
                 } else {
+                    linear_mode &= (next_point_index == 0);  // clear after 1st segment
                     seg_togo = (int) points[next_point_index++];
                     final_value = points[next_point_index++] + bias;
-                    // derivation: f^n = final_value / current
-                    //       ln(f) * n = ln(final_value / current)
-                    //          f      = exp(ln(final_value / current) / n)
-                    seg_factor = exp(log(final_value / current) / seg_togo);
+                    if (linear_mode) {
+                        seg_factor = (final_value - current) / seg_togo;
+                    } else {
+                        // derivation: f^n = final_value / current
+                        //       ln(f) * n = ln(final_value / current)
+                        //          f      = exp(ln(final_value / current) / n)
+                        seg_factor = exp(log(final_value / current) / seg_togo);
+                    }
                 }
             }
-            // invariant 0 < n <= BL and n <= seg_togo
-            for (int i = 0; i < n; i++) {
-                *out_samps++ = current - bias;
-                current *= seg_factor;
+            if (linear_mode) {
+                for (int i = 0; i < n; i++) {
+                    current += seg_factor;
+                    *out_samps++ = current - bias;
+                }
+            } else {
+                // invariant 0 < n <= BL and n <= seg_togo
+                for (int i = 0; i < n; i++) {
+                    current *= seg_factor;
+                    *out_samps++ = current - bias;
+                }
             }
             togo -= n;
             seg_togo -= n;
@@ -86,6 +102,7 @@ public:
     // start the envelope; continue from the current value
     void start() {
         next_point_index = 0;
+        linear_mode = linear_attack;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
     }
@@ -93,7 +110,12 @@ public:
 
     void stop() {
         seg_togo = INT_MAX;
-        seg_factor = 1.0f;
+        seg_factor = !linear_attack;
+    }
+
+
+    void linatk(bool linear) {
+        linear_attack = linear;
     }
 
 
@@ -101,6 +123,7 @@ public:
     void decay(float d) {
         seg_togo = (int) d;
         final_value = bias;
+        linear_mode = false;  // always exponential decay
         seg_factor = exp(log(final_value / current) / seg_togo);
         next_point_index = points.size();  // end of envelope
     }
