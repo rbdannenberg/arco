@@ -3,6 +3,13 @@
 # Roger B. Dannenberg
 # Oct 2024
 
+# for MIDI-like processing, there is a problem with multiple notes
+# playing the same pitch. The preferred method is to give each note a
+# unique id so that noteoff's can name the note to be ended. Without
+# id's, we allow unison notes identified by their MIDI key number
+# (pitch), and a noteoff will end notes in a first on/first off
+# manner.
+
 class Synth (Instrument):
     var notes  // dictionary of sounding notes
         // notes with symbolic ids use the mapping id->Instrument
@@ -22,9 +29,12 @@ class Synth (Instrument):
 
     def get_instr_name(pitch):
     # get a symbol to name the instrument in the mixer. If this method
-    # is called, no id was provided so we need to create or recycle one
-    # if pitch is an integer, it will be used for noteoff, and we need
-    # to insert a mapping from pitch to the new id:
+    # is called, no id was provided so we need to create or recycle
+    # one if pitch is a number, the number rounded to an integer
+    # (becoming a MIDI key number) will be used for noteoff, and we
+    # need to insert a mapping from pitch to the new id. When there is
+    # a unison, the mapping becomes a list of ids. Noteon will append
+    # to the list and noteoff will remove the first id in the list.
         var id
         if len(free_note_names) > 0:
             id = free_note_names.unappend()
@@ -32,54 +42,66 @@ class Synth (Instrument):
             prev_name_number = prev_name_number + 1
             id = mix_name(prev_name_number)
         if isinteger(pitch):  // instrument will be identified by pitch
-            notes[pitch] = id
-        display "synth.get_instr_name", pitch, repr(id)
+            // make notes[pitch] contain id, where "contain" means either
+            // it *is* id, or notes[pitch] is an array that includes id
+            if notes.has_key(pitch): // contains either id symbol or array
+                var existing = notes[pitch]
+                if isarray(existing): // already an array, just append id
+                    existing.append(id)
+                else:  // not an array yet; put existing in new array with id
+                    assert(issymbol(existing))
+                    notes[pitch] = [existing, id]  // make array with 2 ids
+            else:  // empty: just associate the id (a symbol) with pitch:
+                notes[pitch] = id
         return id
 
 
-    def free_instr_name(name):
-    # (private) remove name from notes. If name is an integer (pitch),
-    # then the actual unique instrument name is notes[name], so remove
-    # that AND the instrument name from notes
-        display "synth.free_instr_name", name, time_get()
-        if isinteger(name):
-            var note = notes[name]
-            notes.remove(name)
-            name = note
-        notes.remove(name)
-        // the mixer keeps a reference to the ugen even after the
-        // ugen terminates, so we explicitly remove it here; however,
-        // we depend on the Instrument terminating to remove it from
-        // the mixer and do not call mixer.rem(name)
-        mixer.inputs.remove(name)
-        display "after synth.free_instr_name", name, notes
+    def note(instr_spec, pitch, vel, optional dur, note_id, param_dict,
+             dictionary params):
+        # param_dict is optional and allows you to pass an already-formed
+        # dictionary to note rather than spelling out all the keyword/
+        # value pairs in the actual parameter list. It overrides params.
+        if param_dict:
+            params = param_dict
 
-
-    def note(instr_spec, pitch, vel, optional dur,
-             keyword id, pan, gain, dictionary params):
-        if not id:
-            id = get_instr_name(pitch)
-        if not pan and chans > 1:
-            pan = instr_spec.get('pan', 64)
-        if not gain:
-            gain = instr_spec.get('gain', 1)
-        var instr = funcall(instr_spec['instrument'], instr_spec, pitch,
-                            vel, params)
-        notes[id] = instr
-        display "synth.note after creating instr", notes, time_get()
+        if not note_id:
+            note_id = get_instr_name(round(pitch))
+        var gain = params.get('gain') or instr_spec.get('gain', 1)
+        var instr = funcall(instr_spec['instrument'], instr_spec,
+                            pitch, vel, params)
+        notes[note_id] = instr
         if chans > 1:
+            var pan = params.get('pan') or instr_spec.get('pan', 64)
             gain = pan_45(pan / 127, gain)
-        mixer.ins(id, instr, gain)
+        mixer.ins(note_id, instr, gain)
         if dur:
             sched_select(rtsched)
             sched_cause(dur, this, 'noteoff', pitch)
 
 
     def noteoff(pitch_or_id):
-        display "synth.noteoff", id, pitch_or_id, notes, time_get()
         var id = pitch_or_id
-        if isinteger(pitch_or_id):
-            id = notes[pitch_or_id]
+        if isnumber(pitch_or_id):
+            pitch_or_id = round(pitch_or_id)
+            var ids = notes.get(pitch_or_id, 'no_keynum_mapping')
+            if isarray(ids):
+                id = ids[0]
+                ids.uninsert(0)  // first-in/first-out
+                if len(ids) == 1:
+                    notes[pitch_or_id] = ids[0]  // get rid of the array
+                    // so that the next note off will take the elif branch:
+            elif issymbol(ids):
+                id = ids
+                notes.remove(pitch_or_id)
+        if not notes.has_key(id):
+            print "WARNING: no note in Synth with id", pitch_or_id
+            print "    Ignoring the noteoff."
+            return
         var instr = notes[id]
         instr.noteoff()
-        free_instr_name(pitch_or_id)
+        notes.remove(id)
+        // the mixer keeps a reference to the ugen even after the
+        // ugen terminates, so we explicitly remove it here; however,
+        // we depend on the Instrument terminating to remove it from
+        // the Arco mix Ugen and do not call mixer.rem(name)
+        mixer.inputs.remove(id)

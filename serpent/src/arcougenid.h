@@ -107,7 +107,8 @@ public:
             int n = Ugen_id::free_count;
             while (n < UGEN_TABLE_SIZE / 2) {
                 mach->gc_poll();
-                printf("gc boost\n");
+                printf("gc boost %d/%d ids are free\n",
+                        Ugen_id::free_count, UGEN_TABLE_SIZE);
                 n += Ugen_id::free_count;
             }
         }

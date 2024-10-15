@@ -26,8 +26,7 @@ Synth can be mono or stereo, and if stereo, notes can be panned.
 To play a note, you invoke one of:
 ```
 synth.note(instrument_spec, pitch, velocity, optional dur = nil,
-           keyword pan = nil, gain = nil, id = nil,
-           [*keyword_parameters*])
+           id = nil, [*keyword_parameters*])
 ```
 where `instrument_spec` is a dictionary containing 'instrument', a
 symbol naming the function that creates an Instrument. When the
@@ -63,17 +62,17 @@ is printed and no note is created.
 
 `velocity` is a number from 1 to 127 as in MIDI.
 
-`pan` is specified as a number from 0 to 127 for left to right as in 
-MIDI, where 64 is center. If `pan` is omitted, the value of 'pan' from 
-`instrument_spec` is used, and otherwise 64. If synth has one channel, 
-`pan` is ignored. It is assumed that every instrument returns a mono 
-sound and stereo Synths apply panning. `pan` should be ignored by the
-instrument itself.
+Keyword parameters may contain `pan`: a number from 0 to 127 for left
+to right as in MIDI, where 64 is center. If `pan` is omitted, the
+value of 'pan' from `instrument_spec` is used, and otherwise 64. If
+synth has one channel, `pan` is ignored. It is assumed that every
+instrument returns a mono sound and stereo Synths apply panning. `pan`
+should be ignored by the instrument itself.
 
-`gain` is specified as a linear scale factor applied to the instrument 
-output. If `gain` is omitted, the value of 'pan' from
-`instrument_spec` is used, and otherwise 1.0. `gain` should be ignored
-by the instrument itself.
+Keyword parameters may contain `gain`: a linear scale factor applied
+to the instrument output. If `gain` is omitted, the value of 'gain'
+from `instrument_spec` is used, and otherwise 1.0. `gain` should be
+ignored by the instrument itself.
 
 *keyword_parameters* are optional keyword parameters. The formal
 parameter is declared as a *dictionary* and is passed as `parameters`
@@ -134,8 +133,7 @@ the sound.
 The Synth offers a way to introduce a note that was not created
 internally through a call to `synth.note()`. The method
 ```
-synth.insert(ugen, optional dur, keyword id, pan, gain, 
-             [*keyword_parameters*])
+synth.insert(ugen, optional dur, id, [*keyword_parameters*])
 ```
 outputs the ugen using optional pan and gain (defaults 64 and 1.0) and
 returns the ugen. If `id` is provided, `synth.noteoff(id)` will work

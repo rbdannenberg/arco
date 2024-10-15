@@ -1,0 +1,21 @@
+# pitch.srp -- pitch names and step values
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+def set_pitch_names(optional a4 = 440.0)
+    var bases = ["C", ["CS", "DF"], "D", ["DS", "EF"], "E", "F",
+                 ["FS", "GF"], "G", ["GS", "AF"], "A", ["AS", "BF"], "B"]
+    var step = hz_to_step(a4) - (69 - 12)  // A4 - C0 is 69 - 12
+    for octave = 0 to 9:
+        var octstr = str(octave)
+        for base at pc in bases:
+            if isstring(base):
+                var pname = intern("p" + base + octstr)
+                set_symbol_value(pname, step + octave * 12 + pc)
+            else:
+                for enharmonic in base:
+                    pname = intern("p" + enharmonic + octstr)
+                    set_symbol_value(pname, step + octave * 12 + pc)
+
+set_pitch_names()

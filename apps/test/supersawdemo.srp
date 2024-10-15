@@ -1,0 +1,58 @@
+# supersawdemo.srp - play some music with supersaw
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+require "score"
+require "pitch"
+
+def supersaw_example_chord(chd, score_dur, note_dur, antialias, cutoff):
+    var chord = Score()
+    for p in chd:
+        var note = Note(0, SUPERSAW1, p, 60, note_dur,
+                        chans = 2, detune = 0.3, width = 1,
+                        antialias = antialias, attack = 0.02)
+        if cutoff:  // add one more parameter
+            note.params['cutoff'] = cutoff
+        chord.merge(note)
+    chord.dur = score_dur
+    return chord
+
+
+def supersaw_example_seq(antialias, optional cutoff):
+    var p1 = [pC3, pG4, pB3, pE4]
+    var p2 = [pD3, pA3, pD3, pFS4]
+    var p3 = [pE3, pB3, pD4, pG4]
+    var p4 = [pG2, pB3, pD4, pB4]
+    var sust = 1.1
+    var score = Score()
+    score.append(supersaw_example_chord(p1, 1, sust, antialias, cutoff))
+    score.append(supersaw_example_chord(p2, 1, sust, antialias, cutoff))
+    score.append(supersaw_example_chord(p3, 1, sust, antialias, cutoff))
+    score.append(supersaw_example_chord(p4, 1, sust, antialias, cutoff))
+    score
+
+
+def supersaw_example()
+    var score = Score()
+    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 0.3,
+                      attack = 0.4, decay = 0.5))
+    score.append_rest(1)
+    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 0.3,
+                      attack = 0.4, decay = 0.5, lfofreq = 5, lfodepth = 0.25))
+    score.append_rest(1)
+    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 1.0, 
+                      width = 0.2, chans = 2, attack = 0.4, decay = 0.5))
+    score.append_rest(1)
+    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 1.0,
+                      attack = 0.4, decay = 0.5, chans = 2))
+    score.append_rest(1)
+    score.append(supersaw_example_seq(1))
+    score.append_rest(1)
+    score.append(supersaw_example_seq(0, 8000))  // higher cutoff
+    print "-----"
+    score.show()
+    print "-----"
+    score
+
+

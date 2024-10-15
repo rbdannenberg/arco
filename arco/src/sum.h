@@ -50,10 +50,12 @@ public:
             inputs.push_back(input);
             input->ref();
         }
+        /*
         printf("After insert, sum inputs (%p) has\n", inputs.get_array());
         for (i = 0; i < inputs.size(); i++) {
             printf("    %p: %s\n", inputs[i], inputs[i]->classname());
         }
+        */
     }
 
 

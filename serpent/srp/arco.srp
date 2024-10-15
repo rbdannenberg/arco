@@ -161,6 +161,9 @@ max_ugen_id_used = 0
 
 def create_ugen_id():
     var uid = arco_ugen_new()
+    // Debug: track who makes an Ugen:
+    // if arco_ugen_id(uid) == 13:
+    //     breakpoint()
     if arco_ugen_id(uid) > max_ugen_id_used:
         max_ugen_id_used = arco_ugen_id(uid)
     uid
@@ -936,12 +939,18 @@ class Instrument (Ugen):
                    no_msg = true)
         output = ugen
         id = output.id
+        assert(this.id == id)
+
+        // TODO: delete this debugging stuff...
+        if arco_ugen_id(id) == 13:
+            print "In Instrument, id = 13"
+
         if len(instr_stack) == 0:
             error("instr_stack is empty. Maybe you forgot to call " +
                   "instr_begin() at the beginning of your Instrument " +
                   "subclass's init() function")
         parameter_bindings = instr_stack.unappend()
-        display "Instrument.init", name, parameter_bindings
+        // display "Instrument.init", name, parameter_bindings
 
 
     def get(input):

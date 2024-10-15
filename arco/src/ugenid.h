@@ -8,5 +8,5 @@
    single definition of the number of Ugen Id's available.
  */
 
-const int UGEN_TABLE_SIZE = 1000;
+const int UGEN_TABLE_SIZE = 5000;
 

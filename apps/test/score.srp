@@ -1,0 +1,123 @@
+# scores.srp -- note lists and player
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+# A score or note list is implemented by Score and the main
+# data structure is an array of Notes. A Note is an object
+# with time - start time
+#      duration - duration
+#      symbol - name of a global holding an instrument_spec
+#      params - a dictionary of additional parameters
+#               including pan, gain, and id
+
+class Note:
+    var time
+    var instr
+    var pitch
+    var vel
+    var dur
+    var id
+    var params
+
+    def init(time_, instr_, pitch_, vel_, dur_, optional id_, pdict,
+             dictionary params_):
+        time = time_
+        instr = instr_
+        pitch = pitch_
+        vel = vel_
+        dur = dur_
+        id = id_
+        params = params_
+        if pdict:
+            if isdict(pdict):
+                params = pdict
+                if len(params_) > 0:
+                    print "WARNING: in Note.init(), a parameter dictionary was"
+                    print "    passed AND keyword parameters were passed."
+                    print "    Keyword parameters are ignored if you pass in an"
+                    print "    optional parameter dictionary."
+            else:
+                print "WARNING: in Note.init(), a non-dictionary parameter was"
+                print "    passed as a Note parameter dictionary:", pdict
+                print "    This parameter will be ignored"
+
+
+    def copy_if_shift(offset):
+    # make a new note with the indicated offset if offset is non-zero; otherwise,
+    # you can use the note as is
+        return this if offset == 0 else
+               Note(time + offset, instr, pitch, vel, dur, id, params)
+
+    def play(synth):
+        synth.note(instr, pitch, vel, dur, id, params)
+
+    def show(optional indent = ""):
+        var idstr = (" id=" + str(id)) if id else ""
+        print indent; "at", time; "s", instr.get('instrument'), "p"; pitch,
+        print "v"; vel, dur; "s"; idstr
+        print indent; "    "; instr, params
+
+
+def note_compare(x, y):
+    x.time > y.time
+
+def note_compare_resort(x, y):
+    x.time < y.time
+
+
+class Score:
+    var notes
+    var time
+    var dur
+
+    def init(optional notes_):
+        notes = notes_ or []
+        time = 0
+        dur = 0
+
+    def play(synth):
+        play_note(synth, 0)
+
+    def append_rest(dur_):
+    # insert time at the end of the score (simply adds to score.dur)
+        dur = dur + dur_
+
+    def merge(score, optional offset = 0):
+        if isinstance(score, Score):
+            for note in score.notes:
+                notes.append(note.copy_if_shift(offset))
+            notes.sort('note_compare')
+            var end = max(time + dur, score.time + offset + score.dur)
+            dur = end - time
+        elif isinstance(score, Note):
+            var n = score.copy_if_shift(offset)
+            notes.append(n)
+            dur = max(dur, n.time + n.dur)
+            notes.resort('note_compare_resort')
+
+    def append(score):
+    # aligns time of the score parameter (or note) to the end time of this
+        merge(score, time + dur - score.time)  // position score at our end
+
+    def stretch(x):
+        for note in notes:
+            note.time = note.time * x
+            note.dur = note.dur * x
+
+    def play_note(synth, i):
+        if i >= len(notes):
+            return
+        var note = notes[i]
+        var when = note.time
+        note.play(synth)
+        i = i + 1
+        if i >= len(notes)
+            return
+        note = notes[i]
+        sched_cause(note.time - when, this, 'play_note', synth, i)
+
+    def show(optional msg = ""):
+        print "----- Score at", time, "dur", dur, msg, "-----"
+        for note in notes:
+            note.show("    ")

@@ -18,6 +18,7 @@ require "reverb"
 require "soundfont"
 require "pan"
 require "supersaw"
+require "supersawdemo"
 
 SIMPLE = false
 
@@ -1263,12 +1264,37 @@ def tableosctest(obj, event, x, y):
 
 ########## Tableosc Test ##############
 
+def ssnote():
+    ssnote = Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 0.3,
+                  attack = 0.4, decay = 0.5)
+    ssnote.play(sssynth)
+
+def ssdemo():
+    ssscore = supersaw_example()
+    ssscore.play(sssynth)
+
 def supersawtest(obj, event, x, y):
     display "supersawtest", x
     if x:  # make/play tone with Supersaw
-        supersaw_example_start()
+        sssynth = Synth(2).play()
+        ssscore = supersaw_example()
+        ssscore.play(sssynth)
+        return
+        sss = supersaw(SUPERSAW1, pC3, 80, 
+                       {'n': 16, 'detune': 0.3, 'attack': 0.4, 'decay': 0.5})
+        sss.play()
+        sched_select(rtsched)
+        sched_cause(3, sss, 'noteoff')
+        sched_cause(4, nil, 'ssnote')
+        sched_cause(8, nil, 'ssdemo')
+
     else:
-        supersaw_example_stop()
+        sssynth.mute()
+        sssynth = nil
+        ssscore = nil
+        return
+        sss.mute()
+
 
 def sssynthtest(obj, event, x, y):
     display "sssynthtest sssynth = nil"

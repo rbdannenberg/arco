@@ -66,7 +66,7 @@ public:
         linear_mode = linear_attack;
         seg_togo = 0;
         final_value = current;  // continue from current, whatever it is
-        printf("pweb start: final_value %g\n", final_value - bias);
+        // printf("pweb start: final_value %g\n", final_value - bias);
     }
 
 
