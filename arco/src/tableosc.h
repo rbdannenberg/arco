@@ -9,11 +9,10 @@ extern const char *Tableosc_name;
 class Tableosc : public Wavetables {
 public:
     struct Tableosc_state {
-        double phase;
+        double phase;  // from 0 to 1 (1 represents 2PI or 360 degrees)
         Sample prev_amp;
     };
     int which_table;
-    double phase_scale;
     Vec<Tableosc_state> states;
     void (Tableosc::*run_channel)(Tableosc_state *state,
                                   Sample *table, int tlen);
@@ -28,12 +27,12 @@ public:
     Sample_ptr amp_samps;
 
 
-    Tableosc(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_) : 
+    Tableosc(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_, float phase) :
             Wavetables(id, nchans) {
         which_table = 0;
         states.set_size(chans);
         for (int i = 0; i < chans; i++) {
-            states[i].phase = 0;
+            states[i].phase = fmodf(phase / 360.0f, 1.0f);
         }
         init_freq(freq_);
         init_amp(amp_);
@@ -98,36 +97,37 @@ public:
         }
         which_table = i;
         Wavetable *table = get_table(i);
-        if (table) {
-            phase_scale = (table->size() - 2) * AP;
-        }
     }
 
 
     void chan_aa_a(Tableosc_state *state, Sample *table, int tlen) {
         double phase = state->phase;
         for (int i = 0; i < BL; i++) {
-            int iphase = phase;
-            float frac = phase - iphase;
-            *out_samps++ = (table[iphase] * (1 - frac) + 
-                            table[iphase + 1] * frac) * amp_samps[i];
-            phase += freq_samps[i] * phase_scale;
-            while (phase > tlen) phase -= tlen;
-            while (phase < 0) phase += tlen;
+            float x = phase * tlen;
+            int ix = x;
+            float frac = x - ix;
+            *out_samps++ = (table[ix] * (1 - frac) + 
+                            table[ix + 1] * frac) * amp_samps[i];
+            phase += freq_samps[i] * AP;
+            while (phase > 1) phase--;
+            while (phase < 0) phase++;
         }
+        state->phase = phase;
     }
 
 
     void chan_ba_a(Tableosc_state *state, Sample *table, int tlen) {
         double phase = state->phase;
+        double phase_incr = *freq_samps * AP;
         for (int i = 0; i < BL; i++) {
-            int iphase = phase;
-            float frac = phase - iphase;
-            *out_samps++ = (table[iphase] * (1 - frac) + 
-                            table[iphase + 1] * frac) * amp_samps[i];
-            phase += *freq_samps * phase_scale;
-            while (phase > tlen) phase -= tlen;
-            while (phase < 0) phase += tlen;
+            float x = phase * tlen;
+            int ix = x;
+            float frac = x - ix;
+            *out_samps++ = (table[ix] * (1 - frac) + 
+                            table[ix + 1] * frac) * amp_samps[i];
+            phase += phase_incr;
+            while (phase > 1) phase--;
+            while (phase < 0) phase++;
         }
         state->phase = phase;
     }
@@ -138,33 +138,39 @@ public:
         Sample amp_sig = *amp_samps;
         Sample amp_sig_fast = state->prev_amp;
         state->prev_amp = amp_sig;
+        Sample amp_sig_incr = (amp_sig - amp_sig_fast) * BL_RECIP;
         for (int i = 0; i < BL; i++) {
-            int iphase = phase;
-            float frac = phase - iphase;
-            *out_samps++ = (table[iphase] * (1 - frac) + 
-                            table[iphase + 1] * frac) * amp_sig_fast;
-            phase += freq_samps[i] * phase_scale;
-            while (phase > tlen) phase -= tlen;
-            while (phase < 0) phase += tlen;
+            float x = phase * tlen;
+            int ix = x;
+            float frac = x - ix;
+            amp_sig_fast += amp_sig_incr;
+            *out_samps++ = (table[ix] * (1 - frac) + 
+                            table[ix + 1] * frac) * amp_sig_fast;
+            phase += freq_samps[i] * AP;
+            while (phase > 1) phase--;
+            while (phase < 0) phase++;
         }
+        state->phase = phase;
     }
 
 
     void chan_bb_a(Tableosc_state *state, Sample *table, int tlen) {
         double phase = state->phase;
+        double phase_incr = *freq_samps * AP;
         Sample amp_sig = *amp_samps;
         Sample amp_sig_fast = state->prev_amp;
         state->prev_amp = amp_sig;
         Sample amp_sig_incr = (amp_sig - amp_sig_fast) * BL_RECIP;
         for (int i = 0; i < BL; i++) {
-            int iphase = phase;
-            float frac = phase - iphase;
+            float x = phase * tlen;
+            int ix = x;
+            float frac = x - ix;
             amp_sig_fast += amp_sig_incr;
-            *out_samps++ = (table[iphase] * (1 - frac) + 
-                            table[iphase + 1] * frac) * amp_sig_fast;
-            phase += *freq_samps * phase_scale;
-            while (phase > tlen) phase -= tlen;
-            while (phase < 0) phase += tlen;
+            *out_samps++ = (table[ix] * (1 - frac) + 
+                            table[ix + 1] * frac) * amp_sig_fast;
+            phase += phase_incr;
+            while (phase > 1) phase--;
+            while (phase < 0) phase++;
         }
         state->phase = phase;
     }

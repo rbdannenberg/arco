@@ -165,7 +165,7 @@ class Pv: public Ugen {
             need -= BL;
         }
         if ((input->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
-            terminate();
+            terminate(ACTION_TERM);
         }
     }
 
@@ -272,7 +272,7 @@ class Pv: public Ugen {
         if (!use_stretch) {
             input_samps = input->run(current_block);
             if ((input->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
-                terminate();
+                terminate(ACTION_TERM);
             }
         }
         for (int i = 0; i < chans; i++) {

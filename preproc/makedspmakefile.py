@@ -41,11 +41,18 @@ NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
             "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
             "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
             "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
-            "mathugenb", "onset", "chorddetect", "o2audioio", \
-            "spectralcentroid", "spectralrolloff", "tableosc", "tableoscb"]
+            "mathugenb", "unaryugen", "unaryugenb", "onset", "chorddetect", "o2audioio", \
+            "spectralcentroid", "spectralrolloff", "tableosc", "tableoscb", \
+            "stdistr", "blend", "blendb"]
 
 MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
-             "ugen_clip", "ugen_less", "ugen_greater", "ugen_soft_clip"]
+             "ugen_clip", "ugen_pow", "ugen_less", "ugen_greater", "ugen_soft_clip", \
+             "ugen_powi", "ugen_rand", "ugen_sample_hold", "ugen_quantize", "ugen_rli", \
+             "ugen_hzdiff", "ugen_tan", "ugen_atan2", "ugen_sin", "ugen_cos"]
+
+UNARYUGENS = ["ugen_abs", "ugen_neg", "ugen_exp", "ugen_log", "ugen_log10", \
+              "ugen_log2", "ugen_sqrt", "ugen_step_to_hz", "ugen_hz_to_step", \
+              "ugen_vel_to_lin", "ugen_lin_to_vel"]
 
 # compute all names for which there is an a-rate or b-rate version, but not
 # both. Put the "missing" name in NONEXIST:
@@ -449,7 +456,8 @@ def need_ugen(manifest, name):
     be replaced with the form xxx*. If you try to insert a duplicate, it
     will be ignored.  Also, if the name or name - "b" is in MATHUGENS,
     use "mathugen" or "mathugenb" in place of name since "mathugen" and
-    "mathugenb" implement all of the names in MATHUGENS. 
+    "mathugenb" implement all of the names in MATHUGENS.  Similarly for
+    UNARYUGENS.
     """
     base = None
     if name[-1] == "b":
@@ -468,6 +476,14 @@ def need_ugen(manifest, name):
         return
     elif (name in MATHUGENS):  # no base, so must be xxx form
         need_ugen(manifest, "mathugen")
+        return
+
+    # check for UNARYUGENS:
+    if (base and (base in UNARYUGENS)):  # must be xxxb form
+        need_ugen(manifest, "unaryugenb")
+        return
+    elif (name in UNARYUGENS):  # no base, so must be xxx form
+        need_ugen(manifest, "unaryugen")
         return
 
     # now we know name is not covered by manifest yet, insert something:

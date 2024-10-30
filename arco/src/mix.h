@@ -4,6 +4,9 @@
  * Feb 2022
  */
 
+// mix has per-input fade capabilities so that when input is "removed"
+// it can first be faded to zero smoothly.
+
 extern const char *Mix_name;
 
 class Mix : public Ugen {
@@ -142,6 +145,7 @@ public:
         if (i >= 0) {
             Input &input_desc = inputs[i];
             input_desc.fade_dest = 0.0;
+            // note: fade time is quantized to multiples of block period
             input_desc.fade_count = MAX(1, (int) (dur * BR + 0.5));
             if (input_desc.fade_count > 0) {
                 switch (mode) {
@@ -176,6 +180,7 @@ public:
                     }
                 }
             } else {  // no fade-out, no wait:
+                send_action_id(ACTION_REM, inputs[i].input->id);
                 remove_input(i, &inputs[i]);
             }
         }
@@ -250,13 +255,14 @@ public:
 
         while (i < inputs.size()) {  // use while loop because size can change
             Input &input_desc = inputs[i];
-            float *gain_ptr = input_desc.gain->run(current_block);
+            float *gain_ptr = input_desc.gain->run(current_block);  // b-rate multi-chan
             float *gprev_ptr = &(input_desc.prev_gain[0]);
-            Sample_ptr input_ptr = input_desc.input->run(current_block);
+            Sample_ptr input_ptr = input_desc.input->run(current_block);  // a-rate multi-chan
             float *out = out_samps;
 
             if ((input_desc.input->flags & TERMINATED) ||
                 (input_desc.gain->flags & TERMINATED)) {
+                send_action_id(ACTION_REM, input_desc.input->id);
                 remove_input(i, &input_desc);
                 continue;
             }
@@ -264,6 +270,7 @@ public:
                    MAX(input_desc.input->chans, input_desc.gain->chans));
 
             // compute the next fade value (or fade_dest if not fading)
+            // fade is per-input "mono" and applies to all input gain channels
             float fade = input_desc.fade_dest;
             if (input_desc.fade_count > 0) {
                 switch (input_desc.fade_mode) {
@@ -296,16 +303,23 @@ public:
                     }
                 }
                 input_desc.fade_count--;
-            } else if (fade == 0) {  // fade-out completed
-                remove_input(i, &input_desc);
-                continue;
-            } else if (input_desc.ar_smooth) {  // convert from audio rate
-                // to block rate after fade-in completes.
-                // *gprev_ptr is previous gain before multiplying by fade
-                // but in the normal block-rate processing, *gprev_ptr
-                // includes the factor of fade:
-                *gprev_ptr *= fade;
-                input_desc.ar_smooth = false;
+            } else if (input_desc.fade_count == 0) {
+                if (input_desc.fade_dest == 0) {  // fade-out has completed
+                    send_action_id(ACTION_REM, input_desc.input->id);
+                    remove_input(i, &input_desc);
+                    continue;
+                }
+                if (input_desc.ar_smooth) {
+                    // convert from audio rate to block rate after
+                    // fade-in completes. At this point, *gprev_ptr is
+                    // previous gain before multiplying by fade but in
+                    // the normal block-rate processing from now on,
+                    // *gprev_ptr includes the factor of fade:
+                    *gprev_ptr *= fade;
+                    input_desc.ar_smooth = false;
+                    // make condition false so we don't do this next time:
+                    input_desc.fade_count--;
+                }
             }
 
             for (int ch = 0; ch < input_desc.prev_gain.size(); ch++) {
@@ -349,9 +363,11 @@ public:
             }
             i++;
         }
-        if (inputs.size() == 0 && starting_size > 0 &&
-            (flags & CAN_TERMINATE)) {
-            terminate();
+        if ((flags & TERMINATING) || 
+            (inputs.size() == 0 && starting_size > 0 &&
+             (flags & CAN_TERMINATE))) {
+            // call terminate repeatedly in case there is a "tail" delay:
+            terminate(ACTION_EVENT | ACTION_END);
         }
     }
 };

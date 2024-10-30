@@ -12,13 +12,13 @@ def reson(input, center, q, optional chans):
          'center', center, 'q', q)
 
 def resonb(input, center, q, optional chans):
-    if not isnumber(input) and input.rate != 'b':
+    if not isnumber(input) and input.rate == 'a':
         print "ERROR: 'input' input to Ugen 'resonb' must be block rate"
         return nil
-    if not isnumber(center) and center.rate != 'b':
+    if not isnumber(center) and center.rate == 'a':
         print "ERROR: 'center' input to Ugen 'resonb' must be block rate"
         return nil
-    if not isnumber(q) and q.rate != 'b':
+    if not isnumber(q) and q.rate == 'a':
         print "ERROR: 'q' input to Ugen 'resonb' must be block rate"
         return nil
     if not chans:

@@ -8,7 +8,17 @@ class Mix (Ugen):
     def init(chans_, wrap):
         super.init(create_ugen_id(), "Mix", chans_, A_RATE,
                    "i", 'wrap', 1 if wrap else 0)
+        register_action(this, ACTION_REM, this, 'action_rem')
 
+
+    def action_rem(status, uid, parameters):
+        // find input with uid if any
+        display "Mix.action_rem", status, uid, parameters
+        for input in inputs.values():  // [name, ugen, gain] arrays
+            var ugen = input[1]
+            if arco_ugen_id(ugen.id) == uid:
+                inputs.remove(input[0])
+            
         
     def set(input, value, optional chan = 0):
         print "ERROR: set method called but not available for Mix class"
@@ -40,7 +50,7 @@ class Mix (Ugen):
     
 
     def rem(name, dur, mode):
-        if inputs.has_key(name):
+        if inputs.has_key(name) or force:
             if not dur:
                 dur = 0
             if not mode:

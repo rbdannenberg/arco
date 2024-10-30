@@ -12,11 +12,6 @@
 #define exp10 __exp10
 #endif
 
-#if defined(_WIN32)
-#define RESTRICT __restrict
-#else
-#define RESTRICT __restrict__
-#endif
 /*-------------- END FAUST PREAMBLE --------------*/
 
 extern const char *Math_name;
@@ -34,7 +29,6 @@ extern void (Math::*run_ab_a[NUM_MATH_OPS])(Math_state *state);
 extern void (Math::*run_ba_a[NUM_MATH_OPS])(Math_state *state);
 extern void (Math::*run_bb_a[NUM_MATH_OPS])(Math_state *state);
 
-Vec<Math_state> states;
 class Math : public Ugen {
 public:
     int op;
@@ -96,6 +90,7 @@ public:
             initialize_channel_states();
             run_channel = new_run_channel;
         }
+        clear_counts();
     }
 
     void print_details(int indent) {
@@ -105,6 +100,23 @@ public:
     void print_sources(int indent, bool print_flag) {
         x1->print_tree(indent, print_flag, "x1");
         x2->print_tree(indent, print_flag, "x2");
+    }
+
+    void clear_counts() {
+        // since we have a new parameter, we clear the count so that we will
+        // immediately start ramping to a value between -x2 and x2 rather than
+        // possibly wait for a long ramp to finish. A potential problem is that
+        // if x1 is now low, creating long ramp times, and our current ramp value
+        // (state->hold) is much larger than a new x2, it could take a long time
+        // for the output to get within the desired range -x2 to x2.  It takes
+        // a little work to determine what is affected by a change since an input
+        // could have fanout to multiple output channels, so we just restart ramps
+        // on all channels.
+        if (op == MATH_OP_RLI) {
+            for (int i = 0; i < chans; i++) {
+                states[i].count = 0;
+            }
+        }
     }
 
     void repl_x1(Ugen_ptr ugen) {
@@ -121,10 +133,20 @@ public:
 
     void set_x1(int chan, float f) {
         x1->const_set(chan, f, "Math::set_x1");
+        clear_counts();
     }
 
     void set_x2(int chan, float f) {
         x2->const_set(chan, f, "Math::set_x2");
+        clear_counts();
+    }
+
+    void rliset(float f) {
+        if (op == MATH_OP_RLI) {
+            for (int i = 0; i < chans; i++) {
+                states[i].prev = unifrand_range(-f, f);
+            }
+        }
     }
 
     void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, &x1_stride); }
@@ -257,6 +279,45 @@ public:
     void rli_ba_a(Math_state *state);
     void rli_bb_a(Math_state *state);
 
+    //----------------- HZDIFF ------------------
+    // random linear interpolation at x1 Hz from -x2 to +x2
+
+    void hzdiff_aa_a(Math_state *state);
+    void hzdiff_ab_a(Math_state *state);
+    void hzdiff_ba_a(Math_state *state);
+    void hzdiff_bb_a(Math_state *state);
+
+    //----------------- TAN ------------------
+    // random linear interpolation at x1 Hz from -x2 to +x2
+
+    void tan_aa_a(Math_state *state);
+    void tan_ab_a(Math_state *state);
+    void tan_ba_a(Math_state *state);
+    void tan_bb_a(Math_state *state);
+
+    //----------------- ATAN2 ------------------
+    // random linear interpolation at x1 Hz from -x2 to +x2
+
+    void atan2_aa_a(Math_state *state);
+    void atan2_ab_a(Math_state *state);
+    void atan2_ba_a(Math_state *state);
+    void atan2_bb_a(Math_state *state);
+
+    //----------------- SIN ------------------
+    // random linear interpolation at x1 Hz from -x2 to +x2
+
+    void sin_aa_a(Math_state *state);
+    void sin_ab_a(Math_state *state);
+    void sin_ba_a(Math_state *state);
+    void sin_bb_a(Math_state *state);
+
+    //----------------- COS ------------------
+    // random linear interpolation at x1 Hz from -x2 to +x2
+
+    void cos_aa_a(Math_state *state);
+    void cos_ab_a(Math_state *state);
+    void cos_ba_a(Math_state *state);
+    void cos_bb_a(Math_state *state);
 
 
     void real_run() {
@@ -264,7 +325,7 @@ public:
         x2_samps = x2->run(current_block); // update input
         if (((x1->flags | x2->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
-            terminate();
+            terminate(ACTION_TERM);
         }
         Math_state *state = &states[0];
         for (int i = 0; i < chans; i++) {

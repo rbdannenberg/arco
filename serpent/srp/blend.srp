@@ -1,0 +1,55 @@
+# blend.srp -- granular synthesis from input stream unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+BLEND_LINEAR = 0
+BLEND_POWER = 1
+BLEND_45 = 2
+
+class Blend (Ugen):
+    def init(chans, x1, x2, b, mode, init_b):
+        super.init(create_ugen_id(), "Blend", chans, 'a', "UUUfif",
+	           'x1', x1, 'x2', x2, 'b', b,
+                   'mode', mode, 'init_b', init_b)
+
+    def set_gain(gain)
+        o2_send_cmd("/arco/blend/gain", 0, "Uf", id, gain)
+        this
+
+    def set_mode(mode)
+        o2_send_cmd("/arco/blend/mode", 0, "Ui", id, mode)
+        this
+
+
+def blend(x1, x2, b, optional chans, mode, keyword gain = 1, init_b = 0.5):
+    chans = chans or max(x1.chans, max(x2.chans, b.chans))
+    mode = mode or BLEND_POWER
+    var ugen = Blend(chans, x1, x2, b, mode, init_b)  # blend as a function
+    if gain != 1:  // default for Arco
+        ugen.set_gain(gain)
+    return ugen
+
+
+class Blendb (Ugen):
+    def init(chans, x1, x2, b, mode):
+        super.init(create_ugen_id(), "Blendb", chans, 'b', "UUUfif",
+	           'x1', x1, 'x2', x2, 'b', b, 'mode', mode)
+
+    def set_gain(gain)
+        o2_send_cmd("/arco/blendb/gain", 0, "Uf", id, gain)
+        this
+
+    def set_mode(mode)
+        o2_send_cmd("/arco/blendb/mode", 0, "Ui", id, mode)
+        this
+
+
+def blendb(x1, x2, b, optional chans, mode, keyword gain = 1):
+    chans = chans or max(x1.chans, max(x2.chans, b.chans))
+    mode = mode or BLEND_POWER
+    var ugen = Blendb(chans, x1, x2, b, mode)  # blend as a function
+    if gain != 1:  // default for Arco
+        ugen.set_gain(gain)
+    return ugen
+

@@ -300,8 +300,10 @@ public:
                     all_zeros &= (state[i].goal == 0);
                 }
                 if (all_zeros) {
-                    terminate();
+                    flags = TERMINATING;  // happens once
                 }
+            } else {
+                send_action_id(ACTION_EVENT);
             }
         }
         count--;
@@ -309,6 +311,9 @@ public:
             (this->*run_channel)(state);
             state++;
             input_samps += input_stride;
+        }
+        if (flags & TERMINATING) {
+            terminate(ACTION_EVENT | ACTION_END);
         }
     }
 };

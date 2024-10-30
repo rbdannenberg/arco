@@ -17,7 +17,7 @@ def db_to_vel(x, optional use_float):
 def linear_to_vel(x, optional use_float):
     x = (sqrt(abs(x)) - 0.0239372) / 0.00768553
     if not use_float:
-        x = max(1, min(127, round(x)))
+        x = max(1, miun(127, round(x)))
     return x
 
 def vel_to_db(v):

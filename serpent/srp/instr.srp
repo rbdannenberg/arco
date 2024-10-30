@@ -1,0 +1,242 @@
+# instr.srp - Instr classes
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+instr_stack = []
+def instr_begin():
+    instr_stack.append({})
+
+# After instr_begin(), you can define setable parameters in the
+# Instrument you are building by calling param. A "setable parameter"
+# associates a name to a particular ugen input as if the Instrument
+# itself has that input.  E.g., if you want a Sine in the construction
+# of an Instrument and want the Instrument to have a setable parameter
+# named 'myfreq' that controls the Sine frequency, then between
+# instr_begin() and Instrument's init method (i.e. super.init(...)):
+#     var myfreq = param('myfreq', 440, smooth = true)
+#     osc = sine(amp, myfreq)
+# where `smooth` is a keyword parameter to request a Smoothb ugen
+# instead of the default Const. The parameter can be a number to
+# indicate the Smoothb cutoff frequency. 
+#
+# After the value (440), you can give optional parameters low and high
+# to specify a range of values. If specified, values in [0, 1] are
+# mapped to values in [low, high] and the initial value refers to the
+# parameter value *before* mapping the range. In this case, however,
+# 440 would be clipped to 1 and the value used would therefore be
+# given by high.
+#
+# There is also a keyword `chans` parameter to specify a multi-channel
+# parameter, but these are not supported by the Synth class.
+#
+# You can also write
+#     osc = sine(amp, param('myfreq', 440))
+#
+# Then you can call instrument.set('myfreq', 660).
+#
+
+# If an instrument contains another instrument, you can make the
+# sub-instrument parameters visible as parameters of the parent using
+# a different function:
+#     param_map('myfreq', 440, sub_instrument, 'freq')
+# Where 'myfreq' is the parameter name for this instrument, and
+# setting it will set the 'freq' parameter of sub_instrument. The last
+# parameter, 'freq', defaults to 'myfreq' (first parameter) if it is
+# omitted.
+#
+# Important: the setable parameter connects to a specific unit
+# generator.  If that unit generator is replaced in the Instrument
+# graph, then setting the parameter may not have any effect. The
+# assumption is that the Instrument graph is fixed.
+#
+# An alternative way to update parameters is to define methods. E.g. 
+#     def set_myfreq(val):
+#         osc.set('freq', val)
+# For this to work with the Synth class, you must also define a
+# mapping from parameter name to method:
+#     param_method('myfreq', 'set_myfreq')
+# which must be called between instr_begin() and Instrument's init
+# method. param_method has two optional parameters, low and high.
+
+class Param_descr:
+# A descriptor for an Instrument parameter. There are multiple cases:
+# 1. ugen_method is an Instrument: this parameter is implemented by
+#    the op_name parameter of ugen_method, an instrument contained
+#    within this instrument.
+# 2. ugen_method is a Symbol: this parameter is updated by calling
+#    the method.
+# 3. ugen_method is a Const_like (a Const or a Smoothb): this parameter
+#    is mirrored by an Arco ugen, providing the value at the block rate
+#    to any number of ugens that depend on the value. This Const_like
+#    ugen *could* be shared by multiple instruments, but normally, since
+#    instruments can have per-instrument parameter updates, the Const_like
+#    will be unique to this instrument instance.
+# Scaling and clipping can be requested:
+# - if ugen_method is an Instrument, parameter values are passed on to
+#   the component instrument without shifting or scaling.
+# - otherwise, if op_name is 'clip', then the parameter x is clipped to
+#   max(low, x) if low is non-nil, and min(high, x) if high is non-nil.
+# - or if op_name is 'map', then parameter x is scaled from [0, 1] to
+#   [low, high], and then clipped to the range [low, high] (equivalently,
+#   x is first clipped to [0, 1], then scaled). In this case, both low
+#   and high must be provided.
+#
+# The assumption is that if a parameter is passed to a component,
+# any mapping and clipping will be applied there, so the "raw" parameter
+# value is passed to the component. A special case exists when a parameter
+# must be handled with a method, but the method sets a parameter in a
+# component instrument. When a method is used, it must take into account
+# any clipping and/or scaling that was applied before the method was
+# called, and the method must insure that it is passing the right value
+# to the component instrument.
+    var ugen_method
+    var value
+    var op_name
+    var low
+    var high
+
+    def init(ugen_method_, value_, optional op_name_, low_, high_, name_):
+        if ugen_method_ == 'clip':
+            breakpoint()
+        ugen_method = ugen_method_
+        value = condition(value_)
+        op_name = op_name_
+        low = low_
+        high = high_
+        name = name_
+
+    def to_str():
+        "<Param_descr: name " + str(name) + " = " + str(value) + ">"
+
+    def condition(x):
+    # apply mapping and clipping rules to x
+        if op_name == 'map':
+            x = low + (high - low) * x
+        if low:  // parameter clipping and range mapping
+            x = max(low, x)
+        if high:
+            x = min(high, x)
+        return x
+
+
+    def set(instr, x, reuse):
+        if isinstance(ugen_method, Instrument):  // pass down to sub-instrumnet
+            value = x
+            ugen_method.set(op_name, value)
+        else:
+            value = condition(x)
+            if issymbol(ugen_method):  // invoke method to set name to x
+                send(instr, ugen_method, value, reuse)
+            else:  // directly set Const_like ugen to x
+                ugen_method.set(value)
+        return value
+
+
+def add_param_descr_to_context(pd, name):
+    var context = instr_stack.last()
+    var p = context.get(name)
+    if p:
+        print "WARNING: Parameter", name, "is already specified."
+        print "    This specification is ignored."
+    else:
+        context[name] = pd
+    return pd.value
+
+
+def param(name, initial_value, optional op, low, high, keyword smooth,
+          chans = 1):
+    var ugen
+    if isnumber(smooth):
+        ugen = smoothb(initial_value, smooth)
+    elif smooth:
+        ugen = smoothb(initial_value)
+    else:
+        ugen = const(initial_value)
+    var pd = Param_descr(ugen, initial_value, op, low, high)
+    add_param_descr_to_context(pd, name)
+    return ugen
+
+
+def param_map(name, initial_value, subinstr, subinstr_name):
+    if not subinstr_name:
+        subinstr_name = name
+    var pd = Param_descr(subinstr, initial_value, subinstr_name, nil, nil)
+    add_param_descr_to_context(pd, name)
+
+
+def param_method(name, initial_value, method, optional op, low, high):
+    if isnumber(op):
+        print "ERROR: param_method for", name, "called but seems to be missing"
+        print "     method, and op is", op, "instead of 'clip' or 'map'."
+    var pd = Param_descr(method, initial_value, op, low, high)
+    add_param_descr_to_context(pd, name)
+    
+
+# After instr_begin(), you can define a named "member" of the Instrument
+# You can access members by name, usually to send them an update, e.g.
+#    member(pwl(...), 'env')
+#    myinstr = Instrument(...)
+#    myinstr.get('env').start()
+# The ugen parameter can be an Instrument, in which case the "member"
+# is the instrument object, not the Ugen serving as the Instrument output.
+#
+//def member(ugen, name):
+//    var context = instr_stack.last()
+//    context[name] = ugen
+//    ugen
+
+
+class Instrument (Ugen):
+    // these 5 variables are used by Synth when instruments are managed
+    // by a Synth subclass. They are not used otherwise, except pitch by
+    // convention is steps (real-valued midi key numbers or fractions)
+    // and vel by convention is MIDI-like velocity (see vel_to_linear,
+    // vel_to_db, linear_to vel and db_to_vel in velocity.srp).
+    var synth
+    var gain     // every note created by a synth has an optional gain parameter
+                 // that is used to control mixer gain for this note. The gain
+                 // is just a const() ugen. We store the gain here so that when
+                 // the instrument is reused, we can reuse the gain as well.
+                 // init() should not set this -- leave it nil -- and Synth will
+                 // set it.
+    var user_id  // note_id used by user. Either integer pitch or symbol
+    var mixer_id  // id used by mixer - every instance has a permanent mixer_id
+    var pitch
+    var vel
+
+    var parameter_bindings
+    var output
+
+    def init(name, ugen, optional synth_):
+        super.init(nil, name, ugen.chans, ugen.rate, "",
+                   no_msg = true)
+        synth = synth_
+        if synth:
+            mixer_id = synth.get_mixer_id()
+        output = ugen
+        id = output.id
+        assert(this.id == id)
+
+        if len(instr_stack) == 0:
+            error("instr_stack is empty. Maybe you forgot to call " +
+                  "instr_begin() at the beginning of your Instrument " +
+                  "subclass's init() function")
+        parameter_bindings = instr_stack.unappend()
+
+
+    def get(input):
+        parameter_bindings.get(input)
+
+
+    def set(name, value, optional reuse):
+        var pds = parameter_bindings[name]
+        if pds:
+            pds.value = value
+            pds.set(this, value, reuse)
+
+
+    def finish(status, finisher, parameters):
+    # subclass can override this method
+        if synth and (status & ACTION_END_OR_TERM) > 0:
+            synth.is_finished(this)

@@ -5,13 +5,18 @@ CMakeCache.txt
 CMakeFiles/
 CmakeScripts/
 CmakeFiles/
-CMakeCache.txt
-/arco/cmake_install.cmake
+cmake_install.cmake
 /apps/common/libraries.txt
+__pycache__/
+/tmp/
+srp.log
+/ugens/*/generate_*.sh
+/ugens/*/*.fh
+/ugens/*/*.dsp
+/ugens/*/*.bak
 
 /apps/*/Debug/
 /apps/*/build/
-/apps/*/cmake_install.cmake
 /apps/*/*.build/
 /apps/*/arco-build/
 /apps/*/serpent/
@@ -27,19 +32,26 @@ CMakeCache.txt
 /apps/*/libwxslib.a
 /apps/*/log.txt
 /apps/*/.arco
+/apps/*/Release/
+/apps/*/Debug/
+/apps/*/make_faust_ugens.sh
+/apps/**/allugens.srp
+/apps/*/*.dir/
+/apps/*/*.sln
+/apps/*/*.vcxproj
+/apps/*/*.vcxproj.filters
+/apps/*/*.vcxproj.user
 
 /apps/basic/**/arcobasic
 
 /apps/test/daserpent
 /apps/test/soundfont.srp
 /apps/test/testinput.wav
-
-/apps/resound/allugens.srp
-
-/ugens/*/generate_*.sh
-/ugens/*/*.fh
-/ugens/*/*.dsp
-/ugens/*/*.bak
+/apps/test/pvoutput.wav
+/apps/test/testout.txt
+/apps/test/testoutput.wav
+/apps/test/groutput.wav
+/apps/test/.vs/
 
 /rbdtodo.txt
 
@@ -50,69 +62,14 @@ CMakeCache.txt
 /doc/ugens.md.old
 /serpent/srp/pwl.srp.old
 
-/cmupv/cmake_install.cmake
-/cmupv/CMakeCache.txt
 /cmupv/resamptest.xcodeproj
-/cmupv/CMakeFiles
 /cmupv/Release
-/cmupv/CMakeScripts
-/cmupv/build
-
 /cmupv/Debug/
-
-/apps/test/pvoutput.wav
-
-/apps/test/testout.txt
-
-/apps/test/testoutput.wav
+/cmupv/build
 
 /arco/src/sine_incomplete.h
 
-/apps/sep/Release/
-
-/apps/test/Release/
-
-/apps/handtrack/make_faust_ugens.sh
-
-/apps/handtrack/cmake_install.cmake
-
-/apps/handtrack/dspmakefile
-
-/apps/handtrack/CMakeCache.txt
-
-/apps/handtrack/dspsources.cmakeinclude
-
-/apps/handtrack/allugens.srp
-
-/apps/handtrack/wxsbuild/
-
-/apps/handtrack/CMakeFiles/
-
 /apps/handtrack/serpent/
-
-
-
-/apps/test/.vs/
-
-/apps/test/ALL_BUILD.vcxproj
-
-/apps/test/ALL_BUILD.vcxproj.filters
-
-/apps/test/ALL_BUILD.vcxproj.user
-
-/apps/test/ZERO_CHECK.vcxproj
-
-/apps/test/ZERO_CHECK.vcxproj.filters
-
-/apps/test/daserpent.dir/
-
-/apps/test/daserpent.sln
-
-/apps/test/daserpent.vcxproj
-
-/apps/test/daserpent.vcxproj.filters
-
-/apps/test/daserpent.vcxproj.user
 
 /apps/test/x64/
 
@@ -121,53 +78,14 @@ CMakeCache.txt
 /preproc/.vscode/
 
 /ugens/sttest/sttest_abb_a.dsp
-
 /ugens/sttest/sttest_abb_a.fh
 
-/preproc/__pycache__/
 
 /apps/resound/Release/
 
 /ugens/zitarev/zitarev_abb_a.fh
 
-/apps/perfdata/perfdata001.csv
-
-/apps/perfdata/make_faust_ugens.sh
-
-/apps/perfdata/perfdata003.csv
-
-/apps/perfdata/perfdata002.csv
-
-/apps/perfdata/cmake_install.cmake
-
-/apps/perfdata/perfdata005.csv
-
-/apps/perfdata/perfdata004.csv
-
+/apps/perfdata/perfdata*.csv
 /apps/perfdata/perfdata.zip
-
-/apps/perfdata/dspmakefile
-
-/apps/perfdata/srp.log
-
-/apps/perfdata/CMakeCache.txt
-
-/apps/perfdata/dspsources.cmakeinclude
-
-/apps/perfdata/allugens.srp
-
-/apps/perfdata/wxsbuild/
-
-/apps/perfdata/CMakeFiles/
-
-/apps/perfdata/arco-build/
-
-/apps/perfdata/CMakeScripts/
-
-/apps/perfdata/perfdata.xcodeproj/
-
-/apps/perfdata/
-
 /ugens/sttest/
-
 /ugens/zsine/

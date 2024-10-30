@@ -3,6 +3,7 @@ vu
 probe
 pwl*
 pwe*
+unaryugen*
 mix
 sine*
 mult*
@@ -29,3 +30,5 @@ o2audioio
 sttest
 # zitarev
 tableosc*
+blend*
+stdistr

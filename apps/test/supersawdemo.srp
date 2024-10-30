@@ -4,52 +4,94 @@
 # Oct 2024
 
 require "score"
+require "steps"
 require "pitch"
 
-def supersaw_example_chord(chd, score_dur, note_dur, antialias, cutoff):
+// defaults:
+SSEANI = 1
+SSEN = 16
+SELECT = false
+HACK = false
+BEGINNING_NOTES = true
+// test
+// SSEANI = 0
+// SSEN = 1
+// SELECT = false
+// HACK = true
+// BEGINNING_NOTES = false
+
+SUPERSAW1 = {'synth': 'Supersaw_synth', 'rolloff': 0.5, 'animate': SSEANI,
+             'n': SSEN}
+
+def supersaw_example_chord(chd, score_dur, note_dur, antialias, 
+                           animate, cutoff):
     var chord = Score()
-    for p in chd:
-        var note = Note(0, SUPERSAW1, p, 60, note_dur,
-                        chans = 2, detune = 0.3, width = 1,
-                        antialias = antialias, attack = 0.02)
-        if cutoff:  // add one more parameter
-            note.params['cutoff'] = cutoff
+    for p at i in chd:
+        if not SELECT or SELECT == i:
+            var note = Note(0, p, 60, note_dur, decay = 2,
+                            chans = 2, detune = 0.3, width = 1,
+                            animate = animate,
+                            antialias = antialias, attack = 0.02)
+            if cutoff:  // add one more parameter
+                note.params['cutoff'] = cutoff
         chord.merge(note)
     chord.dur = score_dur
     return chord
 
 
-def supersaw_example_seq(antialias, optional cutoff):
+def supersaw_example_seq(antialias, animate, optional cutoff):
     var p1 = [pC3, pG4, pB3, pE4]
     var p2 = [pD3, pA3, pD3, pFS4]
     var p3 = [pE3, pB3, pD4, pG4]
     var p4 = [pG2, pB3, pD4, pB4]
-    var sust = 1.1
+    if HACK:  // ALL THE SAME
+        display "before", p1, p2, p3, p4
+        for p at i in p1:
+            p2[i] = p
+            p3[i] = p
+            p4[i] = p
+    display "after", p1, p2, p3, p4
+
+    var sust = 0.8
     var score = Score()
-    score.append(supersaw_example_chord(p1, 1, sust, antialias, cutoff))
-    score.append(supersaw_example_chord(p2, 1, sust, antialias, cutoff))
-    score.append(supersaw_example_chord(p3, 1, sust, antialias, cutoff))
-    score.append(supersaw_example_chord(p4, 1, sust, antialias, cutoff))
+    score.append(supersaw_example_chord(p1, 2, sust, antialias, 
+                                        animate, cutoff))
+    score.append(supersaw_example_chord(p2, 2, sust, antialias, 
+                                        animate, cutoff))
+    score.append(supersaw_example_chord(p3, 2, sust, antialias, 
+                                        animate, cutoff))
+    score.append(supersaw_example_chord(p4, 2, sust, antialias,
+                                        animate, cutoff))
     score
+
+
+// DEBUGGING:
+//def ugen_trace(rest ignore):
+//    UGEN_TRACE = true
+// needs this in arco.srp, Ugen.init:
+//         if UGEN_TRACE:
+//             breakpoint()
 
 
 def supersaw_example()
     var score = Score()
-    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 0.3,
+    if BEGINNING_NOTES:
+        score.append(Note(0, pC3, 80, 3, n = SSEN, detune = 0.3,
                       attack = 0.4, decay = 0.5))
-    score.append_rest(1)
-    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 0.3,
+        score.append_rest(1)
+        score.append(Note(0, pD3, 80, 3, n = SSEN, detune = 0.3,
                       attack = 0.4, decay = 0.5, lfofreq = 5, lfodepth = 0.25))
-    score.append_rest(1)
-    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 1.0, 
+        score.append_rest(1)
+        score.append(Note(0, pE3, 80, 3, n = SSEN, detune = 1.0, 
                       width = 0.2, chans = 2, attack = 0.4, decay = 0.5))
-    score.append_rest(1)
-    score.append(Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 1.0,
+        score.append_rest(1)
+        score.append(Note(0, pF3, 80, 3, n = SSEN, detune = 1.0,
                       attack = 0.4, decay = 0.5, chans = 2))
     score.append_rest(1)
-    score.append(supersaw_example_seq(1))
+    score.append(supersaw_example_seq(SSEANI, 1, 12))
     score.append_rest(1)
-    score.append(supersaw_example_seq(0, 8000))  // higher cutoff
+    // score.append(Score_action('ugen_trace'))
+    score.append(supersaw_example_seq(0, 0, 100))  // higher cutoff
     print "-----"
     score.show()
     print "-----"

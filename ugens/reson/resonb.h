@@ -142,9 +142,8 @@ public:
         input_samps = input->run(current_block);  // update input
         center_samps = center->run(current_block);  // update input
         q_samps = q->run(current_block);  // update input
-        if (((input->flags) & TERMINATED) &&
-            (flags & CAN_TERMINATE)) {
-            terminate();
+        if (((input->flags) & TERMINATED) && (flags & CAN_TERMINATE)) {
+            terminate(ACTION_TERM);
         }
         Resonb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {

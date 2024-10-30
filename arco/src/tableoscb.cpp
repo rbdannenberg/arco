@@ -20,11 +20,12 @@ void arco_tableoscb_new(O2SM_HANDLER_ARGS)
     int32_t chans = argv[1]->i;
     int32_t freq = argv[2]->i;
     int32_t amp = argv[3]->i;
+    float phase = argv[3]->f;
     // end unpack message
 
     ANY_UGEN_FROM_ID(freq_ugen, freq, "arco_tableoscb_new");
     ANY_UGEN_FROM_ID(amp_ugen, amp, "arco_tableoscb_new");
-    new Tableoscb(id, chans, freq_ugen, amp_ugen);
+    new Tableoscb(id, chans, freq_ugen, amp_ugen, phase);
 }
     
 
@@ -149,7 +150,7 @@ void arco_tableoscb_createttd(O2SM_HANDLER_ARGS)
 static void tableoscb_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/tableoscb/new", "iiii", arco_tableoscb_new, NULL,
+    o2sm_method_new("/arco/tableoscb/new", "iiiif", arco_tableoscb_new, NULL,
                     true, true);
     o2sm_method_new("/arco/tableoscb/repl_freq", "ii",
                     arco_tableoscb_repl_freq, NULL, true, true);

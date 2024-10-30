@@ -156,13 +156,15 @@ Mix the output of `ugen` into the overall audio output. If `ugen`
 is already playing no action is taken.
 
 ### ugen.mute([status])
+
 Remove `ugen` from the audio output mix. This will also stop
 computing `ugen` unless some other ugen is still using its output.
-The opposite of `play`. If `ugen` is not already playing no action
-is taken, and if `quiet` is false (the default), a warning is
-printed. `status` is always ignored. It is an optional parameter
-because "atend" actions always pass a status (you can access the
-status by overriding `mute` in a `Ugen` subclass).
+The opposite of `play`. If `ugen` is not already playing, no action
+is taken, and a warning is printed. `status` is an optional integer
+parameter because "atend" actions always pass a status.
+For greater control, you can access the status by overriding `mute` in
+a `Ugen` subclass, make a decision based on the status, and invoke
+`super.mute()`).
 
 ### ugen.run()
 Run `ugen`. Use this method instead of `play` when `ugen` does not 
@@ -223,12 +225,28 @@ and, if `quiet` is false (the default), a warning is printed.
 Therefore, the case to avoid is providing a numberical `value` and
 specifying a channel when the current value is not a `Const`'.
 
-### ugen.atend(action, [arg])
+### ugen.atend(action, [target, mask])
 When this unit generator ends, `action` will be sent to `this` or, if
-provided, to `arg`, which in either case must handle "/arco/*class*/act"
-which is currently handled by `Pwlb` and `Fileplay` classes. Allowed
-actions are currently `MUTE`, which invokes `mute`, and `FINISH`,
-which should be implemented by the receiving object (`this` or `arg`).
+provided, to `target`, a different unit generator. Allowed actions are
+currently `MUTE` (equal to `'mute'`), and `FINISH` (equal to
+'finish'). The 'mute' method is implemented by `Ugen` (see above), but
+'finish' is only implemented in `Instrument` where it invokes
+`synth.is_finished(this)` if the instrument was created by a `Synth`.
+When an action occurs, Arco sends a `status` argument, which is sent
+as a parameter to `ugen` or `target`. E.g. `mute` is defined as 
+`def mute(optional status): ...`. The `status` parameter indicates the
+source of the action (but not the source's Arco ID), whether the
+source has terminated, an error flag, and an exception flag. See the
+unit generator descriptions for details.
+
+The optional `mask` parameter is a filter to limit messages to certain
+status values. E.g. to receive only a termination notifications, use
+`ACTION_TERM` as `mask`. To receive notification when an envelope end
+(decays to zero and there are no more breakpoints), use
+`ACTION_END`. The default mask is `ACTION_END | ACTION_TERM`, and note
+that a status can have multiple bits set, e.g. `ACTION_ERROR |
+ACTION_END | ACTION_TERM` is returned by `recplay` when there is an
+error.
 
 ### ugen.term([tail])
 Sets the `CAN_TERMINATE` flag true and sets `tail_blocks` to a count
@@ -238,23 +256,53 @@ already true). When this unit generator ends, it will set
 will set its `TERMINATED` flag. `CAN_TERMINATE` is the default for
 most unit generators so that `TERMINATED` will propagate from
 input signals to consumers. `CAN_TERMINATE` is *not* the default for
-signal generators such as `pwl`, `pwe` and `recplay` (when playing).
-Thus, you can typically mark only the determining unit generator
+signal generators such as `pwl`, `pwe` and `recplay` (when playing),
+so if you want them to terminate, call `ugen.term`.
+
+You can typically mark only the determining unit generator
 such as an envelope by calling its `.term` method in order to
 cause an entire sound to terminate. When an input to a `Sum` or
 `Mix` terminates, the input is automatically removed, so the
 typical application of `.term` is to indicate that *when an
-envelope completes*, the sound it modulates (e.g. using a `Mult`)
-should be detached from a mix or sum, and through reference
-counting, the entire sound should be freed. If there is a tail,
-then the delay starts when the envelope finishes, where "finish"
-means there are no more breakpoints and the envelope value is zero.
+envelope completes*, it will set its terminate flag (after the
+indicated delay), and ugens that read from it will propagate the
+terminate flag to a mix or sum ugen, which in response, will remove
+the input. This will decrement a reference count, propagating back
+"up" to free an entire tree of ugens if there are no other
+references. But there *are* other references when there are "shadow"
+objects on the control side, as described in the next paragraph.
 
-In addition to the possibility of releasing a tree of unit
-generators, any `atend` action is performed when `TERMINATED`
+#### Cleaning up on the control side
+Let's assume you have created a tree of ugens that produce output from
+some ugen we call output. This output is typically inserted into a
+mixer or sum ugen along with other sounds. By default, the mixer or
+sum has a list of inputs (on both Arco and Serpent sides). In the Arco
+server, the tree might terminate and be automatically removed from the
+mixer or sum. This will reduce the output ugen reference count, but
+there is still (normally) an object with a reference on the control
+(Serpent) side, so no ugens are deleted yet.
+
+The mixer or sum sends ACTION_REM with the id of the removed ugen (if
+a signal ugen and gain ugen are both removed, only the id for the
+signal ugen is sent. (The message to the Serpent side is `/actl/act`,
+where `actl` is a controller address set up by `/arco/open`.) The
+action should have the effect of removing the reference from the mixer
+or sum object to the output object. This allows the entire ugen object
+tree to be garbage collected. As garbage collection removes
+references, the Arco ugens receive deref messages and decrement their
+reference counts. This will free the Arco ugens.
+
+In addition to the possibility of releasing a tree of unit generators,
+any `atend` action is performed, sending a status code when `TERMINATED`
 becomes set, so you can use `ugen.atend(FINISH, target)` to
-run the `.finish` method of any object upon the termination
-of `ugen`.
+run the `.finish(status)` method of any object upon the termination of
+`ugen`. (See `atend()` for more details.)
+
+`/arco/term id dur` - set the CAN_TERMINATE flag in a ugen. Most ugens 
+can either terminate as the result of state changes (e.g. an envelope 
+reaches the end) or 
+
+
 
 ### ugen.trace(bool)
 Sets the `UGENTRACE` flag of a unit generator. When the flag is
@@ -298,6 +346,48 @@ id `dur_id`.
 `/arco/allpass/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
 
 `/arco/allpass/set_fb id chan fb` - Set feedback to float value `fb`.
+
+
+### blend
+```
+BLEND_LINEAR = 0
+BLEND_POWER = 1
+BLEND_45 = 2
+
+blend(x1, x2, b [, chans] [, mode], [gain = 1], [init_b = 0.5])
+blendb(x1, x2, b [, chans] [, mode], [gain = 1])
+.set_gain(g)
+.set_mode(m)
+```
+Computes a "blend" of x1 and x2 where b <= 0 selects x1 and b >= 1
+selects x2. This is generalized to transition or blend from x1 to x2
+when b takes on intermediate values from 0 to 1. Gain defaults to 1.
+For blend (audio rate output), x1 and x2 will be upsampled if they
+are not audio rate, so there is no optimization for block rate x1
+or x2. For blendb, as usual, x1 and x2 will be downsampled if they
+are not block rate. In *both* blend and blendb, if the blend 
+parameter is audio rate, it is downsampled to block rate.
+
+The mode defaults to BLEND_LINEAR, which implements linear blend:
+```
+output = gain * (x1 * (1 - b) + x2 * b)
+```
+BLEND_POWER implements a constant power law:
+```
+output = gain * (x1 * cos(b * PI/2) + x2 * sin(b * PI/2))
+```
+BLEND_45 implements a compromize between the two:
+```
+output = gain * (x1 * sqrt((1 - b) * cos(b * PI/2)) + x2 * sqrt(b * sin(b * PI/2)))
+```
+
+The `init_b` parameter provides an initial value to prevent a rapid
+change to the first sample of `b`.
+
+The gain parameter is provided for convenience, but note that gain
+cannot be a signal input. It is not smoothed. Combine this with
+another ugen if you need continuous or click-free gain adjustment.
+
 
 ### chorddetect
 ```
@@ -455,6 +545,17 @@ fader(input, current [, dur] [, goal] [, chans])
 **Fader** is used as a smoothly varying gain control. See also
 **Smooth**.
 
+When a fade ends and all goals and outputs are zero, and if
+termination is enabled, then after the tail delay (if any),
+`ACTION_EVENT | ACTION_END | ACTION_TERM` is sent. If goals are not
+zero, some output will be non-zero and `ACTION_EVENT` is sent. Note
+that `fader` does not test all outputs for zero unless `CAN_TERMINATE`
+is set, so you will never get `ACTION_EVENT | ACTION_END` without
+`ACTION_TERM`.
+
+As always, an action message is only sent if action_id is set and
+`status & mask` is non-zero.
+
 `/arco/fader/new id chans input current` - Create an
 envelope-controlled multiplier. The initial gain is `current`
 (replicated if there are more than one channel).
@@ -540,7 +641,12 @@ next buffer is available. There is currently no notification when
 the first buffer is ready, but the playback does not start until
 a `/arco/fileplay/play` message is sent. To detect when playback
 is finished, a message is sent to `/actl/act` with the action id
-provided earlier in `/arco/fileplay/act`.
+provided earlier in `/arco/act`. The action status values are:
+ - ACTION_END (playback finished normally), 
+ - ACTION_ERROR (failure to start reading file)
+ - ACTION_EXCEPT (message to set the action id received, but the
+       playback has stopped)
+`fileplay` does not currently terminate.
 
 `/arco/fileplay/new id chans filename start end cycle mix expand` -
 Create an audiofile player with `chans` output channels, reading from
@@ -559,10 +665,7 @@ end at the end of the file.
 `/arco/fileplay/play id play_flag` - Starts or stops playback
 according to `playflag` (Boolean). Play will pause if necessary to
 wait for a block of samples to be read from the file.
- 
-`/arco/fileplay/act id action_id` - Registers a request to send a
-message to `/actl/act` with `action_id` (an integer greater than 0)
-when file playback completes (or reaches `end`).
+
 
 ##filerec
 ```
@@ -571,7 +674,12 @@ filerec(filename, input [, chans])
 .stop()
 ```
 
-The filerec unit generator writes its input to a file.
+The filerec unit generator writes its input to a file.  `/arco/act`
+can be used to request messages to `/actl/act` (in Serpent this is
+done using the `.atend(action)` method). An action message is sent
+with the following status:
+ - ACTION_EVENT (file open for write, ready to record)
+ - ACTION_ERROR (file open failed, cannot write)
 
 `/arco/filerec/new id chans filename input` - Create an audiofile writer
 that writes `chans` channels to `filename`. The source of audio is
@@ -579,9 +687,6 @@ that writes `chans` channels to `filename`. The source of audio is
 
 `/arco/filerec/repl_input id input_id` - Set the input to the object
 with id `input_id`.
-
-`/arco/filerec/act id action_id` - Set the action id to `action_id`.
-This id is sent when the file is open and ready for writing.
 
 `/arco/filerec/rec id record` - Start recording (when `record`, a
 Boolean) is true. Stop recording when `record` is false. Recording can
@@ -768,7 +873,7 @@ This keeps the feedback delay buffer full and ready to provide feedback,
 but attenuates feedback to be almost inaudible.
 
 
-### math, mathb 
+### math, mathb
 ```
 math, mathb(op, x1, x2, [x2_init = 0] [, chans])
 mult, multb(x1, x2 [, chans])
@@ -785,7 +890,13 @@ ugen_powi, ugen_powib(x1, x2 [, chans])
 ugen_rand, ugen_randb(x1, x2 [, chans])
 sample_hold, sample_holdb(x1, x2 [, chans])
 ugen_quantize, ugen_quantizeb(x1, x2 [, chans])
-ugen rli, ugen_rlib(x1, x2 [ chans])
+ugen_rli, ugen_rlib(x1, x2 [, chans])
+ugen_hzdiff, ugen_hzdiffb(x1, x2 [, chans])
+ugen_tan, ugen_tanb(x1, x2, [, chans])
+ugen_atan, ugen_atanb(x1, x2, [, chans])
+ugen_sin, ugen_sinb(x1, x2, [, chans])
+ugen_cos, ugen_cosb(x1, x2, [, chans])
+.rliset(x2)
 ```
 The `math` function and unit generator is a general binary operation
 used to implement a variety of functions. Although each operation is
@@ -794,6 +905,11 @@ for each operator.
 
 The `mult` function also takes an `x2_init` keyword parameter, in which 
 case a `Multx` is created (see **multx** below). 
+
+If the operation is MATH_OP_RLI, the initial value is normally 0, but
+this value can be randomized to the range -x2 to +x2 by passing x2 to
+`.rliset(x2)`. This should only be done immediately after the ugen is
+initialized and before it delivers any samples.
 
 `/arco/math/new id chans op x1 x2` - Create a new unit generator to
 perform a binary operation. The value of `op` can be:
@@ -843,20 +959,33 @@ perform a binary operation. The value of `op` can be:
    output is a linear interpolation between these points. Changes in
    amplitude and frequency take effect at the next breakpoint so that
    the output is continuous, and periods are rounded to the nearest
-   sample (audio-rate) or block length (block-rate).
+   sample (audio-rate) or block length (block-rate). The initial
+   breakpoint is 0 unless `.rliset` is called (`/arco/math/rliset`).
+ - `MATH_OP_HZDIFF` = 16, computes the difference in Hz when x2 (in
+     steps) is added to x1, e.g. compute the depth of modulation in Hz
+     to obtain a modulation of x2 steps. (Note that if you modulate Hz
+     by +delta and -delta, the magnitude of the increase in steps will
+     be less than the magnitude of the decrease in steps.)
+   step values: step_to_hz(x2) - step_to_hz(x1).
+ - `MATH_OP_TAN` = 17, computes the tangent of x1 * x2.
+ - `MATH_OP_ATAN2` = 17, computes atan2(x1, x2).
+ - `MATH_OP_SIN` = 17, computes the sine of x1 * x2.
+ - `MATH_OP_COS` = 17, computes the cosine of x1 * x2.
 
+`/arco/math/set_x1 id chan x1` - Set channel `chan` of input to float 
+value `x1`. 
 
-
-`/arco/math/set_x1 id chan x1` - Set channel `chan` of input to float
-value `x1`.
-
-`/arco/math/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`.
+`/arco/math/repl_x1 id x1_id` - Set input x2 to object with id `x1_id`. 
 
 `/arco/math/set_x2 id chan x2` - Set channel `chan` of input to float
 value `x2`.
 
-The `mathb` messages begin with `/arco/mathb` and output is b-rate.
+`/arco/math/repl_x2 id x2_id` - Set input x2 to object with id `x2_id`. 
 
+`/arco/math/rliset id x2` - Set the initial outputs to be random
+between -x2 and +x2 (x2 is a float).
+
+The `mathb` messages begin with `/arco/mathb` and output is b-rate. 
 
 
 ### mix
@@ -880,7 +1009,7 @@ On insert, you can optionally fade in the gain from 0 using the
 `fader`. To avoid fade in, you can set `dur` to 0. The default mode
 is FADE_SMOOTH (raised cosine).
 
-Fromo the Serpent API, optional `at_end` can be SIGNAL (value is
+From the Serpent API, optional `at_end` can be SIGNAL (value is
 'signal') meaning that if `ugen` is an Instrument with a member
 named 'envelope', then an action is attached to the envelope so
 that when it ends, this ugen is removed from the mix. Alternatively,
@@ -917,6 +1046,12 @@ input channel is *never* expanded to the number of mixer
 channels. E.g., mono input is routed to stereo left (only). To place a
 mono channel in the middle of a stereo field, use a 2-channel gain,
 which could be as simple as a Const Ugen with values [0.7, 0.7].
+
+When an input signal or an input gain terminates or if input is
+"removed" by `rem` and any fade-out completes, the input is removed
+and `ACTION_REM` is sent. If the last input is removed and
+`CAN_TERMINATE` is set, the mix ugen terminates and `ACTION_EVENT |
+ACTION_END | ACTION_TERM` is sent.
 
 `/arco/mix/new id chans wrap` - Create a new mixer with `chans` output
 channels. The mixer will "wrap" extra channels if wrap (integer) is non-zero.
@@ -1131,7 +1266,7 @@ ratio. Greater than 1 means raise the pitch.
 
 ### pwe, pweb
 ```
-pwe(d0, y0, d1, y1, ..., [init=0], [start=true])
+pwe(d0, y0, d1, y1, ..., [init=0], [start=true] [lin=false])
     -- d0 through dn are specified in seconds relative to start
 .set_points(d0, y0, d1, y1, ...)
 .start()
@@ -1142,15 +1277,15 @@ pwe(d0, y0, d1, y1, ..., [init=0], [start=true])
 ```
 
 These envelope generators generate approximately exponential curves
-between positive breakpoints. To avoid the problem of zero
-(exponential decays never actually reach zero), all breakpoint values
-are increased by 0.01. The exponential interpolation occurs between
-these biased breakpoints. Then, 0.01 is subtracted to obtain the
-output. This allows envelopes to decay all the way to zero, but for
-very small breakpoint values, the curves are close to linear.
-Unlike `pwl` and `pwlb`, breakpoints cannot be less than zero, so
-that when bias is added, the exponential curves interpolate between
-values greater than zero.
+between positive breakpoints specified by duration, value pairs. To
+avoid the problem of zero (exponential decays never actually reach
+zero), all breakpoint values are increased by 0.01. The exponential
+interpolation occurs between these biased breakpoints. Then, 0.01 is
+subtracted to obtain the output. This allows envelopes to decay all
+the way to zero, but for very small breakpoint values, the curves are
+close to linear. Unlike `pwl` and `pwlb`, breakpoints cannot be less
+than zero, so that when bias is added, the exponential curves
+interpolate between values greater than zero.
 
 The starting value can be given by the `init` keyword, allowing for,
 e.g., an exponential fade from 1 to 0.
@@ -1158,6 +1293,35 @@ e.g., an exponential fade from 1 to 0.
 Note that the default for `start` is true in the Seprent API. When
 false, the output will remain at the initial value until the
 `.start()` method is called.
+
+If `lin` is specified, the value is passed to `.linear_attack(lin)`
+(before starting).
+
+pwe and pweb support action messages (see ugen.atend()). An action
+message (`/actl/act`) is sent whenever the pwe reaches the last
+breakpoint. If the ugen has terminated, then after the tail delay (if
+any), the status `ACTION_EVENT | ACTION_END | ACTION_TERM` is sent.
+If the ugen is not enabled to terminate, then if the value at the
+last breakpoint is zero, then `ACTION_EVENT | ACTION_END` is sent. If
+the last breakpoint is not zero, then just `ACTION_EVENT` is send.
+
+A common use case is to create an envelope that ends on a positive
+value representing a "sustain" portion of a sound. To end the sound,
+`.set_points()` is called with and ending segment that ramps down to
+zero and ends the pwe. If `.term()` was applied, then the pwe will
+terminate, setting its TERMINATE flag, and downstream, a mixer ugen
+might remove the ugen from the mix when it terminates. In this case,
+there will be at least two actions: the first will be `ACTION_EVENT`
+when the first segment ends and the "sustain" begins. The second will
+be `ACTION_EVENT | ACTION_END` (or'd with `ACTION_TERM` if it is
+enabled to terminate) when the pwe ramps to zero. The user probably is
+only interested in the second case, but note that the `.atend()`
+method, used to direct an ending action to some unit generator, by
+default filters for `ACTION_END | ACTION_TERM`, so the first
+`ACTION_EVENT` status will be ignored. (You can still get notification
+for `ACTION_EVENT` by providing a custom bit mask to `.atend()`, but
+in that case you might want to check for `status & ACTION_END` when
+your action handler gets a status.
 
 `/arco/pwe/new id` - Create a new piece-wise linear generator with
 audio output. `id` is the object id. Envelope does not start until
@@ -1167,9 +1331,9 @@ audio output. `id` is the object id. Envelope does not start until
 function shape for object with id. All remaining parameters are
 floats, alternating segment durations (in samples) and segment final
 values. The envelope starts at the current output value and ends at
-yn-1 (defaults to 0). (Note that the Serpent api specified di in
-seconds from the beginning, while the O2 message specifies di in
-samples between one breakpoint and the next.)
+yn-1 (defaults to 0). (Note that the Serpent api specifies di as
+durations in seconds, while the O2 message specifies di in samples.
+Both are durations between one breakpoint and the next.)
 
 `/arco/pwe/start id` - starts object with id.
 
@@ -1180,7 +1344,7 @@ starting with the current value. Alternatively, `decay` can be used to
 fade to zero (without replacing the current envelope). You can also
 use `set` to change the envelope output value discontinuously.
 
-`/arco/pwl/linatk id lin` - `lin` is a Boolean ("B" typecode in O2) and
+`/arco/pwe/linatk id lin` - `lin` is a Boolean ("B" typecode in O2) and
 indicates whether the first segment of the envelope should be *linear*
 instead of *exponential*. Linear onsets have a different and often more
 natural sound.
@@ -1200,12 +1364,18 @@ same except the address begins with `/arco/pweb/`.
 ### pwl, pwlb
 ```
 pwl(d0, y0, d1, y1, ..., [init=0], [start=true])
-.set_points(d0, y0, d1, y1, ...)
+.set\_points(d0, y0, d1, y1, ...)
 .start()
 .stop()
 .decay(dur)
 .set(y)
 ```
+
+An envelope that linearly interpolates between breakpoints.
+
+pwl and pwlb support action messages (see ugen.atend()). An action
+message (`/actl/act`) is sent whenever the pwl reaches the last
+breakpoint. See the discussion under pwe. pwl acts the same.
 
 `/arco/pwl/new id` - Create a new piece-wise linear generator with
 audio output. `id` is the object id.
@@ -1249,7 +1419,17 @@ recplay(input, [chans], [gain], [fade_time], [loop])
 
 `recplay` is a unit generator that can record sound and play it
 back. It applies a smooth envelope when the playback starts and stops,
-and it can automatically loop the recorded sound.
+and it can automatically loop the recorded sound. You can get an
+action notification by setting an action id with `/arco/act` (see
+the `Ugen` `.atend(action)` method.) The action status values are:
+ - ACTION_END (playback has stopped; this message will be delayed if
+   the ugen can terminate and has a non-zero "tail" duration.
+ - ACTION_END | ACTION_ERROR (playback stopped suddenly without
+   completing a fadeout, perhaps because a speed change caused 
+   samples to be exhausted before a fadeout could be accomplished)
+
+*In all of these cases, the ACTION_TERM_MASK (bit 0) is also set if
+the `recplay` has terminated.*
 
 `/arco/recplay/new id chans input_id gain_id fade loop` - Create a
 `recplay` ugen. `chans` is the number of channels recorded and played
@@ -1284,9 +1464,6 @@ samples recorded are deleted.
 `/arco/recplay/start id start_time` - Start playback from time offset
 `start_time` (a float), which is relative to the start of recording.
 
-`/arco/recplay/act id action_id` - Set the action id to `action_id`.
-This id is sent when playback reaches the end of the recording.
-
 `/arco/recplay/stop id` - Stop playback. Playback continues until the
 fade-out completes. (Note that the fade-out may have already started
 if the end of recording is near.)
@@ -1311,14 +1488,14 @@ and audio output.
 `/arco/reson/repl_center id center_id` - Set center frequency to
 object with id `center_id`.
 
-`/arco/reson/set_center id chan center_id` - Set center frequency of
-channel `chan` to float value `center_id`.
+`/arco/reson/set_center id chan center` - Set center frequency of
+channel `chan` to float value `center`.
 
 `/arco/reson/repl_bandwidth id bandwidth_id` - Set bandwidth to object
 with id `bandwidth_id`.
 
-`/arco/reson/set_bandwidth id chan bandwidth_id` - Set bandwidth of
-channel `chan` to float value `bandwidth_id`.
+`/arco/reson/set_bandwidth id chan bandwidth` - Set bandwidth of
+channel `chan` to float value `bandwidth`.
 
 
 ### route
@@ -1429,8 +1606,6 @@ ugen
 with id `input_id`.
 
 
-
-
 ### spectralrolloff
 
 ```
@@ -1444,12 +1619,36 @@ The threshold should be a float between 0 and 1, representing a percentage.
 Calculations occur every 1024 samples, and `spectralrolloff` sends the result 
 as a float to `reply_addr`.
 
-
-
 `/arco/spectralrolloff/new id reply_addr` - Creates a new `spectralrolloff` ugen
 
 `/arco/spectralrolloff/repl_input id input_id` - Set the input to object
 with id `input_id`.
+
+
+### stdistr 
+```
+stdistr(n, [, width] [, gain])
+.ins(i, ugen)
+.set_gain(gain)
+.rem(i)
+```
+A stereo panner for multiple inputs. Inputs 0 through n-1 are panned
+from 0.5-width/2 to 0.5+width/2 where 0 means full left, 1 means full
+right, and width is variable from 0 (all center) to 1 (full
+distribution from full left to full right). width and gain default to 1.
+
+`/arco/stdistr/new id n width` - Creates a new `stdistr` ugen
+
+`/arco/stdistr/ins id i input_id` - Set or replace input i to be input_id
+
+`/arco/stdistr/rem id i` - Remove an input
+
+`/arco/stdistr/repl_width id width - Replace width with a new ugen
+
+`/arco/stdistr/set_width id width - Set width to a float value width
+
+`/arco/stdistr/gain id gain - Set gain to float value gain
+
 
 ### sum, sumb
 ```
@@ -1477,7 +1676,7 @@ the sum of inputs. Changes to gain are smoothed.
 
 ### tableosc, tableoscb
 ```
-tableosc(freq, amp [, chans])
+tableosc(freq, amp [, chans] [, phase = 0])
 .set('freq', freq)
 .set('amp', amp)
 .select(index)
@@ -1487,9 +1686,10 @@ tableosc(freq, amp [, chans])
 .create_ttd(index, samps)
 ```
 
-`/arco/tableosc/new id chans freq amp` -- Create a new tableosc
-table-lookup oscillator. The table is specified separately (see
-the create methods for details).
+`/arco/tableosc/new id chans freq amp phase` -- Create a new tableosc
+table-lookup oscillator. `freq` and `amp` are unit generator ids. The
+table is specified separately (see the create methods for
+details). Phase is a float in degrees.
 
 `/arco/tableosc/select id index` -- Select a waveform by index.
 (See create methods to create wavefoms.)
@@ -1505,7 +1705,7 @@ is changed.
 control input with another unit generator.
 
 `/arco/tableosc/set_amp id chan amp` -- Set the amplitude
-constant to a floating point value. Only the specifid channel
+constant to a floating point value. Only the specified channel
 is changed.
 
 `/arco/tableosc/sel in index` -- select table at index.
@@ -1626,6 +1826,54 @@ reports can be disabled by setting `repl_addr` to the empty string.
 `/arco/trig/pause id pause` - Set the pause time to `pause` (float in
 seconds). Processing is paused for `pause` seconds after threshold is
 exceeded, causing a message to be sent.
+
+
+### unary, unaryb
+```
+ugen_abs, ugen_absb(x1 [, chans])
+ugen_neg, ugen_negb(x1 [, chans])
+ugen_exp, ugen_expb(x1 [, chans])
+ugen_log, ugen_logb(x1 [, chans])
+ugen_log10, ugen_log10b(x1 [, chans])
+ugen_log2, ugen_log2b(x1 [, chans])
+ugen_sqrt, ugen_sqrtb(x1 [, chans])
+ugen_step_to_hz, ugen_step_to_hzb(x1 [, chans])
+ugen_hz_to_step, ugen_hz_to_stepb(x1 [, chans])
+ugen_vel_to_linear, ugen_vel_to_linearb(x1 [, chans])
+ugen_linear_to_vel, ugen_linear_to_velb(x1 [, chans])
+ugen_db_to_linear, ugen_db_to_linearb(x1 [, chans])
+ugen_linear_to_db, ugen_linear_to_dbb(x1 [, chans])
+```
+Similar to Math (see above), the Unary generator implements a variety
+of unary math functions. There is a function call for each math
+function, but all of these are implemented by the Unary unit generator.
+
+`/arco/unary/new id chans op x1` - Create a new unit generator to
+perform a binary operation. The value of `op` can be:
+
+ - `UNARY_OP_ABS` = 0, compute the absolute value.
+ - `UNARY_OP_NEG` = 1, compute the negative of x1.
+ - `UNARY_OP_EXP` = 3, compute exp(x1).
+ - `UNARY_OP_LOG` = 4, compute log(x1).
+ - `UNARY_OP_LOG10` = 5, compute log-base-10 of x1.
+ - `UNARY_OP_LOG2` = 6, compute log-base-2 of x1.
+ - `UNARY_OP_SQRT` = 7, compute the square root of x1.
+ - `UNARY_OP_STEP_TO_HZ` = 8, convert from steps (like MIDI key
+   number) to Hz using A440 equal temperament.
+ - `UNARY_OP_HZ_TO_STEP` = 9, convert from hz to steps (like MIDI key
+   number) using A440 equal temperament.
+ - `UNARY_OP_VEL_TO_LINEAR` = 10, convert from MIDI velocity to linear 
+   gain. 
+ - `UNARY_OP_LINEAR_TO_VEL` = 11, convert from gain to MIDI velocity. 
+ - `UNARY_OP_DB_TO_LINEAR` = 12, convert from dB to linear gain.
+ - `UNARY_OP_LINEAR_TO_DB` = 13, convert from linear gain to dB.
+
+`/arco/unary/set_x1 id chan x1` - Set channel `chan` of input to float 
+value `x1`. 
+
+`/arco/unary/repl_x1 id x1_id` - Set input x1 to object with id `x1_id`. 
+
+The `mathb` messages begin with `/arco/unaryb` and output is b-rate. 
 
 
 ### vu

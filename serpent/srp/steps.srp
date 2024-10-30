@@ -24,3 +24,8 @@ def step_to_ratio(steps)
 def ratio_to_step(ratio)
 # converts frequency rato to steps: 1.5 -> ~7
     return hz_to_step(ratio * 440.0) - 69
+
+
+def steps_to_hzdiff(steps, delta_steps):
+# compute change in hz when adding delta_steps to steps
+    return hz_to_step(steps + delta_steps) - hz_to_step(steps)

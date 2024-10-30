@@ -63,12 +63,18 @@ public:
                 current = final_value;  // make output value exact
                 if (next_point_index >= points.size()) {
                     stop();
-                    send_action_id();
                     if (current == bias && (flags & CAN_TERMINATE)) {
-                        terminate();
+                        flags |= TERMINATING;  // send action when we terminate
+                    } else {
+                        int status = ACTION_EVENT;
+                        if (final_value == bias) {
+                            status |= ACTION_END;
+                        }
+                        send_action_id(status);
                     }
                 } else {
-                    linear_mode &= (next_point_index == 0);  // clear after 1st segment
+                    // clear after 1st segment or any segment not starting from 0:
+                    linear_mode &= (next_point_index == 0) & (current == bias);
                     seg_togo = (int) points[next_point_index++];
                     final_value = points[next_point_index++] + bias;
                     if (linear_mode) {
@@ -96,6 +102,9 @@ public:
             togo -= n;
             seg_togo -= n;
         } while (togo > 0);
+        if (flags & TERMINATING) {
+            terminate(ACTION_EVENT | ACTION_END);
+        }
     }
     
 
@@ -110,7 +119,7 @@ public:
 
     void stop() {
         seg_togo = INT_MAX;
-        seg_factor = !linear_attack;
+        seg_factor = !linear_mode;
     }
 
 

@@ -167,7 +167,7 @@ public:
     void real_run() {
         input_samps = input->run(current_block); // update input
         if (input->flags & TERMINATED) {
-            terminate();
+            terminate(ACTION_TERM);
         }
         Dnsampleb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {

@@ -17,22 +17,26 @@ require "allugens"
 require "reverb"
 require "soundfont"
 require "pan"
+require "instr"
+require "synth"
 require "supersaw"
 require "supersawdemo"
 
 SIMPLE = false
 
 class Atone (Instrument):
+    var env, renv
+
     def init(freq, dur, nharm):
         display "Atone", dur
         instr_begin()
-        var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
+        env = pwlb(dur * 0.2, 0.01, dur * 0.8)
         display "In Atone", env, env.id, id(env.id)
         env.term()  // allow envelope to terminate; termination
         // will propagate all the way to the output, which will
         // remove and free the instrument (assuming there are no
         // other references to it, which we will avoid).
-        var mix = mix(1)
+        var mix = mix(1).term()
         for i = 0 to nharm:
             // we need a symbol for each mixer input but since the
             // number of inputs is controlled by nharm, we have to
@@ -41,16 +45,15 @@ class Atone (Instrument):
             mix.ins(name, sine(freq * i, 0.8 ** i), env)
         if not SIMPLE and pr_coin(0.5):
             // reson filter center frequency envelope:
-            var renv = member(pwlb(random(), pr_unif(4, 10) * freq,
-                                   5.0, 200.0, max(5.0, dur * 2)), 'renv')
+            renv = pwlb(random(), pr_unif(4, 10) * freq,
+                        5.0, 200.0, max(5.0, dur * 2))
             var q = pr_unif(0.5, 2.0)
             mix = reson(mix, renv, q)
         super.init("Atone", mix)
 
 
     def start():
-        get('env').start()
-        var renv = get('renv')
+        env.start()
         if renv:  // start the reson filter envelope too if it exists
             renv.start()
         this
@@ -74,9 +77,17 @@ def arco_ready():
     display "arco_ready", wxs_h, wxs_space,
     display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
     var WIDTH = 170
+    var COLUMN_X = 5  // changes to 200 for Column 2
+    var COLUMN_TWO = 200
 
-    Checkbox(win, "Simple test", 5, 5, WIDTH, 20, 'stcheckbox')
+    Checkbox(win, "Simple test", COLUMN_X, 5, WIDTH, 20, 'stcheckbox')
     stcheckbox.add_target_method(nil, 'play_simple_test')
+
+    Checkbox(win, "Cleanup test", 'S', 'D', WIDTH, 20, 'simtoncheckbox')
+    simtoncheckbox.add_target_method(nil, 'play_simple_tone')
+
+    Checkbox(win, "Finish test", 'S', 'D', WIDTH, 20, 'finishcheckbox')
+    finishcheckbox.add_target_method(nil, 'play_finish_test')
 
     Checkbox(win, "Mixer test", 'S', 'D', idiv(WIDTH, 2), 'S', 'mtcheckbox')
     mtcheckbox.add_target_method(nil, 'play_mixer_test')
@@ -87,7 +98,7 @@ def arco_ready():
     mixmodechoice.append("c. lowpass")
     mixmodechoice.append("d. smooth")
 
-    wxs_x = 5
+    wxs_x = COLUMN_X
     Checkbox(win, "Atonal sequence", 'S', 'D', WIDTH, 'S', 'atcheckbox')
     atcheckbox.add_target_method(nil, 'play_atone_test')
 
@@ -153,18 +164,12 @@ def arco_ready():
     Button(win, "File Play/Record", 'S', 'D', 'S', 'S', 'fprbutton')
     fprbutton.add_target_method(nil, 'file_play_record')
 
-    # start a 2nd column
-    COLUMN_TWO = 200
-    wxs_x = COLUMN_TWO
-
-    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
-
     Checkbox(win, "Yin", 'S', 'D', 55, 'S', 'yincheckbox')
     yincheckbox.add_target_method(nil, 'yintest')
 
     Statictext(win, "", 'R', wxs_y + 2, 100, wxs_h - 2, 'yintext')
     
-    wxs_x = COLUMN_TWO
+    wxs_x = COLUMN_X
     Checkbox(win, "Trig", 'S', 'D', 55, 'S', 'trigcheckbox')
     trigcheckbox.add_target_method(nil, 'trigtest')
 
@@ -176,11 +181,11 @@ def arco_ready():
     ONOFF_OFF_TEXT = "◻ On/Off"
     Statictext(win, ONOFF_OFF_TEXT, 'R', 'S', 'S', 'S', 'onofftext')
 
-    wxs_x = COLUMN_TWO
+    wxs_x = COLUMN_X
     Checkbox(win, "Fade", 'S', 'D', 60, 'S', 'fadecheckbox')
     fadecheckbox.add_target_method(nil, 'fadetest')
 
-    Choice(win, 'R', 'S', WIDTH, 'S', 'fadechoice')
+    Choice(win, COLUMN_X + 10, 'D', WIDTH, 'S', 'fadechoice')
     fadechoice.append("a. 1.000 sec, linear")
     fadechoice.append("b. 1.000 sec, exponential")
     fadechoice.append("c. 1.000 sec, lowpass")
@@ -197,7 +202,13 @@ def arco_ready():
 //    fadechoice.append("k. 0.009 sec, lowpass step")
 //    fadechoice.append("l. 0.009 sec, smooth step")
 
+    # start a 2nd column
+    COLUMN_X = COLUMN_TWO
     wxs_x = COLUMN_TWO
+
+    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
+
+    wxs_x = COLUMN_X
     Checkbox(win, "Add Test", 'S', 'D', 'S', 'S', 'addcheckbox')
     addcheckbox.add_target_method(nil, 'addtest')
 
@@ -249,17 +260,17 @@ def arco_ready():
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'chorddetecttext')
     Statictext(win, "----", 'S', 'D', 'S', 'S', 'chorddetectintdata')
     
-    wxs_x = COLUMN_TWO
+    wxs_x = COLUMN_X
     Checkbox(win, "Spectral Centroid Test", 'S', 'D', 'S', 'S', 'spectralcentroidcheckbox')
     spectralcentroidcheckbox.add_target_method(nil, 'spectralcentroidtest')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'spectralcentroidtext')
     
-    wxs_x = COLUMN_TWO
+    wxs_x = COLUMN_X
     Checkbox(win, "Spectral Rolloff Test", 'S', 'D', 'S', 'S', 'spectralrolloffcheckbox')
     spectralrolloffcheckbox.add_target_method(nil, 'spectralrollofftest')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'spectralrollofftext')
 
-    wxs_x = COLUMN_TWO
+    wxs_x = COLUMN_X
     Checkbox(win, "Onset", 'S', 'D', 55, 'S', 'onsetcheckbox')
     onsetcheckbox.add_target_method(nil, 'onsettest')
     
@@ -267,7 +278,7 @@ def arco_ready():
     ONSET_OFF_TEXT = "◻ Onset"
     Statictext(win, ONSET_OFF_TEXT, 'R', wxs_y + 2, 55, 'S', 'onsettext')
 
-    wxs_x = COLUMN_TWO
+    wxs_x = COLUMN_X
     Checkbox(win, "O2audioio Test", 'S', 'D', WIDTH, 'S', 'o2audioiocheckbox')
     o2audioiocheckbox.add_target_method(nil, 'o2audioiotest')
     
@@ -282,9 +293,6 @@ def arco_ready():
 
     Checkbox(win, "supersaw", 'S', 'D', WIDTH, 'S', 'supersawcheckbox')
     supersawcheckbox.add_target_method(nil, 'supersawtest')
-
-    Checkbox(win, "sssynth erase", 'S', 'D', WIDTH, 'S', 'sssynthcheckbox')
-    sssynthcheckbox.add_target_method(nil, 'sssynthtest')
 
     ui_initialized = true
     default_window.fit_to_children()
@@ -348,6 +356,73 @@ def play_simple_test(obj, event, x, y):
         sin3 = nil
         sin4.mute()
         sin4 = nil
+
+
+// handler for simtoncheckbox: play/stop some sine tones
+def play_simple_tone(obj, event, x, y):
+# this is a cleanup test: in this version, env termination propagates
+# through mult to the output sum, which releases the calculation tree
+# after unchecking the box releases simton_out.
+    display "play_simple_tone", x
+    if x:
+        var env = pweb(start = true, lin = true, 0.5, 1, 3, 1, 4)
+        env.term()
+        var sin1 = sine(440.0, 0.01)
+        var sin2 = sine(880.0, 0.01)
+        var sin3 = sine(1320.0, 0.007)
+        var sin4 = sine(1760.0, 0.005)
+        var sum = sum().ins(sin1, sin2, sin3, sin4)
+        simton_out = mult(sum, env).play()
+    else:
+        simton_out = nil
+
+
+class Finishtest:
+# This is not a good example of how to do anything "right", but it 
+# exercises some code for atend, FINISH, and cleanup. When created,
+# global finish_test gets the object holding `out`, so the calculation
+# tree has a reference and is retained, but when box is unchecked,
+# finish_test is cleared and envelope ramps down. When it ends, 
+# finish should mute the output and everything is garbage collected.
+    var out  // output ugen
+    var env  // envelope (need reference for noteoff)
+
+
+    def init():
+        env = pweb(start = true, lin = true, 0.5, 1)
+        env.atend(FINISH, this)
+        var sin1 = sine(440.0, 0.01)
+        var sin2 = sine(880.0, 0.01)
+        var sin3 = sine(1320.0, 0.007)
+        var sin4 = sine(1760.0, 0.005)
+        var sum = sum().ins(sin1, sin2, sin3, sin4)
+        out = mult(sum, env).play()        
+
+    def noteoff():
+        env.decay(2).term()
+        print "started 2 sec decay"
+
+    def finish(status, finisher, parameters):
+        display "Finishtest.finish", status, status & ACTION_END, finisher,
+        display     parameters
+        if (status & ACTION_END) == 0:
+            print "**** WARNING: finish called but not on ACTION_END"
+        out.mute()
+
+
+// handler for finishcheckbox: play/stop some sine tones
+def play_finish_test(obj, event, x, y):
+# this is a test for atend(FINISH, this): when box is unchecked, noteoff
+# sends ending to envelope, which sends finish() to instrument, which 
+
+    display "play_simple_tone", x
+    if x:
+        finish_test = Finishtest()  // make finish_test
+    else:
+        finish_test.noteoff()
+        finish_test = nil
+        
+
 
 // handler for mtcheckbox: play/stop some sine tones
 def play_mixer_test(obj, event, x, y):
@@ -1265,28 +1340,32 @@ def tableosctest(obj, event, x, y):
 ########## Tableosc Test ##############
 
 def ssnote():
-    ssnote = Note(0, SUPERSAW1, pC3, 80, 3, n = 16, detune = 0.3,
-                  attack = 0.4, decay = 0.5)
-    ssnote.play(sssynth)
+    ssnote = Note(0, pC3, 80, 3, rolloff = 0.8, animate = 1, width = 0.5,
+                  attack = 0.2, decay = 0.5, detune = 0.3, cutoff = 24)
+    sssynth.play_note(ssnote)
 
 def ssdemo():
     ssscore = supersaw_example()
-    ssscore.play(sssynth)
+    sssynth.play_score(ssscore)
+
+def ssstatus():
+    print time_get(),
+    if sssynth:
+        display "STATUS", sssynth.notes, sssynth.free_notes,
+        display     sssynth.finishing_notes
+    else:
+        display "STATUS", sssynth
 
 def supersawtest(obj, event, x, y):
     display "supersawtest", x
     if x:  # make/play tone with Supersaw
-        sssynth = Synth(2).play()
-        ssscore = supersaw_example()
-        ssscore.play(sssynth)
-        return
-        sss = supersaw(SUPERSAW1, pC3, 80, 
-                       {'n': 16, 'detune': 0.3, 'attack': 0.4, 'decay': 0.5})
-        sss.play()
+        sssynth = synth_create(SUPERSAW1, detune = 0.3, chans = 2).play()
+        // ssnote()
+        // return
         sched_select(rtsched)
-        sched_cause(3, sss, 'noteoff')
-        sched_cause(4, nil, 'ssnote')
-        sched_cause(8, nil, 'ssdemo')
+        sched_cause(0, nil, 'ssnote')
+        sched_cause(4, nil, 'ssdemo')
+        // sched_cause(5, nil, 'ssstatus')
 
     else:
         sssynth.mute()
@@ -1295,10 +1374,6 @@ def supersawtest(obj, event, x, y):
         return
         sss.mute()
 
-
-def sssynthtest(obj, event, x, y):
-    display "sssynthtest sssynth = nil"
-    sssynth = nil
 
 
 ########## Main Initialization ################

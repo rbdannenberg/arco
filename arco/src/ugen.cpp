@@ -80,11 +80,20 @@ void Initializer::init()
 const char *OP_TO_STRING[NUM_MATH_OPS] = {
     "MATH_OP_MUL", "MATH_OP_ADD", "MATH_OP_SUB", "MATH_OP_DIV", "MATH_OP_MAX",
     "MATH_OP_MIN", "MATH_OP_CLP", "MATH_OP_POW", "MATH_OP_LT", "MATH_OP_GT",
-    "MATH_OP_SCP", "MATH_OP_POWI", "MATH_OP_RND", "MATH_OP_SH", "MATH_OP_QNT" };
+    "MATH_OP_SCP", "MATH_OP_POWI", "MATH_OP_RND", "MATH_OP_SH", "MATH_OP_QNT",
+    "MATH_OP_RLI", "MATH_OP_HZDIFF", "MATH_OP_TAN", "MATH_OP_ATAN" };
+
+
+const char *UNARY_OP_TO_STRING[NUM_UNARY_OPS] = {
+    "UNARY_OP_ABS", "UNARY_OP_NEG", "UNARY_OP_EXP",
+    "UNARY_OP_LOG", "UNARY_OP_LOG10", "UNARY_OP_LOG2", "UNARY_OP_SQRT",
+    "UNARY_OP_STEP_TO_HZ", "UNARY_OP_HZ_TO_STEP", "UNARY_OP_VEL_TO_LINEAR",
+    "UNARY_OP_LINEAR_TO_VEL", "UNARY_OP_DB_TO_LINEAR",
+    "UNARY_OP_LINEAR_TO_DB" };
 
 
 Ugen::~Ugen() {
-    send_action_id();
+    // send_action_id(ACTION_FREE);
     // special case: check for run set or output set references
     assert((flags & IN_RUN_SET) == 0);
     // printf("Ugen delete %d\n", id);
@@ -96,9 +105,9 @@ void Ugen::unref() {
     // printf("Ugen::unref id %d %s new refcount %d\n",
     //        id, classname(), refcount);
     if (refcount == 0) {
-        terminate();  // notify `atend` mechanism if it is pending
-        // this should be in destructor, but destructors cannot call
-        // inherited methods in c++.
+        on_terminate(ACTION_FREE);  // notify `atend` mechanism if it is
+        // pending this should be in destructor, but destructors cannot
+        // call inherited methods in c++.
         if (flags & UGENTRACE) {
             arco_print("Deleting traced ugen: "); print();
         }
@@ -197,14 +206,14 @@ void Ugen::const_set(int chan, Sample x, const char *from)
 }
 
 
-/* /arco/act id action_id  */
+/* /arco/act id action_id action_mask */
 void arco_act(O2SM_HANDLER_ARGS)
 {
     int32_t id = argv[0]->i;
-    int32_t action_id = argv[1]->i;
-
     ANY_UGEN_FROM_ID(ugen, id, "arco_act");
-    ugen->action_id = action_id;
+    ugen->action_id = argv[1]->i;
+    // ACTION_FREE is always sent when ugen is freed if there is an action_id
+    ugen->action_mask = (argv[2]->i) | ACTION_FREE;
 }
 
 
@@ -213,7 +222,7 @@ void arco_trace(O2SM_HANDLER_ARGS)
     int32_t id = argv[0]->i;
     int32_t trace = argv[1]->i;
 
-    ANY_UGEN_FROM_ID(ugen, id, "arco_act");
+    ANY_UGEN_FROM_ID(ugen, id, "arco_trace");
     if (trace) {
         arco_print("Tracing ugen: "); ugen->print();
         ugen->flags |= UGENTRACE;
@@ -247,7 +256,7 @@ void ugen_initialize()
     Initializer::init();  // add all message handlers to O2sm
 
     o2sm_method_new("/arco/free", NULL, arco_free, NULL, false, false);
-    o2sm_method_new("/arco/act", "ii", arco_act, NULL, true, true);
+    o2sm_method_new("/arco/act", "iii", arco_act, NULL, true, true);
     o2sm_method_new("/arco/trace", "ii", arco_trace, NULL, true, true);
 }
 

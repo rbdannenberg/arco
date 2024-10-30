@@ -215,7 +215,7 @@ public:
             terminated &= ((input->flags & TERMINATED) != 0);
         }
         if (terminated && (flags & CAN_TERMINATE)) {
-            terminate();
+            terminate(ACTION_TERM);
         }
         for (int i = 0; i < chans; i++) {
             Vec<Sample_ptr> &route_vec = routes[i];

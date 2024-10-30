@@ -56,7 +56,7 @@ public:
     void real_run() {
         Sample_ptr input_samps = input->run(current_block); // update input
         if ((input->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
-            terminate();
+            terminate(ACTION_TERM);
         }
         Upsample_state *state = &states[0];
         for (int i = 0; i < chans; i++) {

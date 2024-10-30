@@ -1,5 +1,4 @@
 declare name "sine";
-freq = nentry("freq", 0, 0, 1, 0.1);
 amp = nentry("amp", 0, 0, 1, 0.1);
 
 
@@ -8,6 +7,6 @@ declare interpolated "amp";
 
 import("stdfaust.lib");
 
-process =
+process(freq) =
     os.osc(freq)*amp;
 

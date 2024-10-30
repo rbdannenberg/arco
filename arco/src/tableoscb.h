@@ -25,12 +25,12 @@ public:
     Sample_ptr amp_samps;
 
 
-    Tableoscb(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_) :
+    Tableoscb(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_, float phase) :
             Wavetables(id, nchans) {
         which_table = 0;
         states.set_size(chans);
         for (int i = 0; i < chans; i++) {
-            states[i].phase = 0;
+            states[i].phase = fmodf(phase / 360.0f, 1.0f);
         }
         init_freq(freq_);
         init_amp(amp_);
@@ -86,7 +86,6 @@ public:
     void select(int i) {  // select table
         if (i >= 0 && i < wavetables.size()) {
             which_table = i;
-            phase_scale = (wavetables[i].size() - 2) * BP;
         }
     }
 
@@ -102,13 +101,14 @@ public:
         }
         for (int i = 0; i < chans; i++) {
             double phase = state->phase;
-            int iphase = phase;
-            float frac = phase - iphase;
-            *out_samps++ = (table[iphase] * (1 - frac) + 
-                            table[iphase + 1] * frac) * *amp_samps;
-            phase += *freq_samps * phase_scale;
-            while (phase > tlen) phase -= tlen;
-            while (phase < 0) phase += tlen;
+            float x = phase * tlen;
+            int ix = x;
+            float frac = x - ix;
+            *out_samps++ = (table[ix] * (1 - frac) + 
+                            table[ix + 1] * frac) * *amp_samps;
+            phase += *freq_samps * AP;
+            while (phase > 1) phase--;
+            while (phase < 0) phase++;
             state->phase = phase;
             state++;
             freq_samps += freq_stride;

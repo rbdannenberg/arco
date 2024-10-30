@@ -559,11 +559,11 @@ def find_b_rate_parameter_faust_names(classname, impl, src):
     will look like [parameter_name, interpolated?, faust_name]
     """
     print("find_b_rate_parameter_faust_names called", classname)
+    print("SOURCE---------------\n", src, "\n----------------")
     bui = extract_method(classname, "buildUserInterface", src)
     if bui == None: return True
     bui = bui.split("\n")
     printed_something = False
-    impl.param_faust_names = [None] * len(impl.param_names)
     for line in bui:
         loc = line.find("addNumEntry(")
         if loc >= 0:  # ... "amp", &fEntry0, ...
@@ -594,15 +594,21 @@ def generate_channel_method(fhfile, classname, signature,
     impl is an Implementation object
     rate is the output rate of the Arco ugen
     """
-    print("generate_channel_method", classname, signature, 
-          instvars, rate)
+    print("---------------------------generate_channel_method", classname, signature, 
+          instvars, "\nrate:", rate)
     param_types = fhfile[1][ : -2]  # e.g. ab_a -> ab
     print("------compute method for " + fhfile[2])
 
     # full copy to avoid side affecting the original impl
     # params_info = [p.copy() for p in params_info]
-    if 'b' in param_types or 'c' in param_types:  # update params_info
+
+    # initially, set param_faust_names as if there are no b-rate parameters
+    impl.param_faust_names = [None] * len(impl.param_names)
+    if 'b' in param_types or 'c' in param_types:
+        # update impl.param_faust_names
         find_b_rate_parameter_faust_names(classname, impl, src)
+
+    print("After find_b_rate_parameter_faust_names, impl.param_faust_names:", impl.param_faust_names)
     compute = extract_method(classname, "compute", src)
     print(compute + "-----")
     if compute == None: return True
@@ -714,6 +720,7 @@ def generate_channel_method(fhfile, classname, signature,
     #   n will be 0 for the 2nd parameter
     param_names = [p.name for p in signature.params]
     i = 0 # index into FAUST implementation (.fh) variable names
+    print("Before replace loop", impl.param_names, "impl.param_faust_names", impl.param_faust_names)
     for j, name in enumerate(impl.param_names):
         if impl.param_faust_names[j]:
             faust_name = impl.param_faust_names[j]  # b-rate fEntry0, etc.
@@ -722,7 +729,7 @@ def generate_channel_method(fhfile, classname, signature,
             faust_name = f"inputs[{str(i)}]"  # a-rate inputs[0], ...
             arco_name = expressions[j]
             i += 1  # increment only for each a-rate parameter
-        print("replace", faust_name, arco_name)  # substitute address of block
+        print("####replace", impl.param_faust_names[j], faust_name, arco_name)  # substitute address of block
         compute = compute.replace(faust_name, arco_name)
         # also replace fControl[i] with arco_name
         if faust_name.find("fEntry") == 0:
@@ -1283,7 +1290,7 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
             join_with_or = " | "
         real_run += ") & TERMINATED) &&\n" + \
                     "            (flags & CAN_TERMINATE)) {\n" + \
-                    "            terminate();\n        }\n"
+                    "            terminate(ACTION_TERM);\n        }\n"
 
     # do the signal computation
     real_run += f"        {classname}_state *state = &states[0];\n"

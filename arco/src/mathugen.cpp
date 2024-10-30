@@ -5,8 +5,8 @@
  */
 
 #include "arcougen.h"
-#include "mathugen.h"
 #include "fastrand.h"
+#include "mathugen.h"
 
 const char *Math_name = "Math";
 
@@ -567,6 +567,7 @@ void Math::pwi_aa_a(Math_state *state)
 
 void Math::pwi_ab_a(Math_state *state)
 {
+    // note power (x2) is not interpolated
     Sample x2 = *x2_samps;
     int power = round(x2);
     if (power & 1) {  // power is odd, keep the sign of x1
@@ -854,26 +855,255 @@ void Math::rli_bb_a(Math_state *state)
 }
 
 
+/* HZDIFF = difference in Hz between two step values.
+ */
+void Math::hzdiff_aa_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = (float) steps_to_hzdiff(x2_samps[i], x1_samps[i]);
+    }
+}
+
+void Math::hzdiff_ab_a(Math_state *state)
+{
+    Sample x2 = *x2_samps;
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = (float) steps_to_hzdiff(x2, x1_samps[i]);
+    }
+}
+
+void Math::hzdiff_ba_a(Math_state *state)
+{
+    Sample x1 = *x1_samps;
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = (float) steps_to_hzdiff(x2_samps[i], x1);
+    }
+}
+
+void Math::hzdiff_bb_a(Math_state *state)
+{
+    Sample x1 = *x1_samps;
+    Sample x2 = *x2_samps;
+    float diff = (float) steps_to_hzdiff(x2, x1);
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = diff;
+    }
+}
+
+
+/* TAN = difference in Hz between two step values.
+ */
+void Math::tan_aa_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = tan(x1_samps[i] * x2_samps[i]);
+    }
+}
+
+void Math::tan_ab_a(Math_state *state)
+{
+    Sample br_sig = *x2_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = tan(x1_samps[i] * br_sig_fast);
+    }
+}
+
+void Math::tan_ba_a(Math_state *state)
+{
+    Sample br_sig = *x1_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = tan(br_sig_fast * x2_samps[i]);
+    }
+}
+
+void Math::tan_bb_a(Math_state *state)
+{
+    Sample br_sig = tan(*x1_samps * *x2_samps);
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = br_sig_fast;
+    }
+}
+
+
+/* ATAN2 = difference in Hz between two step values.
+ */
+void Math::atan2_aa_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = atan2f(x1_samps[i], x2_samps[i]);
+    }
+}
+
+void Math::atan2_ab_a(Math_state *state)
+{
+    Sample br_sig = *x2_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = atan2f(x1_samps[i], br_sig_fast);
+    }
+}
+
+void Math::atan2_ba_a(Math_state *state)
+{
+    Sample br_sig = *x1_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = atan2f(br_sig_fast, x2_samps[i]);
+    }
+}
+
+void Math::atan2_bb_a(Math_state *state)
+{
+    Sample br_sig = atan2f(*x1_samps, *x2_samps);
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = br_sig_fast;
+    }
+}
+
+
+/* SIN = difference in Hz between two step values.
+ */
+void Math::sin_aa_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = sinf(x1_samps[i] * x2_samps[i]);
+    }
+}
+
+void Math::sin_ab_a(Math_state *state)
+{
+    Sample br_sig = *x2_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = sinf(x1_samps[i] * br_sig_fast);
+    }
+}
+
+void Math::sin_ba_a(Math_state *state)
+{
+    Sample br_sig = *x1_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = sinf(br_sig_fast * x2_samps[i]);
+    }
+}
+
+void Math::sin_bb_a(Math_state *state)
+{
+    Sample br_sig = sinf(*x1_samps * *x2_samps);
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = br_sig_fast;
+    }
+}
+
+
+
+/* COS = difference in Hz between two step values.
+ */
+void Math::cos_aa_a(Math_state *state)
+{
+    for (int i = 0; i < BL; i = i + 1) {
+        *out_samps++ = cosf(x1_samps[i] * x2_samps[i]);
+    }
+}
+
+void Math::cos_ab_a(Math_state *state)
+{
+    Sample br_sig = *x2_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = cosf(x1_samps[i] * br_sig_fast);
+    }
+}
+
+void Math::cos_ba_a(Math_state *state)
+{
+    Sample br_sig = *x1_samps;
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = cosf(br_sig_fast * x2_samps[i]);
+    }
+}
+
+void Math::cos_bb_a(Math_state *state)
+{
+    Sample br_sig = cosf(*x1_samps * *x2_samps);
+    Sample br_sig_fast = state->prev;
+    Sample br_sig_incr = (br_sig - br_sig_fast) * BL_RECIP;
+    state->prev = br_sig;
+    for (int i = 0; i < BL; i = i + 1) {
+        br_sig_fast += br_sig_incr;
+        *out_samps++ = br_sig_fast;
+    }
+}
+
+
 void (Math::*run_aa_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_aa_a, &Math::add_aa_a, &Math::sub_aa_a, &Math::div_aa_a,
     &Math::max_aa_a, &Math::min_aa_a, &Math::clp_aa_a, &Math::pow_aa_a,
     &Math::lt_aa_a, &Math::gt_aa_a, &Math::scp_aa_a,  &Math::pwi_aa_a,
-    &Math::rnd_aa_a, &Math::sh_aa_a, &Math::qnt_aa_a, &Math::rli_aa_a };
+    &Math::rnd_aa_a, &Math::sh_aa_a, &Math::qnt_aa_a, &Math::rli_aa_a,
+    &Math::hzdiff_aa_a, &Math::tan_aa_a, &Math::atan2_aa_a, &Math::sin_aa_a,
+    &Math::cos_aa_a };
 void (Math::*run_ab_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_ab_a, &Math::add_ab_a, &Math::sub_ab_a, &Math::div_ab_a,
     &Math::max_ab_a, &Math::min_ab_a, &Math::clp_ab_a, &Math::pow_ab_a,
     &Math::lt_ab_a, &Math::gt_ab_a, &Math::scp_ab_a, &Math::pwi_ab_a,
-    &Math::rnd_ab_a, &Math::sh_ab_a, &Math::qnt_ab_a, &Math::rli_ab_a };
+    &Math::rnd_ab_a, &Math::sh_ab_a, &Math::qnt_ab_a, &Math::rli_ab_a,
+    &Math::hzdiff_ab_a, &Math::tan_ab_a, &Math::atan2_ab_a, &Math::sin_ab_a,
+    &Math::cos_ab_a };
 void (Math::*run_ba_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_ba_a, &Math::add_ba_a, &Math::sub_ba_a, &Math::div_ba_a,
     &Math::max_ba_a, &Math::min_ba_a, &Math::clp_ba_a, &Math::pow_ba_a,
     &Math::lt_ba_a, &Math::gt_ba_a, &Math::scp_ba_a, &Math::pwi_ba_a,
-    &Math::rnd_ba_a, &Math::sh_ba_a, &Math::qnt_ba_a, &Math::rli_ba_a };
+    &Math::rnd_ba_a, &Math::sh_ba_a, &Math::qnt_ba_a, &Math::rli_ba_a,
+    &Math::hzdiff_ba_a, &Math::tan_ba_a, &Math::atan2_ba_a, &Math::sin_ba_a,
+    &Math::cos_ba_a };
 void (Math::*run_bb_a[NUM_MATH_OPS])(Math_state *state) = {
     &Math::mul_bb_a, &Math::add_bb_a, &Math::sub_bb_a, &Math::div_bb_a,
     &Math::max_bb_a, &Math::min_bb_a, &Math::clp_bb_a, &Math::pow_bb_a,
     &Math::lt_bb_a, &Math::gt_bb_a, &Math::scp_bb_a, &Math::pwi_bb_a,
-    &Math::rnd_bb_a, &Math::sh_bb_a, &Math::qnt_bb_a, &Math::rli_bb_a };
+    &Math::rnd_bb_a, &Math::sh_bb_a, &Math::qnt_bb_a, &Math::rli_bb_a,
+    &Math::hzdiff_bb_a, &Math::tan_bb_a, &Math::atan2_bb_a, &Math::sin_bb_a,
+    &Math::cos_bb_a };
 
 
 /* O2SM INTERFACE: /arco/math/new int32 id, int32 chans, 
@@ -956,6 +1186,21 @@ static void arco_math_set_x2(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/math/rliset int32 id, float val;
+ */
+static void arco_math_rliset(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float val = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Math, math, id, "arco_math_set_x2");
+    math->rliset(val);
+}
+
+
+
 static void math_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
@@ -968,6 +1213,8 @@ static void math_init()
     o2sm_method_new("/arco/math/repl_x2", "ii", arco_math_repl_x2, NULL,
                     true, true);
     o2sm_method_new("/arco/math/set_x2", "iif", arco_math_set_x2, NULL,
+                    true, true);
+    o2sm_method_new("/arco/math/rliset", "if", arco_math_rliset, NULL,
                     true, true);
     // END INTERFACE INITIALIZATION
 

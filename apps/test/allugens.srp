@@ -76,136 +76,22 @@ class Probe (Ugen):
 # Roger B. Dannenberg
 # May 2023
 
-class Pwl (Ugen):
+require "envelope"
+
+class Pwl (Envelope):
     def init(points):
-        super.init(create_ugen_id(), "Pwl", 1, 'a', "", omit_chans = true)
-        set_point_array(points)
-
-    def set_points(rest points):
-        set_point_array(points)
-        this
-
-    def set_point_array(points):
-    # define the shape of the envelope with an array of floats, 
-    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
-    # If the length is odd, a final yn = 0.0 is appended.
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        # track cummulative time and samples to avoid accumulated time error
-        var time = 0
-        var count = 0
-        for i = 0 to len(points) by 2:  // process points pair-wise
-            time = time + points[i]
-            var samps = round(time * AR - count)
-            count = count + samps
-            o2_add_float(samps)  // the number of samples to ramp
-            if i + 1 < len(points):  // allowed to omit final zero amplitude
-                o2_add_float(points[i + 1])  // the destination amplitude
-        o2_send_finish(0, "/arco/pwl/env", true)
-        this
-
-    def start():
-        o2_send_cmd("/arco/pwl/start", 0, "U", id)
-        this
-
-    def stop():
-        o2_send_cmd("/arco/pwl/stop", 0, "U", id)
-        this
-
-    def decay(dur):
-    # end envelope with decay to zero over given duration (seconds)
-        o2_send_cmd("/arco/pwl/decay", 0, "Uf", id, dur * AR)
-        this
-
-    def set(y):
-    # set current value to y
-        o2_send_cmd("/arco/pwl/set", 0, "Uf", id, y)
-        this
-
-
+        super.init("Pwl", "/arco/pwl/", 'a', points)
 
 def pwl(keyword init, start = true, rest points):
-    var pwl = Pwl(points)
-    if init:
-       pwl.set(init)
-    if start:
-       pwl.start()
-    return pwl
+    envelope(Pwl(points), init, start)
 
 
-
-class Pwlb (Ugen):
-
+class Pwlb (Envelope):
     def init(points):
-        super.init(create_ugen_id(), "Pwlb", 1, 'b', "", omit_chans = true)
-        set_point_array(points)
-
-    def set_points(rest points):
-        set_point_array(points)
-        this
-
-    def set_point_array(points):
-    # define the shape of the envelope with an array of floats, 
-    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
-    # If the length is odd, a final yn = 0.0 is appended. Times are
-    # converted to block periods (seconds * block_rate).
-        // display "Pwlb", points
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        # track cummulative time and samples to avoid accumulated time error
-        var time = 0   // accumulate the total duration (d0 + d1 + ...) here
-        var count = 0  // accumulate the integer block counts here
-        // print "               ";
-        for i = 0 to len(points) by 2:  // process points pair-wise
-            time = time + points[i]
-	    // Avoid accumulated rounding error from converting durations to
-	    // block counts as follows:
-	    //   count is the block count where this segment begins
-	    //   time * BR is the exact fractional block count where it ends
-	    //   samps is therefore the duration we want with compensation
-	    //   for any accumulated rounding error.
-            var samps = round(time * BR - count)
-            count = count + samps
-            // print samps,
-            o2_add_float(samps)  // the number of samples to ramp
-            if i + 1 < len(points):  // allowed to omit final zero amplitude
-                // print points[i + 1],
-                o2_add_float(points[i + 1])  // the destination amplitude
-        // print
-        o2_send_finish(0, "/arco/pwlb/env", true)
-        this
-
-
-    def start():
-        o2_send_cmd("/arco/pwlb/start", 0, "U", id)
-        this
-
-
-    def stop():
-        o2_send_cmd("/arco/pwlb/stop", 0, "U", id)
-        this
-
-
-    def decay(dur):
-    # end envelope with decay to zero over given duration (seconds)
-        o2_send_cmd("/arco/pwlb/decay", 0, "Uf", id, dur * BR)
-        this
-
-
-    def set(y):
-    # set current value to y
-        o2_send_cmd("/arco/pwlb/set", 0, "Uf", id, y)
-        this
-
-
+        super.init("Pwlb", "/arco/pwlb/", 'b', points)
 
 def pwlb(keyword init, start = true, rest points):
-    var pwlb = Pwlb(points)
-    if init:
-        pwlb.set(init)
-    if start:
-        pwlb.start()
-    return pwlb
+    envelope(Pwlb(points), init, start)
 
 
 # ---- included from /Users/rbd/arco/serpent/srp/pwe.srp ----
@@ -215,140 +101,125 @@ def pwlb(keyword init, start = true, rest points):
 # Roger B. Dannenberg
 # May 2023
 
-class Pwe (Ugen):
+require "envelope"
+
+class Pwe (Envelope):
     def init(points):
-        super.init(create_ugen_id(), "Pwe", 1, 'a', "", omit_chans = true)
-        set_point_array(points)
+        super.init("Pwe", "/arco/pwe/", 'a', points)
 
-    def set_points(rest points):
-        set_point_array(points)
-        this
-
-    def set_point_array(points):
-    # define the shape of the envelope with an array of floats, 
-    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
-    # If the length is odd, a final yn = 0.0 is appended.
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        # track cummulative time and samples to avoid accumulated time error
-        var time = 0
-        var count = 0
-        for i = 0 to len(points) by 2:  // process points pair-wise
-            time = time + points[i]
-            var samps = round(time * AR - count)
-            count = count + samps
-            o2_add_float(samps)  // the number of samples to ramp
-            if i + 1 < len(points):  // allowed to omit final zero amplitude
-                o2_add_float(points[i + 1])  // the destination amplitude
-        o2_send_finish(0, "/arco/pwe/env", true)
-        this
-
-    def start():
-        o2_send_cmd("/arco/pwe/start", 0, "U", id)
-        this
-
-    def stop():
-        o2_send_cmd("/arco/pwe/stop", 0, "U", id)
-        this
-
-    def linear_attack(lin):
-        o2_send_cmd("/arco/pwe/linatk", 0, "UB", id, lin)
-        this
-
-    def decay(dur):
-    # end envelope with decay to zero over given duration (seconds)
-        o2_send_cmd("/arco/pwe/decay", 0, "Uf", id, dur * AR)
-        this
-
-    def set(y):
-    # set current value to y
-        o2_send_cmd("/arco/pwe/set", 0, "Uf", id, y)
-        this
+def pwe(keyword init, start = true, lin = false, rest points):
+    envelope(Pwe(points), init, start, lin)
 
 
-def pwe(keyword init, start = true, rest points):
-    var pwe = Pwe(points)
-    if init:
-        pwe.set(init)
-    if start:
-        pwe.start()
-    return pwe
-
-
-
-class Pweb (Ugen):
-
+class Pweb (Envelope):
     def init(points):
-        super.init(create_ugen_id(), "Pweb", 1, 'b', "", omit_chans = true)
-        set_point_array(points)
-        this
+        super.init("Pweb", "/arco/pweb/", 'b', points)
 
-    def set_points(rest points):
-        set_point_array(points)
-        this
-
-    def set_point_array(points):
-    # define the shape of the envelope with an array of floats, 
-    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
-    # If the length is odd, a final yn = 0.0 is appended. Times are
-    # converted to block periods (seconds * block_rate).
-        // display "Pweb", points
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        # track cummulative time and samples to avoid accumulated time error
-        var time = 0   // accumulate the total duration (d0 + d1 + ...) here
-        var count = 0  // accumulate the integer block counts here
-        // print "               ";
-        for i = 0 to len(points) by 2:  // process points pair-wise
-            time = time + points[i]
-	    // Avoid accumulated rounding error from converting durations to
-	    // block counts as follows:
-	    //   count is the block count where this segment begins
-	    //   time * BR is the exact fractional block count where it ends
-	    //   samps is therefore the duration we want with compensation
-	    //   for any accumulated rounding error.
-            var samps = round(time * BR - count)
-            count = count + samps
-            // print samps,
-            o2_add_float(samps)  // the number of samples to ramp
-            if i + 1 < len(points):  // allowed to omit final zero amplitude
-                // print points[i + 1],
-                o2_add_float(points[i + 1])  // the destination amplitude
-        // print
-        o2_send_finish(0, "/arco/pweb/env", true)
-        this
+def pweb(keyword init, start = true, lin = false, rest points):
+    envelope(Pweb(points), init, start, lin)
 
 
-    def start():
-        o2_send_cmd("/arco/pweb/start", 0, "U", id)
-        this
+# ---- included from /Users/rbd/arco/serpent/srp/unaryugen.srp ----
 
-    def stop():
-        o2_send_cmd("/arco/pweb/stop", 0, "U", id)
-        this
+# unaryugen.srp - constructor implementation for abs, neg, exp, log,
+#     log10, log2, sqrt, step_to_hz, hz_to_step, vel_to_lin, lin_to_vel.
+#     For completeness, you can create a Unary as well with ugen_unary.
 
-    def linear_attack(optional lin = true):
-        o2_send_cmd("/arco/pweb/linatk", 0, "UB", id, lin)
-        this
+UNARY_OP_ABS = 0
+UNARY_OP_NEG = 1
+UNARY_OP_EXP = 2
+UNARY_OP_LOG = 3
+UNARY_OP_LOG10 = 4
+UNARY_OP_LOG2 = 5
+UNARY_OP_SQRT = 6
+UNARY_OP_STEP_TO_HZ = 7
+UNARY_OP_HZ_TO_STEP = 8
+UNARY_OP_VEL_TO_LINEAR = 9
+UNARY_OP_LINEAR_TO_VEL = 10
+UNARY_OP_DB_TO_LINEAR = 11
+UNARY_OP_LINEAR_TO_DB = 12
 
-    def decay(dur):
-    # end envelope with decay to zero over given duration (seconds)
-        o2_send_cmd("/arco/pweb/decay", 0, "Uf", id, dur * BR)
-        this
-
-    def set(y):
-    # set current value to y
-        o2_send_cmd("/arco/pweb/set", 0, "Uf", id, y)
-        this
+def unary(op, x1, optional chans):
+    if not chans:
+        chans = max_chans(1, x1)
+    Ugen(create_ugen_id(), "unary", chans, 'a', "iU",
+         'op', op, 'x1', x1)
 
 
-def pweb(keyword init, start = true, rest points):
-    var pweb = Pweb(points)
-    if init:
-        pweb.set(init)
-    if start:
-        pweb.start()
-    return pweb
+def unaryb(op, x1, optional chans):
+    if not isnumber(x1) and x1.rate != 'b':
+        display "ERROR: 'x1' input to Ugen 'mathb' must be block rate", op
+        return nil
+    if not chans:
+        chans = max_chans(1, x1)
+    Ugen(create_ugen_id(), "unaryb", chans, 'b', "iU",
+         'op', op, 'x1', x1)
+
+
+def ugen_abs(x1, optional chans):
+    unary(UNARY_OP_ABS, x1, chans)
+def ugen_absb(x1, optional chans):
+    unaryb(UNARY_OP_ABS, x1, chans)
+
+def ugen_neg(x1, optional chans):
+    unary(UNARY_OP_NEG, x1, chans)
+def ugen_negb(x1, optional chans):
+    unaryb(UNARY_OP_NEG, x1, chans)
+
+def ugen_exp(x1, optional chans):
+    unary(UNARY_OP_EXP, x1, chans)
+def ugen_expb(x1, optional chans):
+    unaryb(UNARY_OP_EXP, x1, chans)
+
+def ugen_log(x1, optional chans):
+    unary(UNARY_OP_LOG, x1, chans)
+def ugen_logb(x1, optional chans):
+    unaryb(UNARY_OP_LOG, x1, chans)
+
+def ugen_log10(x1, optional chans):
+    unary(UNARY_OP_LOG10, x1, chans)
+def ugen_log10b(x1, optional chans):
+    unaryb(UNARY_OP_LOG10, x1, chans)
+
+def ugen_log2(x1, optional chans):
+    unary(UNARY_OP_LOG2, x1, chans)
+def ugen_log2b(x1, optional chans):
+    unaryb(UNARY_OP_LOG2, x1, chans)
+
+def ugen_sqrt(x1, optional chans):
+    unary(UNARY_OP_SQRT, x1, chans)
+def ugen_sqrtb(x1, optional chans):
+    unaryb(UNARY_OP_SQRT, x1, chans)
+
+def ugen_step_to_hz(x1, optional chans):
+    unary(UNARY_OP_STEP_TO_HZ, x1, chans)
+def ugen_step_to_hzb(x1, optional chans):
+    unaryb(UNARY_OP_STEP_TO_HZ, x1, chans)
+
+def ugen_hz_to_step(x1, optional chans):
+    unary(UNARY_OP_HZ_TO_STEP, x1, chans)
+def ugen_hz_to_stepb(x1, optional chans):
+    unaryb(UNARY_OP_HZ_TO_STEP, x1, chans)
+
+def ugen_vel_to_linear(x1, optional chans):
+    unary(UNARY_OP_VEL_TO_LINEAR, x1, chans)
+def ugen_vel_to_linearb(x1, optional chans):
+    unaryb(UNARY_OP_VEL_TO_LINEAR, x1, chans)
+
+def ugen_linear_to_vel(x1, optional chans):
+    unary(UNARY_OP_LINEAR_TO_VEL, x1, chans)
+def ugen_linear_to_velb(x1, optional chans):
+    unaryb(UNARY_OP_LINEAR_TO_VEL, x1, chans)
+
+def ugen_db_to_linear(x1, optional chans):
+    unary(UNARY_OP_DB_TO_LINEAR, x1, chans)
+def ugen_db_to_linearb(x1, optional chans):
+    unaryb(UNARY_OP_DB_TO_LINEAR, x1, chans)
+
+def ugen_linear_to_db(x1, optional chans):
+    unary(UNARY_OP_LINEAR_TO_DB, x1, chans)
+def ugen_linear_to_dbb(x1, optional chans):
+    unaryb(UNARY_OP_LINEAR_TO_DB, x1, chans)
 
 
 # ---- included from /Users/rbd/arco/serpent/srp/mix.srp ----
@@ -363,7 +234,17 @@ class Mix (Ugen):
     def init(chans_, wrap):
         super.init(create_ugen_id(), "Mix", chans_, A_RATE,
                    "i", 'wrap', 1 if wrap else 0)
+        register_action(this, ACTION_REM, this, 'action_rem')
 
+
+    def action_rem(status, uid, parameters):
+        // find input with uid if any
+        display "Mix.action_rem", status, uid, parameters
+        for input in inputs.values():  // [name, ugen, gain] arrays
+            var ugen = input[1]
+            if arco_ugen_id(ugen.id) == uid:
+                inputs.remove(input[0])
+            
         
     def set(input, value, optional chan = 0):
         print "ERROR: set method called but not available for Mix class"
@@ -395,7 +276,7 @@ class Mix (Ugen):
     
 
     def rem(name, dur, mode):
-        if inputs.has_key(name):
+        if inputs.has_key(name) or force:
             if not dur:
                 dur = 0
             if not mode:
@@ -467,10 +348,10 @@ def sine(freq, amp, optional chans):
     Ugen(create_ugen_id(), "sine", chans, 'a', "UU", 'freq', freq, 'amp', amp)
 
 def sineb(freq, amp, optional chans):
-    if not isnumber(freq) and freq.rate != 'b':
+    if not isnumber(freq) and freq.rate == 'a':
         print "ERROR: 'freq' input to Ugen 'sineb' must be block rate"
         return nil
-    if not isnumber(amp) and amp.rate != 'b':
+    if not isnumber(amp) and amp.rate == 'a':
         print "ERROR: 'amp' input to Ugen 'sineb' must be block rate"
         return nil
     if not chans:
@@ -481,7 +362,7 @@ def sineb(freq, amp, optional chans):
 
 # ---- included from /Users/rbd/arco/serpent/srp/mathugen.srp ----
 
-# add.srp - constructor implementation for mult, add, ugen_div, ugen_max,
+# mathugen.srp - constructor implementation for mult, add, ugen_div, ugen_max,
 #           ugen_min, ugen_clip, ugen_less, ugen_greater, ugen_soft_clip.
 #           For completeness, you can create a Math as well with ugen_math.
 
@@ -501,25 +382,36 @@ MATH_OP_RND = 12
 MATH_OP_SH = 13
 MATH_OP_QNT = 14
 MATH_OP_RLI = 15
+MATH_OP_HZDIFF = 16
 
-def math(op, x1, x2, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(1, x1), x2)
-    Ugen(create_ugen_id(), "math", chans, 'a', "iUU",
-         'op', op, 'x1', x1, 'x2', x2)
+class Math (Ugen):
+    def init(op, x1, x2, optional chans):
+        if not chans:
+            chans = max_chans(max_chans(1, x1), x2)
+        super.init(create_ugen_id(), "math", chans, 'a', "iUU",
+                   'op', op, 'x1', x1, 'x2', x2)
+    def rliset(x):
+    # randomize initial values (only for op == MATH_OP_RLI)
+        o2_send_cmd("/arco/math/rliset", 0, "Uf", id, x)
 
 
-def mathb(op, x1, x2, optional chans):
-    if not isnumber(x1) and x1.rate != 'b':
-        display "ERROR: 'x1' input to Ugen 'mathb' must be block rate", op
-        return nil
-    if not isnumber(x2) and x2.rate != 'b':
-        display "ERROR: 'x2' input to Ugen 'mathb' must be block rate", op
-        return nil
-    if not chans:
-        chans = max_chans(max_chans(1, x1), x2)
-    Ugen(create_ugen_id(), "mathb", chans, 'b', "iUU",
-         'op', op, 'x1', x1, 'x2', x2)
+class Mathb (Ugen):
+    # NOTE: initialization may fail if x1 or x2 are incompatible
+    # An object is created and returned but its id will be nil
+    def init(op, x1, x2, optional chans):
+        if not isnumber(x1) and x1.rate == 'a':
+            display "ERROR: 'x1' input to Ugen 'mathb' must be block rate",
+            display op, x1
+        elif not isnumber(x2) and x2.rate == 'a':
+            display "ERROR: 'x2' input to Ugen 'mathb' must be block rate",
+            display op, x2
+        else:
+            chans = chans or max_chans(max_chans(1, x1), x2)
+            super.init(create_ugen_id(), "mathb", chans, 'b', "iUU",
+                       'op', op, 'x1', x1, 'x2', x2)
+
+    def rliset(x):
+        o2_send_cmd("/arco/mathb/rliset", 0, "Uf", id, x)
 
 
 def mult(x1, x2, optional chans, keyword x2_init):
@@ -529,87 +421,112 @@ def mult(x1, x2, optional chans, keyword x2_init):
         Ugen(create_ugen_id(), "multx", chans, 'a', "UUf", 'x1', x1, 'x2', x2,
              'init', x2_init)
     else:
-        math(MATH_OP_MUL, x1, x2, chans)
+        Math(MATH_OP_MUL, x1, x2, chans)
 
 
 def multb(x1, x2, optional chans):
-    mathb(MATH_OP_MUL, x1, x2, chans)
+    Mathb(MATH_OP_MUL, x1, x2, chans)
 
 
 def add(x1, x2, optional chans):
-    math(MATH_OP_ADD, x1, x2, chans)
+    Math(MATH_OP_ADD, x1, x2, chans)
 def addb(x1, x2, optional chans):
-    mathb(MATH_OP_ADD, x1, x2, chans)
+    Mathb(MATH_OP_ADD, x1, x2, chans)
 
 def sub(x1, x2, optional chans):
-    math(MATH_OP_SUB, x1, x2, chans)
+    Math(MATH_OP_SUB, x1, x2, chans)
 def subb(x1, x2, optional chans):
-    mathb(MATH_OP_SUB, x1, x2, chans)
+    Mathb(MATH_OP_SUB, x1, x2, chans)
 
 def ugen_div(x1, x2, optional chans):
-    math(MATH_OP_DIV, x1, x2, chans)
+    Math(MATH_OP_DIV, x1, x2, chans)
 def ugen_divb(x1, x2, optional chans):
-    mathb(MATH_OP_DIV, x1, x2, chans)
+    Mathb(MATH_OP_DIV, x1, x2, chans)
 
 def ugen_max(x1, x2, optional chans):
-    math(MATH_OP_MAX, x1, x2, chans)
+    Math(MATH_OP_MAX, x1, x2, chans)
 def ugen_maxb(x1, x2, optional chans):
-    mathb(MATH_OP_MAX, x1, x2, chans)
+    Mathb(MATH_OP_MAX, x1, x2, chans)
 
 def ugen_min(x1, x2, optional chans):
-    math(MATH_OP_MIN, x1, x2, chans)
+    Math(MATH_OP_MIN, x1, x2, chans)
 def ugen_minb(x1, x2, optional chans):
-    mathb(MATH_OP_MIN, x1, x2, chans)
+    Mathb(MATH_OP_MIN, x1, x2, chans)
 
 def ugen_clip(x1, x2, optional chans):
-    math(MATH_OP_CLP, x1, x2, chans)
+    Math(MATH_OP_CLP, x1, x2, chans)
 def ugen_clipb(x1, x2, optional chans):
-    mathb(MATH_OP_CLP, x1, x2, chans)
+    Mathb(MATH_OP_CLP, x1, x2, chans)
 
 def ugen_pow(x1, x2, optional chans):
-    math(MATH_OP_POW, x1, x2, chans)
+    Math(MATH_OP_POW, x1, x2, chans)
 def ugen_powb(x1, x2, optional chans):
-    mathb(MATH_OP_POW, x1, x2, chans)
+    Mathb(MATH_OP_POW, x1, x2, chans)
 
 def ugen_less(x1, x2, optional chans):
-    math(MATH_OP_LT, x1, x2, chans)
+    Math(MATH_OP_LT, x1, x2, chans)
 def ugen_lessb(x1, x2, optional chans):
-    mathb(MATH_OP_LT, x1, x2, chans)
+    Mathb(MATH_OP_LT, x1, x2, chans)
 
 def ugen_greater(x1, x2, optional chans):
-    math(MATH_OP_GT, x1, x2, chans)
+    Math(MATH_OP_GT, x1, x2, chans)
 def ugen_greaterb(x1, x2, optional chans):
-    mathb(MATH_OP_GT, x1, x2, chans)
+    Mathb(MATH_OP_GT, x1, x2, chans)
 
 def ugen_soft_clip(x1, x2, optional chans):
-    math(MATH_OP_SCP, x1, x2, chans)
+    Math(MATH_OP_SCP, x1, x2, chans)
 def ugen_soft_clipb(x1, x2, optional chans):
-    mathb(MATH_OP_SCP, x1, x2, chans)
+    Mathb(MATH_OP_SCP, x1, x2, chans)
 
 def ugen_powi(x1, x2, optional chans):
-    math(MATH_OP_PWI, x1, x2, chans)
+    Math(MATH_OP_PWI, x1, x2, chans)
 def ugen_powib(x1, x2, optional chans):
-    mathb(MATH_OP_PWI, x1, x2, chans)
+    Mathb(MATH_OP_PWI, x1, x2, chans)
 
 def ugen_rand(x1, x2, optional chans):
-    math(MATH_OP_RND, x1, x2, chans)
+    Math(MATH_OP_RND, x1, x2, chans)
 def ugen_randb(x1, x2, optional chans):
-    mathb(MATH_OP_RND, x1, x2, chans)
+    Mathb(MATH_OP_RND, x1, x2, chans)
 
 def sample_hold(x1, x2, optional chans):
-    math(MATH_OP_SH, x1, x2, chans)
+    Math(MATH_OP_SH, x1, x2, chans)
 def sample_holdb(x1, x2, optional chans):
-    mathb(MATH_OP_SH, x1, x2, chans)
+    Mathb(MATH_OP_SH, x1, x2, chans)
 
 def ugen_quantize(x1, x2, optional chans):
-    math(MATH_OP_QNT, x1, x2, chans)
+    Math(MATH_OP_QNT, x1, x2, chans)
 def ugen_quantizeb(x1, x2, optional chans):
-    mathb(MATH_OP_QNT, x1, x2, chans)
+    Mathb(MATH_OP_QNT, x1, x2, chans)
 
 def ugen_rli(x1, x2, optional chans):
-    math(MATH_OP_RLI, x1, x2, chans)
+    Math(MATH_OP_RLI, x1, x2, chans)
 def ugen_rlib(x1, x2, optional chans):
-    mathb(MATH_OP_RLI, x1, x2, chans)
+    Mathb(MATH_OP_RLI, x1, x2, chans)
+
+def ugen_hzdiff(x1, x2, optional chans):
+    Math(MATH_OP_HZDIFF, x1, x2, chans)
+def ugen_hzdiffb(x1, x2, optional chans):
+    Mathb(MATH_OP_HZDIFF, x1, x2, chans)
+
+def ugen_tan(x1, x2, optional chans):
+    Math(MATH_OP_TAN, x1, x2, chans)
+def ugen_tanb(x1, x2, optional chans):
+    Mathb(MATH_OP_TAN, x1, x2, chans)
+
+def ugen_atan2(x1, x2, optional chans):
+    Math(MATH_OP_ATAN2, x1, x2, chans)
+def ugen_atan2b(x1, x2, optional chans):
+    Mathb(MATH_OP_ATAN2, x1, x2, chans)
+
+def ugen_sin(x1, x2, optional chans):
+    Math(MATH_OP_SIN, x1, x2, chans)
+def ugen_sinb(x1, x2, optional chans):
+    Mathb(MATH_OP_SIN, x1, x2, chans)
+
+def ugen_cos(x1, x2, optional chans):
+    Math(MATH_OP_COS, x1, x2, chans)
+def ugen_cosb(x1, x2, optional chans):
+    Mathb(MATH_OP_COS, x1, x2, chans)
 
 
 # ---- included from /Users/rbd/arco/ugens/reson/reson.srp ----
@@ -628,13 +545,13 @@ def reson(input, center, q, optional chans):
          'center', center, 'q', q)
 
 def resonb(input, center, q, optional chans):
-    if not isnumber(input) and input.rate != 'b':
+    if not isnumber(input) and input.rate == 'a':
         print "ERROR: 'input' input to Ugen 'resonb' must be block rate"
         return nil
-    if not isnumber(center) and center.rate != 'b':
+    if not isnumber(center) and center.rate == 'a':
         print "ERROR: 'center' input to Ugen 'resonb' must be block rate"
         return nil
-    if not isnumber(q) and q.rate != 'b':
+    if not isnumber(q) and q.rate == 'a':
         print "ERROR: 'q' input to Ugen 'resonb' must be block rate"
         return nil
     if not chans:
@@ -660,10 +577,10 @@ def lowpass(input, cutoff, optional chans):
          'cutoff', cutoff)
 
 def lowpassb(input, cutoff, optional chans):
-    if not isnumber(input) and input.rate != 'b':
+    if not isnumber(input) and input.rate == 'a':
         print "ERROR: 'input' input to Ugen 'lowpassb' must be block rate"
         return nil
-    if not isnumber(cutoff) and cutoff.rate != 'b':
+    if not isnumber(cutoff) and cutoff.rate == 'a':
         print "ERROR: 'cutoff' input to Ugen 'lowpassb' must be block rate"
         return nil
     if not chans:
@@ -1241,11 +1158,11 @@ def sttest(input, hz1, hz2):
 class Wavetables (Ugen):
     var address_prefix  // e.g. "/arco/tableosc/"
 
-    def init(freq, amp, chans, classname):
+    def init(freq, amp, phase, chans, classname, rate):
         if not chans:
             chans = max_chans(max_chans(1, freq), amp)
-        super.init(create_ugen_id(), classname, chans, A_RATE,
-                   "UU", 'freq', freq, 'amp', amp)
+        super.init(create_ugen_id(), classname, chans, rate,
+                   "UUf", 'freq', freq, 'amp', amp, 'phase', phase)
         address_prefix = "/arco/" + tolower(classname) + "/"
 
 
@@ -1284,20 +1201,20 @@ class Wavetables (Ugen):
 
 
 class Tableosc (Wavetables):
-    def init(freq, amp, chans):
-        super.init(freq, amp, chans, "Tableosc")
+    def init(freq, amp, phase, chans):
+        super.init(freq, amp, phase, chans, "Tableosc", A_RATE)
     
 
 class Tableoscb (Wavetables):
-    def init(freq, amp, chans):
-        super.init(freq, amp, chans, "Tableoscb")
+    def init(freq, amp, phase, chans):
+        super.init(freq, amp, phase, chans, "Tableoscb", B_RATE)
 
 
-def tableosc(freq, amp, optional chans):
-    Tableosc(freq, amp, chans)
+def tableosc(freq, amp, optional chans, keyword phase = 0):
+    Tableosc(freq, amp, phase, chans)
 
 
-def tableoscb(freq, amp, optional chans):
+def tableoscb(freq, amp, optional chans, keyword phase = 0):
     if not isnumber(freq) and freq.rate != 'b':
         print "ERROR: 'freq' input to Ugen 'tableoscb' must be block rate"
         return nil
@@ -1306,7 +1223,99 @@ def tableoscb(freq, amp, optional chans):
         return nil
     if not chans:
         chans = max_chans(max_chans(1, freq), amp)
-    Tableoscb(freq, amp, chans)
+    Tableoscb(freq, amp, phase, chans)
+
+
+# ---- included from /Users/rbd/arco/serpent/srp/blend.srp ----
+
+# blend.srp -- granular synthesis from input stream unit generator
+#
+# Roger B. Dannenberg
+# June 2023
+
+BLEND_LINEAR = 0
+BLEND_POWER = 1
+BLEND_45 = 2
+
+class Blend (Ugen):
+    def init(chans, x1, x2, b, mode, init_b):
+        super.init(create_ugen_id(), "Blend", chans, 'a', "UUUfif",
+	           'x1', x1, 'x2', x2, 'b', b,
+                   'mode', mode, 'init_b', init_b)
+
+    def set_gain(gain)
+        o2_send_cmd("/arco/blend/gain", 0, "Uf", id, gain)
+        this
+
+    def set_mode(mode)
+        o2_send_cmd("/arco/blend/mode", 0, "Ui", id, mode)
+        this
+
+
+def blend(x1, x2, b, optional chans, mode, keyword gain = 1, init_b = 0.5):
+    chans = chans or max(x1.chans, max(x2.chans, b.chans))
+    mode = mode or BLEND_POWER
+    var ugen = Blend(chans, x1, x2, b, mode, init_b)  # blend as a function
+    if gain != 1:  // default for Arco
+        ugen.set_gain(gain)
+    return ugen
+
+
+class Blendb (Ugen):
+    def init(chans, x1, x2, b, mode):
+        super.init(create_ugen_id(), "Blendb", chans, 'b', "UUUfif",
+	           'x1', x1, 'x2', x2, 'b', b, 'mode', mode)
+
+    def set_gain(gain)
+        o2_send_cmd("/arco/blendb/gain", 0, "Uf", id, gain)
+        this
+
+    def set_mode(mode)
+        o2_send_cmd("/arco/blendb/mode", 0, "Ui", id, mode)
+        this
+
+
+def blendb(x1, x2, b, optional chans, mode, keyword gain = 1):
+    chans = chans or max(x1.chans, max(x2.chans, b.chans))
+    mode = mode or BLEND_POWER
+    var ugen = Blendb(chans, x1, x2, b, mode)  # blend as a function
+    if gain != 1:  // default for Arco
+        ugen.set_gain(gain)
+    return ugen
+
+
+
+# ---- included from /Users/rbd/arco/serpent/srp/stdistr.srp ----
+
+# stdistr.srp -- stereo distribution
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Stdistr (Ugen):
+    def init(n, width):
+        super.init(create_ugen_id(), "Stdistr", 2, 'a', "if",
+	           'n', n, 'width', width, omit_chans = true)
+
+    def set_gain(gain)
+        o2_send_cmd("/arco/stdistr/gain", 0, "Uf", id, gain)
+        this
+
+    def set_width(width)
+        o2_send_cmd("/arco/stdistr/width", 0, "Uf", id, width)
+        this
+
+    def ins(index, ugen):
+        o2_send_cmd("/arco/stdistr/ins", 0, "UiU", id, index, ugen)
+        this
+        
+    def rem(index):
+        o2_send_cmd("/arco/stdistr/rem", 0, "Ui", id, index)
+        this
+        
+
+def stdistr(n, width):
+    Stdistr(n, width)  # stdistr as a function
 
 
 # ---- included from /Users/rbd/arco/serpent/srp/thru.srp ----
@@ -1454,19 +1463,38 @@ class Sum(Ugen):
     def init(chans, wrap, optional id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
                    "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0)
+        register_action(this, ACTION_REM, this, 'action_rem')
+
+    def action_rem(status, uid, parameters):
+        // find input with uid if any -- similar to mix but inputs
+        // directly map to ugens:
+        display "Sum.action_rem", status, uid, parameters
+        for ugen in inputs.values():
+            if arco_ugen_id(ugen.id) == uid:
+                inputs.remove(uid)
 
     def ins(rest ugens):
         for ugen in ugens:
+            // for sum, use integer Arco id as input name in dictionary:
+            inputs[arco_ugen_id(ugen.id)] = ugen
             o2_send_cmd("/arco/sum/ins", 0, "UU", id, ugen.id)
         this
 
     def rem(rest ugens):
         for ugen in ugens:
-            o2_send_cmd("/arco/sum/rem", 0, "UU", id, ugen.id)
+            var name = arco_ugen_id(ugen.id)
+            if inputs.has_key(name):
+                inputs.remove(name)
+                o2_send_cmd("/arco/sum/rem", 0, "UU", id, ugen.id)
         this
 
     def swap(ugen, replacement):
-        o2_send_cmd("/arco/sum/swap", 0, "UUU", id, ugen.id, replacement.id)
+        var name = arco_ugen_id(ugen.id)
+        if inputs.has_key(name):
+            // locally, act as if ugen is removed and replacement is inserted
+            inputs.remove(name)
+            inputs[arco_ugen_id(replacement.id)] = replacement
+            o2_send_cmd("/arco/sum/swap", 0, "UUU", id, ugen.id, replacement.id)
         this
 
 
@@ -1477,19 +1505,38 @@ class Sumb(Ugen):
     def init(chans, wrap, optional id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
                    "Sumb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
+        register_action(this, ACTION_REM, this, 'action_rem')
+
+    def action_rem(status, uid, parameters):
+        // find input with uid if any -- similar to mix but inputs
+        // directly map to ugens:
+        display "Sum.action_rem", status, uid, parameters
+        for ugen in inputs.values():
+            if arco_ugen_id(ugen.id) == uid:
+                inputs.remove(uid)
 
     def ins(rest ugens):
         for ugen in ugens:
+            inputs[arco_ugen_id(ugen.id)] = ugen
             o2_send_cmd("/arco/sumb/ins", 0, "UU", id, ugen.id)
         this
 
     def rem(rest ugens):
         for ugen in ugens:
-            o2_send_cmd("/arco/sumb/rem", 0, "UU", id, ugen.id)
+            var name = arco_ugen_id(ugen.id)
+            if inputs.has_key(name):
+                inputs.remove(name)
+                o2_send_cmd("/arco/sumb/rem", 0, "UU", id, ugen.id)
         this
 
     def swap(ugen, replacement):
-        o2_send_cmd("/arco/sumb/swap", 0, "UUU", id, ugen.id, replacement.id)
+        var name = arco_ugen_id(ugen.id)
+        if inputs.has_key(name):
+            // locally, act as if ugen is removed and replacement is inserted
+            inputs.remove(name)
+            inputs[arco_ugen_id(replacement.id)] = replacement
+            o2_send_cmd("/arco/sumb/swap", 0, "UUU",
+                        id, ugen.id, replacement.id)
         this
 
 

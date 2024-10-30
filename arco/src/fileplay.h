@@ -113,6 +113,7 @@ public:
             started = true;
         } else if (!play && !stopped) { // you can stop before play starts!
             stopped = true;
+            send_action_id(ACTION_END);
         } else {
             return;
         }
@@ -126,10 +127,11 @@ public:
     void ready(bool is_ready) {
         if (!is_ready && !started) {
             arco_warn("Fileplay - failure to start reading from file");
-            send_action_id(-1);  // send error code
+            send_action_id(ACTION_ERROR);
         }
         if (!is_ready) {  // there is nothing more to read
             stopped = true;
+            send_action_id(ACTION_END);
             if (refcount == 0) {
                 printf("Fileplay::ready deleting %p\n", this);
                 delete this;
@@ -141,7 +143,7 @@ public:
     void set_action_id(int id) {
         action_id = id;
         if (stopped) {
-            send_action_id(started ? 0 : -1);
+            send_action_id(ACTION_EXCEPT);
         }
     }
 
@@ -178,9 +180,6 @@ public:
         Audioblock *block = blocks[block_on_deck];
         if (!started || stopped || !block) {
             block_zero_n(out_samps, chans);
-            if (stopped) {
-                send_action_id();
-            }
             return;
         }
         int i = 0;  // how many frames we have computed so far

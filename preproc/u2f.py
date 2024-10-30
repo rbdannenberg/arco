@@ -152,7 +152,7 @@ def main():
                     print("        return nil", file=srpf)
                 elif p.abtype == 'b':
                     print("    if not isnumber(" + p.name + ") and",
-                          p.name + ".rate != 'b':", file=srpf)
+                          p.name + ".rate == 'a':", file=srpf)
                     print('        print "ERROR:', "'" + p.name + \
                           "' input to Ugen '" + c + "'",
                           'must be block rate"', file=srpf)
@@ -228,7 +228,7 @@ def expand_signature(signature, params, impl):
             # the sum of channel counts must equal the length of params
             plist = ""
             i = 0
-            for param in signature.params:
+            for param in params:
                 print("param", param.abtype, "param.chans", param.chans)
                 for j in range(param.chans):
                     if i >= len(impl.param_names):
@@ -236,6 +236,7 @@ def expand_signature(signature, params, impl):
                               "    compared to FAUST process() definition.\n"
                               "    Arco signature specifies", i)
                         return
+                    print("******************", param.abtype, impl.param_names[i])
                     if param.abtype == 'a':
                         plist = plist + ", " + impl.param_names[i]
                     else:  # 'b' or 'c'

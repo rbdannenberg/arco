@@ -125,7 +125,7 @@ public:
         }
         if (ready_flag) {
             isready = true;
-            send_action_id();  // successful open
+            send_action_id(ACTION_EVENT);  // successful open
             if (recording) {  // do we need to send block(s)?
                 while (num_ready_to_send > 0) {
                     send_a_block();
@@ -133,7 +133,7 @@ public:
             }
         } else {
             arco_warn("Filerec - failure to open file");
-            send_action_id(-1);
+            send_action_id(ACTION_ERROR);
             finished = true;
         }
     }

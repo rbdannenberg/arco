@@ -12,10 +12,10 @@ def lowpass(input, cutoff, optional chans):
          'cutoff', cutoff)
 
 def lowpassb(input, cutoff, optional chans):
-    if not isnumber(input) and input.rate != 'b':
+    if not isnumber(input) and input.rate == 'a':
         print "ERROR: 'input' input to Ugen 'lowpassb' must be block rate"
         return nil
-    if not isnumber(cutoff) and cutoff.rate != 'b':
+    if not isnumber(cutoff) and cutoff.rate == 'a':
         print "ERROR: 'cutoff' input to Ugen 'lowpassb' must be block rate"
         return nil
     if not chans:

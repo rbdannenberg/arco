@@ -1,0 +1,76 @@
+# envelope.srp - the Envelope class inherited by pwl, pwe, pwlb, pweb, etc.
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+class Envelope (Ugen):
+    var address  // Arco address for updates
+    var sample_rate  // either AR or BR
+
+    def init(classname, addr, rate, points)
+        address = addr
+        super.init(create_ugen_id(), classname, 1, rate, "", omit_chans = true)
+        sample_rate = (AR if rate == 'a' else BR)
+        set_point_array(points)
+
+    def set_points(rest points):
+        set_point_array(points)
+        this
+
+    def set_point_array(points):
+    # define the shape of the envelope with an array of floats, 
+    # d0 y0 d1 y1 ... where di is duration (secs) and yi is amplitude.
+    # If the length is odd, a final yn = 0.0 is appended.
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        # track cummulative time and samples to avoid accumulated time error
+        var time = 0
+        var count = 0
+        for i = 0 to len(points) by 2:  // process points pair-wise
+            time = time + points[i]
+	    // Avoid accumulated rounding error from converting durations to
+	    // block counts as follows:
+	    //   count is the block count where this segment begins
+	    //   time * BR is the exact fractional block count where it ends
+	    //   samps is therefore the duration we want with compensation
+	    //   for any accumulated rounding error.
+            var samps = max(1, round(time * sample_rate - count))
+            count = count + samps
+            o2_add_float(samps)  // the number of samples to ramp
+            if i + 1 < len(points):  // allowed to omit final zero amplitude
+                o2_add_float(points[i + 1])  // the destination amplitude
+        o2_send_finish(0, address + "env", true)
+        this
+
+    def start():
+        o2_send_cmd(address + "start", 0, "U", id)
+        this
+
+    def stop():
+        o2_send_cmd(address + "stop", 0, "U", id)
+        this
+
+    def decay(dur):
+    # end envelope with decay to zero over given duration (seconds)
+        o2_send_cmd(address + "decay", 0, "Uf", id, dur * sample_rate)
+        this
+
+    // only handled by pwe and pweb, but not worth another 
+    // level of class hierarchy to split pwe, pweb from pwl, pwlb:
+    def linear_attack(optional lin = true):
+        o2_send_cmd(address + "linatk", 0, "UB", id, lin)
+        this
+
+    def set(y):
+    # set current value to y
+        o2_send_cmd(address + "set", 0, "Uf", id, y)
+        this
+
+def envelope(env, init, start, optional lin):
+    if init:
+        env.set(init)
+    if start:
+        env.start()
+    if lin:
+        env.linear_attack(lin)
+    return env

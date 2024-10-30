@@ -12,6 +12,18 @@ require "sched"
 require "o2util"
 require "utils"
 require "prefs"
+// require "instr" -- included below after Ugen is defined
+
+ACTION_ALL = 63     // all actions except FREE
+ACTION_TERM = 1     // this flag is always present to indicate whether ugen has
+                    //     terminated, controlled by CAN_TERMINATE setting.
+ACTION_ERROR = 2
+ACTION_EXCEPT = 4
+ACTION_EVENT = 8    // normal event such as envelope running out of breakpoints
+ACTION_END = 16   // final event such as reaching envelope breakpoint == 0
+ACTION_REM = 32     // uid was removed from mixer or sum
+ACTION_FREE = 64
+ACTION_END_OR_TERM = ACTION_END | ACTION_TERM
 
 FADE_LINEAR = 0
 FADE_EXPONENTIAL = 1
@@ -158,6 +170,7 @@ next_action_id = 1
 action_dict = {}
 
 max_ugen_id_used = 0
+ugens_created = 0
 
 def create_ugen_id():
     var uid = arco_ugen_new()
@@ -166,51 +179,95 @@ def create_ugen_id():
     //     breakpoint()
     if arco_ugen_id(uid) > max_ugen_id_used:
         max_ugen_id_used = arco_ugen_id(uid)
+    ugens_created = ugens_created + 1
     uid
 
 
-def create_action(ugen, object, method, rest parameters):
-# Assign an object, method and parameters to be invoked when
-# a unit generator (ugen) sends an action message.
-// ugen.action_id is an integer key. Arco sends /actl/act with
-//     the key when the Ugen finishes.
-// action_dict[key] is a list of actions of the form
-//     [ugen, object, method, params], where ugen is the holder of the
-//     action_id, which equals key, and the remaining [object, method, params]
-//     is the method or function to invoke to perform the action.
+class Action_list:
+    var action_mask   // integer bit set
+    var ugen_actions  // list of Ugen_action
+
+    def init(am, ua):
+        action_mask = am
+        ugen_actions = ua
+
+
+class Ugen_action:
+    var target
+    var method
+    var parameters
+
+    def init(targ, meth, par):
+        target = targ
+        method = meth
+        parameters = par
+
+    def to_str():
+        if type(target) == 'Weakref':
+            target = "wkrf(" + repr(wkrf_deref(target)) + ")"
+        else:
+            target = repr(target)
+        "<Ugen_action " + target + " " + repr(method) + ">"
+
+
+def register_action(ugen, action_mask, target, method, rest parameters):
+# Assign an target, method and parameters to be invoked when
+# a unit generator (ugen) sends action messages. target is
+# held as weak references so that registering an action does not prevent
+# garbage collection. When GC frees an object, the Arco object sends
+# ACTION_FREE and the entry for the ugen in action_dict is freed.
+// ugen.action_id is an integer key. Arco sends /actl/act with the
+//     key and a status to signal actions. When the Ugen is freed,
+//     the status will have the ACTION_FREE bit set.
+// action_dict[key] is a list of actions (Ugen_action)
 // See also atend(), which conveniently invokes 'mute' or 'finish' methods
 //     of a unit generator when the ugen's behavior ends.
     var action_list
-    var action = [ugen, object, method, parameters]
-    if ugen.action_id:
-        action_list = action_dict.get(ugen.action_id)
+    var action = Ugen_action(wkrf_create(target), method, parameters)
+    var action_id = ugen.action_id
+    var send_action
+    if action_id:
+        action_list = action_dict.get(action_id)
         if not action_list:
             print "ERROR: create_action - action_id not found in action_dict",
-            print ugen.action_id
-        action_list.append(action)
+            print action_id
+        if action_mask != (action_mask & action_list.action_mask):
+            // action_mask has some new actions we need: OR them and resend
+            action_list.action_mask = action_list.action_mask | action_mask
+            send_action = true
+        action_list.ugen_actions.append(action)
     else:
-        action_dict[next_action_id] = [action]
+        action_list = Action_list(action_mask, [action])
+        action_dict[next_action_id] = action_list
         ugen.action_id = next_action_id
-        o2_send_cmd("/arco/act", 0, "Ui", ugen.id, next_action_id)
         next_action_id = next_action_id + 1
-    print "create_action for ugen", ugen.id, "action", ugen.action_id
+        send_action = true
+    if send_action:
+        o2_send_cmd("/arco/act", 0, "Uii",
+                    ugen, ugen.action_id, action_list.action_mask)
 
 
-def actl_act(timestamp, address, types, rest parameters):
+def actl_act(timestamp, address, types, key, status, uid):
 # This is an internal handler for actions, which are "callbacks" to notify
 # the client of some event (like ending an envelope) in the server.
-    display "actl_act", types, parameters
-    var key = parameters[0]
     var action_list = action_dict.get(key)
     if not action_list:
         print "ERROR: actl_act - action_id not found in action_dict", key
         return
-    var ugen = action_list[0][0]  // all actions start with the same ugen
-    ugen.action_id = nil     // clear the action so we can install a new one
-    for action in action_list:
-        action[3].insert(0, parameters[1])  // make status be first parameter
-        general_apply(action[1], action[2], action[3])
-    action_dict.remove(key)  // allow garbage collection
+    var i = 0
+    while i < len(action_list.ugen_actions):
+        var action = action_list.ugen_actions[i]
+        var target = wkrf_deref(action.target)
+        // while loop makes progress either by sending message to ugen_actions[i]
+        // and incrementing i or by removing ugen_actions[i] which decrements length
+        if target:
+            var method = action.method
+            send(target, method, status, uid, action.parameters)
+            i = i + 1
+        else:
+            action_list.ugen_actions.uninsert(i)
+    if (status & ACTION_FREE) > 0:
+        action_dict.remove(key)  // ugen is gone - no more status messages
 
 
 # call default_window.method.add_target_method(nil, 'arco_main_win_handler')
@@ -466,7 +523,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     o2_service_new("actl")
     print "service actl created"
     o2_method_new("/actl/devinf", "s", 'actl_devinf', t)
-    o2_method_new("/actl/act", "ii", 'actl_act', t)
+    o2_method_new("/actl/act", "iii", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
     o2_method_new("/actl/reset", "", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
@@ -758,7 +815,7 @@ class Ugen:
         this
 
 
-    def mute(optional status):
+    def mute(optional status, source, parameters):
     # disconnect this Ugen from audio output
     # since "atend" actions always have a status, we accept a status
     # but ignore it.
@@ -859,12 +916,11 @@ class Ugen:
         this
 
 
-    def atend(action, optional arg):
-    # When this unit generator ends, action will be sent to this or, if
-    # provided, to arg, which in either case must handle /arco/act
-    # which is currently handled by Pwlb and Fileplay classes.
+    def atend(action, optional arg, mask = ACTION_END_OR_TERM):
+    # When this unit generator ends or terminates, action will be sent
+    # to this or, if provided, to arg
         if action == MUTE or action == FINISH:
-            create_action(this, arg if arg else this, action)
+            register_action(this, mask, arg or this, action)
         else:
             print "ERROR: Ugen atend - unknown action", repr(action)
 
@@ -877,91 +933,7 @@ class Ugen:
         this
 
 
-instr_stack = []
-def instr_begin():
-    instr_stack.append({})
-
-# After instr_begin(), you can define setable parameters in the Instrument
-# you are building by calling param. A "setable parameter" associates a
-# name to a particular ugen input as if the Instrument itself has that input.
-# E.g., if you use an oscillator in the construction of an Instrument and 
-# want the Instrument to have a setable parameter named 'myfreq' that
-# controls the oscillator frequency, then between instr_begin() and 
-# Instrument's init method, call param(oscillator, 'freq', 'myfreq').
-# Then you can call instrument.set('myfreq', 440).
-#
-# Important: the setable parameter connects to a specific unit generator.
-# If that unit generator is replaced in the Instrument graph, then setting
-# the parameter may not have any effect. The assumption is that the
-# Instrument graph is fixed.
-#
-# Parameters:
-#     ugen - the Ugen or Instrument to be controlled
-#     input - the symbol name of the ugen input to be controlled
-#     name - the setable parameter name (defaults to input)
-#
-def param(ugen, input, optional name):
-    if not name: name = input
-    var context = instr_stack.last()
-    var ugen_input = context.get(name)
-    if ugen_input:
-        print "ERROR: in param,", name, "is already defined."
-        return
-    // if ugen, input are abstractions, drill down to the actual ugen
-    while issubclass(ugen, Instrument):
-        ugen_input = ugen.parameter_bindings[input]
-        ugen = ugen_input[0]
-        input = ugen_input[1]
-    context[name] = [ugen, input]
-
-
-# After instr_begin(), you can define a named "member" of the Instrument
-# You can access members by name, usually to send them an update, e.g.
-#    member(pwl(...), 'env')
-#    myinstr = Instrument(...)
-#    myinstr.get('env').start()
-# The ugen parameter can be an Instrument, in which case the "member"
-# is the instrument object, not the Ugen serving as the Instrument output.
-#
-def member(ugen, name):
-    var context = instr_stack.last()
-    context[name] = ugen
-    ugen
-
-
-class Instrument (Ugen):
-    var parameter_bindings
-    var output
-
-
-    def init(name, ugen):
-        super.init(nil, name, ugen.chans, ugen.rate, "",
-                   no_msg = true)
-        output = ugen
-        id = output.id
-        assert(this.id == id)
-
-        // TODO: delete this debugging stuff...
-        if arco_ugen_id(id) == 13:
-            print "In Instrument, id = 13"
-
-        if len(instr_stack) == 0:
-            error("instr_stack is empty. Maybe you forgot to call " +
-                  "instr_begin() at the beginning of your Instrument " +
-                  "subclass's init() function")
-        parameter_bindings = instr_stack.unappend()
-        // display "Instrument.init", name, parameter_bindings
-
-
-    def get(input):
-        parameter_bindings.get(input)
-
-
-    def set(input, value, optional chan = 0):
-        var ugen_input = parameter_bindings[input]
-        var ugen = ugen_input[0]
-        input = ugen_input[1]
-        ugen.set(input, value, chan)
+require "instr"
 
 
 def zero(): zero_ugen

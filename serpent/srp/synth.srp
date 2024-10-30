@@ -1,0 +1,256 @@
+# synth3.srp -- "synthesizer" manager for playing notes
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+# for MIDI-like processing, there is a problem with multiple notes
+# playing the same pitch. The preferred method is to give each note a
+# unique id so that noteoff's can name the note to be ended. Without
+# id's, we allow either retrigger or end the sounding note and play a
+# new one.
+#
+# Synth should be subclassed to support/describe a particular instrument.
+# Instrument instances managed by the Synth subclass will themselves be
+# instances of a subclass of Synth.
+#
+# To make a Synth, you should instantiate the subclass; always using
+#     synth_create(INSTR_SPEC, customization)
+# where INSTR_SPEC is a dictionary that includes 'synth': Synth_subclass,
+# where Synth_subclass is the manager for a collection of instruments.
+# customization (optional) is a dictionary of parameters to override
+# those in INSTR_SPEC.
+#
+# The Synth_subclass calls super.init(instr_spec, customization, params),
+# where params is an array of parameter names (symbols) supported by
+# Synth_subclass.
+#
+# You normally rely on Synth_subclass to make an Instrument by just
+# calling it's noteon() method. Instruments are allocated and recycled
+# by Synth as needed.
+
+def synth_create(instr_spec, keyword chans, instr_chans,
+                 dictionary customization):
+    // the chans keyword controls the synthesizer (mono/stereo), so
+    // if you want to customize instrument mono/stereo, use the keyword
+    // instr_chans. This is passed to Synth via customization as 'chans':
+    customization['chans'] = instr_chans
+    funcall(instr_spec['synth'], instr_spec, customization, chans)
+
+
+class Synth (Instrument):
+    var instr_spec  // the current configuration and parameter state
+    var param_names  // array of parameter names
+    var notes  // dictionary of sounding notes
+        // notes with symbolic ids use the mapping id->Instr
+        // notes with pitch ids use rounded(pitch)->Instr
+    var free_notes // array of freed notes
+    var finishing_notes // array of notes after noteoff, but still sounding
+    var prev_mixer_id_number  // integer for generating a new note name
+    var has_retrigger  // subclass can set to true if retrigger() is provided
+    
+    def init(instr_spec_, customization, chans, param_names_):
+        instr_spec = {}
+        param_names = param_names_
+        // 'chans' is special and is not allowed in param_names
+        var chan_index = param_names.index('chans')
+        if chan_index >= 0:
+            param_names.uninsert(chan_index)
+        notes = {}
+        free_notes = []
+        finishing_notes = []
+        prev_mixer_id_number = 0
+        // subclass should set has_retrigger
+        // build instr_spec from customization and instr_spec_. If neither
+        // has a value for param, do not add param to instr_spec.
+        for param in param_names:
+            var value = customization.get(param)
+            if not value:
+                value = instr_spec_.get(param)
+            if value:
+                instr_spec[param] = value
+
+        instr_begin()
+
+        // tricky logic: search for chans in chans, instr_spec, then 1
+        //               search for instr_chans in instr_spec, then chans
+        var instr_chans = instr_spec_.get('chans')
+        chans = chans or instr_chans or 1
+        instr_chans = instr_chans or chans
+        instr_spec['chans'] = instr_chans  // it is always specified
+
+        output = mix(chans)
+        super.init("Synth", output)
+        
+
+    def get_mixer_id():
+        prev_mixer_id_number = prev_mixer_id_number + 1
+        return mix_name(prev_mixer_id_number)
+
+
+    def noteon(pitch, vel, optional dur, id, optional pdict,
+               dictionary params):
+        // there are 2 id's: Our local dict of notes uses user_id, which
+        // could be the pitch or an id provided in noteon. The user_id is
+        // the name used by the "user" sending noteon, noteoff, and updates.
+        // We also need a pitch-independent symbol for the mixer id. This
+        // is mixer_id, which is always created and stored in the instrument
+        // instance. It is "hidden" from users.
+        
+        if pdict:  // sort out two ways of acquiring note-specific parameters:
+            if isdict(pdict):
+                if len(params) > 0:
+                    print "WARNING: in Synth.noteon(), a parameter dictionary"
+                    print "    was passed AND keyword parameters were passed."
+                    print "    Keyword parameters are ignored if you pass in"
+                    print "    an optional parameter dictionary."
+            else:
+                pdict = params
+        else:
+            print "WARNING: in Synth.noteon(), a non-dictionary parameter"
+            print "    was passed as a Note parameter dictionary:", pdict
+            print "    This parameter will be ignored."
+            
+        // does note exist? first find note_id, if any
+        var user_id = id, value
+        if not user_id:
+            user_id = round(pitch)
+        // does note exist?
+        var instr = notes.get(user_id)
+        if instr:
+            if has_retrigger:  // retrigger on same pitch?
+                // instr keeps the same user_id and mixer_id
+                instr.retrigger(pitch, vel, dur, pdict)
+                return instr
+            noteoff(user_id)  // otherwise, need to start new note
+
+        // start a new instr; do we have a free instance to reuse?
+        if len(free_notes) > 0:
+            instr = free_notes.unappend()
+            instr.user_id = user_id  // (instr.mixer_id already assigned)
+            for param in param_names:
+                value = pdict.get(param) or instr_spec.get(param)
+                var pd = instr.parameter_bindings.get(param)
+                // if parameter is setable, there will be a Param_desc in
+                // parameter_bindings
+                if value and pd and (value != pd.value):
+                    instr.set(param, value, true)
+            instr.pitch = pitch
+            instr.vel = vel
+            instr.set_pitch_vel()
+        else:  // no free instruments, need a new instr instance
+            // we will alter config_values to include note-specific
+            // parameters (consts), then make an Instr:
+            var note_spec = instr_spec.copy()
+            for param in param_names:
+                var p = pdict.get(param)
+                if p:
+                    note_spec[param] = p
+            instr = instr_create(note_spec, pitch, vel)
+            instr.pitch = pitch
+            instr.vel = vel
+        instr.user_id = user_id
+
+        var gain = pdict.get('gain') or instr_spec.get('gain', 1)
+        notes[user_id] = instr
+        if chans > 1 and instr_spec['chans'] == 1:
+            var pan = pdict.get('pan') or instr_spec.get('pan', 0.5)
+            gain = pan_45(pan / 127, gain)
+
+        var gain_const = instr.gain  // get a const to serve as gain
+        if not gain_const:  // nothing to reuse
+            gain_const = const(gain)
+            instr.gain = gain_const
+
+        // set the gain_const to value(s) from gain
+        if isarray(gain):
+            gain_const.set_chan(0, gain[0])
+            gain_const.set_chan(1, gain[1])
+        else:
+            gain_const.set(gain)
+
+        output.ins(instr.mixer_id, instr, gain_const)
+        if dur:
+            sched_select(rtsched)
+            sched_cause(dur, this, 'noteoff', user_id)
+
+
+    def noteoff(id):
+    # id is either pitch (from user) or note_id (from noteon)
+    # or mixer_id (from user)
+        if isreal(id):  // from user
+            id = round(id)
+            var mixer_id = notes.get(id, 'no_keynum_mapping')
+            if issymbol(mixer_id):  // there's a keynum->mixer_id mapping
+                notes.remove(id)
+                id = mixer_id  // as if original noteon used mixer_id
+        if not notes.has_key(id):
+            return no_id_found(id, "noteoff")
+        var note = notes[id]
+        // TODO: DEBUGGING ON NEXT LINE TO BE REMOVED:
+        var instr_id = note.id
+        note.noteoff()
+        notes.remove(id)
+        finishing_notes.append(note)
+
+
+    def play_score(score):
+        score.play(this)
+
+
+    def play_note(note):
+        note.play(this)
+
+
+    def no_id_found(id, detail):
+        print "WARNING: no note in Synth with id", id, "in", detail
+        
+
+    def is_finished(note):
+    # note is finished and terminated, removed from the mixer. Remove
+    # from the finishing_notes list and move to the free_notes list.
+        var i = finishing_notes.index(note)
+        if i >= 0:
+            finishing_notes.uninsert(i)
+        else:
+            if notes.get(note.user_id):
+                print "Synth.is_finished found note still on:", note
+                notes.remove(note.user_id)
+        assert(note not in free_notes)
+        free_notes.append(note)
+
+
+
+    def update_note(id, param, value):
+        if param not in param_names:
+            return not_setable(param)
+        if isreal(id):
+            id = round(id)
+            var mixer_id = notes.get(id, 'no_keynum_mapping')
+            if not issymbol(mixer_id):
+                return no_id_found(id, "update_note")
+            id = mixer_id
+        instr = notes.get(id)
+        if not instr:
+            return no_id_found(id, "update_note")
+        instr.note_spec[param] = value
+        send(instr, 'set', param, value)
+
+
+    def not_setable(param):
+        print "Synth.update or .update_note called, but", param,
+        print     "is not a setable parameter."
+
+    def update(param, value):
+        if param not in param_names:
+            return not_setable(param)
+        instr_spec[param] = value
+        for instr in notes.values():
+            var pd = instr.parameter_bindings[param]
+            if pd:
+                pd[0] = value;
+                for elem at i in pd:
+                    if i > 0:
+                        elem.set(instr, value)
+                instr.note_spec[param] = value
+            else:
+                return not_setable(param)

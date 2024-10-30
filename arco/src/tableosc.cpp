@@ -11,7 +11,7 @@
 const char *Tableosc_name = "Tableosc";
 
 /* O2SM INTERFACE: /arco/tableosc/new 
-       int32 id, int32 chans, int32 freq, int32 amp;
+       int32 id, int32 chans, int32 freq, int32 amp, float phase;
  */
 void arco_tableosc_new(O2SM_HANDLER_ARGS)
 {
@@ -20,11 +20,12 @@ void arco_tableosc_new(O2SM_HANDLER_ARGS)
     int32_t chans = argv[1]->i;
     int32_t freq = argv[2]->i;
     int32_t amp = argv[3]->i;
+    int32_t phase = argv[3]->f;
     // end unpack message
 
     ANY_UGEN_FROM_ID(freq_ugen, freq, "arco_tableosc_new");
     ANY_UGEN_FROM_ID(amp_ugen, amp, "arco_tableosc_new");
-    new Tableosc(id, chans, freq_ugen, amp_ugen);
+    new Tableosc(id, chans, freq_ugen, amp_ugen, phase);
 }
     
 
@@ -169,7 +170,7 @@ void arco_tableosc_createttd(O2SM_HANDLER_ARGS)
 static void tableosc_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/tableosc/new", "iiii", arco_tableosc_new, NULL,
+    o2sm_method_new("/arco/tableosc/new", "iiiif", arco_tableosc_new, NULL,
                     true, true);
     o2sm_method_new("/arco/tableosc/repl_freq", "ii",
                     arco_tableosc_repl_freq, NULL, true, true);

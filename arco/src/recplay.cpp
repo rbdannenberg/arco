@@ -276,9 +276,10 @@ void Recplay::real_run()
             block_zero_n(out_samps, chans);
             playing = false;
             arco_warn("Recplay sudden stop, out of samples"); print();
-            send_action_id();
             if (flags & CAN_TERMINATE) {
-                terminate();
+                terminate(ACTION_ERROR | ACTION_END);
+            } else {
+                send_action_id(ACTION_ERROR | ACTION_END);
             }
             return;
         }
@@ -314,9 +315,10 @@ void Recplay::real_run()
                     if (loop) {
                         start(start_time);
                     } else {
-                        send_action_id();
                         if (flags & CAN_TERMINATE) {
-                            terminate();
+                            terminate(ACTION_END);
+                        } else {
+                            send_action_id(ACTION_END);
                         }
                     }
                 }
@@ -336,8 +338,11 @@ void Recplay::real_run()
                 play_index = std::ceil(play_phase);  // round up
             }                
         }
-    } else { // !playing, so just output zeros
+    } else { // !playing, so just output zeros and check for termination
         block_zero_n(out_samps, chans);
+        if (flags & CAN_TERMINATE) {
+            terminate(ACTION_END);
+        }  // else we already did send_action_id
     }
 }
 
@@ -421,7 +426,7 @@ void Recplay::start(double start_time_)
     playing = true;
     return;
 no_play:
-    send_action_id();
+    send_action_id(ACTION_EXCEPT);
 }
 
 

@@ -1,0 +1,29 @@
+# stdistr.srp -- stereo distribution
+#
+# Roger B. Dannenberg
+# June 2023
+
+class Stdistr (Ugen):
+    def init(n, width):
+        super.init(create_ugen_id(), "Stdistr", 2, 'a', "if",
+	           'n', n, 'width', width, omit_chans = true)
+
+    def set_gain(gain)
+        o2_send_cmd("/arco/stdistr/gain", 0, "Uf", id, gain)
+        this
+
+    def set_width(width)
+        o2_send_cmd("/arco/stdistr/width", 0, "Uf", id, width)
+        this
+
+    def ins(index, ugen):
+        o2_send_cmd("/arco/stdistr/ins", 0, "UiU", id, index, ugen)
+        this
+        
+    def rem(index):
+        o2_send_cmd("/arco/stdistr/rem", 0, "Ui", id, index)
+        this
+        
+
+def stdistr(n, width):
+    Stdistr(n, width)  # stdistr as a function

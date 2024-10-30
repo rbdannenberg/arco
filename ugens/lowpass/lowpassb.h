@@ -123,7 +123,7 @@ public:
         cutoff_samps = cutoff->run(current_block);  // update input
         if (((input->flags) & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
-            terminate();
+            terminate(ACTION_TERM);
         }
         Lowpassb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {

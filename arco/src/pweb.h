@@ -37,16 +37,25 @@ public:
     const char *classname() { return Pweb_name; }
 
     void real_run() {
-        if (seg_togo == 0) { // set up next segment
+        while (seg_togo == 0) { // set up next segment
             current = final_value;  // make output value exact
             if (next_point_index >= points.size()) {
                 stop();
-                send_action_id();
                 if (current == bias && (flags & CAN_TERMINATE)) {
-                    terminate();
+                    if (terminate(ACTION_EVENT | ACTION_END)) {
+                        seg_togo = INT_MAX;
+                    }
+                } else {
+                    int status = ACTION_EVENT;
+                    if (final_value == bias) {
+                        status |= ACTION_END;
+                    }
+                    send_action_id(status);
                 }
+                break;
             } else {
-                linear_mode &= (next_point_index == 0);  // clear after 1st segment
+                // clear after 1st segment or any segment not starting from 0:
+                linear_mode &= (next_point_index == 0) & (current == bias);
                 seg_togo = (int) points[next_point_index++];
                 final_value = points[next_point_index++] + bias;
                 if (linear_mode) {

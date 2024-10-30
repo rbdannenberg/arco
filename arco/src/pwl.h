@@ -45,9 +45,14 @@ public:
                 current = final_value;  // make output value exact
                 if (next_point_index >= points.size()) {
                     stop();
-                    send_action_id();
                     if (current == 0 && (flags & CAN_TERMINATE)) {
-                        terminate();
+                        flags |= TERMINATING;
+                    } else {
+                        int status = ACTION_EVENT;
+                        if (final_value == 0) {
+                            status |= ACTION_END;
+                        }
+                        send_action_id(status);
                     }
                     seg_incr = 0.0f;
                     n = togo;  // finish the block by filling with current
@@ -65,6 +70,9 @@ public:
             togo -= n;
             seg_togo -= n;
         } while (togo > 0);
+        if (flags & TERMINATING) {
+            terminate(ACTION_EVENT | ACTION_TERM);
+        }
     }
     
     void start() {

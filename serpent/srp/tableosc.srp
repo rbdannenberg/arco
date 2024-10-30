@@ -6,11 +6,11 @@
 class Wavetables (Ugen):
     var address_prefix  // e.g. "/arco/tableosc/"
 
-    def init(freq, amp, chans, classname):
+    def init(freq, amp, phase, chans, classname, rate):
         if not chans:
             chans = max_chans(max_chans(1, freq), amp)
-        super.init(create_ugen_id(), classname, chans, A_RATE,
-                   "UU", 'freq', freq, 'amp', amp)
+        super.init(create_ugen_id(), classname, chans, rate,
+                   "UUf", 'freq', freq, 'amp', amp, 'phase', phase)
         address_prefix = "/arco/" + tolower(classname) + "/"
 
 
@@ -49,20 +49,20 @@ class Wavetables (Ugen):
 
 
 class Tableosc (Wavetables):
-    def init(freq, amp, chans):
-        super.init(freq, amp, chans, "Tableosc")
+    def init(freq, amp, phase, chans):
+        super.init(freq, amp, phase, chans, "Tableosc", A_RATE)
     
 
 class Tableoscb (Wavetables):
-    def init(freq, amp, chans):
-        super.init(freq, amp, chans, "Tableoscb")
+    def init(freq, amp, phase, chans):
+        super.init(freq, amp, phase, chans, "Tableoscb", B_RATE)
 
 
-def tableosc(freq, amp, optional chans):
-    Tableosc(freq, amp, chans)
+def tableosc(freq, amp, optional chans, keyword phase = 0):
+    Tableosc(freq, amp, phase, chans)
 
 
-def tableoscb(freq, amp, optional chans):
+def tableoscb(freq, amp, optional chans, keyword phase = 0):
     if not isnumber(freq) and freq.rate != 'b':
         print "ERROR: 'freq' input to Ugen 'tableoscb' must be block rate"
         return nil
@@ -71,4 +71,4 @@ def tableoscb(freq, amp, optional chans):
         return nil
     if not chans:
         chans = max_chans(max_chans(1, freq), amp)
-    Tableoscb(freq, amp, chans)
+    Tableoscb(freq, amp, phase, chans)

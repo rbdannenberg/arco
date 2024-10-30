@@ -1,0 +1,329 @@
+# supersaw4.srp -- Instr_design subclass for Supersaw instruments
+#
+# Roger B. Dannenberg
+# Oct 2024
+
+# DEPENDENCIES - the internal values and the parameters they depend on
+#
+# gain_to_normalize:
+#     computed by: calc_tableosc_amps
+#     depends on:  rolloff, n, animate
+# lowpass cutoff: cutoff
+# detune_hz x2: detune
+# pitch_const: pitch
+# vib_depth x2: lfodepth
+# vib freq: lfofreq
+# shared_hz x1: pitch
+# animate_detune x1: animate
+# anirate_const x: anirate
+# comp[i] amp:
+#     computed by: calc_tableosc_amps
+#     depends on:  rolloff, n, animate, gain_to_normalize
+# comp[i] table_index: pitch, antialias
+# mixer width: width
+#
+# REVERSING DEPENDENCIES, these are the parameters and what to update
+# when they change:
+#
+# set_rolloff   -> calc_tableosc_amps
+# set_animate   -> calc_tableosc_amps, animate_detune x1
+# set_cutoff    -> lowpass cutoff
+# set_detune    -> detune_hz x2
+# set_pitch     -> pitch_const x, shared_hz x1, comp[i] table_index
+# set_lfodepth  -> vib_depth x2
+# set_lfofreq   -> vib freq
+# set_anirate   -> anirate_const x
+# set_antialias -> comp[i] table_index
+# set_width     -> mixer width
+
+require "velocity"
+
+sawtooth_waveforms = nil
+
+class Sawtooth_waveforms:
+# manager for a tableosc with precomputed sawtooth waveforms
+# there should be only one instance
+    var tables   // a tableosc ugen holding shared waveforms
+    var created  // array of index or nil - does waveform exist and
+                 // at what index?
+    var next_index // where to put next waveform
+
+    def init():
+        created = array(36)  // cached waveforms for full 2048-point
+                             // sawtooth at 0, then steps 4, 8, ... 136
+        tables = tableosc(1, 1)
+        next_index = 0
+        assert(not sawtooth_waveforms)  // this is a singleton class
+        sawtooth_waveforms = this
+    
+    def get_index(step, optional antialias = t):
+        var i, f0, n, tlen, ampspec
+        if antialias:
+            i = max(min(int(step / 4), len(created) - 1), 1)
+        else:
+            i = 0
+        if created[i]:
+            return created[i]
+        created[i] = next_index
+
+        if antialias:
+            f0 = step_to_hz(step)
+            n = max(1, int(AR  * 2 / (5 * f0)))
+            // note that n * f0 is about (sample-rate / 2) * 4 / 5
+            // table len should be 8x oversampled, so 16 * n
+            tlen = max(16 * n, 512)
+            ampspec = [1 / i for i = 1 to n + 1]
+            tables.create_tas(next_index, tlen, ampspec)
+        else:  // for the aliasing version, just make a 256-point
+               // table. It will be an exact sawtooth due to linear
+               // interpolation except for the last 1/256 of the period
+               // where linear interpolation will make it ramp down.
+            ampspec = [i / 256 for i = 0 to 256]
+            tables.create_ttd(next_index, ampspec)
+        next_index = next_index + 1
+        return next_index - 1
+
+
+class Supersaw_instr (Instrument):
+    // copies of values in note_spec:
+    var n
+    var rolloff
+    var animate
+    var decay
+    var lowpass
+
+    // derived from rolloff and animate
+    var gain_to_normalize  // 1 / sqrt(power), based on rolloff and animate
+
+    // needed to cause calc_tableosc_amps to run:
+    var recalc_tableosc_amps  // redo power computation
+    
+    var pitch_const // pitch which is used by all components
+    var vib  // the lfo
+    var vib_depth  // a ugen_hzdiff
+    var shared_hz  // addb ugen providing basic frequency (with vib)
+    var detune_hz  // a ugen_hzdiff for full detuning range in hz
+    var initial_detune // detune_hz * animate as a real for initialization
+    var animate_detune // detune_hz * animate for rlib ugen scaling
+    var animate_const  // a const ugen with animate parameter
+    var anirate_const  // a const ugen with animation rate
+    var rndphase  // the rndphase parameter used by all components
+    var antialias  // the current antialias value
+
+    var mixer
+    var env
+    var components  // array of table_osc ugens
+
+    def init(synth, note_spec, pitch, vel):
+        instr_begin()
+        if not sawtooth_waveforms:
+            Sawtooth_waveforms()  // need singleton
+        var chans = note_spec['chans']
+        animate = param_method('animate', note_spec.get('animate', 0),
+                               'set_animate', 'clip', 0, 1)
+        animate_const = const(animate)
+        antialias = param_method('antialias', note_spec.get('antialias', 1),
+                                 'set_antialias', 'clip', 0, 1)
+        n = max(1, round(note_spec.get('n', 8)))
+        rndphase = note_spec.get('rndphase', 1)
+        rolloff = param_method('rolloff', note_spec.get('rolloff', 0),
+                               'set_rolloff', 'clip', 0, 1)
+        var table_index = sawtooth_waveforms.get_index(pitch, antialias != 0)
+        if chans == 1:
+            mixer = sum()
+            // note that 'width' is not declared as a parameter if chans == 1
+            // so any attempt to set 'width' will do nothing. chans is also
+            // not set-able, so if this instrument is created by a synth with
+            // chans == 1, it will not be possible to change to chans == 2, so
+            // it will always be correct to ignore 'width'
+        else:
+            var width = param_method('width', note_spec.get('width', 0),
+                                     'set_width', 'clip', 0, 1)
+            mixer = stdistr(n, width)
+                             
+        attack = param_method('attack', note_spec.get('attack', 0.04),
+                              'set_attack', 'clip', 0, nil)
+        env = pweb(attack, vel_to_linear(vel), lin = true)
+        env.linear_attack().atend(FINISH, this)
+        // when instrument ends, it will be removed from the mixer
+        // and put on the finishing_notes list, but when it finishes,
+        // we should call synth.is_finished(this) to put it on the 
+        // free_notes list.
+        var cutoff = param_method('cutoff', note_spec.get('cutoff', 100),
+                                  'set_cutoff')
+        var lphz = min(AR * 0.4, step_to_hz(cutoff + pitch))
+        lowpass = lowpass(mixer, lphz)
+        output = mult(lowpass, env)
+        decay = max(0, note_spec.get('decay', 0.1))
+
+        // frequency will be hz_to_step(step) + detune + lfo
+        // we share vib among all components
+        // we combine step, animate, detune and (i, n) to form hz.
+        // we use hz and vib to control our oscillator.
+        pitch_const = const(pitch)
+        var lfofreq = note_spec.get('lfofreq', 5)
+        var lhz = param('lfofreq', lfofreq, 'map', 0, 20)
+        var lfodepth = note_spec.get('lfodepth', 0)
+        var ldp = param('lfodepth', lfodepth, 'map', 0, 2)
+        vib = sineb(lhz, ugen_hzdiffb(pitch_const, ldp))
+
+        shared_hz = addb(step_to_hz(pitch), vib)
+        var detune = note_spec.get('detune', 0)
+        var dhz = param('detune', detune, 'map', 0, 2)
+        detune_hz = ugen_hzdiffb(pitch_const, dhz)
+                      
+        var anirate = note_spec.get('anirate', 1)
+        initial_detune = animate * steps_to_hzdiff(pitch, detune)
+        animate_detune = multb(animate_const, detune_hz)
+        anirate_const = param('anirate', anirate, 'map', 0, 10)
+
+        calc_gain_to_normalize()
+        components = [supersaw_component(i, chans, table_index) for i = 0 to n]
+        super.init("Supersaw", output, synth)
+
+
+    def supersaw_component(i, chans, table_index):
+    # each component is one sawtooth wave. i is in the range 0 to n-1
+    # where n is the total number of sawtooths added together by
+    # supersaw.
+        var comp  // the component (before panning)
+        var animate_fmod = ugen_rlib(anirate_const, animate_detune)
+        animate_fmod.rliset(initial_detune)  // randomize initial hz offset
+        // detune_frac gives n points uniformly spaced from -1 to +1:
+        var detune_frac = (i * 2) / (n - 1) - 1 if n > 1 else 0
+        // fixed detuning amount in hz:
+        var fixed_fmod = multb(detune_hz, detune_frac)
+        var hz = addb(shared_hz, 
+                      blendb(fixed_fmod, animate_fmod, animate_const))
+        var amp = calc_tableosc_amp(i)
+        comp = tableosc(hz, amp, phase = rndphase * pr_unif(360))
+
+        comp.borrow(sawtooth_waveforms.tables)
+        comp.select(table_index)
+        if chans == 1:
+            mixer.ins(comp)
+        else:
+            mixer.ins(i, comp)
+        return comp
+
+
+    def calc_tableosc_amp(i):
+    # compute amplitude as a function of gain, i, rolloff, animate
+        // ith component with rolloff is rolloff ** k where k increases
+        // with distance from the center = (n-1)/2
+        var k = abs(i - (n - 1) / 2)
+        return (animate + (1 - animate) * (rolloff ** k)) * gain_to_normalize
+
+
+    def calc_gain_to_normalize():
+    # compute total power for normalization and set amplitudes of components
+        // first, we use a formula for summing n terms in a geometric series
+        // created by summing n waveforms with amplitude rolloff^i
+        var rsqr = rolloff ** 2
+        var power = 1
+        if rolloff == 1:
+            power = power + (n - 1)
+        elif n > 1:  // and rolloff < 1
+            power = power + 2 * rsqr * (1 - rolloff ** (n - 1)) / (1 - rsqr)
+        // now power is for the case where animate is 0. When animate is 1,
+        // there is no rolloff, so power is just n. Since we're interpolating
+        // the signals, we can also interpolate the power:
+        power = n * animate + power * (1 - animate)
+        // so we normalize by scaling by 1/sqrt(power):
+        gain_to_normalize = 1 / sqrt(power)
+
+        
+    def calc_tableosc_amps():
+        calc_gain_to_normalize()
+        // now we can set amps in components:
+        for comp at i in components:
+            var amp = calc_tableosc_amp(i)
+            comp.set('amp', amp)
+
+        
+    def set_rolloff(rolloff_, reuse):
+        rolloff = rolloff_
+        if reuse:
+            recalc_tableosc_amps = true
+        else:
+            calc_tableosc_amps()
+
+            
+    def set_attack(attack_, reuse):
+        attack = attack_
+
+    def set_animate(animate_, reuse):
+        animate = animate_
+        animate_const.set(animate)
+        if reuse:
+            recalc_tableosc_amps = true
+        else:
+            calc_tableosc_amps()
+
+
+    def set_cutoff(cutoff, reuse):
+    # compute cutoff as sum of pitch and cutoff parameter in steps. Clip
+    # to 80% of Nyquist rate to avoid problems.
+        lowpass.set('cutoff', min(AR * 0.4, step_to_hz(cutoff + pitch)))
+
+
+    def set_antialias(antialias_, reuse):
+        antialias = antialias_
+        if not reuse:
+            calc_tableosc_index()
+
+
+    def set_width(width, reuse):
+        if chans == 2:  // otherwise, mixer is a sum and width does nothing
+            mixer.set_width(width)
+
+
+    def calc_tableosc_index()
+        var table_index = sawtooth_waveforms.get_index(pitch, antialias != 0)
+        for comp in components:
+            comp.select(table_index)
+
+
+    def set_pitch_vel():
+        if recalc_tableosc_amps:
+            calc_tableosc_amps()
+            recalc_tableosc_amps = false
+        // set dependents on pitch:
+        pitch_const.set(pitch)
+        shared_hz.set('x1', step_to_hz(pitch))
+        calc_tableosc_index()
+        // start envelope
+        env.set_points(attack, vel_to_linear(vel))
+        env.start()
+
+
+    def noteoff():
+        env.decay(decay)
+        
+
+
+class Supersaw_synth (Synth):
+
+    def instr_create(note_spec, pitch, vel):
+        Supersaw_instr(this, note_spec, pitch, vel)
+
+
+    def init(instr_spec, customization, chans):
+        super.init(instr_spec, customization, chans,
+            // parameter names:
+            ['animate',  // 0 (fixed) to 1 (fluctuating)
+             'anirate',  // rate of animation
+             'antialias',  // 0 or 1
+             'n',  // num. components, fixed at synth creation
+             'rndphase',  // if not 0, randomizes initial phases
+             'detune',
+             'width',
+             'rolloff',
+             'attack',
+             'decay',
+             'cutoff',  // cutoff frequency is steps above pitch
+             'lfofreq',
+             'lfodepth'])
+
+
+

@@ -42,12 +42,22 @@ public:
         while (seg_togo == 0) { // set up next segment
             current = final_value;  // make output value exact
             if (next_point_index >= points.size()) {
-                seg_togo = INT_MAX;
                 seg_incr = 0.0f;
-                send_action_id();
+                // if we can terminate, send_action_id when termination
+                // is complete (done by terminate(ACTION_TERM)):
                 if (current == 0 && (flags & CAN_TERMINATE)) {
-                    terminate();
+                    // keep polling terminate until it happens:
+                    if (terminate(ACTION_EVENT | ACTION_END)) {
+                        seg_togo = INT_MAX;  // then this stops polling until start()
+                    }
+                } else {  // otherwise, just send_action_id now:
+                    int status = ACTION_EVENT;
+                    if (final_value == 0) {
+                        status |= ACTION_END;
+                    }
+                    send_action_id(status);
                 }
+                break;
             } else {
                 seg_togo = (int) points[next_point_index++];
                 final_value = points[next_point_index++];

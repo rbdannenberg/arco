@@ -70,7 +70,6 @@ public:
 
     void update_run_channel() {
         // initialize run_channel based on input types
-        void (Multx::*new_run_channel)(Multx_state *state);
         if (x1->rate == 'a' && x2->rate == 'a') {
             run_channel = &Multx::chan_aa_a;
         } else if (x1->rate == 'a' && x2->rate != 'a') {
@@ -120,8 +119,8 @@ public:
 
     void chan_ab_a(Multx_state *state) {
         float x2 = *x2_samps;
-        Sample x2_incr = (x2 - state->prev) * BL_RECIP;
         Sample x2_fast = state->prev;
+        Sample x2_incr = (x2 - x2_fast) * BL_RECIP;
         state->prev = x2;
         for (int i = 0; i < BL; i++) {
             x2_fast += x2_incr;
@@ -131,8 +130,8 @@ public:
 
     void chan_ba_a(Multx_state *state) {
         float x1 = *x1_samps;
-        Sample x1_incr = (x1 - state->prev) * BL_RECIP;
         Sample x1_fast = state->prev;
+        Sample x1_incr = (x1 - x1_fast) * BL_RECIP;
         state->prev = x1;
         for (int i = 0; i < BL; i++) {
             x1_fast += x1_incr;
@@ -143,9 +142,8 @@ public:
     void real_run() {
         x1_samps = x1->run(current_block); // update input
         x2_samps = x2->run(current_block); // update input
-        if ((x1->flags & x2->flags & TERMINATED) &&
-            (flags & CAN_TERMINATE)) {
-            terminate();
+        if ((x1->flags & x2->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
+            terminate(ACTION_TERM);
         }
         Multx_state *state = &states[0];
         for (int i = 0; i < chans; i++) {

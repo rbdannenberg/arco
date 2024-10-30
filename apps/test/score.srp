@@ -7,23 +7,20 @@
 # data structure is an array of Notes. A Note is an object
 # with time - start time
 #      duration - duration
-#      symbol - name of a global holding an instrument_spec
 #      params - a dictionary of additional parameters
 #               including pan, gain, and id
 
 class Note:
     var time
-    var instr
     var pitch
     var vel
     var dur
     var id
     var params
 
-    def init(time_, instr_, pitch_, vel_, dur_, optional id_, pdict,
+    def init(time_, pitch_, vel_, dur_, optional id_, pdict,
              dictionary params_):
         time = time_
-        instr = instr_
         pitch = pitch_
         vel = vel_
         dur = dur_
@@ -40,23 +37,23 @@ class Note:
             else:
                 print "WARNING: in Note.init(), a non-dictionary parameter was"
                 print "    passed as a Note parameter dictionary:", pdict
-                print "    This parameter will be ignored"
+                print "    This parameter will be ignored."
 
 
     def copy_if_shift(offset):
-    # make a new note with the indicated offset if offset is non-zero; otherwise,
-    # you can use the note as is
+    # make a new note with the indicated offset if offset is non-zero;
+    # otherwise, you can use the note as is
         return this if offset == 0 else
-               Note(time + offset, instr, pitch, vel, dur, id, params)
+               Note(time + offset, pitch, vel, dur, id, params)
 
     def play(synth):
-        synth.note(instr, pitch, vel, dur, id, params)
+        synth.noteon(pitch, vel, dur, id, params)
 
     def show(optional indent = ""):
         var idstr = (" id=" + str(id)) if id else ""
-        print indent; "at", time; "s", instr.get('instrument'), "p"; pitch,
+        print indent; "at", time; "s", "p"; pitch,
         print "v"; vel, dur; "s"; idstr
-        print indent; "    "; instr, params
+        print indent; "    "; params
 
 
 def note_compare(x, y):
@@ -66,10 +63,36 @@ def note_compare_resort(x, y):
     x.time < y.time
 
 
+class Score_action (Note):
+# this is a Score event that can take the place of a Note
+# when the action is reached, the parameter is called as
+# a function.
+    def init(fn):
+        super.init(0, 1, 1, 0, function = fn)
+    
+    def play(synth):
+        var fn = params['function']
+        print "Score_action invokes", fn
+        funcall(fn, synth, this) 
+
+    def copy_if_shift(offset):
+    # make a new Score_action with the indicated offset if offset is non-zero;
+    # otherwise, you can use the Score_action as is. This cannot be inherited
+    # from Note, which would make a Note, not another Score_action
+        if offset == 0:
+            return this
+        var rslt = Score_action(params['function'])
+        rslt.time = time + offset
+        return rslt
+
+
 class Score:
     var notes
     var time
     var dur
+    // DEBUGGING / MEASUREMENT:
+    var num_ugens
+    var num_ugens_at_start
 
     def init(optional notes_):
         notes = notes_ or []
@@ -77,6 +100,8 @@ class Score:
         dur = 0
 
     def play(synth):
+        num_ugens = ugens_created
+        num_ugens_at_start = ugens_created
         play_note(synth, 0)
 
     def append_rest(dur_):
@@ -105,17 +130,37 @@ class Score:
             note.time = note.time * x
             note.dur = note.dur * x
 
-    def play_note(synth, i):
-        if i >= len(notes):
-            return
+    def play_note(synth, i, optional starting = false):
+        // THIS IS HERE FOR DEBUGGING AND MEASURING:
+        // TIMING: when there's a set of notes at time T, we want to output
+        // how late we are starting to play them and then output how late we
+        // are when we finish them all.
+        //     To know if we're starting, we use the parameter starting,
+        // which is set when we cause this event with a non-zero delay
+        // (so it's not at the same time as the previous note.)
+        //     To know if we're ending, we just look for a non-zero delay
+        // to the next note. 
         var note = notes[i]
         var when = note.time
+        if starting:
+            starting = false
+            num_ugens_at_start = ugens_created
+        if i >= len(notes):
+            return
         note.play(synth)
         i = i + 1
         if i >= len(notes)
+            print "created", ugens_created - num_ugens, "ugens"
             return
         note = notes[i]
-        sched_cause(note.time - when, this, 'play_note', synth, i)
+        if note.time != when:  // next note is in the future
+            // how far behind are we?
+            print "finished at score time", when, "late by", 
+            print     sched_time_get() - sched_rtime
+            print "created", ugens_created - num_ugens_at_start, "ugens"
+            num_ugens_at_start = ugens_created
+            starting = true
+        sched_cause(note.time - when, this, 'play_note', synth, i, starting)
 
     def show(optional msg = ""):
         print "----- Score at", time, "dur", dur, msg, "-----"

@@ -88,6 +88,20 @@ static void arco_mathb_set_x2(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/mathb/rliset int32 id, float val;
+ */
+static void arco_mathb_rliset(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    float val = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Mathb, mathb, id, "arco_mathb_set_x2");
+    mathb->rliset(val);
+}
+
+
 static void mathb_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
@@ -100,6 +114,8 @@ static void mathb_init()
     o2sm_method_new("/arco/mathb/repl_x2", "ii", arco_mathb_repl_x2, NULL,
                     true, true);
     o2sm_method_new("/arco/mathb/set_x2", "iif", arco_mathb_set_x2, NULL,
+                    true, true);
+    o2sm_method_new("/arco/mathb/rliset", "if", arco_mathb_rliset, NULL,
                     true, true);
     // END INTERFACE INITIALIZATION
 

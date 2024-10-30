@@ -28,6 +28,14 @@ const int TERMINATED = 16;    // have we terminated?  After termination,
 const int UGENTRACE = 32;     // print debugging info on this ugen. Mainly
 // to confirm that destructors run on ugens.
 
+const int ACTION_TERM = 1;    // if source is terminated, bit 0 is set
+const int ACTION_ERROR = 2;
+const int ACTION_EXCEPT = 4;
+const int ACTION_EVENT = 8;  // normal event but not terminated
+const int ACTION_END = 16; // final event such as reaching breakpoint == 0
+const int ACTION_REM = 32;   // uid was removed from mix or sum
+const int ACTION_FREE = 64;  // sent when ugen is deleted
+
 // special Unit generator IDs:
 const int ZERO_ID = 0;
 const int ZEROB_ID = 1;
@@ -37,6 +45,10 @@ const int FADE_LINEAR = 0;        // linear fade
 const int FADE_EXPONENTIAL = 1;   // exponential (linear in dB) fade
 const int FADE_LOWPASS = 2;       // 1st-order low-pass smoothed fade
 const int FADE_SMOOTH = 3;        // raised-cosine (S-curve) fade
+
+const int BLEND_LINEAR = 0;
+const int BLEND_POWER = 1;
+const int BLEND_45 = 2;
 
 extern char control_service_addr[64];  // where to send messages
         // this is set in audioio.cpp by /arco/open messages and is
@@ -65,9 +77,33 @@ const int MATH_OP_RND = 12;
 const int MATH_OP_SH = 13;
 const int MATH_OP_QNT = 14;
 const int MATH_OP_RLI = 15;
-#define NUM_MATH_OPS 16
+const int MATH_OP_HZDIFF = 16;
+const int MATH_OP_TAN = 17;
+const int MATH_OP_ATAN2 = 18;
+const int MATH_OP_SIN = 19;
+const int MATH_OP_COS = 20;
+
+#define NUM_MATH_OPS 21
+
+const int UNARY_OP_ABS = 0;
+const int UNARY_OP_NEG = 1;
+const int UNARY_OP_EXP = 2;
+const int UNARY_OP_LOG = 3;
+const int UNARY_OP_LOG10 = 4;
+const int UNARY_OP_LOG2 = 5;
+const int UNARY_OP_SQRT = 6;
+const int UNARY_OP_STEP_TO_HZ = 7;
+const int UNARY_OP_HZ_TO_STEP = 8;
+const int UNARY_OP_VEL_TO_LINEAR = 9;
+const int UNARY_OP_LINEAR_TO_VEL = 10;
+const int UNARY_OP_DB_TO_LINEAR = 11;
+const int UNARY_OP_LINEAR_TO_DB = 12;
+
+#define NUM_UNARY_OPS 13
+
 
 extern const char *OP_TO_STRING[NUM_MATH_OPS];
+extern const char *UNARY_OP_TO_STRING[NUM_UNARY_OPS];
 
 // IMPORTANT: x1 and x2 should be variables, not expressions
 // since they are evaluated multiple times. x1 is modified
@@ -114,6 +150,7 @@ class Ugen : public O2obj {
     Sample_ptr out_samps;  // pointer to actual sample memory
     int current_block;
     int action_id;
+    int action_mask;
 
     // to initialize a Ugen without installing in table, pass id = -1
     Ugen(int id, char ab, int nchans) {
@@ -223,7 +260,9 @@ class Ugen : public O2obj {
     }
 
 
-    virtual void on_terminate() { send_action_id(); }  // override if needed
+    virtual void on_terminate(int status) {
+        send_action_id(status);
+    }  // override if needed
 
 
     // declare that when an input terminates, this ugen should continue
@@ -236,14 +275,18 @@ class Ugen : public O2obj {
     }
 
 
-    virtual void terminate() { // this Ugen will terminate after tail blocks
-        if (!(flags & TERMINATING)) {
-            flags |= TERMINATING;  // start the count
-        }
-        if (tail_blocks-- == 0) {
+    virtual bool terminate(int status) {
+        // this Ugen will terminate after tail blocks - it is required that
+        // ugen continue to call terminate(status) from real_run() on every
+        // block after termination, not just once.
+        flags |= TERMINATING;
+        if (tail_blocks-- == 0) {  // one-time on_terminate when tail_blocks=0
             flags |= TERMINATED;
-            on_terminate();  // a virtual method called at most once
+            // a virtual method called at most once:
+            on_terminate(status);
+            return true;
         }
+        return false;
     }
  
 
@@ -251,16 +294,20 @@ class Ugen : public O2obj {
 
     void const_set(int chan, Sample x, const char *from);
 
-    void send_action_id(int status = 0) {
-        if (action_id == 0) return;
+    void send_action_id(int status, int uid = -1) {
+        if (flags & TERMINATED) {
+            status |= ACTION_TERM;
+        }
+        if (action_id == 0 || !(status & action_mask)) return;
         o2sm_send_start();
         o2sm_add_int32(action_id);
         o2sm_add_int32(status);
+        o2sm_add_int32(uid);
         strcpy(control_service_addr + control_service_addr_len, "act");
-        printf("send_action_id address %s status(actl) %d\n",
-               control_service_addr, o2_status("actl"));
+        printf("send_action_id address %s id %d status %d uid %d "
+               "o2_status(actl) %d\n",
+               control_service_addr, action_id, status, o2_status("actl"));
         o2sm_send_finish(0.0, control_service_addr, true);
-        action_id = 0;  // one-shot
     }
 };
 

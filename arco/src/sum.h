@@ -104,6 +104,7 @@ public:
             Ugen_ptr input = inputs[i];
             Sample_ptr input_ptr = input->run(current_block);
             if (input->flags & TERMINATED) {
+                send_action_id(ACTION_REM, input->id);
                 input->unref();
                 inputs.remove(i);
                 continue;
@@ -142,7 +143,7 @@ public:
             // inputs, we will not terminate. Only terminate if there was at
             // least one input that terminated and now there are none:
             if (starting_size > 0 && (flags & CAN_TERMINATE)) {
-                terminate();
+                terminate(ACTION_TERM);
             }
         }
         // scale output by gain. Gain change is limited to at least 50 msec

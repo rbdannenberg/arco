@@ -83,42 +83,26 @@ public:
 
 
     void real_run() {
-        int n = inputs.size();
-        if (n == 0) { // zero the outputs
-            memset(out_samps, 0, chans * sizeof(Sample));
-        } else {
-            Ugen_ptr input = inputs[0];
+        memset(out_samps, 0, chans * sizeof(Sample));
+        int i = 0;
+        while (i < inputs.size()) {
+            Ugen_ptr input = inputs[i];
             Sample_ptr input_ptr = input->run(current_block);
-            // if more input channels than output channels, drop some input:
-            int ch = MIN(input->chans, chans);
-            memcpy(out_samps, input_ptr, ch * sizeof(Sample));
-            // if more output channels than input channels, zero fill; except
-            // if there is only one input channel, copy it to all outputs
-            if (ch < chans) {
-                if (ch == 1) {
-                    for (int i = 1; i < n; i++) {
-                        out_samps[i] = *input_ptr;
-                    }
-                } else {
-                    block_zero_n(out_samps + ch,
-                                 (chans - ch) * sizeof(Sample));
-                }
+            if (input->flags & TERMINATED) {
+                send_action_id(ACTION_REM, input->id);
+                input->unref();
+                inputs.remove(i);
+                continue;
             }
-            // now add remaining channels
-            for (int i = 1; i < n; i++) {
-                input = inputs[i];
-                input_ptr = input->run(current_block);
-                int samps = MIN(input->chans, chans);
-                for (int j = 0; j < samps; j++) {
-                    *out_samps++ += *input_ptr++;
-                }
-                if (samps == 1 && chans > 1) {  // sumb single channel to all
-                    input_ptr -= 1;  // back up top beginning of input
-                    for (int ch = 1; ch < chans; ch++) {
-                        for (int j = 0; j < BL; j++) {
-                            *out_samps++ = *input_ptr;
-                        }
-                    }
+            i++;
+            int samps = MIN(input->chans, chans);
+            for (int j = 0; j < samps; j++) {
+                *out_samps++ += *input_ptr++;
+            }
+            if (samps == 1 && chans > 1) {  // sumb single channel to all
+                input_ptr -= 1;  // back up top beginning of input
+                for (int ch = 1; ch < chans; ch++) {
+                    *out_samps++ = *input_ptr;
                 }
             }
         }
