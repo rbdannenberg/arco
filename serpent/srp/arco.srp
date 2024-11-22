@@ -534,7 +534,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
 
 
 def arco_run():
-    sched_poll_function = 'arco_thread_poll'
+    sched_poll_function_add('arco_thread_poll')
     sched_o2_enabled = true
     if getfeatures() & OPTION_WXS == 0:
         sched_run()
@@ -611,6 +611,7 @@ def reset_arco():
     if not set_arco_state('initializing' if arco_state == 'discovery'
                                          else 'initializing2'):
         return
+    print "reset_arco called and runs"
     o2_send_cmd("/arco/reset", 0, "s", "actl")  // pass in this service name
     arco_poll_to_free_ugens_id = arco_poll_to_free_ugens_id + 1
     arco_poll_to_free_ugens(arco_poll_to_free_ugens_id)

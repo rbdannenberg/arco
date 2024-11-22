@@ -91,6 +91,7 @@ long pvst_offset = -1000; // -1 means we haven't seen first frame yet
 #include "internal.h"
 // only needed for some debugging code which is probably commented out
 #include "cmupvdbg.h"
+#include "inttypes.h"
 
 // define PHASE_FIX to tie neighboring bin phase to phase of spectral peaks
 // #define PHASE_FIX 1
@@ -1105,7 +1106,7 @@ float *pv_get_output2(Phase_vocoder x)
                (long) (out_next - output_buffer),
                (long) (pv->output_total - (out_next - output_buffer)));
     }
-    D printf("pv_get_output2 returning at offset %ld abs %I64d\n", 
+    D printf("pv_get_output2 returning at offset %ld abs %" PRId64 "\n", 
              (long) (pv->out_next - pv->output_buffer), pv->output_total);
     /*DBG out_next position is output_total, so if we subtract out_next - output_buffer,
        we get the absolute position of the output_buffer

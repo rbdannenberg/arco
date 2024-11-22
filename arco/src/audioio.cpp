@@ -1076,6 +1076,8 @@ void audioio_initialize()
 
     O2_context *save = o2_ctx;
     o2sm_initialize(&aud_o2_ctx, audio_bridge);
+    printf("initialized audio_bridge %p id %d outgoing %p\n", audio_bridge,
+           audio_bridge->id, &audio_bridge->outgoing.queue_head);
 
     o2sm_service_new("arco", NULL);
 

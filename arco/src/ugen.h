@@ -306,7 +306,7 @@ class Ugen : public O2obj {
         strcpy(control_service_addr + control_service_addr_len, "act");
         printf("send_action_id address %s id %d status %d uid %d "
                "o2_status(actl) %d\n",
-               control_service_addr, action_id, status, o2_status("actl"));
+               control_service_addr, action_id, status, uid, o2_status("actl"));
         o2sm_send_finish(0.0, control_service_addr, true);
     }
 };

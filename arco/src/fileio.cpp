@@ -423,6 +423,8 @@ int fileio_initialize()
     fileio_bridge = o2_shmem_inst_new();
     O2_context *save = o2_ctx;
     o2sm_initialize(&(fileio_actual.fio_o2_ctx), fileio_bridge);
+    printf("initialized fileio_bridge %p id %d outgoing %p\n", fileio_bridge,
+           fileio_bridge->id, &fileio_bridge->outgoing.queue_head);
     o2sm_service_new("fileio", NULL);
 
     // O2SM INTERFACE INITIALIZATION: (machine generated)

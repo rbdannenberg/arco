@@ -96,7 +96,7 @@ mkdir -p arco/src cmupv/src serpent/src serpent/srp server/src ffts/src
 cd modal
 mkdir -p docs modal modal/detectionfunctions src
 cd ../ugens
-mkdir -p lowpass mult notchw reson sine
+mkdir -p lowpass notchw reson sine sttest
 cd ..
 # cwd is build/arco
 
@@ -150,13 +150,19 @@ cp -p ~/arco/server/src/*.{cpp,h,c} server/src/
 cp -p ~/arco/ugens/README.md ugens/
 cp -p ~/arco/ugens/lowpass/lowpass.{cpp,h,srp,ugen} ugens/lowpass
 cp -p ~/arco/ugens/lowpass/lowpassb.{cpp,h} ugens/lowpass
-cp -p ~/arco/ugens/mult/mult.{cpp,h,srp,ugen} ugens/mult
-cp -p ~/arco/ugens/mult/multb.{cpp,h} ugens/mult
-cp -p ~/arco/ugens/notchw/notchw.{cpp,h,srp,ugen} ugens/notchw
+# cp -p ~/arco/ugens/mult/mult.{cpp,h,srp,ugen} ugens/mult
+# cp -p ~/arco/ugens/mult/multb.{cpp,h} ugens/mult
+
+# Note: we're not using notch (yet), and .cpp, .h, .srp are not in repo
+#cp -p ~/arco/ugens/notch/notchw.{cpp,h,srp,ugen} ugens/notchw
+
+cp -p ~/arco/ugens/notch/notchw.ugen ugens/notchw
 cp -p ~/arco/ugens/reson/reson.{cpp,h,srp,ugen} ugens/reson
 cp -p ~/arco/ugens/reson/resonb.{cpp,h} ugens/reson
 cp -p ~/arco/ugens/sine/sine.{cpp,h,srp,ugen} ugens/sine
 cp -p ~/arco/ugens/sine/sineb.{cpp,h} ugens/sine
+cp -p ~/arco/ugens/sttest/sttest.{cpp,h,srp,ugen} ugens/sttest
+
 
 # portaudio sources from nyquist
 cp -pR ~/nyquist/portaudio .

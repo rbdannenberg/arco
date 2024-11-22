@@ -30,18 +30,18 @@ methods often include the forms:
 
 ### Creating and Updating a Ugen
 To create a Ugen (see also the next subsection , "Serpent"):
-````
+```
 /arco/fmosc/new ID chans input1 input2 ...
-````
+```
 where inputs are ID's for other UGens.
 
 To release a Ugen, free the ID, but the ugen is actually deleted only
 when all references to it are deleted. When a Ugen is deleted, its
 references are also deleted, which may cause other Ugens to be
 deleted. 
-````
+```
 /arco/free ID
-````
+```
 
 To change a parameter, there are two possibilities. A constant (a Ugen
 of class Const) can be updated with a new value. A constant can have
@@ -55,9 +55,9 @@ input to some other Ugen. Since the refcount is greater than 1,
 releasing the ID does not delete the constant, and some Ugen holds the
 reference. But every Ugen has commands to follow the reference to the
 Const object and set a value:
-````
+```
 /arco/fmosc/set_freq ID chan float
-````
+```
 This message only works if the current input is a Const and is
 recommended because the client can free its direct reference to the
 Const object. Also, it seems more direct to set an *input* parameter

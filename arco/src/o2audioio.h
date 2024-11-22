@@ -253,11 +253,11 @@ public:
     //     and outputs audio that is received via O2
     // Parameters:
     //     id - the new id for the Ugen (as usual)
+    //     recvchans - how many channels to receive via O2 (0 for none)
+    //                 (also the number of output channels for this Ugen)
     //     input - the id for the input Ugen (may or may not be used)
     //     destaddr - base address for outgoing O2 messages with audio data.
     //     destchans - how many channels to send via O2 (0 for none)
-    //     recvchans - how many channels to receive via O2 (0 for none)
-    //                 (also the number of output channels for this Ugen)
     //     buffsize - size in frames to buffer incoming audio messages
     //     sampletype - 0 for int16 and 1 for float
     //     msgsize - size in frames of O2 audio messages
