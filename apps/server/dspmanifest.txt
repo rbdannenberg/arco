@@ -1,0 +1,34 @@
+# manifest for test (daserpent)
+vu
+probe
+pwl*
+pwe*
+unaryugen*
+mix
+sine*
+mult*
+reson*
+lowpass*
+fileplay
+filerec
+recplay
+delay
+allpass
+olapitchshift
+feedback
+granstream
+flsyn
+pv
+yin
+trig
+route
+chorddetect
+onset
+spectralcentroid
+spectralrolloff
+o2audioio
+sttest
+# zitarev
+tableosc*
+blend*
+stdistr

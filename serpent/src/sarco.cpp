@@ -26,8 +26,8 @@ void s2c_arco_thread_poll(Machine_ptr m)
 void s2c_arco_initialize(Machine_ptr m)
 {
     if (!m->error_flag) {
-        arco_initialize();
-        m->push(NULL);
+        int res = arco_initialize();
+        m->push(Node::create_long(res, m));
     }
 }
 

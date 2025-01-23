@@ -10,6 +10,8 @@
 #include "arcotypes.h"
 #include "arcoutil.h"
 #include <cmath>
+#include "ugenid.h"
+#include "audioio.h"
 #include "ugen.h"
 #include "audioblob.h"
 

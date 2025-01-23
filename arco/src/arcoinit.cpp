@@ -17,8 +17,8 @@
 #include "fileio.h"
 
 
-void arco_initialize()
+int arco_initialize()
 {
-    audioio_initialize();
-    fileio_initialize();
+    return audioio_initialize() ||
+           fileio_initialize();
 }

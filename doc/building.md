@@ -359,6 +359,17 @@ prefer to run make in a terminal window. The section below on
 **Details** gives some options.
 
 ## Making a Server
+`arco/server/src` has source code for an ncurses-based Arco server
+with no dependency on Serpent and no GUI other than the ncurses
+console/text-based interface.
+
+`arco/apps/server` has a CMake file to build the server.
+
+To debug the server with Xcode, you should use "Product:Scheme:Edit
+Scheme..." (or CMD-<) and select "Info:Launch:Wait for the executable
+to be launched". Then, when you use CMD-R to run the debugger, Xcode
+will pause and you can start the server in a terminal, getting the
+ncurses interface (which will not work in the usual Xcode console).
 
 ## Linking with wxSerpent
 

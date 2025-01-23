@@ -1,27 +1,21 @@
 # CMakeList for arco server interface
+# Roger B. Dannenberg
+# modified Dec 2024
 
 # Structure of the CMake system (PROJ = server instance name)
 #
 # apps/PROJ/CMakeLists.txt
-#     server/arco.cmakeinclude
-#         arco/CMakeLists.txt -- arco sources for arco library
+#     server/arcoserver.cmakeinclude
+#         arco/arco/CMakeLists.txt -- arco sources for arco library
 #
 # library organization:
 #    arcolib -- arco audio processingm, including unit generators
-#    o2_static, portaudio_static, libflac_static, sndfile_static,
-#        vorbis_static -- arco depends on these
+#    o2_static, portaudio_static, portaudio_static, libflac_static,
+#        sndfile_static, vorbis_static -- arco depends on these
 
 
 # The version minimum is required by CMake 
 cmake_minimum_required(VERSION 3.24)
-
-include("../apps/common/libraries.txt")  # audio and O2 library prefs
-
-include("../apps/common/arco_cmake_macros.txt")
-globals_initialize()
-
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 message(STATUS CMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR} " "
                CMAKE_CURRENT_LIST_DIR=${CMAKE_CURRENT_LIST_DIR})
@@ -30,24 +24,52 @@ message(STATUS CMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR} " "
 get_filename_component(FRIENDS ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
 get_filename_component(FRIENDS ${FRIENDS} DIRECTORY)
 
+# audio and O2 library prefs:
+include("${CMAKE_CURRENT_LIST_DIR}/../apps/common/libraries.txt")
+
+include("${CMAKE_CURRENT_LIST_DIR}/../apps/common/arco_cmake_macros.txt")
+globals_initialize()
+
+append_to_global(ALL_COMPILE_DEFINITIONS "O2_NO_O2DISCOVERY=1")
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+message(STATUS CMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR} " "
+               CMAKE_CURRENT_LIST_DIR=${CMAKE_CURRENT_LIST_DIR})
+
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING
               "Semicolon-separated list of supported configuration types"
               FORCE)
 
-set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "only build forx86_64" FORCE)
+set(CMAKE_OSX_ARCHITECTURES ${CMAKE_SYSTEM_PROCESSOR} CACHE STRING
+			    "only build for local architecture" FORCE)
 
 option(USE_STATIC_LIBS "Build with static libs?" TRUE)
+set(USE_O2 TRUE CACHE STRING "Link Serpent with O2 support" FORCE)
 
 SET(SOURCES src/arco.cpp src/arco_ui.cpp src/arco_ui.h
             src/cmtio.c src/cmtio.h  
             src/svprefs.cpp src/svprefs.h)  
  
+list(TRANSFORM SOURCES PREPEND "${CMAKE_CURRENT_LIST_DIR}/")
 add_executable(${ARCO_SERVER_NAME} ${SOURCES}) 
 register_target(${ARCO_SERVER_NAME})
 
 
 if(APPLE) 
   set(CURSES_LIB curses)
+  find_library(COREAUDIO CoreAudio)
+  find_library(COREFOUNDATION CoreFoundation)
+  find_library(COREMIDI CoreMIDI)
+  find_library(CORESERVICES CoreServices)
+  find_library(AVFOUNDATION AVFoundation)
+  find_library(AUDIOTOOLBOX AudioToolbox)
+  find_library(FOUNDATION Foundation)
+  target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
+      ${COREAUDIO} ${COREFOUNDATION} ${COREMIDI} ${CORESERVICES}
+      ${AVFOUNDATION} ${AUDIOTOOLBOX} ${FOUNDATION})
+  target_link_options(${ARCO_SERVER_NAME} PUBLIC "-ObjC")
 else()
   set(CURSES_LIB ncurses)
 endif() 
@@ -55,7 +77,6 @@ endif()
 # O2 is not in arcolib because it is already in wxslib (if you link
 # with wxserpent), but this server version does not use wxserpent,
 # so we have to find and add O2 libraries here
-append_to_global(ALL_COMPILE_DEFINITIONS "O2_NO_O2DISCOVERY=1") 
 if(O2_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES "${O2_INCL}") 
 endif()  # otherwise, assume portmidi.h is on default include paths
@@ -81,6 +102,8 @@ target_link_libraries(${ARCO_SERVER_NAME} PRIVATE form ${CURSES_LIB})
 if(UNIX AND NOT APPLE)  # linux
   target_link_libraries(arcolib PRIVATE avahi-client avahi-common atomic rt) 
 endif()
+
+
 
 apply_common_settings()
 message(STATUS "--------- bottom of server/CMakeLists.txt ---------")

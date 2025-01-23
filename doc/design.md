@@ -11,6 +11,7 @@
 - Instruments in Serpent
 - End-of-Sound Actions
 - Phase Vocoder and Pitch Shifting
+- Audio Shutdown
 
 ## External Control
 This section describes protocols and interaction between a client and
@@ -40,7 +41,7 @@ with:
 - `/arco/zero/new ZERO_ID`
 - `/arco/bzero/new ZEROB_ID`
 - `/arco/thru/new INPUT_ID input_channels ZERO_ID`
-- `/arco/thru/new PREV_OUTPUT_ID output_channels ZERO_ID`
+- `/arco/thru/new OUTPUT_ID output_channels ZERO_ID`
 
 Note that audio input and previous output are represented by Thru
 Ugens whose outputs are written directly by the Audioio callback, and
@@ -53,6 +54,10 @@ service passed to `/arco/reset`. Here, we assume `/actl`.
 
 Arco sends `/actl/starting`: gives actual device ids, actual channel
 counts, actual latency and actual buffer size (in frames).
+
+If open is successful (indicated by actual_in_chans and
+actual_out_chans both equal to zero), Arco later sends `/actl/started`
+when audio callbacks are happening.
 
 Arco receives `/arco/close`: close audio stream, but keep Ugens in
 place.
@@ -103,15 +108,18 @@ They are used by the audio callback to interpret the audio stream.
 Preferences are only written on request by writing the current `p_*`
 values, which can include -1 for "no preference".
 
+Initially, arco_* values are set to preferences. The can be changed.
+Changes are saved in preferences.
+Default in and out channels is 2. 
+
 **Preferences inside/outside the server**
 Applications pass in parameters to open audio: device ids, channel
-counts, buffer size and latency. -1 works to get default values,
-but it is up to applications to manage preferences.
+counts, buffer size and latency. -1 works to get default values.
 
-Therefore preferences are on the "server side" and not visible to
+Preferences are on the "server side" and not visible to
 the "arco side". To allow inspection of actual values selected, the
 arco side sends actual values back to the control service, the name
-of which is provided in /arco/open.
+of which is provided in /arco/ctrl.
 
 On the "arco side", we have only defaults and whatever values are
 passed into the open operation.
@@ -825,9 +833,11 @@ and the best approach is simply to transpose down, not up.
 
 Execution time with a window of 8 is about 2000 times real time.
 
+## Audio Shutdown
 
+How does Arco shut down in a coordinated fashion?
 
+### Running the Audio thread
 
-
-
-
+See comments at the top of audioio.cpp with an analysis/description of
+aud_state transitions.

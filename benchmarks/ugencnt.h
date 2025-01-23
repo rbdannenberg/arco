@@ -1,3 +1,5 @@
+// *********** ugen ************
+
 /* ugen.h -- Unit Generator
  *
  * Roger B. Dannenberg
@@ -16,6 +18,8 @@
 // This maps to range -32767 to 32767:
 #define FLOAT_TO_INT16(x) ((int) ((32767 * (x) + 32768.5)) - 32768)
 
+extern long real_run_count;  // counts ugen executions
+
 // flags for Unit generators to cooperate with audioio, etc.
 const int IN_RUN_SET = 1;
 const int UGEN_MARK = 2;      // used for graph traversal
@@ -27,6 +31,12 @@ const int TERMINATED = 16;    // have we terminated?  After termination,
 // it can be assumed that the output signal in all channels is zero.
 const int UGENTRACE = 32;     // print debugging info on this ugen. Mainly
 // to confirm that destructors run on ugens.
+
+extern char control_service_addr[64];  // where to send messages
+        // this is set in audioio.cpp by /arco/open messages and is
+        // "!" followed by the service followed by "/" so that you can
+        // append the rest of the address in place.
+extern int control_service_addr_len;  // address len including "!" and "/"
 
 // used by recplay and fader Ugens:
 #define COS_TABLE_SIZE 100
@@ -45,22 +55,13 @@ extern const char *UNARY_OP_TO_STRING[NUM_UNARY_OPS];
       (x1 * 3 - x1 * x1 * x1) * 0.5 * x2))
 
 
+int set_control_service(const char *ctrlservice);
 
 class Ugen;
 typedef Ugen *Ugen_ptr;
 extern Vec<Ugen_ptr> ugen_table;
 
 extern void ugen_initialize();
-
-class Initializer {
-  public:
-    Initializer *next;
-    void (*fn)();
-
-    Initializer(void (*f)());  // constructor adds function to a list
-    static void init();  // init calls all functions on the list
-};
-
 
 class Ugen : public O2obj {
   public:
@@ -182,6 +183,8 @@ class Ugen : public O2obj {
         Sample_ptr save_out_samps = out_samps;
         if (block_count > current_block) {
             current_block = block_count;
+            real_run_count++;
+            // printf("%s (%d)\n", classname(), id);
             real_run();
         }
         out_samps = save_out_samps;
@@ -217,6 +220,7 @@ class Ugen : public O2obj {
         }
         return false;
     }
+ 
 
     void set_current_block(int n) { current_block = n; }
 
@@ -227,14 +231,17 @@ class Ugen : public O2obj {
             status |= ACTION_TERM;
         }
         if (action_id == 0 || !(status & action_mask)) return;
+        /* FOR BENCHMARKING, NO ACTION MESSAGES:
         o2sm_send_start();
         o2sm_add_int32(action_id);
         o2sm_add_int32(status);
         o2sm_add_int32(uid);
-        o2sm_send_finish(0.0, ctrl_complete_addr("act"), true);
-        printf("send_action_id sent to address %s id %d status %d uid %d "
+        strcpy(control_service_addr + control_service_addr_len, "act");
+        printf("send_action_id address %s id %d status %d uid %d "
                "o2_status(actl) %d\n",
-               ctrl_service_addr, action_id, status, uid, o2_status("actl"));
+               control_service_addr, action_id, status, uid, o2_status("actl"));
+        o2sm_send_finish(0.0, control_service_addr, true);
+        */
     }
 };
 
@@ -267,7 +274,3 @@ Ugen_ptr id_to_ugen(int32_t id, const char *classname, const char *operation);
 #define block_zero_n(dst, n) memset(dst, 0, BLOCK_BYTES * (n))
 
 void block_add_n(Sample_ptr x, Sample_ptr y, int n);
-
-void arco_term(O2SM_HANDLER_ARGS);  // normally these handlers are local
-// to the compilation unit (.cpp file), but this one is defined in
-// ugen.cpp but registered with o2sm_method_new() in audioio.cpp.

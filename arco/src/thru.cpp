@@ -5,7 +5,6 @@
  */
 
 #include "arcougen.h"
-#include "audioio.h"
 #include "thru.h"
 
 const char *Thru_name = "Thru";

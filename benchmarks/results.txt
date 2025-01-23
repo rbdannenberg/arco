@@ -1,0 +1,58 @@
+Analyzing files:
+--------------------------------------------------
+allaudio-2:
+  Mean: 3.5388
+  Std Dev: 0.0155
+
+allaudio:
+  Mean: 3.1399
+  Std Dev: 0.0839
+
+arcolike:
+  Mean: 0.9770
+  Std Dev: 0.0039
+
+arcolike64:
+  Mean: 0.9084
+  Std Dev: 0.0071
+
+block16-2:
+  Mean: 2.6207
+  Std Dev: 0.0092
+
+block16:
+  Mean: 2.6370
+  Std Dev: 0.0624
+
+block2:
+  Mean: 5.6696
+  Std Dev: 0.0344
+
+block4:
+  Mean: 3.2962
+  Std Dev: 0.0060
+
+block64:
+  Mean: 3.5447
+  Std Dev: 0.0090
+
+block8:
+  Mean: 2.3913
+  Std Dev: 0.0057
+
+fastchannels:
+  Mean: 0.9798
+  Std Dev: 0.0025
+
+nopoly:
+  Mean: 0.9652
+  Std Dev: 0.0028
+
+noterminate:
+  Mean: 0.9703
+  Std Dev: 0.0028
+
+singlechannel:
+  Mean: 0.8572
+  Std Dev: 0.0031
+

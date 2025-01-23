@@ -7,6 +7,7 @@
 #include "arcoutil.h"
 #include "ugenid.h"
 #include <cmath>
+#include "audioio.h"
 #include "ugen.h"
 #include "upsample.h"
 #include "dnsampleb.h"

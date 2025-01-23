@@ -5,5 +5,5 @@
  */
 
 
-void arco_initialize();
-/*SER void arco_initialize() PENT*/
+int arco_initialize();
+/*SER int arco_initialize() PENT*/

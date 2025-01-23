@@ -8,24 +8,95 @@
 
 Internal States
 
-Supports running O2SM even when audio callbacks are not functioning.
+Supports running O2SM even when audio callbacks are not functioning by
+handing control back-and-forth between the main process and the audio
+callback thread.
+
+The API for this module is through O2 messages:
+
+  /arco/ctrl - set the control service name for reply messages
+
+  /arco/reset - free all unit generators, set
+          control_service address, notify /host/reset (where /host is the
+          control_service) with 0->success, -1->not IDLE, reset ignored
+
+  /arco/devinfo - send audio device info to a given address
+
+  /arco/open - open audio device(s) and start processing audio
+
+  /arco/run - add a ugen to the run set
+
+  /arco/unrun - remove a ugen from the run set
+
+  /arco/cpu - get the estimated CPU load for audio
+
+  /arco/load - impose a dsp load on the cpu (for debugging)
+
+  /arco/gain - set the master gain (smoothing is applied)
+
+  /arco/close - close audio
+
+  /arco/quit - shut down the whole arco service including fileio
+
+  /arco/test1 - prints a message; a simple test if the server is alive
+
+  /arco/prtree - prints a tree of all unit generators, including the
+          run set
+
+  /arco/prugen - prints one unit generator
+
+  /arco/prugens - prints all unit generators that have ids in id order
+
+  /arco/hb - enable/disable printing block counts, a way to show that
+          audio is running and computing normally
+
+Reply and notification messages are as follows. /host is shown here,
+but the client sets the service name using /arco/reset (see above):
+
+  /host/reset - audio processing has been reset (all ugens are freed)
+
+  /host/starting - audio processing is starting; actual audio
+          parameters are provided in this message
+
+  /host/started - audio callback is happening soon
+
+  /host/stopped - reply to /arco/close: 
+      0->audio is already stopped and in IDLE state
+      1->audio has stopped and Arco is in IDLE state
+      -1->failure: audio is neither RUNNING nore IDLE; try again
+
+  /host/cpu - reply from /arco/cpu request
+
+
+State Transitions in Arco Audio Service
+---------------------------------------
+To coordinate audio start-up and shut-down and also to hand off
+control of the arco service between main thread and audio thread.
 
 Let's assume that it can take awhile for audio to start up, so we'll
 get it running first, then switch over to actually using it.
- - states are UNINITIALIZED, IDLE, STARTING, STARTED, FIRST, RUNNING,
-   STOPPING:
-   UNINITIALIZED->IDLE by calling Pa_Initialize()
-   IDLE->STARTING done by thread when starting PortAudio
-   STARTING->STARTED done by callback when it happens - signals thread
-   STARTED->FIRST done by thread - acknowledges the STARTED signal
+ - states for startup are IDLE, STARTING, STARTED,
+   FIRST, RUNNING, STOPPING, AUDIO_STOPPED:
+   If aud_is_reset (meaning that thru and zero ugens exist to represent
+     audio input/output, then
+   IDLE->STARTING done by arco/open when starting PortAudio
+   STARTING->STARTED done by callback when first callback happens - 
+     this signals the non-audio thread
+   STARTED->FIRST done by the non-audio thread - acknowledges the 
+     STARTED signal and tells the callback to process audio
    FIRST->RUNNING done by callback to effect handoff and time adjust
-   RUNNING->STOPPING done by callback upon request to shut down
-   STOPPING->IDLE done by thread to close log file, etc.
-   These are the atomic actions that mark handoffs.
-   The callback does nothing except output zero (silence) unless 
-   the state is FIRST which immediately becomes RUNNING.
-   STOPPING is set at the very end of the callback, so once it is
-   set, it is immediately safe to run the audio zone on another thread.
+   RUNNING->STOPPING done by /arco/close to request shut down
+     from callback after zero fill
+   STOPPING->AUDIO_STOPPED done by callback when it stops PortAudio
+   AUDIO_STOPPED->IDLE done by main thread when it runs
+     arco_thread_poll().
+
+- states for reset are just IDLE (in the IDLE state, you can reset;
+  you will get a /host/reset message to acknowledge the reset
+  occurred)
+
+- states for quit are IDLE, FINISHED
+  IDLE->FINISHED is done by arco/quit
 
  - When audio processing starts, we set source to audio thread and
    start incrementing the time when each block arrives.
@@ -34,7 +105,110 @@ get it running first, then switch over to actually using it.
      We want: precise_secs() + precise_offset == GETTIME, so
      set precise_offset = GETTIME - precise_secs()
 
+
+State Transitions for Applications and Server
+---------------------------------------------
+
+Here we describe commands and actions on the Server's main
+thread. (By Server, we mean the process that runs O2 and has
+a shared memory interface to the arco service.)
+Since some actions take time and are asynchronous, there is a
+risk that the system will not be ready for the next command
+(e.g. closing audio and then doing a reset requires that we wait for
+the audio to become idle before doing a reset). The actions of the
+Server are described.
+
+We use the same state names as on the Arco service side, but add some
+states and flags to deal with the asynchrony.
+
+Since the Server shares memory with the Arco thread, we will call the
+server state server_aud_state.
+
+Initial state: IDLE, other states used are STARTING, RUNNING, STOPPING
+
+To Start (Server's host_open_audio):
+    if state is STARTING or RUNNING, just return with 
+        "already starting"
+    if state is STOPPING, set open_requested and return
+    if basic ugens are not yet created, create the standard
+        zero, zerob, input and output ugens
+    send /arco/open, IDLE->STARTING
+    if /host/starting shows a failure, STARTING->IDLE
+    when /host/started is called, STARTING->RUNNING and 
+        if close_requested, clear it and call close
+        else for libraries implementing "To Start" for
+            applications, call back to application
+
+To Close:
+    if state is STOPPING or IDLE, just return with
+        "already stopping"
+    if state is STARTING, set close_requested and return
+    send /arco/close, RUNNING->STOPPING
+    when /host/stopped is called, check for failure (value 2):
+        if failure, then wait 2 msec and call /arco/close again
+            (the wait prevents a busy loop continuously sending
+            /arco/close and receiving another failure while arco
+            is trying to poll the audio thread and make progress)
+            return (/host/stopped will be called very soon and
+                we will re-enter this handler)
+        STOPPING->IDLE and
+        if quit requested, call quit and return
+        if reset_requested, clear it and call reset
+        if open_requested, clear it and call start
+
+To Reset:
+    if state is STARTING, set reset_requested and
+        close_requested and return
+    if state is RUNNING, set reset_requested and
+        send /arco/close and return
+    if state is STOPPING, set reset_requested and return
+    if state is IDLE,
+        send /arco/reset
+
+To quit:
+    if state is STARTING or RUNNING, set quit_requested
+        and call close and return
+    if state is STOPPING, set quit_requested and return
+    if state is IDLE, send /arco/quit
+    when service is no longer available and quit_requested, exit Server
+
+For the application developer
+-----------------------------
+
+The application should subclass a library-provided superclass
+that has methods for various steps in application setup. An
+object of this class should be submitted to arco_init(). Then,
+the following methods allow the application to customize behavior:
+    service_found() - the arco service is connected
+    audio_starting() - the audio stream is running
+    
+The superclass also provides methods that the application can use:
+    arco_reset() - runs the "To Reset" procedure shown above
+    audio_open() - open and start audio io
+    arco_close() - shuts down audio
+    
+
+Typical pattern is:
+- arco_init(...) - starts waiting for arco service to be available;
+    when found, /arco/close is used to shut down audio in case it is
+    running. When /actl/stopped gets a success code (either 0 or 1),
+    invoke arco_reset() to clear all ugens and create the standard
+    zero, zerob, input and output ugens.
+    call the application's method arco_service_ready()
+- in arco_service_ready(), send /arco/devinf with /actl/devinf 
+    (where /actl is the application's service, short for "Arco ConTroL")
+- /actl/devinf will get multiple messages (one per device).
+    When the info parameter is the empty string, we have
+    all devices. Either pick one to open or let the user
+    pick one.
+- call audio_open() to start audio io
+    reply service "actl"
+- the application's audio_starting() is called when audio is running
+- the application can call arco_close() to stop the audio stream
+
+
 Audio Processing
+----------------
 
 1. Audio input has aud_in_chans channels. These are
 de-interleaved and copied to the *output* of ugen_table[INPUT_ID].
@@ -94,9 +268,7 @@ See doc/design.md
 #if defined(__APPLE__)
 #include "recperm.h"
 #endif
-#include "prefs.h"
 #include "sum.h"
-#include "audioio.h"
 #include "thru.h"
 
 
@@ -104,7 +276,7 @@ static const int ZERO_PAD_COUNT = 4410;  // how many zeros to write when closing
 
 /* this is not used:
 const char *aud_state_name[] = {
-    "UNINITIALIZED", "IDLE", "STARTING", "STARTED",
+    "IDLE", "STARTING", "STARTED",
     "FIRST", "RUNNING", "STOPPING" };
 */
 
@@ -120,9 +292,8 @@ O2_context aud_o2_ctx;  // O2 context for audio thread
 
 O2queue *arco_msg_queue = NULL;
 
-int aud_state = UNINITIALIZED;
-int aud_quit_request = false;  // request to o2sm_finish() at a clean spot
-bool aud_reset_request = false;
+int aud_state = IDLE;
+bool aud_is_reset = false;
 int64_t aud_frames_done = 0;
 int aud_blocks_done = 0;
 bool aud_heartbeat = true;
@@ -140,7 +311,6 @@ const float aud_gain_factor = 0.03;
 // (It will change with sample rate, but exact value does not matter.)
 const float aud_max_gain_incr = 1.0 / (0.1 * 48000);
 
-static bool arco_thread_exited = false;  // stop processing after o2sm_finish()
 static int actual_in_chans = -1;     // number of channels in callback
 static int actual_out_chans = -1;    // number of channels in callback
 static int actual_latency_ms = -1;
@@ -148,7 +318,6 @@ static int actual_buffer_size = BL;
 static int actual_in_id = -1;
 static int actual_out_id = -1;
 
-static int aud_close_request;
 static int aud_zero_fill_count = 0;
 static PaStream *audio_stream;
 
@@ -158,6 +327,9 @@ static Vec<Ugen_ptr> output_set;  // list of UG ID's to sum to form output
 static int cpuload = 0;
 
 static int underflow_count = 0;
+
+char ctrl_service_addr[64] = "";
+int ctrl_service_addr_len = 0;
 
 /************ CLOCK *************/
 
@@ -235,6 +407,35 @@ static bool forget_ugen(Ugen_ptr ugen, Vec<Ugen_ptr> &set)
         }
     }
     return false;
+}
+
+
+// safely copy ctrlservice to ctrl_service_addr -- this is who we
+//   send action messages to.  Allow 20 bytes for the rest of the address,
+//   and 3 bytes for "!", "/", and EOS. Result is "!<ctrlservice>/"
+int ctrl_set_service(const char *ctrlservice)
+{
+    const size_t csalen = strlen(ctrlservice);
+    if (csalen + 23 > sizeof(ctrl_service_addr)) {
+        arco_warn("Control service name is too long: %s.",
+                  ctrl_service_addr);
+        ctrl_service_addr[0] = 0;
+        ctrl_service_addr_len = 0;
+        return 1;  // error return
+    }
+    ctrl_service_addr_len = (int) (csalen + 2);
+    ctrl_service_addr[0] = '!';
+    strcpy(ctrl_service_addr + 1, ctrlservice);
+    strcat(ctrl_service_addr, "/");
+    return 0;  // normal, no error
+}
+
+
+const char *ctrl_complete_addr(const char *method_name)
+{
+    assert(ctrl_service_addr_len > 1);
+    strcpy(ctrl_service_addr + ctrl_service_addr_len, method_name);
+    return ctrl_service_addr;
 }
 
 
@@ -322,22 +523,53 @@ static void arco_prugens(O2SM_HANDLER_ARGS)
 }
 
 
+void arco_free_all_ugens()
+{
+    output_set.clear();
+    run_set.clear();
+    for (int i = 0; i < ugen_table.size(); i++) {
+        Ugen_ptr ugen = ugen_table[i];
+        if (ugen) {
+            ugen->flags &= ~IN_RUN_SET;
+            ugen_table[i] = NULL;
+            ugen->unref();
+        }
+    }
+}
 
-/* O2SM INTERFACE: /arco/reset string s;
-   Reset the server: stop audio, disconnect run set and outputs,
-   send to /<s>/reset, where <s> is the control service name
-   passed as an argument of this message.
+
+/* O2SM INTERFACE: /arco/ctrl string s;
+   set the arco control service - where we send replies
 */
-static void arco_reset(O2SM_HANDLER_ARGS)
+static void arco_ctrl(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     char *s = argv[0]->s;
     // end unpack message
+    ctrl_set_service(s);
+}
 
-    set_control_service(s);
-    aud_close_request = true;
-    aud_zero_fill_count = 0;
-    aud_reset_request = true;
+
+/* O2SM INTERFACE: /arco/reset;
+   Disconnect run set and outputs,
+   send to /<ctrl>/reset, where <ctrl> is the control service name
+*/
+static void arco_reset(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    // end unpack message
+    int status = 0;  // success
+    if (aud_state == IDLE) {
+        arco_free_all_ugens();
+        aud_zero_fill_count = 0;
+    } else {
+        arco_warn("arco_reset ignored because aud_state is %d\n", aud_state);
+        status = -1;  // failure
+    }
+    // notify the control service that reset is finished
+    o2sm_send_start();
+    o2sm_add_int32(status);
+    o2sm_send_finish(0.0, ctrl_complete_addr("reset"), true);
 }
 
 
@@ -346,10 +578,24 @@ static void arco_reset(O2SM_HANDLER_ARGS)
 */
 static void arco_quit(O2SM_HANDLER_ARGS)
 {
-    o2sm_send_cmd("/fileio/quit", 0, "");
-    aud_close_request = true;
-    aud_reset_request = true;
-    aud_quit_request = true;
+    if (aud_state == IDLE) {
+        o2sm_send_cmd("/fileio/quit", 0, "");
+
+        arco_free_all_ugens();
+        ugen_table.finish();
+        
+        assert(run_set.size() == 0);
+        run_set.finish();
+        
+        assert(output_set.size() == 0);
+        output_set.finish();
+
+        o2sm_finish();
+
+        aud_state = FINISHED;
+    } else {
+        arco_warn("arco_quit ignored because aud_state is %d\n", aud_state);
+    }
 }
 
 
@@ -382,11 +628,6 @@ static void arco_devinf(O2SM_HANDLER_ARGS)
     // end unpack message
 
     char audio_info_buff[ARCO_STRINGMAX];
-    if (aud_state == UNINITIALIZED) {
-        PaError err = Pa_Initialize();
-        if (err != paNoError) return;
-        aud_state = IDLE;
-    }
     PaDeviceIndex num_devs = Pa_GetDeviceCount();
     for (int id = 0; id < num_devs; id++) {
         const PaDeviceInfo *info = Pa_GetDeviceInfo(id);
@@ -513,16 +754,17 @@ static int callback_entry(float *input, float *output,
     assert(!in_audio_callback);
     in_audio_callback++;
     
-    if (aud_state == RUNNING && !aud_close_request) {
+    if (COMPUTE_AUDIO) {
         // arco time will suffer from audio computation time jitter, and
         // if PortAudio blocks are large (e.g. multiple Arco blocks), time
         // will tend to advance in big steps on each callback.
         arco_wall_time += BP; // time is advanced by block period
     } else {
         block_zero_n(output, actual_out_chans);
-        if (aud_close_request) {
+        if (aud_state == STOPPING) {
             if (aud_zero_fill_count >= ZERO_PAD_COUNT) {
                 in_audio_callback = false;
+                aud_state = AUDIO_STOPPED;
                 return paComplete;
             }
             aud_zero_fill_count += BL;
@@ -664,7 +906,7 @@ static int pa_callback(const void *input, void *output,
     }
     underflow_count++;
     
-    if (aud_state == RUNNING) {
+    if (DO_AUDIO_CALLBACK) {  // RUNNING or STOPPING
         // input and output are interleaved, so each arco block has length
         // BL * chans, and each block is at in + i * actual_in_chans.
         // in case PortAudio frame_count > BL, synthesize multiple blocks:
@@ -678,7 +920,6 @@ static int pa_callback(const void *input, void *output,
             // since some time has elapsed computing audio (maybe), call
             // precise_secs() again to compute precise offset.
             switch_to_o2_time();
-            aud_state = STOPPING;
             result = paComplete;
         }
     } else if (aud_state == FIRST) {
@@ -735,8 +976,7 @@ static void arco_unrun(O2SM_HANDLER_ARGS)
 /* O2SM INTERFACE:  /arco/open
        int32 in_id, int32 out_id, 
        int32 in_chans, int32 out_chans,
-       int32 latency_ms, int32 buffer_size,
-       string ctrlservice;
+       int32 latency_ms, int32 buffer_size;
    Open audio device(s) for input and output and begin processing
    audio.
 */
@@ -749,7 +989,6 @@ static void arco_open(O2SM_HANDLER_ARGS)
     int32_t out_chans = argv[3]->i;
     int32_t latency_ms = argv[4]->i;
     int32_t buffer_size = argv[5]->i;
-    char *ctrlservice = argv[6]->s;
     // end unpack message
 
     PaError err;
@@ -760,19 +999,9 @@ static void arco_open(O2SM_HANDLER_ARGS)
     PaStreamParameters output_params;
     PaStreamParameters *output_params_ptr = &output_params;
 
-    if (aud_state != UNINITIALIZED && aud_state != IDLE) {
-        arco_warn("aud_open called but audio is already opened");
+    if (aud_state != IDLE) {
+        arco_warn("aud_open called in an invalid state %d", aud_state);
         return;
-    }
-
-    if (set_control_service(ctrlservice)) {
-        return;  // error -- probably string too long for service name
-    };
-
-    if (aud_state == UNINITIALIZED) {
-        err = Pa_Initialize();
-        if (err != paNoError) goto done;
-        aud_state = IDLE;
     }
 
     aud_frames_done = 0;
@@ -810,7 +1039,6 @@ static void arco_open(O2SM_HANDLER_ARGS)
         }
     }
 
-
     out_chans = req_out_chans(out_chans);
     if (out_chans == 0) {
         actual_out_id = paNoDevice;
@@ -831,7 +1059,9 @@ static void arco_open(O2SM_HANDLER_ARGS)
         }
     }
 
-    actual_latency_ms = (int) (suggested_latency * 1000 + 0.5);  // convert to ms
+    // convert to ms
+    actual_latency_ms = (int) (suggested_latency * 1000 + 0.5);
+
     // override prefs with specified latency in open call
     actual_latency_ms = (latency_ms >= 0 ? latency_ms : actual_latency_ms);
     arco_print("Audio latency = %d ms\n", actual_latency_ms);
@@ -849,8 +1079,6 @@ static void arco_open(O2SM_HANDLER_ARGS)
     output_params.suggestedLatency = suggested_latency;
     output_params.hostApiSpecificStreamInfo = NULL;
     
-    aud_close_request = false;
-
     actual_buffer_size = (buffer_size >= 0 ? buffer_size : BL);
     if (actual_buffer_size <= 0) {  // enforce minimum buffer_size
         actual_buffer_size = BL;
@@ -902,14 +1130,13 @@ static void arco_open(O2SM_HANDLER_ARGS)
     }
     // notify control service that audio is finally starting (or failed)
     o2sm_send_start();
-    strcpy(control_service_addr + control_service_addr_len, "starting");
     o2sm_add_int32(actual_in_id);
     o2sm_add_int32(actual_out_id);
     o2sm_add_int32(actual_in_chans);
     o2sm_add_int32(actual_out_chans);
     o2sm_add_int32(actual_latency_ms);
     o2sm_add_int32(actual_buffer_size);
-    o2sm_send_finish(0.0, control_service_addr, true);
+    o2sm_send_finish(0.0, ctrl_complete_addr("starting"), true);
 
     if (err == paNoError &&
         (err = Pa_StartStream(audio_stream)) != paNoError) {
@@ -943,8 +1170,14 @@ static void arco_open(O2SM_HANDLER_ARGS)
 /* O2SM INTERFACE: /arco/close ;  --Close audio stream */
 static void arco_close(O2SM_HANDLER_ARGS)
 {
-    if (aud_state == IDLE) return;
-    aud_close_request = true;
+    if (aud_state != RUNNING) {
+        arco_warn("arco_close ignored because aud_state is %d\n", aud_state);
+        o2sm_send_start();
+        o2sm_add_int32(aud_state == IDLE ? 0 : -1);
+        o2sm_send_finish(0.0, ctrl_complete_addr("stopped"), true);
+        return;
+    }
+    aud_state = STOPPING;
     aud_zero_fill_count = 0;
 }
 
@@ -958,8 +1191,7 @@ void arco_cpu(O2SM_HANDLER_ARGS)
     }
     o2sm_send_start();
     o2sm_add_float(load);
-    strcpy(control_service_addr + control_service_addr_len, "cpu");
-    o2sm_send_finish(0.0, control_service_addr, true);
+    o2sm_send_finish(0.0, ctrl_complete_addr("cpu"), true);
 }
 
 /* O2SM INTERFACE: /arco/load  
@@ -992,68 +1224,38 @@ void arco_gain(O2SM_HANDLER_ARGS)
 }
 
 
-void arco_free_all_ugens()
-{
-    output_set.clear();
-    run_set.clear();
-    for (int i = 0; i < ugen_table.size(); i++) {
-        Ugen_ptr ugen = ugen_table[i];
-        if (ugen) {
-            ugen->flags &= ~IN_RUN_SET;
-            ugen_table[i] = NULL;
-            ugen->unref();
-        }
-    }
-}
-
 // called to keep this zone running when there are no audio callbacks
 // this can be called directly from the main O2 thread.
 void arco_thread_poll()
 {
-    if (arco_thread_exited) {
+    if (aud_state == FINISHED) {
         return;
     }
-    if (aud_state == RUNNING || aud_state == FIRST) return;
     if (aud_state == STARTED) {
         aud_state = FIRST;
+        o2sm_send_start();
+        o2sm_send_finish(0.0, ctrl_complete_addr("started"), true);
         return;
     }
-    
-    if (aud_state == STOPPING) { // adjust offset
+    if (aud_state == AUDIO_STOPPED) {
+        o2sm_send_start();
         aud_state = IDLE;
+        o2sm_send_start();
+        // 1 == successful transition from RUNNING to AUDIO_STOPPED:
+        o2sm_add_int32(1);
+        o2sm_send_finish(0.0, ctrl_complete_addr("stopped"), true);
     }
+
+    if (!USE_MAIN_THREAD) {
+        return;  // audio thread is polling; don't do it here
+    }
+
     // now, aud_state == IDLE
     arco_wall_time = o2_native_time() + arco_wall_time_offset;
 
     O2_context *save_ctx = o2_ctx;
     o2_ctx = &aud_o2_ctx;
     o2sm_poll();
-    // if audio is possibly running or going to run, we use this
-    // request flag to cause it to stop. Otherwise, we can safely
-    // (re)initialize everything.
-    if (aud_reset_request &&
-        (aud_state == UNINITIALIZED || aud_state == IDLE)) {
-        aud_reset_request = false;  // clear the request
-        arco_free_all_ugens();
-        // notify the control service that reset is finished
-        o2sm_send_start();
-        strcpy(control_service_addr + control_service_addr_len, "reset");
-        o2sm_send_finish(0.0, control_service_addr, true);
-    }
-    // we're IDLE now, so if quit is requested, do it now:
-    if (aud_quit_request) {
-        arco_free_all_ugens();
-        ugen_table.finish();
-        
-        assert(run_set.size() == 0);
-        run_set.finish();
-        
-        assert(output_set.size() == 0);
-        output_set.finish();
-
-        o2sm_finish();
-        arco_thread_exited = true;  // stop further polling of audio
-    }
     // restore thread local context
     o2_ctx = save_ctx;
 }
@@ -1065,7 +1267,7 @@ void arco_thread_poll()
 // streaming audio and after proper handshakes to hand off control of this
 // "thread" from the main thread. The main thread regains control and 
 // continues polling when a PortAudio stream ends.
-void audioio_initialize()
+int audioio_initialize()
 {
     int rslt = o2_shmem_initialize();
     // it is ok if some other shared memory action has already started
@@ -1076,8 +1278,8 @@ void audioio_initialize()
 
     O2_context *save = o2_ctx;
     o2sm_initialize(&aud_o2_ctx, audio_bridge);
-    printf("initialized audio_bridge %p id %d outgoing %p\n", audio_bridge,
-           audio_bridge->id, &audio_bridge->outgoing.queue_head);
+    printf("initialized audio_bridge %p id %d outgoing %p\n",
+           audio_bridge, audio_bridge->id, &audio_bridge->outgoing.queue_head);
 
     o2sm_service_new("arco", NULL);
 
@@ -1087,22 +1289,28 @@ void audioio_initialize()
     o2sm_method_new("/arco/prtree", "", arco_prtree, NULL, true, true);
     o2sm_method_new("/arco/prugens", "", arco_prugens, NULL, true, true);
     o2sm_method_new("/arco/prugen", "is", arco_prugen, NULL, true, true);
-    o2sm_method_new("/arco/reset", "s", arco_reset, NULL, true, true);
+    o2sm_method_new("/arco/reset", "", arco_reset, NULL, true, true);
     o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);
     o2sm_method_new("/arco/run", "i", arco_run, NULL, true, true);
     o2sm_method_new("/arco/unrun", "i", arco_unrun, NULL, true, true);
-    o2sm_method_new("/arco/open", "iiiiiis", arco_open, NULL, true, true);
+    o2sm_method_new("/arco/open", "iiiiii", arco_open, NULL, true, true);
     o2sm_method_new("/arco/close", "", arco_close, NULL, true, true);
     o2sm_method_new("/arco/cpu", "", arco_cpu, NULL, true, true);
     o2sm_method_new("/arco/load", "i", arco_load, NULL, true, true);
     o2sm_method_new("/arco/gain", "f", arco_gain, NULL, true, true);
+    o2sm_method_new("/arco/ctrl", "s", arco_ctrl, NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     // this one is manually inserted. It is implemented in ugen.cpp:
     o2sm_method_new("/arco/term", "if", arco_term, NULL, true, true);
 
-    Pa_Initialize();
+    PaError err = Pa_Initialize();
+    if (err != paNoError) {
+        printf("FATAL CONDITION: PortAudio failed to initialize.\n");
+        return err;  // FAIL!
+    }
+
     ugen_initialize();
 //    actual_in_chans = 0;  // no input open yet
 //    actual_out_chans = 0;  // no output open yet
@@ -1110,5 +1318,6 @@ void audioio_initialize()
     o2_ctx = save;  // restore caller (probably main O2 thread)'s context
     // now that o2_ctx is restored, we can set the clock source:
     o2_clock_set(arco_time, NULL);
+    return 0;
 }
 

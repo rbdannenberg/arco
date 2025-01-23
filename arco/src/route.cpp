@@ -5,7 +5,6 @@
  */
 
 #include "arcougen.h"
-#include "audioio.h"
 #include "route.h"
 
 const char *Route_name = "Route";

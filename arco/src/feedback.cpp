@@ -5,7 +5,6 @@
  */
 
 #include "arcougen.h"
-#include "audioio.h"
 #include "feedback.h"
 
 const char *Feedback_name = "Feedback";

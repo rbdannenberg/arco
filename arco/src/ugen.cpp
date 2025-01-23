@@ -6,13 +6,9 @@
 
 #include "arcougen.h"
 #include "const.h"
-#include "audioio.h"
-
 
 Vec<Ugen_ptr> ugen_table;
 int ugen_table_free_list = 1;
-char control_service_addr[64] = "";
-int control_service_addr_len = 0;
 
 // note table really goes from 0 to 1 over index range 2 to 102
 // there are 2 extra samples at either end to allow for interpolation and
@@ -35,27 +31,6 @@ float raised_cosine[COS_TABLE_SIZE + 5] = {
     0.922164, 0.930371, 0.938153, 0.945503, 0.952414, 0.958877,
     0.964888, 0.97044, 0.975528, 0.980147, 0.984292, 0.987958,
     0.991144, 0.993844, 0.996057, 0.997781, 0.999013, 0.999753, 1, 1, 1};
-
-// safely copy ctrlservice to control_service_addr -- this is who we
-//   send action messages to.  Allow 20 bytes for the rest of the address,
-//   and 3 bytes for "!", "/", and EOS. Result is "!<ctrlservice>/"
-int set_control_service(const char *ctrlservice)
-{
-    const size_t csalen = strlen(ctrlservice);
-    if (csalen + 23 > sizeof(control_service_addr)) {
-        arco_warn("Control service name is too long: %s.",
-                  control_service_addr);
-        control_service_addr[0] = 0;
-        control_service_addr_len = 0;
-        return 1;  // error return
-    }
-    control_service_addr_len = (int) (csalen + 2);
-    control_service_addr[0] = '!';
-    strcpy(control_service_addr + 1, ctrlservice);
-    strcat(control_service_addr, "/");
-    return 0;  // normal, no error
-}
-
 
 Initializer *initializer_list = NULL;
 

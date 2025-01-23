@@ -575,6 +575,13 @@ void ui_start_dialog()
     direct_mode = false;
 }
 
+
+// ui_int_field - make an editable field for integer input.
+// prompt is a string label
+// value is the value displayed and returned. -1 displays blank
+// min and max are range of values
+// actual and pref are dsiplayed as actual and pref value information
+//
 void ui_int_field(const char *prompt, int *value, int min, int max,
                  int actual, int pref)
 {

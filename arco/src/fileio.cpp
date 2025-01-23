@@ -20,7 +20,6 @@
 #include "o2atomic.h"
 #include "sharedmemclient.h"
 #include "sharedmem.h"
-#include "audioio.h"
 #include "audioblock.h"
 #include "fileiothread.h"
 #include "fileio.h"
@@ -438,6 +437,7 @@ int fileio_initialize()
 
     // create a thread to poll for fileio
     if (fileio_actual.initialize(50) != 0) {
+        printf("FATAL CONDITION: Arco fileio failed initialization.\n");
         return 1;
     }
 

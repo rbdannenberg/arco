@@ -519,13 +519,16 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     sched_init()
     o2_network_enable(network)
     o2_initialize(ensemble, o2trace)
-    arco_initialize()  // create audio shared memory interface
+    if arco_initialize() != 0:  // create audio shared memory interface
+        print "arco_initialize() (called from Serpent) failed"
+        exit(1)
     o2_service_new("actl")
     print "service actl created"
     o2_method_new("/actl/devinf", "s", 'actl_devinf', t)
     o2_method_new("/actl/act", "iii", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
-    o2_method_new("/actl/reset", "", 'actl_reset', t)
+    o2_method_new("/actl/stopped", "i", 'actl_stopped', t)
+    o2_method_new("/actl/reset", "i", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
     sched_select(rtsched)
     sched_cause(0.1, nil, 'poll_for_arco')
@@ -553,8 +556,8 @@ def arco_open(indev, outdev, inchan, outchan, latency, buffersize):
     prefs.set('audio_open_success', nil, true)  // audio crash detect
     if not zero_ugen:
         create_standard_ugens()
-    o2_send_cmd("/arco/open", 0, "iiiiiis", indev, outdev,
-                inchan, outchan, latency, buffersize, "actl");
+    o2_send_cmd("/arco/open", 0, "iiiiii", indev, outdev,
+                inchan, outchan, latency, buffersize);
 
 
 arco_get_cpu_load_continuation = nil
@@ -612,7 +615,8 @@ def reset_arco():
                                          else 'initializing2'):
         return
     print "reset_arco called and runs"
-    o2_send_cmd("/arco/reset", 0, "s", "actl")  // pass in this service name
+    o2_send_cmd("/arco/ctrl", 0, "s", "actl")
+    o2_send_cmd("/arco/reset", 0, "")  // pass in this service name
     arco_poll_to_free_ugens_id = arco_poll_to_free_ugens_id + 1
     arco_poll_to_free_ugens(arco_poll_to_free_ugens_id)
     zero_ugen = nil
@@ -638,8 +642,10 @@ def arco_poll_to_free_ugens(id):
         last_gc_cycles = gc_cycles()
 
 
-
-def actl_reset(rest ignore):
+def actl_reset(timestamp, address, types, status):
+    if status != 0:
+        print "!!!! ERROR: actl_reset status", status, "!!!!"
+        print "!!!! Untested code path !!!!"
     if not set_arco_state('devinf' if arco_state == 'initializing' 
                                    else 'devinf2'):
         return
@@ -683,13 +689,13 @@ monitor_audio_manager = nil
 # this is an O2 message handler for message sent by audio thread
 # when the audio stream is started:
 #
-def actl_starting(timestamp, address, types, rest args):
+def actl_starting(timestamp, address, types, in_id, out_id, in_chans, out_chans,
+                  latency_ms, buffer_size):
+                  
     vtsched.set_bps(saved_vtsched_bps)  // continue advancing time
-    var in_chans = args[2]
-    var out_chans = args[3]
-    print "Audio stream is starting: in", args[0], "("; in_chans, "chan),",
-    print "out", args[1], "("; out_chans, "chan),", "latency", args[4], 
-    print "ms, block size", args[5]
+    print "Audio stream is starting: in", in_id, "("; in_chans, "chan),",
+    print "out", out_id, "("; out_chans, "chan),", "latency", latency_ms,
+    print "ms, block size", buffer_size
     display "actl_starting", arco_state
     if in_chans == 0 and out_chans == 0:
         print "WARNING: failed to open audio device"
@@ -708,6 +714,10 @@ def actl_starting(timestamp, address, types, rest args):
         
     sched_select(rtsched)
     start_poll_for_status()
+
+
+def actl_stopped(timestamp, address, types, status):
+    print "**** /actl/stoppped received with status", status
 
 
 def max_chans(chans, ugen):

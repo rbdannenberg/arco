@@ -23,15 +23,16 @@
 #include "string.h"
 #include "ctype.h"
 #include "prefs.h"
+#include "arcotypes.h"
 
-static char p_in_name[80] = "";
-static char p_out_name[80] = "";
-static char p_in_id = -1;
-static char p_out_id = -1;
-static int p_in_chans = -1;
-static int p_out_chans = -1;
-static int p_buffer_size = -1;
-static int p_latency_ms = -1;
+char p_in_name[80] = "";
+char p_out_name[80] = "";
+int p_in_id = -1;
+int p_out_id = -1;
+int p_in_chans = -1;
+int p_out_chans = -1;
+int p_buffer_size = -1;
+int p_latency_ms = -1;
 
 
 char *prefs_in_name()
@@ -73,16 +74,16 @@ int prefs_in_id() { return p_in_id; }
 int prefs_out_id() { return p_out_id; }
 
 
-int prefs_in_chans() { return p_in_chans; }
+int prefs_in_chans() { return p_in_chans != -1 ? p_in_chans : 2; }
 
 
-int prefs_out_chans() { return p_out_chans; }
+int prefs_out_chans() { return p_out_chans != -1 ? p_out_chans : 2; }
 
 
-int prefs_buffer_size() { return p_buffer_size; }
+int prefs_buffer_size() { return p_buffer_size != -1 ? p_buffer_size : BL; }
 
 
-int prefs_latency_ms() { return p_latency_ms; }
+int prefs_latency_ms() { return p_latency_ms != -1 ? p_latency_ms : 10; }
 
 
 void prefs_set_in_name(const char *name) 
