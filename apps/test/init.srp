@@ -294,6 +294,9 @@ def arco_ready():
     Checkbox(win, "supersaw", 'S', 'D', WIDTH, 'S', 'supersawcheckbox')
     supersawcheckbox.add_target_method(nil, 'supersawtest')
 
+    Checkbox(win, "Overdrive Test", 'S', 'D', WIDTH, 'S', 'overdrivecheckbox')
+    overdrivecheckbox.add_target_method(nil, 'overdrivetest')
+
     ui_initialized = true
     default_window.fit_to_children()
 
@@ -1374,7 +1377,22 @@ def supersawtest(obj, event, x, y):
         return
         sss.mute()
 
+########## Overdrive Test ##############
 
+ovd = nil
+def overdrivetest(obj, event, x, y):
+    display "overdrivetest", x
+    if x:
+        var noise = sine(sample_hold(ugen_rand(220.0, 880.0),
+                                 sineb(8, 1)),
+                     0.3)
+        ovd = overdrive(noise, 0.85, 0.85, 0.8)  // snd, gain, tone, volume
+        ovd.play()
+    else:
+        ovd.set('snd', zero_ugen)
+        sched_select(rtsched)
+        sched_cause(6, ovd, 'mute')
+        ovd = nil
 
 ########## Main Initialization ################
 
