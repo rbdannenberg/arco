@@ -148,7 +148,7 @@ public:
 
 
 class Granstream : public Ugen {
-    friend Gran_gen;
+    friend class Gran_gen;
 public:
     int polyphony;  // how many grains can we have at once per channel
     float dur;      // how far we can reach back in time to find a grain
