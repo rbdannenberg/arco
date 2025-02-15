@@ -142,7 +142,8 @@ public:
         input_samps = input->run(current_block);  // update input
         center_samps = center->run(current_block);  // update input
         q_samps = q->run(current_block);  // update input
-        if (((input->flags) & TERMINATED) && (flags & CAN_TERMINATE)) {
+        if (((input->flags) & TERMINATED) &&
+            (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
         Resonb_state *state = &states[0];
@@ -155,7 +156,7 @@ public:
             float fSlow5 = (fSlow2 - fSlow0) / fSlow1 + 1.0f;
             float fSlow6 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(fSlow1));
             state->fRec0[0] = fSlow4 - fSlow3 * (fSlow5 * state->fRec0[2] + fSlow6 * state->fRec0[1]);
-            out_samps[0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
+            out_samps[0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + 2.0f * state->fRec0[1] + state->fRec0[0]));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
     

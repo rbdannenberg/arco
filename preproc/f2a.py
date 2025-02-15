@@ -1149,9 +1149,11 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
         print("**** signature.params[i]", signature.params[i], 
               signature.params[i].fixed)
         # if only 1 channel or not fixed, we need stride
-        if (signature.params[i].chans > 1 or \
-            not signature.params[i].fixed) and \
-           signature.params[i].abtype != 'c':
+# TODO: Try to understand this...
+#        if (signature.params[i].chans > 1 or \
+#            not signature.params[i].fixed) and \
+#           signature.params[i].abtype != 'c':
+        if signature.params[i].abtype != 'c':
             var_decls += f"    int {p}_stride;\n"
             var_decls += f"    Sample_ptr {p}_samps;\n\n"
 

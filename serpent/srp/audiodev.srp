@@ -435,11 +435,16 @@ class Monitor_audio (Arco_window):
             # a wxWidgets bug. The max() protects against this.
             Checkbox(mon_win, "Mute", wxs_x + wxs_w + 7, max(wxs_y - 10, 0),
                      60, 25, 'mute_audio_bn')
+            mute_audio_bn.set_value(prefs.get('output_mute'))
             mute_audio_bn.add_target_method(this, 'mute_audio')
 
             ## output meter is pre- or post-fader?
             Checkbox(mon_win, "Meter is", 'S', wxs_y + 20, 70, 25, 'prefade_bn')
+            arco_meter_prefade = prefs.get('meter_prefade')
+            prefade_bn.set_value(arco_meter_prefade)
+
             prefade_bn.add_target_method(this, 'meter_prefade')
+            display "Audio Output Controls", arco_meter_prefade, prefs.get('meter_prefade')
 
             Statictext(mon_win, "prefader", wxs_x + 20, wxs_y + 20, 40, 15,
                        'prefade_txt')
@@ -462,17 +467,21 @@ class Monitor_audio (Arco_window):
             Vumeter(mon_win, arco_output_chans, 
                     left, in_out_y + 26, 'output_vu_meter')
             arco_out_monitor = Audio_monitor(outclip_light, output_vu_meter)
+            arco_out_monitor.gain = 1 if arco_meter_prefade else arco_master_gain
             output_vu = vu("/actl/outpks", 0.05)
             output_vu.set('input', output_ugen)
             output_vu.run()  // add to run_set to make it compute peaks
             print "********* Created output VU meter ***********"
 
         ## probe and scope to monitor input
+        var pref_probe = prefs.get('probe', 'input')
+
         var probe_what, probe_name
-        if arco_input_chans > 0:
+        if arco_input_chans > 0 and pref_probe == 'input':
             probe_what = input_ugen
             probe_name = "Input"
         else:
+            prefs.set('probe', 'output')
             probe_what = output_ugen
             print "** Note: no input, Oscilloscope shows nothing **"
             probe_name = "Output"
@@ -481,7 +490,8 @@ class Monitor_audio (Arco_window):
 
         master_scope = Arco_scope(mon_win, "scope", scope_x, scope_y,
                                   212, scope_h, master_probe)
-        master_scope.start()
+        if not prefs.get('scope_disable'):
+            master_scope.start()
 
         Checkbox(mon_win, "Enable Scope", scope_x, scope_y + scope_h + 5,
                  120, 15, 'enable_scope_bn')
@@ -507,8 +517,13 @@ class Monitor_audio (Arco_window):
     # create or replace channel selector for scope input
         if scope_channel_sp:
             scope_channel_sp.delete()
-        Spinctrl(mon_win, 0, chans - 1, 0, scope_x + 155, scope_y + scope_h,
-                 40, 30, 'scope_channel_sp')
+        var pref_chan = prefs.get('scope_channel', 0)
+        if pref_chan >= chans:
+            pref_chan = 0  // something changed
+            prefs.set('scope_channel', pref_chan)
+        master_scope.probe_channel = pref_chan
+        Spinctrl(mon_win, 0, chans - 1, pref_chan, scope_x + 155,
+                 scope_y + scope_h, 40, 30, 'scope_channel_sp')
 
 
     def delete():
@@ -546,6 +561,11 @@ class Monitor_audio (Arco_window):
                 master_scope.start()
             else:
                 master_scope.stop()
+            // it's undesirable to use a negative name like disable, but
+            // the preference default is nil, and the scope default is ON,
+            // so by using 'scope_disable' the initial pref value matches
+            // the initial state of disabled (false).
+            prefs.set('scope_disable', not x)
 
 
     def mon_input(obj, event, x, y):
@@ -617,37 +637,42 @@ class Monitor_audio (Arco_window):
         var probe_what
         if arco_input_chans > 0 and x == "Input":
             probe_what = input_ugen
+            prefs.set('probe', 'input')
         else:
             probe_what = output_ugen
             if x == "Input":
                 print "There is no audio input, showing Output"
                 scope_input_choice.set_value("Output")
+            prefs.set('probe', 'output')
         make_channel_selector(probe_what.chans)
         // new channel selector now selects channel 0, so tell oscilloscope:
-        scope_channel_select(scope_channel_sp,  WXS_SPINCTRL_UPDATED, 0, nil)
+        scope_channel_sp.set_and_act(0)
         master_probe.set('input', probe_what)
 
 
     def scope_channel_select(obj, event, x, y):
         display "scope_channel_select", x
         master_scope.probe_channel = x
+        prefs.set('scope_channel', x)
 
 
-    def mute_audio(rest ignore):
+    def mute_audio(obj, event, x, y):
     # handler for mute button: something changed, so do an update
         set_arco_master_gain(nil, arco_master_gain)
+        prefs.set('output_mute', x)
 
 
     def meter_prefade(obj, event, x, y):
     # handler for Meter is pre-fade button
         arco_meter_prefade = x
         arco_out_monitor.gain = 1 if x else arco_master_gain
+        prefs.set('meter_prefade', x)
 
 
     def set_arco_master_gain(slider, g)
         arco_master_gain = g
         display "set master gain", mute_audio_bn.value()
-        arco_muted = mute_audio_bn.value()
+        var arco_muted = mute_audio_bn.value()
         var gain = 0 if arco_muted else
                    db_to_linear(arco_master_gain)
         arco_gain(gain)
