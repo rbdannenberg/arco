@@ -564,9 +564,20 @@ arco_get_cpu_load_continuation = nil
 arco_get_cpu_load_data = nil
 
 def arco_get_cpu_load(continuation, optional data):
+# get the cpu load. Since this requires a message to Arco, the reply
+# is delivered by calling continuation, which is a function name
+# (symbol, e.g. 'show_cpu_load') that takes one or two parameters:
+#   continuation(cpu) -- called if data is nil
+#   continuation(cpu, data) -- called if data is non-nil
+# data and continuation are stored as globals, so it is an error
+# to request the cpu_load before the reply is received for an earlier
+# request.
     arco_get_cpu_load_continuation = continuation
     arco_get_cpu_load_data = data
-    o2_send_cmd("/arco/cpu", 0, "")  // get and display cpu load
+    if arco_state == 'running':
+        o2_send_cmd("/arco/cpu", 0, "")  // get and display cpu load
+    else:  // audio is not running, so load is approximately zero
+        actl_cpu(0, nil, nil, 0)  // fake a reply of 0% cpu load
 
 
 # request a callback with estimated cpu load. Callback can have a

@@ -259,6 +259,7 @@ class Configure_audio (Arco_window):
         
 
     def poll_for_status(id):
+        // (varname becomes nil when the configure audio window is closed)
         if not varname or id != poll_for_status_id:
             return  // quit this "process"
         // display "poll_for_status", gccyclesst, maxugenst
@@ -269,13 +270,6 @@ class Configure_audio (Arco_window):
         // polling could be held up by a dialog box interaction or something:
         sched_cause(absolute(sched_time_get() + 1.0), this, 'poll_for_status',
                              id)
-
-
-//    def win_handler(obj, event, x, y):
-//        if event == WXS_CLOSE_WINDOW:
-//            config_win.delete()    // destroy the window and components
-//            configure_audio = nil  // destroy reference to this object
-//        wxs_event_not_handled()    // allow window to close
 
 
     def device_id(rb, attr):  // compute device id, given radio button
