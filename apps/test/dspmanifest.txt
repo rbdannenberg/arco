@@ -28,8 +28,8 @@ spectralcentroid
 spectralrolloff
 o2audioio
 sttest
-# zitarev
+zitarev
 tableosc*
 blend*
 stdistr
-overdrive
+monodistortion

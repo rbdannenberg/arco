@@ -1386,7 +1386,7 @@ def overdrivetest(obj, event, x, y):
         var noise = sine(sample_hold(ugen_rand(220.0, 880.0),
                                  sineb(8, 1)),
                      0.3)
-        ovd = overdrive(noise, 0.85, 0.85, 0.8)  // snd, gain, tone, volume
+        ovd = monodistortion(noise, 0.85, 0.85, 0.8)  // snd, gain, tone, volume
         ovd.play()
     else:
         ovd.set('snd', zero_ugen)
