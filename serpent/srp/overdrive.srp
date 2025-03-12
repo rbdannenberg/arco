@@ -1,0 +1,19 @@
+# overdrive.srp -- overdrive unit generator
+#
+# Vivek Mohan
+# February 2025
+
+class Overdrive(Instrument):
+    def init(input, gain, tone, volume, wetdry):
+
+        mono_input = route(1)
+        for i = 0 to input.chans:
+            mono_input.ins(input, i, 0)
+
+        scale_factor = 1.0 / sqrt(input.chans)
+
+        processed = monodistortion(mono_input, gain * scale_factor, tone, volume)
+
+        final_output = add(mult(input, subb(1, wetdry)), mult(processed, wetdry))
+
+        super.init("Overdrive", final_output)
