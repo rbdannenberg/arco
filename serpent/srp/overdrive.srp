@@ -12,8 +12,8 @@ class Overdrive(Instrument):
 
         scale_factor = 1.0 / sqrt(input.chans)
 
-        processed = monodistortion(mono_input, gain * scale_factor, tone, volume)
+        processed = monodistortion(mono_input, gain, tone, volume * scale_factor)
 
-        final_output = add(mult(input, subb(1, wetdry)), mult(processed, wetdry))
+        final_output = add(mult(input, mult(scale_factor,subb(1, wetdry))), mult(processed, mult(scale_factor,wetdry)))
 
         super.init("Overdrive", final_output)
