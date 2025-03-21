@@ -878,7 +878,7 @@ but attenuates feedback to be almost inaudible.
 math, mathb(op, x1, x2, [x2_init = 0] [, chans])
 mult, multb(x1, x2 [, chans])
 add, addb(x1, x2 [, chans])
-sub, subb(x1, x2 [, chans])
+sub[, subb(x1, x2 [, chans])
 ugen_div, ugen_divb(x1, x2 [, chans])
 ugen_max, ugen_maxb(x1, x2 [, chans])
 ugen_min, ugen_minb(x1, x2 [, chans])
@@ -1946,31 +1946,26 @@ zero()
 '''
 monodistortion(input, gain, tone, volume)
 '''
+The input signal can have multiple channels, which are first summed into 
+a mono signal and scaled by `gain`. After processing in mono, the signal 
+is fanned out and blended with the original input signal using `wetdry` 
+to control the balance from pure input (`wetdry` = 0) to pure effect 
+(`wetdry` = 1).
 
-The `monodistortion` unit generator applies a nonlinear distortion effect 
-to an audio signal, modifying its harmonic content and amplitude 
-characteristics. The input signal can have multiple channels, which are 
-first summed into a mono signal using the `route` unit generator. Each 
-input channel is explicitly routed to a single output channel (0). The 
-`gain` parameter is scaled by `1/sqrt(N)`, where `N` is the number of 
-input channels.
-
-The processing chain contains a first-order high-pass filter set at 720 Hz, 
-which removes low-frequency components that could cause unwanted distortion 
-artifacts. The filtered signal is then passed through a cubic nonlinear 
-distortion function, controlled by the `gain` parameter, which shapes the 
-signal by introducing harmonic content and increasing saturation. After 
-distortion, the signal is passed through a low-pass filter with a cutoff 
-frequency determined by the `tone` parameter. This filter helps shape the 
-final tonal characteristics of the distorted signal, allowing for control 
-over the brightness or warmth of the effect. Finally, the signal is 
+The processing chain contains a first-order high-pass filter set at 720 Hz,
+which removes low-frequency components. The filtered signal is then passed
+through a cubic nonlinear distortion function, which shapes the
+signal by introducing harmonic content and saturation. After
+distortion, the signal is passed through a low-pass filter with a cutoff
+frequency determined by the `tone` parameter (in Hz), allowing for control
+over the brightness or warmth of the effect. Finally, the signal is
 multiplied by the `volume` parameter, controlling the output gain.
 
-After the signal is processed, the `wetdry` parameter is used to blend the 
-distorted signal with the original input. When `wetdry` is set to 0, the 
-output consists entirely of the original input signal. When set to 1, the 
-output consists only of the distorted signal. Values in between allow for a 
-balance between the dry and processed signals.
+After the signal is processed, the `wetdry` parameter is used to blend the
+distorted signal with the original input. When `wetdry` is set to 0, the
+output consists entirely of the original input signal. When set to 1, the
+output consists only of the distorted signal. Values in between allow for a
+balance between the dry and processed signals
 
 `/arco/monodistortion/new id chans gain tone volume` - Create a new 
 monodistortion unit generator with `gain`, `tone`, and `volume` control 

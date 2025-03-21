@@ -1380,19 +1380,31 @@ def supersawtest(obj, event, x, y):
 ########## Overdrive Test ##############
 
 ovd = nil
+
 def overdrivetest(obj, event, x, y):
     display "overdrivetest", x
     if x:
-        var noise = sine(sample_hold(ugen_rand(220.0, 880.0),
-                                 sineb(8, 1)),
-                     0.3)
-        ovd = monodistortion(noise, 0.85, 0.85, 0.8)  // snd, gain, tone, volume
+       
+        var left_tone = sine(220, 0.3)  // 220 Hz (A3)
+        var right_tone = sine(275, 0.3) // 275 Hz (~C#4)
+
+        var env = pweb(0.2, 0.5, 1)
+        var left_env = mult(left_tone, env)
+        var right_env = mult(right_tone, env)
+
+        // Mix left and right signals into a single mono signal before distortion
+        var mono_input = add(left_env, right_env)
+
+        // Apply distortion
+        ovd = monodistortion(mono_input, 0.85, 0.85, 0.8) // snd, gain, tone, volume
         ovd.play()
     else:
+        // Fade out and stop processing
         ovd.set('snd', zero_ugen)
         sched_select(rtsched)
         sched_cause(6, ovd, 'mute')
         ovd = nil
+
 
 ########## Main Initialization ################
 
