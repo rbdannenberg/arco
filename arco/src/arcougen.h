@@ -1,5 +1,6 @@
 /* arcougen.h -- files needed by all unit generators */
 
+#define _USE_MATH_DEFINES
 #include "o2internal.h"
 #include "sharedmemclient.h"
 #include <limits.h>

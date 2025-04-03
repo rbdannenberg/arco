@@ -90,8 +90,8 @@ Follow the instructions printed by `build_everything_cmd.sh` to run the
 
 Finally, you will probably want to develop with Xcode:
  1. Open `CMake.app`
- 2. change "Where to build the binaries" to your `build/arco/apps/test`,
-    e.g. I would select `/Users/rbd/build/arco/apps/test`.
+ 2. change "Where to build the binaries" to your `build/arco/apps/test`, 
+    e.g. I would select `/Users/rbd/build/arco/apps/test`. 
  3. In the main CMake menu bar, select "File:Delete Cache" (because the
     `build_everything_cmd.sh` configured CMake to create a Unix makefile,
     but you want CMake to build an Xcode project.)
@@ -227,6 +227,12 @@ e.g. "C:\dev\" and build there.
   output, indicating that nmake is now on your path and runnable.)
 - Install CMake (I prefer the GUI version. Maybe there is a command line
   version that works.)
+- O2 depends on the Bonjour SDK. You can get this from Apple, but now
+  it seems that you have to pay as a developer, but an alternative is
+  www.softpedia.com, which has a free download. I advise caution with
+  second-hand downloads, as these sites are sometimes subsidized by
+  embedding malware into the installers, but our experience with the
+  Bonjour SDK has been good.
 - Clone and build o2 from https://github.com/rbdannenberg/o2
 - Checkout and build serpent from SourceForge (serpent project:
   `https://sourceforge.net/projects/serpent`, see 
@@ -311,7 +317,8 @@ e.g. "C:\dev\" and build there.
   - set USE_STATIC_LIBS = ON
   - set USE_LIBSNDFILE_EXTERNALS = ON
   - set USE_HID = OFF
-  - leave OFF: USE_PROC, USE_SHFILE, USE_ZEROMQ, WXS_STDOUT_WINDOW
+  - set WXS_STDOUT_WINDOW = ON
+  - leave OFF: USE_PROC, USE_SHFILE, USE_ZEROMQ,
   - set WX_BASE_PATH to your top wxWidgets path, e.g.
     `/home/rbd/wxWidgets`; there should be wx-build inside this
     directory
@@ -322,6 +329,8 @@ e.g. "C:\dev\" and build there.
     WXS_STDOUT_WINDOW = OFF.
 - GLIB_DBG_LIB and GLIB_OPT_LIB should be the full path to glib-2.0.lib
 - INTL_DBG_LIB should be ignore
+- change "Where to build the binaries" to your `arco/apps/test`, 
+    e.g. I would select `c:/Users/Roger/research/arco/apps/test`.
 - Use Cmake's configure and generate commands to create a Visual Studio
   project (`daserpent.sln`)
 - Open `arco/apps/test/daserpent.sln` and build with Visual Studio (start
@@ -335,9 +344,15 @@ e.g. "C:\dev\" and build there.
   serpent64.exe or wxserpent64.exe.)
 - Copy glib-2.0.dll, iconv-2.dll, intl-8.dll, and pcre2-8.dll from 
   xcpkg/installed/x64-windows/bin to the directory with your 
-  application, e.g. arco/apps/test/Debug/
-- Set search path in the Registry using RegEdit to set
-  `Computer\HKEY_LOCAL_MACHINE\SOFTWARE\CMU\Serpent` to
+  application, e.g. arco/apps/test/Debug/. If you linked with other
+  DLLs (remember that you specified local libraries in libraries.txt),
+  you may have to move those to arco/apps/test/Debug/ as well.You can
+  also set a general search path for your Windows OS so that you do
+  not have to move all the DLLs.
+- Create a place and set the search path in the Registry using
+  RegEdit: You need keys `Computer\HKEY_LOCAL_MACHINE\SOFTWARE\CMU` and
+  `Computer\HKEY_LOCAL_MACHINE\SOFTWARE\CMU\Serpent`. Then, under
+  Serpent, create the string named SERPENTPATH set to the value
   `SP\lib;SP\programs;SP\wxslib;ARCODIR\serpent\srp`, where SP is the
   serpent directory, e.g. `C:\Users\Roger\research\serpent` and
   ARCODIR is the arco directory, e.g. `C:\Users\Roger\research\arco`

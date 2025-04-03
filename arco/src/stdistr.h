@@ -100,7 +100,7 @@ public:
 
     // remove operation finds the signal and removes it and its gain
     void rem(int i) {
-        if (i >= 0 and i < inputs.size()) {
+        if (i >= 0 && i < inputs.size()) {
             inputs[i]->unref();
             inputs[i] = nullptr;
         }

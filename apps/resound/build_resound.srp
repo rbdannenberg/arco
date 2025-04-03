@@ -39,7 +39,7 @@ SERPENTSOURCES = [
     LIB + "timemap.srp",
     LIB + "utils.srp",
     LIB + "precision.srp",
-    ARCO + "o2util.srp",
+    ARCO + "o2msgutil.srp",
     ARCO + "arco.srp",
     ARCO + "windowmgr.srp",
     ARCO + "arcoslider.srp",

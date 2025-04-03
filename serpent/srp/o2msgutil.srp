@@ -1,4 +1,4 @@
-# o2util.srp -- Serpent library for higher-level O2 sends
+# o2msgutil.srp -- Serpent library for higher-level O2 sends
 #
 # Roger B. Dannenberg
 # Jan 2022
@@ -35,7 +35,7 @@ def o2_send(addr, when, optional sig = "", rest rest_args):
 
 def o2_send_helper(tcp, addr, when, sig, args):
     if len(sig) != len(args):
-        print "ERROR: o2util o2_send_cmd bad args:", sig, args
+        print "ERROR: o2msgutil o2_send_cmd bad args:", sig, args
         return
     o2_send_start()
     for s at i in sig:

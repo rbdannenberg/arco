@@ -9,10 +9,12 @@
 
 require "debug"
 require "sched"
-require "o2util"
+require "o2msgutil"
 require "utils"
 require "prefs"
 // require "instr" -- included below after Ugen is defined
+
+DEBUG_ACTIONS = false
 
 ACTION_ALL = 63     // all actions except FREE
 ACTION_TERM = 1     // this flag is always present to indicate whether ugen has
@@ -24,6 +26,19 @@ ACTION_END = 16   // final event such as reaching envelope breakpoint == 0
 ACTION_REM = 32     // uid was removed from mixer or sum
 ACTION_FREE = 64
 ACTION_END_OR_TERM = ACTION_END | ACTION_TERM
+
+ACTION_STRINGS = [" TERM", " ERROR", " EXCEPT", " EVENT",
+                  " END", " REM", " FREE"]
+
+def action_mask_string(mask):
+# return a string describing an action mask
+    var s = "<mask"
+    for action_string at i in ACTION_STRINGS:
+        if ((1 << i) & mask) != 0:
+            s = s + action_string
+    return s + ">"
+
+
 
 FADE_LINEAR = 0
 FADE_EXPONENTIAL = 1
@@ -242,6 +257,9 @@ def register_action(ugen, action_mask, target, method, rest parameters):
         ugen.action_id = next_action_id
         next_action_id = next_action_id + 1
         send_action = true
+    if DEBUG_ACTIONS:
+        display "register_action", target, method, parameters, ugen.action_id,
+        print action_mask_string(action_mask)
     if send_action:
         o2_send_cmd("/arco/act", 0, "Uii",
                     ugen, ugen.action_id, action_list.action_mask)
@@ -262,9 +280,17 @@ def actl_act(timestamp, address, types, key, status, uid):
         // and incrementing i or by removing ugen_actions[i] which decrements length
         if target:
             var method = action.method
+            if DEBUG_ACTIONS:
+                display "actl_act", key, target, method, 
+                display uid, action.parameters,
+                print action_mask_string(status)
             send(target, method, status, uid, action.parameters)
             i = i + 1
         else:
+            if DEBUG_ACTIONS:
+                display "actl_act - target deleted", key, action.method, 
+                display action.parameters,
+                print action_mask_string(status)
             action_list.ugen_actions.uninsert(i)
     if (status & ACTION_FREE) > 0:
         action_dict.remove(key)  // ugen is gone - no more status messages
@@ -819,7 +845,7 @@ class Ugen:
             if types_[idiv(i, 2)] == "U":  // it's a Ugen
                 o2_add_int32(arco_ugen_id(inp.id))
                 inputs[inputs_[i]] = inp  // build dictionary of inputs
-            else:  // add a normal value, use code from o2util.srp:
+            else:  // add a normal value, use code from o2msgutil.srp:
                 funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 2)]], inp)
             // print inputs_[i], inp.id,
         o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)

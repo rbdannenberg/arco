@@ -7,7 +7,7 @@
 # call arco_run() after setting up UI and or scheduling things
 # arco_ready is set to true when arco is ready for action
 
-print "apps/daserpent/init.srp is loading, getcwd() ->", getcwd()
+print "apps/test/init.srp is loading, getcwd() ->", getcwd()
 
 require "debug"
 require "wxserpent"
@@ -24,6 +24,7 @@ require "supersawdemo"
 require "steps"
 
 SIMPLE = false
+DEBUG_ACTIONS = true  // override default
 
 class Atone (Instrument):
     var env, renv
@@ -419,14 +420,26 @@ class Finishtest:
 def play_finish_test(obj, event, x, y):
 # this is a test for atend(FINISH, this): when box is unchecked, noteoff
 # sends ending to envelope, which sends finish() to instrument, which 
-
     display "play_simple_tone", x
     if x:
         finish_test = Finishtest()  // make finish_test
     else:
         finish_test.noteoff()
         finish_test = nil
-        
+
+// here's what happens at end (depends on GC timing though):
+// - when finish_test is created, there are two action_id's registered:
+//   - finish_test is target when env finishes
+//   - sum is target when mult finishes
+// - after starting the test, user unchecks the box
+// - finish_test is deleted and is GC'd before env terminates
+// - env starts decay and .term() method sets its CAN_TERMINATE flag
+// - env reaches end; it is input to a mult
+// - "finish" is sent to finish_test, but ignored because it was GC'd
+// - mult gets termination from env
+// - sum removes mult and sends an ACTION_REMOVE
+// - sum has no reference, so it sends an ACTION_FREE, but it was GC'd
+// - env is freed and sends an ACTION_FREE, to finish_test, but env was GC'd
 
 
 // handler for mtcheckbox: play/stop some sine tones
@@ -1013,18 +1026,32 @@ class File_play_record:
         frec.run()
         frec.go()
 
-    def finish(optional status):  // stop recording and clean up
+    def finish(optional status, finisher, parameters):
+    # stop recording and clean up
         print "File_play_record.finish called via .atend() processing"
         frec.stop()
         frec.unrun()
         frec = nil
         fply = nil
+        file_play_record_inst = nil  // allow it to be GC'd
 
 
 // handler for fprbutton: play file and record it
 def file_play_record(obj, event, x, y):
     display "file_play_record", x
-    File_play_record()
+    print "\n---------\nNote: file_play_record makes no sound."
+    print "It plays sound from a fileplay ugen as input to a filerec ugen."
+    print "The result is a copy from testinput.wav (if it exists) to"
+    print "testoutput.wav. You have to play it yourself (it just a test)."
+    print "----------\n"
+    // Note: if you allow the File_play_record() to be GC'd, there will be
+    // no handler for "fply.atend(FINISH, this)" and frec will record
+    // forever. It seems like you could direct .atend() to send .stop() to
+    // frec, but this does not work either: Actions only maintain weak
+    // references to action targets to avoid a circular reference problem
+    // (object ref counts never go to zero so they never terminate and send
+    // a termination action, so the ref count never goes to zero, ...).
+    file_play_record_inst = File_play_record()
 
 
 ########## Fade Test ################
