@@ -26,18 +26,18 @@
 
 #define D if (0)
 
-extern O2sm_info *audio_bridge;
+extern void *audio_bridge;
     
-O2sm_info *fileio_bridge = NULL;
+void *fileio_bridge = NULL;
 Vec<Fileio_obj *> fileio_objs;
 
 class Fileio_actual : public Fileio_thread {
 public:
-    O2_context fio_o2_ctx;
+    void *fio_o2_ctx;
 
     // thread_started() will be called once when thread starts
     void thread_started() {
-        o2_ctx = &fio_o2_ctx;
+        o2_set_context(fio_o2_ctx);
     }
 
 
@@ -122,8 +122,9 @@ public:
         o2_add_int64(addr);
         o2_add_int32(file_is_open ? chans : 0);
         o2_add_bool(rslt >= 0);
-        O2message_ptr msg = o2_message_finish(0.0, "/arco/fileplay/ready", true);
-        audio_bridge->outgoing.push((O2list_elem *) msg);
+        O2message_ptr msg = o2_message_finish(0.0, "/arco/fileplay/ready",
+                                              true);
+        o2_shmem_inst_outgoing_push(audio_bridge, (O2list_elem *) msg);
 
         load_block();  // even if error opening or seeking
 
@@ -176,8 +177,9 @@ public:
         o2_send_start();
         o2_add_int64(addr);
         o2_add_int64((int64_t) ablock);
-        O2message_ptr msg = o2_message_finish(0.0, "/arco/fileplay/samps", true);
-        audio_bridge->outgoing.push((O2list_elem *) msg);
+        O2message_ptr msg = o2_message_finish(0.0, "/arco/fileplay/samps",
+                                              true);
+        o2_shmem_inst_outgoing_push(audio_bridge, (O2list_elem *) msg);
 
         block_on_deck ^= 1;  // swap 0 <-> 1
         if (ablock->last) {
@@ -224,7 +226,7 @@ public:
         o2_add_int64(addr);
         o2_add_bool(rslt >= 0);
         O2message_ptr msg = o2_message_finish(0.0, "/arco/filerec/ready", true);
-        audio_bridge->outgoing.push((O2list_elem *) msg);
+        o2_shmem_inst_outgoing_push(audio_bridge, (O2list_elem *) msg);
     }
 
 
@@ -274,7 +276,7 @@ public:
         o2_send_start();
         o2_add_int64(addr);
         O2message_ptr msg = o2_message_finish(0.0, "/arco/filerec/samps", true);
-        audio_bridge->outgoing.push((O2list_elem *) msg);
+        o2_shmem_inst_outgoing_push(audio_bridge, (O2list_elem *) msg);
         return block->last;
     }
     
@@ -401,7 +403,7 @@ void fileio_filerec_write(O2SM_HANDLER_ARGS)
         o2_add_int64(addr);
         O2message_ptr msg = 
                 o2_message_finish(0.0, "/arco/filerec/samps", true);
-        audio_bridge->outgoing.push((O2list_elem *) msg);
+        o2_shmem_inst_outgoing_push(audio_bridge, (O2list_elem *) msg);
         if (last) {
             fileio_objs.remove(i);
             printf("fileio_filerec_write deleting writer @ %p addr %p\n",
@@ -420,19 +422,23 @@ int fileio_initialize()
     // create the bridge and instance
     assert(fileio_bridge == NULL);
     fileio_bridge = o2_shmem_inst_new();
-    O2_context *save = o2_ctx;
-    o2sm_initialize(&(fileio_actual.fio_o2_ctx), fileio_bridge);
-    printf("initialized fileio_bridge %p id %d outgoing %p\n", fileio_bridge,
-           fileio_bridge->id, &fileio_bridge->outgoing.queue_head);
+    fileio_actual.fio_o2_ctx = o2sm_initialize(fileio_bridge);
+    printf("initialized fileio_bridge %p id %d\n", fileio_bridge,
+           o2_shmem_inst_id(fileio_bridge));
     o2sm_service_new("fileio", NULL);
 
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/fileio/fileplay/new", "hsffB", fileio_fileplay_new, NULL, true, true);
-    o2sm_method_new("/fileio/fileplay/read", "h", fileio_fileplay_read, NULL, true, true);
-    o2sm_method_new("/fileio/fileplay/play", "hB", fileio_fileplay_play, NULL, true, true);
+    o2sm_method_new("/fileio/fileplay/new", "hsffB", fileio_fileplay_new,
+                    NULL, true, true);
+    o2sm_method_new("/fileio/fileplay/read", "h", fileio_fileplay_read,
+                    NULL, true, true);
+    o2sm_method_new("/fileio/fileplay/play", "hB", fileio_fileplay_play,
+                    NULL, true, true);
     o2sm_method_new("/fileio/quit", "", fileio_quit, NULL, true, true);
-    o2sm_method_new("/fileio/filerec/new", "his", fileio_filerec_new, NULL, true, true);
-    o2sm_method_new("/fileio/filerec/write", "hh", fileio_filerec_write, NULL, true, true);
+    o2sm_method_new("/fileio/filerec/new", "his", fileio_filerec_new,
+                    NULL, true, true);
+    o2sm_method_new("/fileio/filerec/write", "hh", fileio_filerec_write,
+                    NULL, true, true);
     // END INTERFACE INITIALIZATION
 
     // create a thread to poll for fileio
@@ -441,6 +447,6 @@ int fileio_initialize()
         return 1;
     }
 
-    o2_ctx = save;  // restore caller (probably main O2 thread)'s context
+    o2_set_context(NULL);  // restore caller (main O2 thread)'s context
     return 0;
 }

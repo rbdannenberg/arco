@@ -96,7 +96,6 @@ public:
             i = 0;
         }
         which_table = i;
-        Wavetable *table = get_table(i);
     }
 
 
@@ -107,7 +106,7 @@ public:
             int ix = x;
             float frac = x - ix;
             *out_samps++ = (table[ix] * (1 - frac) + 
-                            table[ix + 1] * frac) * amp_samps[i];
+                            table[ix + 1] * frac) * amp_samps[i];  
             phase += freq_samps[i] * AP;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -192,7 +191,7 @@ public:
             return;
         }
         for (int i = 0; i < chans; i++) {
-            (this->*run_channel)(state, &((*table)[0]), tlen);
+            (this->*run_channel)(state, table->get_array(), tlen);
             state++;
             freq_samps += freq_stride;
             amp_samps += amp_stride;

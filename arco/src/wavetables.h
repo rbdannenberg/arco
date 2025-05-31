@@ -46,25 +46,15 @@ public:
 
 
     Wavetable *get_table(int i) {
-        if (lender) {
-            if (i >= lender->wavetables.size()) {
-                if (lender->wavetables.size() > 0) {
-                    i = 0;
-                } else {
-                    return nullptr;
-                }
+        Vec<Wavetable> &w = (lender ? lender->wavetables : wavetables);
+        if (i >= w.size()) {
+            if (w.size() > 0) {
+                i = 0;
+            } else {
+                return nullptr;
             }
-            return &lender->wavetables[0];
-        } else {
-            if (i >= wavetables.size()) {
-                if (wavetables.size() > 0) {
-                    i = 0;
-                } else {
-                    return nullptr;
-                }
-            }
-            return &wavetables[0];
         }
+        return &w[i];
     }
 
 

@@ -2,8 +2,8 @@
 
 # Configuration
 NUM_RUNS=25
-WHAT_TO_RUN=Release/arcolike16
-echo "Running benchmarks $NUM_RUNS times..."
+WHAT_TO_RUN=Release/fixphase
+echo "Running benchmark $WHAT_TO_RUN $NUM_RUNS times..."
 
 # Run benchmarks
 for i in $(seq 1 $NUM_RUNS); do
@@ -13,4 +13,3 @@ for i in $(seq 1 $NUM_RUNS); do
     sleep 1
 
 done
-

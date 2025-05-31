@@ -284,11 +284,11 @@ using std::min;
 
 // Note: audio processing can be carried out by more than one thread.
 // When the audio callback happens, we set the thread_local o2_ctx
-// variable to &aud_o2_ctx. When audio is not running, someone should
+// variable to aud_o2_ctx. When audio is not running, someone should
 // call arco_thread_poll(), which saves o2_ctx on the stack, sets
-// o2_ctx to &aud_o2_ctx, checks for messages and events, then restores
+// o2_ctx to aud_o2_ctx, checks for messages and events, then restores
 // o2_ctx.
-O2_context aud_o2_ctx;  // O2 context for audio thread
+void *aud_o2_ctx = NULL;  // O2 context for audio thread
 
 O2queue *arco_msg_queue = NULL;
 
@@ -297,7 +297,7 @@ bool aud_is_reset = false;
 int64_t aud_frames_done = 0;
 int aud_blocks_done = 0;
 bool aud_heartbeat = true;
-O2sm_info *audio_bridge = NULL;
+void *audio_bridge = NULL;
 
 // slew-rate limited master gain control:
 float aud_gain = 1.0;
@@ -750,7 +750,7 @@ static int in_audio_callback = 0;
 static int callback_entry(float *input, float *output,
                           PaStreamCallbackFlags flags)
 {
-    o2_ctx = &aud_o2_ctx;  // make thread context available to o2 functions
+    o2_set_context(aud_o2_ctx);  // make thread context available to o2 functions
     assert(!in_audio_callback);
     in_audio_callback++;
     
@@ -1253,11 +1253,11 @@ void arco_thread_poll()
     // now, aud_state == IDLE
     arco_wall_time = o2_native_time() + arco_wall_time_offset;
 
-    O2_context *save_ctx = o2_ctx;
-    o2_ctx = &aud_o2_ctx;
+    assert(aud_o2_ctx);
+    void *save_ctx = o2_set_context(aud_o2_ctx);
     o2sm_poll();
     // restore thread local context
-    o2_ctx = save_ctx;
+    o2_set_context(save_ctx);
 }
 
 
@@ -1276,10 +1276,9 @@ int audioio_initialize()
     assert(audio_bridge == NULL);  // not OK if this bridge was already created
     audio_bridge = o2_shmem_inst_new();  // make our bridge
 
-    O2_context *save = o2_ctx;
-    o2sm_initialize(&aud_o2_ctx, audio_bridge);
-    printf("initialized audio_bridge %p id %d outgoing %p\n",
-           audio_bridge, audio_bridge->id, &audio_bridge->outgoing.queue_head);
+    aud_o2_ctx = o2sm_initialize(audio_bridge);
+    printf("initialized audio_bridge %p id %d\n",
+           audio_bridge, o2_shmem_inst_id(audio_bridge));
 
     o2sm_service_new("arco", NULL);
 
@@ -1315,7 +1314,7 @@ int audioio_initialize()
 //    actual_in_chans = 0;  // no input open yet
 //    actual_out_chans = 0;  // no output open yet
     
-    o2_ctx = save;  // restore caller (probably main O2 thread)'s context
+    o2_set_context(NULL);  // restore caller (main O2 thread)'s context
     // now that o2_ctx is restored, we can set the clock source:
     o2_clock_set(arco_time, NULL);
     return 0;
