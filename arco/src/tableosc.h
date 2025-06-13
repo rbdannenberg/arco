@@ -33,6 +33,7 @@ public:
         states.set_size(chans);
         for (int i = 0; i < chans; i++) {
             states[i].phase = fmodf(phase / 360.0f, 1.0f);
+            states[i].prev_amp = 0.0f;
         }
         init_freq(freq_);
         init_amp(amp_);

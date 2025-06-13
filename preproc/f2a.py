@@ -1107,9 +1107,16 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
     """
     Write the .h file which is most of the ugen dsp code to outf.
 
-    fhfiles is a list of fhfile of the form:
+
+    Parameters
+    ----------
+    classname: the full name of the class, e.g. Sineb
+    impl: an Implementation object (see implementation.py)
+    signature: constructor signature info (see get_signatures() ini params.py)
+    rate: one of 'a', 'b', or 'c'
+    fhfiles: a list of fhfile of the form:
         [filename, signature (ab_b), output (classname)]
-    impl is an Implementation object
+    outf: output file, e.g. for Sineb.h
     """
 
     global fsrc, fimpl  # faust .dsp file and faust-generated .fh file
@@ -1194,6 +1201,8 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
         constructor += f"        run_channel = (void ({classname}::*)("
         constructor +=                          f"{classname}_state *)) 0;\n"
         constructor += "        update_run_channel();\n"
+    else:
+        constructor += "        initialize_channel_states();\n"
     constructor += "    }\n\n"
 
     ## Generate the destructor

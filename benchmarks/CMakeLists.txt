@@ -152,3 +152,13 @@ target_compile_definitions(writetest PUBLIC O2_NO_O2DISCOVERY)
 target_include_directories(writetest PUBLIC ${O2_INCL}) 
 target_link_libraries(writetest ${O2_OPT_LIB} ${EXTRA_LIBS}) 
 
+add_executable(arcolike2 arcolike2.cpp) 
+target_compile_definitions(arcolike2 PUBLIC O2_NO_O2DISCOVERY) 
+target_include_directories(arcolike2 PUBLIC ${O2_INCL}) 
+target_link_libraries(arcolike2 ${O2_OPT_LIB} ${EXTRA_LIBS}) 
+
+add_executable(arcoopt arcoopt.cpp) 
+target_compile_definitions(arcoopt PUBLIC O2_NO_O2DISCOVERY) 
+target_include_directories(arcoopt PUBLIC ${O2_INCL}) 
+target_link_libraries(arcoopt ${O2_OPT_LIB} ${EXTRA_LIBS}) 
+

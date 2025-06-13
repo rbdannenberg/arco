@@ -145,3 +145,5 @@ srp.log
 /benchmarks/Debug/
 
 /benchmarks/data-jan20/
+
+/ugens/mult/mult.srp

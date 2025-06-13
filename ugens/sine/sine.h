@@ -66,7 +66,7 @@ class SineSIG0 {
     void fillSineSIG0(int count, float* table) {
         for (int i1 = 0; i1 < count; i1 = i1 + 1) {
             iVec0[0] = 1;
-            iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
+            iRec0[0] = (iRec0[1] + iVec0[1]) % 65536;
             table[i1] = std::sin(9.58738e-05f * float(iRec0[0]));
             iVec0[1] = iVec0[0];
             iRec0[1] = iRec0[0];
@@ -196,7 +196,7 @@ public:
             state->iVec1[0] = 1;
             float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow0 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            output0[i0] = FAUSTFLOAT(float(input0[i0]) * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            output0[i0] = FAUSTFLOAT(ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))] * float(input0[i0]));
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }
@@ -232,7 +232,7 @@ public:
             state->iVec1[0] = 1;
             float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : state->fRec1[1] + fConst0 * float(input0[i0]));
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            output0[i0] = FAUSTFLOAT(ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))] * float(input1[i0]));
+            output0[i0] = FAUSTFLOAT(float(input1[i0]) * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }

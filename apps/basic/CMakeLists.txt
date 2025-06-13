@@ -18,4 +18,4 @@ PROJECT(${ARCO_SERVER_NAME})
 set(CUSTOM_ARCO )
 
 # This command pulls in all the greatness of Arco.
-add_subdirectory(../../server arco-build)
+include(../../server/arcoserver.cmakeinclude)

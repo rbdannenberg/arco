@@ -1,5 +1,6 @@
-// singlechannel.cpp - based on Dannenberg and Thompson, CMJ, implements
-//     unit generators in the style of Arco
+// arcolike2.cpp - based on Dannenberg and Thompson, CMJ, implements
+//     unit generators in the style of Arco.
+// This is similar to arco32.cpp, but with experimental optimizations
 //
 // Roger B. Dannenberg
 // Jan 2025
@@ -30,12 +31,15 @@ sum: Sum
  * Jan 2022
  */
 
+// #define CHEAT 1
+
+const int LOG2_BL = 5;
+#define RESULTS "data/arcolike2.txt"
+
 #define SIMSECS 3600
 
 #include <climits>
 #include "o2internal.h"
-
-// int64_t gcount = 0; /*C*/
 
 /* arcotypes.h -- audio dsp process for Arco
  *
@@ -49,7 +53,6 @@ typedef Sample *Sample_ptr;
 const int ARCO_STRINGMAX = 128;
 const double AR = 44100.0;
 const double AP = 1.0 / AR;
-const int LOG2_BL = 5;
 const int BL = 1 << LOG2_BL;  // = 32
 const float BL_RECIP = 1.0F / BL;
 const double BR = AR / BL;
@@ -429,7 +432,6 @@ public:
             }
         }
         *out_samps = current;
-//         gcount++; /*C*/
         current += seg_incr;
         seg_togo--;
     }
@@ -836,15 +838,38 @@ const char *Tableosc_name = "Tableosc";
 
 class Tableosc : public Wavetables {
 public:
-    struct Tableosc_state {
+    class Tableosc_state {
+    public:
         double phase;  // from 0 to 1 (1 represents 2PI or 360 degrees)
         Sample prev_amp;
+
+        void chan_bb_a(Sample *table, int tlen,
+                       Sample *amp_samps, Sample *freq_samps, Sample *out_samps) {
+            double phase_reg = phase;
+            double phase_incr = *freq_samps * AP;
+            Sample amp_sig = *amp_samps;
+            Sample amp_sig_fast = prev_amp;
+            prev_amp = amp_sig;
+            Sample amp_sig_incr = (amp_sig - amp_sig_fast) * BL_RECIP;
+            for (int i = 0; i < BL; i++) {
+                float x = phase_reg * tlen;
+                int ix = x;
+                float frac = x - ix;
+                amp_sig_fast += amp_sig_incr;
+                *out_samps++ = (table[ix] * (1 - frac) + 
+                                table[ix + 1] * frac) * amp_sig_fast;
+                phase_reg += phase_incr;
+                while (phase_reg > 1) phase_reg--;
+                while (phase_reg < 0) phase_reg++;
+            }
+            phase = phase_reg;
+        }
+        
     };
     int which_table;
-    Tableosc_state states;
-    void (Tableosc::*run_channel)(Tableosc_state *state,
-                                  Sample *table, int tlen);
-
+    Vec<Tableosc_state> states;
+    void (Tableosc_state::*run_channel)(Sample *table, int tlen,
+            Sample *amp_samps, Sample *freq_samps, Sample *out_ptr);
 
     Ugen_ptr freq;
     int freq_stride;
@@ -858,8 +883,10 @@ public:
     Tableosc(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_, float phase) :
             Wavetables(id, nchans) {
         which_table = 0;
-        states.phase = fmodf(phase / 360.0f, 1.0f);
-        states.prev_amp = 0;
+        states.set_size(chans);
+        for (int i = 0; i < chans; i++) {
+            states[i].phase = fmodf(phase / 360.0f, 1.0f);
+        }
         init_freq(freq_);
         init_amp(amp_);
         update_run_channel();
@@ -874,15 +901,15 @@ public:
     void update_run_channel() {
         if (freq->rate == 'a') {
             if (amp->rate == 'a') {
-                run_channel = &Tableosc::chan_aa_a;
+                run_channel = NULL;
             } else {
-                run_channel = &Tableosc::chan_ab_a;
+                run_channel = NULL;
             }
         } else {
             if (amp->rate == 'a') {
-                run_channel = &Tableosc::chan_ba_a;
+                run_channel = NULL;
             } else {
-                run_channel = &Tableosc::chan_bb_a;
+                run_channel = &Tableosc_state::chan_bb_a;
             }
         }
     }
@@ -925,7 +952,7 @@ public:
         Wavetable *table = get_table(i);
     }
 
-
+#ifdef IGNORE
     void chan_aa_a(Tableosc_state *state, Sample *table, int tlen) {
         double phase = state->phase;
         for (int i = 0; i < BL; i++) {
@@ -934,7 +961,6 @@ public:
             float frac = x - ix;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_samps[i];
-//             gcount++; /*C*/
             phase += freq_samps[i] * AP;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -952,7 +978,6 @@ public:
             float frac = x - ix;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_samps[i];
-//             gcount++; /*C*/
             phase += phase_incr;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -974,7 +999,6 @@ public:
             amp_sig_fast += amp_sig_incr;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_sig_fast;
-//             gcount++; /*C*/
             phase += freq_samps[i] * AP;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -983,7 +1007,7 @@ public:
     }
 
 
-    void chan_bb_a(Tableosc_state *state, Sample *table, int tlen) {
+    void chan_bb_a(Sample *table, int tlen) {
         double phase = state->phase;
         double phase_incr = *freq_samps * AP;
         Sample amp_sig = *amp_samps;
@@ -997,18 +1021,18 @@ public:
             amp_sig_fast += amp_sig_incr;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_sig_fast;
-//             gcount++; /*C*/
             phase += phase_incr;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
         }
         state->phase = phase;
     }
-
+#endif
 
     void real_run() {
         RUN(freq_samps, freq, current_block); // update input
         RUN(amp_samps, amp, current_block); // update input
+        Tableosc_state *state = states.get_array();
         if (which_table >= num_tables()) {
             return;
         }
@@ -1020,7 +1044,24 @@ public:
         if (tlen < 2) {
             return;
         }
-            (this->*run_channel)(&states, &((*table)[0]), tlen);
+#ifndef CHEAT
+        int i = 1;
+#endif
+  more_chans:
+        (state->*run_channel)(&((*table)[0]), tlen,
+                              amp_samps, freq_samps, out_samps);
+#ifdef CHEAT
+        return;
+#else
+        if (i >= chans) return;
+        arco_error("i < chans");
+        state++;
+        freq_samps += freq_stride;
+        amp_samps += amp_stride;
+        out_samps += BL;
+        i++;
+        goto more_chans;
+#endif
     }
 };
 
@@ -1113,14 +1154,26 @@ const char *Sineb_name = "Sineb";
 
 class Sineb : public Ugen {
 public:
-    struct Sineb_state {
+    class Sineb_state {
+    public:
         FAUSTFLOAT fEntry0;
         int iVec1[2];
         FAUSTFLOAT fEntry1;
         float fRec1[2];
+
+        void real_run(Sample amp_samp, Sample freq_samp, Sample *out_samp,
+                      float fConst0) {
+            float fSlow0 = float(amp_samp);
+            float fSlow1 = fConst0 * float(freq_samp);
+            iVec1[0] = 1;
+            float fTemp0 = ((1 - iVec1[1]) ? 0.0f : fSlow1 + fRec1[1]);
+            fRec1[0] = fTemp0 - std::floor(fTemp0);
+            *out_samp = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(SINESIZE * fRec1[0]), (SINESIZE - 1)))]);
+            iVec1[1] = iVec1[0];
+            fRec1[1] = fRec1[0];
+        }
     };
-    Sineb_state states;
-    void (Sineb::*run_channel)(Sineb_state *state);
+    Vec<Sineb_state> states;
 
     Ugen_ptr freq;
     int freq_stride;
@@ -1137,6 +1190,7 @@ public:
         freq = freq_;
         amp = amp_;
         flags = CAN_TERMINATE;
+        states.set_size(chans);
         fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
         init_freq(freq);
         init_amp(amp);
@@ -1150,12 +1204,14 @@ public:
     const char *classname() { return Sineb_name; }
 
     void initialize_channel_states() {
+        for (int i = 0; i < chans; i++) {
             for (int l2 = 0; l2 < 2; l2 = l2 + 1) {
-                states.iVec1[l2] = 0;
+                states[i].iVec1[l2] = 0;
             }
             for (int l3 = 0; l3 < 2; l3 = l3 + 1) {
-                states.fRec1[l3] = 0.0f;
+                states[i].fRec1[l3] = 0.0f;
             }
+        }
     }
 
     void print_sources(int indent, bool print_flag) {
@@ -1188,17 +1244,24 @@ public:
     void real_run() {
         RUN(freq_samps, freq, current_block);  // update input
         RUN(amp_samps, amp, current_block);  // update input
-
-            float fSlow0 = float(amp_samps[0]);
-            float fSlow1 = fConst0 * float(freq_samps[0]);
-            states.iVec1[0] = 1;
-            float fTemp0 = ((1 - states.iVec1[1]) ? 0.0f : fSlow1 + states.fRec1[1]);
-            states.fRec1[0] = fTemp0 - std::floor(fTemp0);
-            out_samps[0] = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(SINESIZE * states.fRec1[0]), (SINESIZE - 1)))]);
-//             gcount++; /*C*/
-            states.iVec1[1] = states.iVec1[0];
-            states.fRec1[1] = states.fRec1[0];
-    
+        Sineb_state *state = states.get_array();
+#ifndef CHEAT
+        int i = 1;
+#endif
+  more_chans:
+        state->real_run(*amp_samps, *freq_samps, out_samps, fConst0);
+#ifdef CHEAT
+        return;
+#else
+        if (i >= chans) return;
+        arco_error("i < chans");
+        state++;
+        out_samps++;
+        freq_samps += freq_stride;
+        amp_samps += amp_stride;
+        i++;
+        goto more_chans;
+#endif
     }
 };
 
@@ -1220,13 +1283,27 @@ extern const char *Blend_name;
 
 class Blend : public Ugen {
 public:
-    struct Blend_state {
+    class Blend_state {
+    public:
         Sample prev_x1_gain;
         Sample prev_x2_gain;
         Sample prev_b;  // blend
+
+        void linear_aab_a(Sample *x1_samps, Sample *x2_samps, Sample b,
+                          Sample *out_samps, Sample gain) {
+            Sample b_fast = prev_b;
+            Sample b_incr = (b - b_fast) * BL_RECIP;
+            prev_b = b;
+            for (int i = 0; i < BL; i++) {
+                b_fast += b_incr;
+                *out_samps++ = gain * (x1_samps[i] * (1.0f - b_fast) +
+                                       x2_samps[i] * b_fast);
+            }
+        }
     };
-    Blend_state states;
-    void (Blend::*run_channel)(Blend_state *state);
+    Vec<Blend_state> states;
+    void (Blend_state::*run_channel)(Sample *x1_samps, Sample *x2_samps, Sample b,
+                                     Sample *out_samps, Sample gain);
 
     Ugen_ptr x1;
     int x1_stride;
@@ -1252,6 +1329,7 @@ public:
         mode = mode_;
         gain = 1;
         flags = CAN_TERMINATE;
+        states.set_size(chans);  // zeros everything
 
         init_x1(x1);
         init_x2(x2);
@@ -1274,16 +1352,18 @@ public:
     const char *classname() { return Blend_name; }
 
     void initialize_channel_states(float b_init) {
-            states.prev_b = b_init;
+        for (int i = 0; i < chans; i++) {
+            states[i].prev_b = b_init;
+        }
     }
 
     void update_run_channel() {
         if (mode == BLEND_POWER) {
-            run_channel = &Blend::power_aab_a;
+            run_channel = NULL;
         } else if (mode == BLEND_45) {
-            run_channel = &Blend::p45_aab_a;
+            run_channel = NULL;
         } else {
-            run_channel = &Blend::linear_aab_a;
+            run_channel = &Blend_state::linear_aab_a;
         }
     }
 
@@ -1365,12 +1445,12 @@ public:
     x2_gain += x2_gain - 1;
 
 #define COMPUTE_X1_X2_GAIN \
-    Sample x1_gain_fast = states.prev_x1_gain; \
+    Sample x1_gain_fast = state->prev_x1_gain; \
     Sample x1_gain_incr = (x1_gain - x1_gain_fast) * BL_RECIP; \
-    states.prev_x1_gain = x1_gain; \
-    Sample x2_gain_fast = states.prev_x2_gain; \
+    state->prev_x1_gain = x1_gain; \
+    Sample x2_gain_fast = state->prev_x2_gain; \
     Sample x2_gain_incr = (x2_gain - x2_gain_fast) * BL_RECIP; \
-    states.prev_x2_gain = x2_gain;
+    state->prev_x2_gain = x2_gain;
 
 #define P45_BLEND \
     x1_gain = sqrt((1 - b) * x1_gain);  /* blend linear with constant power */ \
@@ -1385,16 +1465,16 @@ public:
     }
 
 
+#ifdef IGNORE
     void linear_aab_a(Blend_state *state) {
         float b = *b_samps;
-        Sample b_fast = states.prev_b;
+        Sample b_fast = state->prev_b;
         Sample b_incr = (b - b_fast) * BL_RECIP;
-        states.prev_b = b;
+        state->prev_b = b;
         for (int i = 0; i < BL; i++) {
             b_fast += b_incr;
             *out_samps++ = gain * (x1_samps[i] * (1.0f - b_fast) +
                                    x2_samps[i] * b_fast);
-//             gcount++; /*C*/
         }
     }
 
@@ -1412,7 +1492,7 @@ public:
         COMPUTE_X1_X2_GAIN  // prepare to upsample x1_gain, x2_gain
         APPLY_X1_X2_GAIN  // compute output using x1_gain, x2_gain weighting
     }
-
+#endif
 
     void real_run() {
         RUN(x1_samps, x1, current_block); // update input
@@ -1422,8 +1502,24 @@ public:
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-
-            (this->*run_channel)(&states);
+        Blend_state *state = states.get_array();
+#ifndef CHEAT
+        int i = 1;
+#endif
+  more_chans:
+        (state->*run_channel)(x1_samps, x2_samps, *b_samps, out_samps, gain);
+#ifdef CHEAT
+        return;
+#else
+        if (i >= chans) return;
+        state++;
+        x1_samps += x1_stride;
+        x2_samps += x2_stride;
+        b_samps += b_stride;
+        out_samps += BL;
+        i++;
+        goto more_chans;
+#endif
     }
 };
 
@@ -1447,6 +1543,7 @@ typedef struct Stpan_state {
 
 class Stpan : public Ugen {
 public:
+    Vec<Stpan_state> states;
 
     Ugen_ptr x;
     int x_stride;
@@ -1456,16 +1553,13 @@ public:
     int pan_stride;
     Sample_ptr pan_samps;
 
-    Stpan_state state;
-
     Stpan(int id, int nchans, Ugen_ptr x_, Ugen_ptr pan_) :
         Ugen(id, 'a', 2 /* chans */) {
         x = x_;
         pan = pan_;
         init_x(x);
         init_pan(pan);
-        state.left = 0.5;
-        state.right = 0.5;
+        states.set_size(nchans);
     }
 
     void repl_x(Ugen_ptr ugen) {
@@ -1503,6 +1597,7 @@ public:
             terminate(ACTION_TERM);
         }
         // first channel to write output
+        Stpan_state *state = states.get_array();
         float pan_sig = *pan_samps;
         pan_sig = (pan_sig < 0 ? 0 : (pan_sig > 1 ? 1 : pan_sig));
         // pan 0 to 1 maps to COS_TABLE_SIZE + 2 to COS_TABLE_SIZE / 2 + 2
@@ -1514,8 +1609,8 @@ public:
         // now left is from 0.5 to 1 because we used raised_cosine,
         // but we want 0 to 1 as in cosine, so fix it
         left += left - 1;
-        float left_incr = (left - state.left) * BL_RECIP;
-        left = state.left;
+        float left_incr = (left - state->left) * BL_RECIP;
+        left = state->left;
         
         // pan 0 to 1 maps to COS_TABLE_SIZE / 2 + 2 to COS_TABLE_SIZE + 2
         angle = (COS_TABLE_SIZE * 3 / 2.0f) - angle;
@@ -1525,19 +1620,32 @@ public:
         // now right is from 0.5 to 1 because we used raised_cosine,
         // but we want 0 to 1 as in cosine, so fix it
         right += right - 1;
-        float right_incr = (right - state.right) * BL_RECIP;
-        right = state.right;
+        float right_incr = (right - state->right) * BL_RECIP;
+        right = state->right;
 
         for (int i = 0; i < BL; i++) {
             left += left_incr;
             right += right_incr;
             out_samps[i] = *x_samps * left;
-//             gcount++; /*C*/
             out_samps[i + BL] = *x_samps++ * right;
-//             gcount++; /*C*/
         }
-        state.left = left;
-        state.right = right;
+        state->left = left;
+        state->right = right;
+#ifdef CHEAT
+        return;
+#endif
+        state++;
+        x_samps += x_stride;
+        pan_samps += pan_stride;
+
+        for (int i = 1; i < x->chans; i++) {  // sum remaining chans into outputs
+            for (int i = 0; i < BL; i++) {
+                fail();  // not implemented! (similar to above)
+            }
+            state++;
+            x_samps += x_stride;
+            pan_samps += pan_stride;
+        }
     }
 };
 
@@ -1661,7 +1769,6 @@ public:
             int ch = input->chans;
             if (copy_first_input) {
                 block_copy_n(out_samps, input_ptr, MIN(ch, chans));
-//                 gcount += MIN(ch, chans) * BL; /*C*/
                 if (ch < chans) {  // if more output channels than
                     // input channels, zero fill; but if there is only one
                     // input channel, copy it to all outputs
@@ -1671,13 +1778,11 @@ public:
                     //    }
                     //} else {
                     block_zero_n(out_samps + BL * ch, chans - ch);
-//                     gcount += (chans - ch) * BL; /*C*/
                     //}
                 }
                 copy_first_input = false;  // from now on, need to sum input
             } else {
                 block_add_n(out_samps, input_ptr, MIN(ch, chans));
-//                 gcount += MIN(ch, chans) * BL; /*C*/
             }
             // whether we copied or sumed the first chans channels of input,
             // there could be extra channels to "wrap" and now we have to sum
@@ -1685,13 +1790,11 @@ public:
                 for (int c = chans; c < ch; c += chans) {
                     block_add_n(out_samps, input_ptr + c * BL,
                                 MIN(ch - c, chans));
-//                     gcount += MIN(ch - c, chans) * BL; /*C*/
                 }
             }
         }
         if (copy_first_input) {  // did not find even first input to copy
             block_zero_n(out_samps, chans);  // zero the outputs
-//             gcount += chans * BL; /*C*/
             // Check starting_size so that if we entered real_run() with no
             // inputs, we will not terminate. Only terminate if there was at
             // least one input that terminated and now there are none:
@@ -1708,7 +1811,6 @@ public:
             if (gain != 1) {
                 for (int i = 0; i < chans * BL; i++) {
                     *out_samps++ *= gain;
-//                     gcount++; /*C*/
                 }
                 prev_gain = gain;
             }
@@ -1723,7 +1825,6 @@ public:
                     for (int i = 0; i < BL; i++) {
                         g += gincr;
                         *out_samps++ *= g;
-//                         gcount++; /*C*/
                     }
                 }
                 // due to rate limiting, the end of the ramp over BL
@@ -1755,7 +1856,7 @@ typedef struct Mathb_state {
 class Mathb : public Ugen {
 public:
     int op;
-    Mathb_state states;
+    Vec<Mathb_state> states;
     
     Ugen_ptr x1;
     int x1_stride;
@@ -1774,6 +1875,7 @@ public:
         x1 = x1_;
         x2 = x2_;
         flags = CAN_TERMINATE;
+        states.set_size(chans);  // note that states are initialized to all zero
 
         init_x1(x1);
         init_x2(x2);
@@ -1796,14 +1898,14 @@ public:
         // immediately start ramping to a value between -x2 and x2 rather than
         // possibly wait for a long ramp to finish. A potential problem is that
         // if x1 is now low, creating long ramp times, and our current ramp value
-        // (states.hold) is much larger than a new x2, it could take a long time
+        // (state->hold) is much larger than a new x2, it could take a long time
         // for the output to get within the desired range -x2 to x2.  It takes
         // a little work to determine what is affected by a change since an input
         // could have fanout to multiple output channels, so we just restart ramps
         // on all channels.
         if (op == MATH_OP_RLI) {
             for (int i = 0; i < chans; i++) {
-                states.count = 0;
+                states[i].count = 0;
             }
         }
     }
@@ -1841,101 +1943,132 @@ public:
         if (((x1->flags | x2->flags) & TERMINATED) && (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-//             gcount++; /*C*/
-
-            switch (op) {
-              case MATH_OP_MUL:
-                *out_samps++ = *x1_samps * *x2_samps;
-                break;
-              case MATH_OP_ADD:
-                *out_samps++ = *x1_samps + *x2_samps;
-                break;
-              case MATH_OP_SUB:
-                *out_samps++ = *x1_samps - *x2_samps;
-                break;
-              case MATH_OP_DIV: {
-                Sample div = *x2_samps;
-                div = copysign(fmaxf(fabsf(div), 0.01), div);
-                *out_samps++ = *x1_samps / div; }
-                break;
-              case MATH_OP_MAX:
-                *out_samps++ = fmaxf(*x1_samps, *x2_samps);
-                break;
-              case MATH_OP_MIN:
-                *out_samps++ = fminf(*x1_samps, *x2_samps);
-                break;
-              case MATH_OP_CLP: {
+#ifndef CHEAT
+        int i = 1;
+#endif
+  more_chans:
+        switch (op) {
+          case MATH_OP_MUL:
+            *out_samps++ = *x1_samps * *x2_samps;
+            break;
+          case MATH_OP_ADD:
+            *out_samps++ = *x1_samps + *x2_samps;
+            break;
+          case MATH_OP_SUB:
+            *out_samps++ = *x1_samps - *x2_samps;
+            break;
+          case MATH_OP_DIV: {
+            Sample div = *x2_samps;
+            div = copysign(fmaxf(fabsf(div), 0.01), div);
+            *out_samps++ = *x1_samps / div; }
+            break;
+          case MATH_OP_MAX:
+            *out_samps++ = fmaxf(*x1_samps, *x2_samps);
+            break;
+          case MATH_OP_MIN:
+            *out_samps++ = fminf(*x1_samps, *x2_samps);
+            break;
+          case MATH_OP_CLP: {
+            Sample x1 = *x1_samps;
+            *out_samps++ = copysign(fminf(fabsf(x1), *x2_samps), x1); }
+            break;
+          case MATH_OP_POW:
+            *out_samps++ = pow(*x1_samps, *x2_samps);
+            break;
+          case MATH_OP_LT:
+            *out_samps++ = float(*x1_samps < *x2_samps);
+            break;
+          case MATH_OP_GT:
+            *out_samps++ = float(*x1_samps > *x2_samps);
+            break;
+          case MATH_OP_SCP: {
                 Sample x1 = *x1_samps;
-                *out_samps++ = copysign(fminf(fabsf(x1), *x2_samps), x1); }
-                break;
-              case MATH_OP_POW:
-                *out_samps++ = pow(*x1_samps, *x2_samps);
-                break;
-              case MATH_OP_LT:
-                *out_samps++ = float(*x1_samps < *x2_samps);
-                break;
-              case MATH_OP_GT:
-                *out_samps++ = float(*x1_samps > *x2_samps);
-                break;
-              case MATH_OP_SCP: {
-                    Sample x1 = *x1_samps;
-                    Sample x2 = *x2_samps;
-                    *out_samps++ = SOFTCLIP(x1, x2);
-                }
-                break;
-              case MATH_OP_PWI: {
-                    Sample x1 = *x1_samps;
-                    int power = round(*x2_samps);
-                    Sample y = pow(fabsf(x1), power);
-                    *out_samps++ = (power & 1) ? copysign(y, x1) : x1;
-                }
-                break;
-                    
-              case MATH_OP_SH: {
-                    Sample h = states.hold;
-                    Sample p = states.prev;
-                    Sample x2 = *x2_samps;
-                    if (p <= 0 && x2 > 0) {
-                        h = *x1_samps;
-                        states.hold = h;
-                    }
-                    *out_samps++ = h;
-                    states.prev = x2;
-                }
-                break;
-
-              case MATH_OP_QNT: {
-                    Sample x2 = *x2_samps;
-                    Sample q = x2 * 0x8000;
-                    *out_samps++ = x2 <= 0 ? 0 : 
-                            round((*x1_samps + 1) * q) / q - 1;
-                }
-                break;
-
-              case MATH_OP_TAN: {
-                    *out_samps++ = tanf(*x1_samps * *x2_samps);
-                }
-                break;
-
-              case MATH_OP_ATAN2: {
-                    *out_samps++ = atan2f(*x1_samps, *x2_samps);
-                }
-                break;
-
-              case MATH_OP_SIN: {
-                    *out_samps++ = sinf(*x1_samps * *x2_samps);
-                }
-                break;
-
-              case MATH_OP_COS: {
-                    *out_samps++ = cosf(*x1_samps * *x2_samps);
-                }
-                break;
-
-              default: 
-                fail();
-                break;
+                Sample x2 = *x2_samps;
+                *out_samps++ = SOFTCLIP(x1, x2);
             }
+            break;
+          case MATH_OP_PWI: {
+                Sample x1 = *x1_samps;
+                int power = round(*x2_samps);
+                Sample y = pow(fabsf(x1), power);
+                *out_samps++ = (power & 1) ? copysign(y, x1) : x1;
+            }
+            break;
+
+          case MATH_OP_SH: {
+#ifdef CHEAT
+                int i = 0;
+#endif
+                Mathb_state *state = &states[i];
+                Sample h = state->hold;
+                Sample p = state->prev;
+                Sample x2 = x2_samps[i];
+                if (p <= 0 && x2 > 0) {
+                    h = *x1_samps;
+                    state->hold = h;
+                }
+                *out_samps++ = h;
+                state->prev = x2;
+            }
+            break;
+
+          case MATH_OP_QNT: {
+#ifdef CHEAT
+                int i = 0;
+#endif
+                Sample x2 = x2_samps[i];
+                Sample q = x2 * 0x8000;
+                *out_samps++ = x2 <= 0 ? 0 : 
+                        round((x1_samps[i] + 1) * q) / q - 1;
+            }
+            break;
+
+          case MATH_OP_TAN: {
+#ifdef CHEAT
+                int i = 0;
+#endif
+                *out_samps++ = tanf(x1_samps[i] * x2_samps[i]);
+            }
+            break;
+
+          case MATH_OP_ATAN2: {
+#ifdef CHEAT
+                int i = 0;
+#endif
+                *out_samps++ = atan2f(x1_samps[i], x2_samps[i]);
+            }
+            break;
+
+          case MATH_OP_SIN: {
+#ifdef CHEAT
+                int i = 0;
+#endif
+                *out_samps++ = sinf(x1_samps[i] * x2_samps[i]);
+            }
+            break;
+
+          case MATH_OP_COS: {
+#ifdef CHEAT
+                int i = 0;
+#endif
+                *out_samps++ = cosf(x1_samps[i] * x2_samps[i]);
+            }
+            break;
+
+          default: 
+            fail();
+            break;
+        }
+#ifdef CHEAT
+        return;
+#else
+        if (i >= chans) return;
+        arco_error("i < chans");
+        x1_samps += x1_stride;
+        x2_samps += x2_stride;
+        i++;
+        goto more_chans;
+#endif
     }
 };
 
@@ -2049,8 +2182,5 @@ int main()
     printf("Completed %d samples, %g seconds, wall time %g s.\n",
            duration_blocks * BL, duration_blocks * BP,
            finish_time - start_time);
-    // printf("full sample output gcount: %lld\n", gcount);
-
-#define RESULTS "data/singlechannel.txt"
 #include "report.cpp"
 }

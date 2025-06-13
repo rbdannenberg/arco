@@ -166,7 +166,7 @@ public:
                     Mathb_state *state = &states[i];
                     Sample h = state->hold;
                     Sample p = state->prev;
-                    Sample x2 = x2_samps[i];
+                    Sample x2 = *x2_samps;
                     if (p <= 0 && x2 > 0) {
                         h = *x1_samps;
                         state->hold = h;
@@ -177,21 +177,21 @@ public:
                 break;
 
               case MATH_OP_QNT: {
-                    Sample x2 = x2_samps[i];
+                    Sample x2 = *x2_samps;
                     Sample q = x2 * 0x8000;
                     *out_samps++ = x2 <= 0 ? 0 : 
-                            round((x1_samps[i] + 1) * q) / q - 1;
+                            round((*x1_samps + 1) * q) / q - 1;
                 }
                 break;
 
               case MATH_OP_RLI: {
                     Mathb_state *state = &states[i];
                     if (state->count == 0) {
-                        state->count = (int) (BR / x1_samps[i]);
+                        state->count = (int) (BR / *x1_samps);
                         if (state->count == 0) {
                             state->count = 1;
                         }
-                        Sample x2 = x2_samps[i];
+                        Sample x2 = *x2_samps;
                         Sample target = unifrand_range(-x2, x2);
                         state->hold = (target - state->prev) / state->count;
                     }
@@ -201,26 +201,26 @@ public:
                 break;
 
               case MATH_OP_HZDIFF:
-                *out_samps = (float) steps_to_hzdiff(x1_samps[i], x2_samps[i]);
+                *out_samps = (float) steps_to_hzdiff(*x1_samps, *x2_samps);
                 break;
 
               case MATH_OP_TAN: {
-                    *out_samps++ = tanf(x1_samps[i] * x2_samps[i]);
+                    *out_samps++ = tanf(*x1_samps * *x2_samps);
                 }
                 break;
 
               case MATH_OP_ATAN2: {
-                    *out_samps++ = atan2f(x1_samps[i], x2_samps[i]);
+                    *out_samps++ = atan2f(*x1_samps, *x2_samps);
                 }
                 break;
 
               case MATH_OP_SIN: {
-                    *out_samps++ = sinf(x1_samps[i] * x2_samps[i]);
+                    *out_samps++ = sinf(*x1_samps * *x2_samps);
                 }
                 break;
 
               case MATH_OP_COS: {
-                    *out_samps++ = cosf(x1_samps[i] * x2_samps[i]);
+                    *out_samps++ = cosf(*x1_samps * *x2_samps);
                 }
                 break;
 

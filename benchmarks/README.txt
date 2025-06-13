@@ -25,3 +25,13 @@ fixphase.cpp : new idea to use fixed-point for phase
     accumulation. Saves 10% of entire computation (!) compared to arco32.cpp.
 report.cpp - shared include file to append results to RESULTS
 ugen.cpp, ugen.h : shared files for Ugen superclass implementation
+
+
+Some results:
+arco32: 0.9628
+arcoopt with states.get_array() instead of &(states[0]): 0.9708 (!)
+arcoopt with states.array using local vec.h and o2internal.h: 0.9663 (0.0177)
+arcoopt where real_run computes first channel directly, then a for loop
+    increments state and input/output pointers by strides and runs
+    additional channels (but in this case it's just a test that skips all
+    additional processing and returns): 0.9674 (.0052) NOT SIG
