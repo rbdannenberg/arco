@@ -71,7 +71,12 @@ class Sawtooth_waveforms:
             n = max(1, int(AR  * 2 / (5 * f0)))
             // note that n * f0 is about (sample-rate / 2) * 4 / 5
             // table len should be 8x oversampled, so 16 * n
-            tlen = max(16 * n, 512)
+            // but limit table size to 16K which would correspond
+            // to an f0 of 17 Hz. Otherwise, very low frequencies
+            // would lead to very large tables, e.g. 1Hz would, after
+            // rounding up to a table size that's a power of 2, lead
+            // to a table size of 0.5 M, or 2 MB of memory.
+            tlen = min(16384, max(16 * n, 512))
             ampspec = [1 / i for i = 1 to n + 1]
             tables.create_tas(next_index, tlen, ampspec)
         else:  // for the aliasing version, just make a 256-point

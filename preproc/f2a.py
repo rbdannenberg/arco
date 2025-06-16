@@ -1304,7 +1304,7 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
                     "            terminate(ACTION_TERM);\n        }\n"
 
     # do the signal computation
-    real_run += f"        {classname}_state *state = &states[0];\n"
+    real_run += f"        {classname}_state *state = states.get_array();\n"
     if signature.output.fixed:   # just call run_channel once
         indent = ""
     else:  # create a loop to call run_channel for each channel

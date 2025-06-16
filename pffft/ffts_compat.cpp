@@ -73,13 +73,13 @@ void riffts(float *data, long M, long Rows)
 }
            
 
-/* compute the log2 of an integer power of 2
+/* compute the log2 of an integer rounded up to an integer
+   if n > 0 then 2^ilog2(n) >= n > 2^(ilog2(n) - 1)
  */
 int ilog2(int n)
 {
     int m = 0;
     while (n > (0x100 << m)) m += 8;
     while (n > (1 << m)) m++;
-    assert(n == (1 << m));
     return m;
 }

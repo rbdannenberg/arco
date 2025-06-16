@@ -8,6 +8,8 @@
  * w[0] repeats at w[n-2] and w[1] repeats at w[n-1] to simplify
  * interpolation.
  */
+#include "ffts_compat.h"  // for ilog2()
+
 typedef Vec<float> Wavetable;
 
 const int sine_table_len = 1024;
@@ -60,6 +62,10 @@ public:
 
     void create_table_at(int i, int tlen) {
         // if i > size, extend wavetables and initialize to empty wavetables
+        // round tlen up to the next power of 2 if needed
+        if ((tlen & (tlen - 1)) != 0) {
+            tlen = 1 << ilog2(tlen);
+        }
         int n = wavetables.size();
         if (n <= i) {
             wavetables.set_size(i + 1, false);
@@ -81,6 +87,7 @@ public:
         create_table_at(i, tlen);
         // now wavetables[i] exists and is initialized but may be wrong size
         Wavetable &table = wavetables[i];
+        tlen = table.size() - 2;  // length is rounded up to power of 2 + 2
         table.zero();
         int harm = 1;  // harmonic number
         for (int h = 0; h < slen - hasphase; h += 1 + hasphase) {
