@@ -1307,9 +1307,9 @@ def rlitest(obj, event, x, y):
 def o2audioiotest(obj, event, x, y):
     display "o2audioiotest", x
     if x:
-       o2audioioout = o2audioio(sine(1000, 0.1), "/audtest", 1, 1,
-                                2048, 0, 256)
-       o2audioioout.play()
+       o2audioioout = o2audioio(input_ugen, "/audtest", 1, 1,
+                                4096, 0, 2048)  # recvchans = 1
+       stereoize(o2audioioout).play()
        o2audioioout.enable(true)
     else:
         o2audioioout.mute()

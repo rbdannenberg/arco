@@ -1,37 +1,17 @@
-# loopback.py -- test program to receive audio from o2audioio ugen
-#                over o2 and return it
-#
-# Roger B. Dannenberg
-# Aug, 2024
-#
-"""
-Normal behavior: 
-    Receive /audiotest/prep
-    Receive /audiotest/enab (with enab = True)
-    Repeat:
-        Receive /audiotest/data with blob
-        Send blob back to /arco/o2aud/data
-
-Recovery behavior: On startup, o2audioio object may already be sending
-(and dropping) /data messages. When we start and connect loopback.py,
-we may receive a /data message without an initial /prep and /enab
-message. Alternatively, o2audioio may have blocked sending /data because
-no replies have been received (but it still sends /hello every 3 sec).
-    Receive /audiotest/data or /audiotest/enab or /audiotest/hello
-        If the last sent /hello message was more than 1 second ago,
-            send to /arco/o2aud/hello
-        Otherwise, ignore the message
-    Receive /audiotest/prep -- resume Normal behavior
-"""
-
-
 from o2litepy import O2lite, O2blob
 import time
 import struct
-import math
+import torch
+
+from absl import flags, app
+import rave_utils
+
 
 ENSEMBLE = "arco"
 BL = 32
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string('model', required=True, default=None, help="model path")
 
 # initialize globals:
 enabled = False
@@ -45,6 +25,9 @@ outchans = 0
 sampletype = 0
 samplerate = 44100.0
 prepped = False
+
+device = torch.device('cpu')
+model = None
 
 
 def blob_get_int16(blob):
@@ -61,20 +44,6 @@ def blob_put_float(blob, x):
     blob.data = struct.pack(f'>{len(x)}f', *x)
     blob.size = len(blob.data)
 
-
-
-class Audioblob:
-    def __init__(self, floattype, chans, frames):
-        self.floattype = floattype
-        self.chans = chans
-        self.frames = frames
-        self.next = 0
-        if chans > 0:
-            self.blob = O2blob(size=frames * chans * 2 * (floattype + 1))
-        else:
-            self.blob = None
-
-
             
 def prep_handler(address, types, info):
     global inchans, outchans, samplerate, sampletype, \
@@ -85,16 +54,16 @@ def prep_handler(address, types, info):
     samplerate = o2lite.get_float()
     sampletype = o2lite.get_int32()
     prepped = True
-    print("Got prep message: id", id, "inchans", inchans, \
+    print("Got prep message: id", o2audioio_id, "inchans", inchans, \
           "outchans", outchans,  "samplerate", samplerate, \
           "sampletype", "float" if sampletype == 1 else "16-bit")
-    # ignoring info because we will just return whatever data we get
 
 
 
 def hello_handler(address, types, info):
     global o2audioio_id, prepped
     o2audioio_id = o2lite.get_int32()
+    print("got hello: id", o2audioio_id)
     send_hello(o2audioio_id)
 
 
@@ -109,8 +78,6 @@ def send_hello(id):
     last_hello_time = time
     print("send_hello", id)
     o2lite.send_cmd("/arco/o2aud/hello", 0, "i", id)
-    prepped = False
-    enabled = False
     print("Sent hello message.")
 
 
@@ -124,8 +91,8 @@ def enab_handler(address, types, info):
     print("Got enab message: id", id, "enab", enab, "time", timestamp,
           "frame_count", frames)
     if not prepped:
+        print("sending hello from enab_handler")
         return send_hello(id)
-    # ignoring info because we will just return whatever data we get
     if enab == enabled:
         return
     enabled = enab
@@ -134,21 +101,8 @@ def enab_handler(address, types, info):
     start_frame = frames
 
 
-trem_phase = 0
-trem_freq = 6
-trem_depth = 0.4
-trem_scale = 1 - trem_depth
-trem_2pi = 2 * math.pi
-trem_phase_incr = trem_freq * trem_2pi / 44100.0
-
-def tremolo_next():
-    global trem_phase, trem_phase_incr, trem_scale, trem_depth
-    trem_phase = math.fmod(trem_phase + trem_phase_incr, trem_2pi)
-    return trem_scale + math.sin(trem_phase) * trem_depth
 
 
-def process_audio(samples):
-    return [s * tremolo_next() for s in samples]
 
 
 last_report_time = 0  # secs since we printed max_process_time
@@ -162,28 +116,60 @@ def data_handler(address, types, info):
     data_time = o2lite.get_time()
     frames = o2lite.get_int64()
     data = o2lite.get_blob()
+    
     if not prepped or not enabled:
+        print("sending hello from data_handler")
         return send_hello(id)
-    if sampletype == 0:
-        samples = blob_get_int16(data)
-        samples = process_audio([s * 3.0518509476e-5 for s in samples])
-        blob_put_int16(data, [math.trunc((32767 * s + 32768.5) - 32768) \
-                                     for s in  samples])
+    if sampletype == 0: # sample is int
+        samples = blob_get_int16(data)            
+        # Normalize into [-1.0, 1.0]
+        samples_float = [s * 3.0518509476e-5 for s in samples]
+        samples_float = torch.tensor(samples_float)
+        out_samples = rave_utils.process_audio(model, samples_float, samplerate, device).flatten()
+
+        out_samples_int = (out_samples * 32767).round().to(torch.int16).tolist()
+        
+        # Validate output size matches input
+        if len(out_samples_int) != len(samples):
+            print(f"ERROR: Model output size mismatch!")
+            print(f"  Input samples: {len(samples)}")
+            print(f"  Output samples: {len(out_samples_int)}")
+            print("  Model should not be changing audio length")
+            
+        blob_put_int16(data, out_samples_int)
     else:
         samples = blob_get_float(data)
-        samples = process_audio(samples)
-        blob_put_float(data, samples)
+        
+        samples = torch.tensor(samples)
+        out_samples = rave_utils.process_audio(model, samples, samplerate, device)
+        
+        out_samples_list = out_samples.flatten().tolist()
+        
+        if len(out_samples_list) != len(samples):
+            print(f"ERROR: Model output size mismatch!")
+            print(f"  Input samples: {len(samples)}")
+            print(f"  Output samples: {len(out_samples_list)}")
+            print("  Model should not be changing audio length")
+            
+        blob_put_float(data, out_samples_list)
 
-    # return data to sender.
     o2lite.send_cmd("/arco/o2aud/data", 0, "ithb", id, data_time, frames, data)
-    # print("Got data message: id", id, "time", data_time, "frames", frames, \
+    # print("Sent data message: id", id, "frames", frames, \
     #       "data_len", data.size)
     end = time.monotonic_ns()
     max_process_time = max(max_process_time, (end - start) * 0.000000001)
 
 
-def main():
-    global o2lite, last_report_time, max_process_time, max_poll_time
+def main(argv):
+    # Load and set up rave model
+    
+    global o2lite, last_report_time, max_process_time, max_poll_time, model
+
+    model = rave_utils.load_model(FLAGS.model, device)
+    
+    print(f"Starting RAVE model with device: {device}")
+    print(f"Model loaded from: {FLAGS.model}")
+    
     o2lite = O2lite()
     o2lite.initialize(ENSEMBLE, debug_flags="")
     o2lite.set_services("audtest")
@@ -214,4 +200,5 @@ def main():
         time.sleep(0.002)
             
 
-main()
+if __name__ == "__main__":
+    app.run(main)

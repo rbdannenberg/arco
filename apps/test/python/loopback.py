@@ -25,7 +25,7 @@ no replies have been received (but it still sends /hello every 3 sec).
 """
 
 
-from o2lite import O2lite, O2blob
+from o2litepy import O2lite, O2blob
 import time
 
 ENSEMBLE = "arco"
@@ -47,7 +47,7 @@ prepped = False
 
 
 class Audioblob:
-    def __init__(floattype, chans, frames):
+    def __init__(self, floattype, chans, frames):
         self.floattype = floattype
         self.chans = chans
         self.frames = frames
