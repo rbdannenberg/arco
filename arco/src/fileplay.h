@@ -39,7 +39,7 @@ confirmation message is /arco/fileplay/ready (ready = false).
 */
 
 extern const char *Fileplay_name;
-extern O2sm_info *fileio_bridge;
+extern void *fileio_bridge;
 
 void send_fileplay_play(int64_t addr, bool play_flag);
 
@@ -78,7 +78,7 @@ public:
         o2_add_bool(cycle);
         O2message_ptr msg = o2_message_finish(0.0, "/fileio/fileplay/new",
                                               true);
-        fileio_bridge->outgoing.push((O2list_elem *) msg);
+        o2_shmem_inst_outgoing_push(fileio_bridge, (O2list_elem *) msg);
     };
 
     ~Fileplay();
@@ -163,7 +163,7 @@ public:
             o2_add_int64((int64_t) this);
             O2message_ptr msg = 
                     o2_message_finish(0.0, "/fileio/fileplay/read", true);
-            fileio_bridge->outgoing.push((O2list_elem *) msg);
+            o2_shmem_inst_outgoing_push(fileio_bridge, (O2list_elem *) msg);
         }
         blocks[block_on_deck] = NULL;
         block_on_deck ^= 1;  // swap 0 <-> 1
