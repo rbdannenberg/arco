@@ -27,12 +27,12 @@ class Feedback : public Ugen {
     int from_stride;
     Sample_ptr from_samps;
 
-    Feedback(int id, int nchans, Ugen_ptr input, Ugen_ptr from, Ugen_ptr gain) :
+    Feedback(int id, int nchans, Ugen_ptr input) :
             Ugen(id, 'a', nchans) {
         states.set_size(chans);
         init_input(input);
-        init_from(from);
-        init_gain(gain);
+        init_from(ugen_table[ZERO_ID]);
+        init_gain(ugen_table[ZEROB_ID]);
         run_channel = (void (Feedback::*)(Feedback_state *)) 0;
         update_run_channel();
     }
@@ -85,7 +85,6 @@ class Feedback : public Ugen {
     void repl_from(Ugen_ptr f) {
         from->unref();
         init_from(f);
-        feedback.init(from->chans * BL, true);
     }
 
     void repl_gain(Ugen_ptr g) {
@@ -98,11 +97,20 @@ class Feedback : public Ugen {
         gain->const_set(chan, g, "Feedback::set_gain");
     }
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_input(Ugen_ptr ugen) {
+        assert(ugen->rate == 'a');
+        init_param(ugen, input, &input_stride);
+    }
 
-    void init_from(Ugen_ptr ugen) { init_param(ugen, from, &from_stride); }
+    void init_from(Ugen_ptr ugen) {
+        assert(ugen->rate == 'a');
+        init_param(ugen, from, &from_stride);
+        feedback.set_size(from->chans * BL);
+    }
 
-    void init_gain(Ugen_ptr ugen) { init_param(ugen, gain, &gain_stride); }
+    void init_gain(Ugen_ptr ugen) {
+        init_param(ugen, gain, &gain_stride);
+    }
 
     void chan_aa_a(Feedback_state *state) {
         for (int i = 0; i < BL; i++) {
@@ -122,7 +130,7 @@ class Feedback : public Ugen {
 
     void real_run() {
         input_samps = input->run(current_block);  // update input
-        from_samps = &feedback[0];  // use previous block
+        from_samps = feedback.get_array();  // use previous block
         gain_samps = gain->run(current_block);  // update gain
         Feedback_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
@@ -137,6 +145,6 @@ class Feedback : public Ugen {
         // we get samples from "from" to be used as feedback to the next
         // call to real_run():
         from_samps = from->run(current_block);
-        block_copy_n(&feedback[0], from_samps, from->chans);
+        block_copy_n(feedback.get_array(), from_samps, from->chans);
     }
 };

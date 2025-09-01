@@ -6,7 +6,7 @@
 TYPE_TO_ADD_TYPE = {
   "i": 'o2_add_int32',
   "f": 'o2_add_float',
-  "b": 'o2_add_blob',
+  "bc": 'o2_add_blob',
   "s": 'o2_add_string',
   "h": 'o2_add_int64',
   "d": 'o2_add_double',

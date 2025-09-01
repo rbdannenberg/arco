@@ -121,6 +121,22 @@ void arco_mix_repl_gain(O2SM_HANDLER_ARGS)
     mix->repl_gain(name, gain_ugen);
 }
 
+/* O2SM INTERFACE: /arco/mix/repl_in int32 id, string name, int32 in;
+ */
+void arco_mix_repl_in(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    char *name = argv[1]->s;
+    int32_t in = argv[2]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Mix, mix,id,  "arco_mix_repl_in");
+    ANY_UGEN_FROM_ID(in_ugen, in, "arco_mix_repl_in");
+
+    mix->repl_in(name, in_ugen);
+}
+
 static void mix_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
@@ -131,6 +147,8 @@ static void mix_init()
     o2sm_method_new("/arco/mix/set_gain", "isif", arco_mix_set_gain, NULL,
                     true, true);
     o2sm_method_new("/arco/mix/repl_gain", "isi", arco_mix_repl_gain, NULL,
+                    true, true);
+    o2sm_method_new("/arco/mix/repl_in", "isif", arco_mix_repl_in, NULL,
                     true, true);
     // END INTERFACE INITIALIZATION
 }

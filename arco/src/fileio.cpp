@@ -27,6 +27,8 @@
 #define D if (0)
 
 extern void *audio_bridge;
+
+bool fileio_finished = false;
     
 void *fileio_bridge = NULL;
 Vec<Fileio_obj *> fileio_objs;
@@ -55,6 +57,7 @@ public:
         }
         fileio_objs.finish();
         o2sm_finish();
+        fileio_finished = true;  // sensed by audio thread
     }
 };
 

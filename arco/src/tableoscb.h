@@ -26,7 +26,7 @@ public:
 
 
     Tableoscb(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_, float phase) :
-            Wavetables(id, nchans) {
+            Wavetables(id, 'b', nchans) {
         which_table = 0;
         states.set_size(chans);
         for (int i = 0; i < chans; i++) {
@@ -79,6 +79,9 @@ public:
         amp->const_set(chan, f, "Tableoscb::set_amp");
     }
 
+    void set_phase(int chan, float f) {
+        states[chan].phase = fmodf(f / 360.0f, 1.0f);
+    }
 
     void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, &amp_stride); }
 
@@ -94,18 +97,22 @@ public:
         Sample_ptr freq_samps = freq->run(current_block); // update input
         Sample_ptr amp_samps = amp->run(current_block); // update input
         Tableoscb_state *state = &states[0];
-        Wavetable &table = wavetables[which_table];
-        int tlen = table.size() - 2;
+        Wavetable *table = get_table(which_table);
+        if (!table) {
+            return;
+        }
+        int tlen = table->size() - 2;
         if (tlen < 2) {
             return;
         }
+        float *waveform = table->get_array();
         for (int i = 0; i < chans; i++) {
             double phase = state->phase;
             float x = phase * tlen;
             int ix = x;
             float frac = x - ix;
-            *out_samps++ = (table[ix] * (1 - frac) + 
-                            table[ix + 1] * frac) * *amp_samps;
+            *out_samps++ = (waveform[ix] * (1 - frac) +
+                            waveform[ix + 1] * frac) * *amp_samps;
             phase += *freq_samps * AP;
             while (phase > 1) phase--;
             while (phase < 0) phase++;

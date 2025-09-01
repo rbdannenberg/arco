@@ -581,7 +581,8 @@ def find_b_rate_parameter_faust_names(classname, impl, src):
 
 def generate_channel_method(fhfile, classname, signature,
                             instvars, impl, src, rate):
-    """Generate and return one channel method. Return True on error
+    """Generate and return one channel method and its slow_vars as a tuple.
+    Return True on error.
     The method is returned in 5 parts:
         the declaration
         the body
@@ -746,6 +747,8 @@ def generate_channel_method(fhfile, classname, signature,
     print("add code for interpolation") # , params_info is", params_info)
     varlist = []
     for i, name in enumerate(impl.param_names):
+        print(f"    name {name}, rate {fhfile[1][1 + i]},",
+              f"interp {impl.param_interp[i]}")
         if impl.param_interp[i] and fhfile[1][1 + i] != 'a':  # interpolated flag and b-rate
             varlist.append(name)
 
@@ -927,7 +930,7 @@ def generate_state_init(classname, instvars, slow_vars):
     for p in slow_vars:
         state_init += f"            states[i].{p}_prev = 0.0f;\n"
     state_init += "        }\n    }\n\n"
-    print(f"** state_init\n{state_init}\n------")
+    print(f"** state_init slow_vars: {slow_vars}\n{state_init}\n------")
     return state_init
 
 
@@ -1328,7 +1331,7 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
         else:
             real_run += "\n            state++;\n"
             real_run += "            out_samps++;\n"
-        for p in impl.param_names:
+        for p in ab_params:
             real_run += f"            {p}_samps += {p}_stride;\n"
         real_run += "        }\n"
     real_run += "    }\n"

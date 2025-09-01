@@ -81,6 +81,7 @@ public:
         init_input(input);
         init_center(center);
         init_q(q);
+        initialize_channel_states();
     }
 
     ~Resonb() {
@@ -146,17 +147,17 @@ public:
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-        Resonb_state *state = &states[0];
+        Resonb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
-            float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
-            float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
-            float fSlow2 = 1.0f / fSlow1;
-            float fSlow3 = 1.0f / ((fSlow0 + fSlow2) / fSlow1 + 1.0f);
+            float fSlow0 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
+            float fSlow1 = 1.0f / fSlow0;
+            float fSlow2 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
+            float fSlow3 = 1.0f / ((fSlow1 + fSlow2) / fSlow0 + 1.0f);
             float fSlow4 = float(input_samps[0]);
-            float fSlow5 = (fSlow2 - fSlow0) / fSlow1 + 1.0f;
-            float fSlow6 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(fSlow1));
+            float fSlow5 = (fSlow1 - fSlow2) / fSlow0 + 1.0f;
+            float fSlow6 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(fSlow0));
             state->fRec0[0] = fSlow4 - fSlow3 * (fSlow5 * state->fRec0[2] + fSlow6 * state->fRec0[1]);
-            out_samps[0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + 2.0f * state->fRec0[1] + state->fRec0[0]));
+            out_samps[0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
     

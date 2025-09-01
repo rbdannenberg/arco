@@ -66,7 +66,7 @@ class SineSIG0 {
     void fillSineSIG0(int count, float* table) {
         for (int i1 = 0; i1 < count; i1 = i1 + 1) {
             iVec0[0] = 1;
-            iRec0[0] = (iRec0[1] + iVec0[1]) % 65536;
+            iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
             table[i1] = std::sin(9.58738e-05f * float(iRec0[0]));
             iVec0[1] = iVec0[0];
             iRec0[1] = iRec0[0];
@@ -259,7 +259,7 @@ public:
     void real_run() {
         freq_samps = freq->run(current_block);  // update input
         amp_samps = amp->run(current_block);  // update input
-        Sine_state *state = &states[0];
+        Sine_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
             state++;

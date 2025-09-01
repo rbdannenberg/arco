@@ -15,7 +15,6 @@
 # vib freq: lfofreq
 # shared_hz x1: pitch
 # animate_detune x1: animate
-# anirate_const x: anirate
 # comp[i] amp:
 #     computed by: calc_tableosc_amps
 #     depends on:  rolloff, n, animate, gain_to_normalize
@@ -30,9 +29,7 @@
 # set_cutoff    -> lowpass cutoff
 # set_detune    -> detune_hz x2
 # set_pitch     -> pitch_const x, shared_hz x1, comp[i] table_index
-# set_lfodepth  -> vib_depth x2
-# set_lfofreq   -> vib freq
-# set_anirate   -> anirate_const x
+# set_anirate   -> anirate x
 # set_antialias -> comp[i] table_index
 # set_width     -> mixer width
 
@@ -90,12 +87,21 @@ class Sawtooth_waveforms:
 
 
 class Supersaw_instr (Instrument):
-    // copies of values in note_spec:
-    var n
-    var rolloff
-    var animate
-    var decay
-    var lowpass
+    // copies of values in note_spec for use by components:
+    // var chans -- inherited from Instrument(Ugen)
+    var antialias  // select antialiased wavetables, can be updated
+    var n  // number of components, the instance's n cannot be updated
+    var rndphase  // randomize initial phase, cannot be updated
+    var attack  // attack time, can be updated
+    var decay   // decay time, can be updated
+
+    // Param_descr's derived from note_spec attribute of the same name.
+    // Since these are in the Instrument.parameter_bindings, they can be set
+    // while the instance is playing to update the instance:
+    var animate  // animation Param_descr from 0 to 1 for use by components
+    var rolloff_param  // Param_descr for use by components
+    var anirate  // the animation rate Param_descr for use by components
+    var lowpass  // controlled by 'cutoff' using set_cutoff() method
 
     // derived from rolloff and animate
     var gain_to_normalize  // 1 / sqrt(power), based on rolloff and animate
@@ -104,18 +110,16 @@ class Supersaw_instr (Instrument):
     var recalc_tableosc_amps  // redo power computation
     
     var pitch_const // pitch which is used by all components
-    var vib  // the lfo
-    var vib_depth  // a ugen_hzdiff
+    var vib  // the lfo, controlled by 'lfofreq' and 'lfodepth'
     var shared_hz  // addb ugen providing basic frequency (with vib)
-    var detune_hz  // a ugen_hzdiff for full detuning range in hz
+    var detune_hz  // a ugen_hzdiff for full detuning range in hz, controlled
+                   // by 'detune' in the range 0 to 2 (steps)
     var initial_detune // detune_hz * animate as a real for initialization
     var animate_detune // detune_hz * animate for rlib ugen scaling
-    var animate_const  // a const ugen with animate parameter
-    var anirate_const  // a const ugen with animation rate
-    var rndphase  // the rndphase parameter used by all components
-    var antialias  // the current antialias value
+    var rolloff  // amplitude rolloff of components with distance from center
+                 // this can be set via .set('rolloff', x) via rolloff_param
 
-    var mixer
+    var mixer  // a stdistr Ugen, controlled by setable 'width' attribute
     var env
     var components  // array of table_osc ugens
 
@@ -124,15 +128,28 @@ class Supersaw_instr (Instrument):
         if not sawtooth_waveforms:
             Sawtooth_waveforms()  // need singleton
         var chans = note_spec['chans']
-        animate = param_method('animate', note_spec.get('animate', 0),
-                               'set_animate', 'clip', 0, 1)
-        animate_const = const(animate)
-        antialias = param_method('antialias', note_spec.get('antialias', 1),
-                                 'set_antialias', 'clip', 0, 1)
+
+        animate = param('animate', note_spec.get('animate', 0), 'clip', 0, 1)
+        animate.add_method(this, 'set_animate')
+
+        // note: antialias is a number (0 or 1) that is not passed as a
+        // Param_descr to any unit generators, but it *is* used as a number,
+        // so we need it to be just a number. To implement
+        // .set('antialias', a), we create a Param_descr with param() and
+        // attach a method to change antialias and select new waveforms.
+        var antialias_param = param('antialias', note_spec.get('antialias', 1),
+                                    'clip', 0, 1)
+        antialias = antialias_param.value() // get clipped value
+        antialias_param.add_method(this, 'set_antialias')
+
         n = max(1, round(note_spec.get('n', 8)))
+
         rndphase = note_spec.get('rndphase', 1)
-        rolloff = param_method('rolloff', note_spec.get('rolloff', 0),
-                               'set_rolloff', 'clip', 0, 1)
+
+        rolloff = note_spec.get('rolloff', 0)
+        rolloff_param = param('rolloff', rolloff, 'clip', 0, 1)
+        rolloff_param.add_method(this, 'set_rolloff')
+
         var table_index = sawtooth_waveforms.get_index(pitch, antialias != 0)
         if chans == 1:
             mixer = sum()
@@ -142,45 +159,51 @@ class Supersaw_instr (Instrument):
             // chans == 1, it will not be possible to change to chans == 2, so
             // it will always be correct to ignore 'width'
         else:
-            var width = param_method('width', note_spec.get('width', 0),
-                                     'set_width', 'clip', 0, 1)
-            mixer = stdistr(n, width)
+            var width = param('width', note_spec.get('width', 0), 'clip', 0, 1)
+            width.add_method(this, 'set_width')
+            mixer = stdistr(n, width.value())
                              
-        attack = param_method('attack', note_spec.get('attack', 0.04),
-                              'set_attack', 'clip', 0, nil)
+        var attack_param = param('attack', note_spec.get('attack', 0.04),
+                                 'clip', 0)
+        attack = attack_param.value()  // get clipped value
+        attack_param.add_method(this, 'set_attack')
+
         env = pweb(attack, vel_to_linear(vel), lin = true)
         env.linear_attack().atend(FINISH, this)
         // when instrument ends, it will be removed from the mixer
         // and put on the finishing_notes list, but when it finishes,
         // we should call synth.is_finished(this) to put it on the 
         // free_notes list.
-        var cutoff = param_method('cutoff', note_spec.get('cutoff', 100),
-                                  'set_cutoff')
-        var lphz = min(AR * 0.4, step_to_hz(cutoff + pitch))
+
+        var cutoff = param('cutoff', note_spec.get('cutoff', 100))
+        cutoff.add_method(this, 'set_cutoff')
+
+        var lphz = min(AR * 0.4, step_to_hz(cutoff.value() + pitch))
         lowpass = lowpass(mixer, lphz)
         output = mult(lowpass, env)
-        decay = max(0, note_spec.get('decay', 0.1))
+        var decay_param = param('decay', note_spec.get('decay', 0.1), 'clip', 0)
+        decay = decay_param.value()
+        decay_param.add_method(this, 'set_decay')
 
         // frequency will be hz_to_step(step) + detune + lfo
         // we share vib among all components
         // we combine step, animate, detune and (i, n) to form hz.
         // we use hz and vib to control our oscillator.
         pitch_const = const(pitch)
-        var lfofreq = note_spec.get('lfofreq', 5)
-        var lhz = param('lfofreq', lfofreq, 'map', 0, 20)
-        var lfodepth = note_spec.get('lfodepth', 0)
-        var ldp = param('lfodepth', lfodepth, 'map', 0, 2)
-        vib = sineb(lhz, ugen_hzdiffb(pitch_const, ldp))
+        var lfofreq = param('lfofreq', note_spec.get('lfofreq', 5),
+                            'map', 0, 20)
+        var lfodepth = param('lfodepth', note_spec.get('lfodepth', 0),
+                             'map', 0, 2)
+        vib = sineb(lfofreq, ugen_hzdiffb(pitch_const, lfodepth))
 
         shared_hz = addb(step_to_hz(pitch), vib)
-        var detune = note_spec.get('detune', 0)
-        var dhz = param('detune', detune, 'map', 0, 2)
-        detune_hz = ugen_hzdiffb(pitch_const, dhz)
+        var detune = param('detune', note_spec.get('detune', 0), 'map', 0, 2)
+        detune_hz = ugen_hzdiffb(pitch_const, detune)
                       
-        var anirate = note_spec.get('anirate', 1)
-        initial_detune = animate * steps_to_hzdiff(pitch, detune)
-        animate_detune = multb(animate_const, detune_hz)
-        anirate_const = param('anirate', anirate, 'map', 0, 10)
+        anirate = param('anirate', note_spec.get('anirate', 1), 'map', 0, 10)
+        initial_detune = animate.value() *
+                         steps_to_hzdiff(pitch, detune.value())
+        animate_detune = multb(animate, detune_hz)
 
         calc_gain_to_normalize()
         components = [supersaw_component(i, chans, table_index) for i = 0 to n]
@@ -192,14 +215,14 @@ class Supersaw_instr (Instrument):
     # where n is the total number of sawtooths added together by
     # supersaw.
         var comp  // the component (before panning)
-        var animate_fmod = ugen_rlib(anirate_const, animate_detune)
+        var animate_fmod = ugen_rlib(anirate, animate_detune)
         animate_fmod.rliset(initial_detune)  // randomize initial hz offset
         // detune_frac gives n points uniformly spaced from -1 to +1:
         var detune_frac = (i * 2) / (n - 1) - 1 if n > 1 else 0
         // fixed detuning amount in hz:
         var fixed_fmod = multb(detune_hz, detune_frac)
         var hz = addb(shared_hz, 
-                      blendb(fixed_fmod, animate_fmod, animate_const))
+                      blendb(fixed_fmod, animate_fmod, animate))
         var amp = calc_tableosc_amp(i)
         comp = tableosc(hz, amp, phase = rndphase * pr_unif(360))
 
@@ -217,7 +240,8 @@ class Supersaw_instr (Instrument):
         // ith component with rolloff is rolloff ** k where k increases
         // with distance from the center = (n-1)/2
         var k = abs(i - (n - 1) / 2)
-        return (animate + (1 - animate) * (rolloff ** k)) * gain_to_normalize
+        var ani = animate.value()
+        return (ani + (1 - ani) * (rolloff ** k)) * gain_to_normalize
 
 
     def calc_gain_to_normalize():
@@ -233,7 +257,8 @@ class Supersaw_instr (Instrument):
         // now power is for the case where animate is 0. When animate is 1,
         // there is no rolloff, so power is just n. Since we're interpolating
         // the signals, we can also interpolate the power:
-        power = n * animate + power * (1 - animate)
+        var ani = animate.value()
+        power = n * ani + power * (1 - ani)
         // so we normalize by scaling by 1/sqrt(power):
         gain_to_normalize = 1 / sqrt(power)
 
@@ -246,7 +271,7 @@ class Supersaw_instr (Instrument):
             comp.set('amp', amp)
 
         
-    def set_rolloff(rolloff_, reuse):
+    def set_rolloff(rolloff_):
         rolloff = rolloff_
         if reuse:
             recalc_tableosc_amps = true
@@ -254,31 +279,34 @@ class Supersaw_instr (Instrument):
             calc_tableosc_amps()
 
             
-    def set_attack(attack_, reuse):
+    def set_attack(attack_):
         attack = attack_
 
-    def set_animate(animate_, reuse):
-        animate = animate_
-        animate_const.set(animate)
+
+    def set_decay(decay_):
+        decay = decay_
+
+
+    def set_animate(animate_):
         if reuse:
             recalc_tableosc_amps = true
         else:
             calc_tableosc_amps()
 
 
-    def set_cutoff(cutoff, reuse):
+    def set_cutoff(cutoff):
     # compute cutoff as sum of pitch and cutoff parameter in steps. Clip
     # to 80% of Nyquist rate to avoid problems.
         lowpass.set('cutoff', min(AR * 0.4, step_to_hz(cutoff + pitch)))
 
 
-    def set_antialias(antialias_, reuse):
+    def set_antialias(antialias_):
         antialias = antialias_
         if not reuse:
             calc_tableosc_index()
 
 
-    def set_width(width, reuse):
+    def set_width(width):
         if chans == 2:  // otherwise, mixer is a sum and width does nothing
             mixer.set_width(width)
 

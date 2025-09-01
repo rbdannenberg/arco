@@ -32,7 +32,7 @@ public:
 
 
     Tableosc(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_, float phase) :
-            Wavetables(id, nchans) {
+            Wavetables(id, 'a', nchans) {
         which_table = 0;
         states.set_size(chans);
         Wavetable *table = get_table(which_table);
@@ -101,6 +101,16 @@ public:
 
     void set_amp(int chan, float f) {
         amp->const_set(chan, f, "Tableosc::set_amp");
+    }
+
+    void set_phase(int chan, float f) {
+        Wavetable *table = get_table(which_table);
+        int tlen = 0;
+        if (table) {
+            tlen = table->size() - 2;
+        }
+        int64_t phase64 = fmodf(f / 360.0f, 1.0f) * float_to_fix * tlen;
+        states[chan].phase = phase64;
     }
 
     void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, &amp_stride); }
@@ -204,9 +214,6 @@ public:
         freq_samps = freq->run(current_block); // update input
         amp_samps = amp->run(current_block); // update input
         Tableosc_state *state = &states[0];
-        if (which_table >= num_tables()) {
-            return;
-        }
         Wavetable *table = get_table(which_table);
         if (!table) {
             return;

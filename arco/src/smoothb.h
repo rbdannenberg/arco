@@ -1,4 +1,4 @@
-/* smooth.h -- unit generator like const, but transitions are smoothed
+/* smoothb.h -- unit generator like const, but transitions are smoothed
  *
  * Roger B. Dannenberg
  * Oct 2023

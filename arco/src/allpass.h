@@ -134,7 +134,10 @@ public:
         fb->const_set(chan, f, "Allpass::set_fb");
     }
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_input(Ugen_ptr ugen) {
+        assert(ugen->rate = 'a');
+        init_param(ugen, input, &input_stride);
+    }
     void init_dur(Ugen_ptr ugen) { init_param(ugen, dur, &dur_stride); }
     void init_fb(Ugen_ptr ugen) { init_param(ugen, fb, &fb_stride); }
         

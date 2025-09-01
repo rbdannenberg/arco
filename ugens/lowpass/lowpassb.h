@@ -71,6 +71,7 @@ public:
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
         init_input(input);
         init_cutoff(cutoff);
+        initialize_channel_states();
     }
 
     ~Lowpassb() {
@@ -125,7 +126,7 @@ public:
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-        Lowpassb_state *state = &states[0];
+        Lowpassb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
             float fSlow1 = 1.0f / (fSlow0 + 1.0f);

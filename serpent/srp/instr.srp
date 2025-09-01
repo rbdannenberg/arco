@@ -3,22 +3,28 @@
 # Roger B. Dannenberg
 # Oct 2024
 
-instr_stack = []
-def instr_begin():
-    instr_stack.append({})
+require "pair"
 
-# After instr_begin(), you can define setable parameters in the
-# Instrument you are building by calling param. A "setable parameter"
-# associates a name to a particular ugen input as if the Instrument
-# itself has that input.  E.g., if you want a Sine in the construction
-# of an Instrument and want the Instrument to have a setable parameter
-# named 'myfreq' that controls the Sine frequency, then between
-# instr_begin() and Instrument's init method (i.e. super.init(...)):
+instr_stack = []
+
+def get_current_instrument():
+    instr_stack.last().x
+
+
+# After instr_begin(p1, p2, ...), you can define setable parameters in the
+# Instrument you are building by calling param() to support later
+# calling instrument.set('attribute', value). See doc/instruments.md
+# for discussion.
+
+# Example: if you want a Sine in the construction of an Instrument and
+# want the Instrument to have a setable parameter named 'myfreq' that
+# controls the Sine frequency, then between instr_begin() and
+# Instrument's init method (i.e. super.init(...)):
 #     var myfreq = param('myfreq', 440, smooth = true)
 #     osc = sine(amp, myfreq)
 # where `smooth` is a keyword parameter to request a Smoothb ugen
 # instead of the default Const. The parameter can be a number to
-# indicate the Smoothb cutoff frequency. 
+# indicate the Smoothb cutoff frequency.
 #
 # After the value (440), you can give optional parameters low and high
 # to specify a range of values. If specified, values in [0, 1] are
@@ -35,16 +41,6 @@ def instr_begin():
 #
 # Then you can call instrument.set('myfreq', 660).
 #
-
-# If an instrument contains another instrument, you can make the
-# sub-instrument parameters visible as parameters of the parent using
-# a different function:
-#     param_map('myfreq', 440, sub_instrument, 'freq')
-# Where 'myfreq' is the parameter name for this instrument, and
-# setting it will set the 'freq' parameter of sub_instrument. The last
-# parameter, 'freq', defaults to 'myfreq' (first parameter) if it is
-# omitted.
-#
 # Important: the setable parameter connects to a specific unit
 # generator.  If that unit generator is replaced in the Instrument
 # graph, then setting the parameter may not have any effect. The
@@ -53,138 +49,237 @@ def instr_begin():
 # An alternative way to update parameters is to define methods. E.g. 
 #     def set_myfreq(val):
 #         osc.set('freq', val)
-# For this to work with the Synth class, you must also define a
-# mapping from parameter name to method:
-#     param_method('myfreq', 'set_myfreq')
+# For this to work with the Instrument or Synth class, you must also
+# define a mapping from parameter name to method:
+#     param_method('myfreq', this, 'set_myfreq')
 # which must be called between instr_begin() and Instrument's init
-# method. param_method has two optional parameters, low and high.
+# method.
+
+class Conditioner:
+    var op     // 'map'     - linearly interpolate input range [0, 1] to
+               //                 output range [lo, high]
+               // 'clip'    - clip input to the range [low, high]
+               // 'mapclip' - map [0, 1] to [low, high],
+               //                 then clip to [low, high]
+    var low    // the low end of the mapped range
+    var high   // the high end of the mapped range
+
+    def init(op_, lo, hi, name):
+        low = lo
+        high = hi
+        op = op_
+        assert((not low or isnumber(low)) and
+               (not high or isnumber(high)) and
+               (not low or not high or low <= high))
+        if (op == 'map' or op == 'mapclip') and
+           (not isnumber(low) or not isnumber(high)):
+            print "WARNING: Parameter", name, "specifies", repr(op),
+            print     "but low ("; low; ") and high ("; high;
+            print     ") need to be numbers. Turning off mapping."
+            op = 'clip' if op == 'mapclip' else nil
+
+
+    def map(x):
+        if op == 'map' or op == 'mapclip':  // low and high are numbers
+            x = low + x * (high - low)
+        if op == 'clip' or op == 'mapclip':
+            if high: x = min(x, high)
+            if low:  x = max(low, x)
+        return x
+
+param_descr_set_recursion = 0
 
 class Param_descr:
 # A descriptor for an Instrument parameter. There are multiple cases:
-# 1. ugen_method is an Instrument: this parameter is implemented by
-#    the op_name parameter of ugen_method, an instrument contained
-#    within this instrument.
-# 2. ugen_method is a Symbol: this parameter is updated by calling
-#    the method.
-# 3. ugen_method is a Const_like (a Const or a Smoothb): this parameter
-#    is mirrored by an Arco ugen, providing the value at the block rate
-#    to any number of ugens that depend on the value. This Const_like
-#    ugen *could* be shared by multiple instruments, but normally, since
-#    instruments can have per-instrument parameter updates, the Const_like
-#    will be unique to this instrument instance.
-# Scaling and clipping can be requested:
-# - if ugen_method is an Instrument, parameter values are passed on to
-#   the component instrument without shifting or scaling.
-# - otherwise, if op_name is 'clip', then the parameter x is clipped to
-#   max(low, x) if low is non-nil, and min(high, x) if high is non-nil.
-# - or if op_name is 'map', then parameter x is scaled from [0, 1] to
-#   [low, high], and then clipped to the range [low, high] (equivalently,
-#   x is first clipped to [0, 1], then scaled). In this case, both low
-#   and high must be provided.
+# This supports a general method for Ugens: set(attribute, value)
+# where attribute is a symbol (e.g., 'freq') and value is a float or
+# a Ugen.
+#     For Instruments, the interface looks similar (calling
+# set(attribute, value), but the interface is richer to support a few
+# possibilities. In all cases, Instrument.set(attribute, value) uses
+# a dictionary to map attribute to a Param_descr. Then Param_descr.set
+# is involked. See doc/instruments.md for more details.
 #
-# The assumption is that if a parameter is passed to a component,
-# any mapping and clipping will be applied there, so the "raw" parameter
-# value is passed to the component. A special case exists when a parameter
-# must be handled with a method, but the method sets a parameter in a
-# component instrument. When a method is used, it must take into account
-# any clipping and/or scaling that was applied before the method was
-# called, and the method must insure that it is passing the right value
-# to the component instrument.
-    var ugen_method
-    var value
-    var op_name
-    var low
-    var high
-
-    def init(ugen_method_, value_, optional op_name_, low_, high_, name_):
-        if ugen_method_ == 'clip':
-            breakpoint()
-        ugen_method = ugen_method_
-        value = condition(value_)
-        op_name = op_name_
-        low = low_
-        high = high_
-        name = name_
-
-    def to_str():
-        "<Param_descr: name " + str(name) + " = " + str(value) + ">"
+# Scaling and clipping can be requested (see init below).
+    var name         // the attribute symbol represented by this descriptor
+    var ugen_users   // Pair(Ugen, attr) or pairs of (Ugen, attr) with attr
+                     //     controlled by this parameter
+    var methods      // Pair(Ugen, method) or pairs of (Ugen, method) to
+                     //     invoke when parameter changes
+    var subinstrs    // Pair(subinstrument, attr) or pairs of (subinstr, attr)
+                     //     with input controlled by this parameter
+    var cutoff       // cutoff for smoothing float updates (or true for default)
+    var conditioner  // scaling and clipping parameters (if any)
+    var cur_val      // the most recent value or a Const-like Ugen with value
+    var rates        // valid rates: a subset of "abc", can be nil if we have
+                     // yet to get rate info by assigning to a Ugen input
 
     def condition(x):
-    # apply mapping and clipping rules to x
-        if op_name == 'map':
-            x = low + (high - low) * x
-        if low:  // parameter clipping and range mapping
-            x = max(low, x)
-        if high:
-            x = min(high, x)
+        if conditioner:
+            if isarray(x):
+                for xi at i in x:
+                    x[i] = conditioner.map(xi)
+            else:
+                x = conditioner.map(x)
         return x
 
 
-    def set(instr, x, reuse):
-        if isinstance(ugen_method, Instrument):  // pass down to sub-instrumnet
-            value = x
-            ugen_method.set(op_name, value)
+    def init(name_, value_, optional op, low, high, keyword smooth):
+    # Creates a new descriptor. See instance variable documentation above.
+        name = name_
+        if low or high:
+            op == op or 'clip'  // default is just clip if low or high but no op
+            conditioner = Conditioner(op, low, high, name_)
+        cur_val = condition(value_)
+        cutoff = smooth
+        var context = instr_stack.last().y
+        if context.get(name):
+            print "ERROR: param() called twice with the same name", repr(name)
+            print "This one will not respond to instr.set("; name; ", value)."
         else:
-            value = condition(x)
-            if issymbol(ugen_method):  // invoke method to set name to x
-                send(instr, ugen_method, value, reuse)
-            else:  // directly set Const_like ugen to x
-                ugen_method.set(value)
-        return value
+            context[name] = this
 
 
-def add_param_descr_to_context(pd, name):
-    var context = instr_stack.last()
-    var p = context.get(name)
-    if p:
-        print "WARNING: Parameter", name, "is already specified."
-        print "    This specification is ignored."
-    else:
-        context[name] = pd
-    return pd.value
+    def to_str():
+        "<Param_descr: name " + str(name) + " = " + str(value()) + ">"
 
 
-def param(name, initial_value, optional op, low, high, keyword smooth,
-          chans = 1):
-    var ugen
-    if isnumber(smooth):
-        ugen = smoothb(initial_value, smooth)
-    elif smooth:
-        ugen = smoothb(initial_value)
-    else:
-        ugen = const(initial_value)
-    var pd = Param_descr(ugen, initial_value, op, low, high)
-    add_param_descr_to_context(pd, name)
-    return ugen
+    def rate_error(instr, x):
+        print "ERROR: parameter", name, "of", instr, "must be in rate(s)",
+        print     rates, "but set()'ing value", x
 
 
-def param_map(name, initial_value, subinstr, subinstr_name):
-    if not subinstr_name:
-        subinstr_name = name
-    var pd = Param_descr(subinstr, initial_value, subinstr_name, nil, nil)
-    add_param_descr_to_context(pd, name)
+    def set(instr, x):
+        param_descr_set_recursion = param_descr_set_recursion + 1
+        if param_descr_set_recursion > 10:
+            error("Param_descr.set is nested 10 deep: There is probably" +
+                  " a circular dependency, e.g., a method called as a" +
+                  " result of a set() has recursively set() the parameter" +
+                  " again.")
+        if isnumber(x) or isarray(x):
+            if rates and find(rates, "b") == -1:
+                rate_error(instr, x)
+                param_descr_set_recursion = param_descr_set_recursion - 1
+                return
+            x = condition(x)
+            if isinstance(cur_val, Const_like):
+                // we have a Const_like connected to all ugen inputs we
+                // need to update, so just update the Const_like cur_val
+                cur_val.set(x)
+            elif ugen_users:
+                // trick get_ugen_value() into creating and saving
+                // a Const-like into cur_val:
+                cur_val = x
+                get_ugen_value()
+                // each of ugen_users is a Pair(ugen target, input name)
+                if isarray(ugen_users):
+                    for u in ugen_users:
+                        u.x.set(u.y, cur_val)
+                else:
+                    ugen_users.x.set(ugen_users.y, cur_val)
+        else:
+            if find(rates, str(x.rate)) == -1:
+                rate_error(instr, x)
+                param_descr_set_recursion = param_descr_set_recursion - 1
+                return
+        // now propagate value through methods, whether float(s) or ugen
+        if methods:
+            if isarray(methods):  // each method is a Pair(Ugen, method)
+                display "Param_descr propagate to methods", methods
+                for m in methods:
+                    if issymbol(m.y):
+                        send(m.x, m.y, x)
+                    else:
+                        send(m.x, m.y[0], m.y[1], x)
+            elif issymbol(methods.y):
+                send(methods.x, methods.y, x)
+            else:
+                send(methods.x, methods.y[0], methods.y[1], x)
+
+        // now propagate to subinstruments by invoking set methods:
+        if subinstrs:
+            if isarray(subinstrs):
+                for s in subinstrs:
+                    s.x.set(s.y, x)
+            else:
+                subinstrs.x.set(subinstrs.y, x)
+
+        param_descr_set_recursion = param_descr_set_recursion - 1
+        return x  // return the mapped x
 
 
-def param_method(name, initial_value, method, optional op, low, high):
-    if isnumber(op):
-        print "ERROR: param_method for", name, "called but seems to be missing"
-        print "     method, and op is", op, "instead of 'clip' or 'map'."
-    var pd = Param_descr(method, initial_value, op, low, high)
-    add_param_descr_to_context(pd, name)
+    def add_method(target, name):
+        methods = enlist(Pair(target, name), methods)
+
+
+    def add_ugen_user(ugen, name, rates_):
+    # a ugen wants to connect this Param_descr to its <name> input
+        ugen_users = enlist(Pair(ugen, name), ugen_users)
+        if not rates:
+            rates = rates_
+        else:
+            var i = 0
+            while i < len(rates):
+                if find(rates_, rates[i]) == -1:
+                    rates.uninsert(i)
+                else:
+                    i = i + 1
+            if rates == "":
+                print "ERROR: subinstrument "; ugen; " input "; repr(name);
+                print     "' rate must be in "; repr(rates_);
+                print     ", but an input with incompatible rates is being"
+                print     " passed into it."
+                breakpoint()
+
+
+    def add_subinstr_param(subinstr, name):
+    # a subinstrument want to connect this Param_descr to its <name> input
+        subinstrs = enlist(Pair(subinstr, name), subinstrs)
+
+
+    def value():
+    # gets the initial value of an attribute after conditioning but
+    # before it is possibly turned into a Const_like as an input for
+    # ugens. This is needed when a Param_descr is passed as a parameter
+    # to subinstruments who then map it again using param(). What initial
+    # value to they pass to param()?
+        cur_val.value() if isinstance(cur_val, Const_like) else cur_val
+            
+
+    def get_ugen_value(classname, paramname):
+    # a ugen needs to to initialize a parameter with a value but it
+    # was given this Param_descr instead. Return a parameter for the ugen.
+        if isinstance(cur_val, Ugen):
+            // display "get_ugen_value", classname, paramname, rates,
+            // display     repr(cur_val), repr(cur_val.rate)
+            if find(rates, str(cur_val.rate)) == -1:
+                print "ERROR: '"; paramname; "' input to Ugen '";
+                print     tolower(classname); "' rate must be in "; repr(rates)
+                breakpoint()
+            return cur_val  // we already have a ugen
+        // convert float or float array value to Const-like:
+        if cutoff:
+            cur_val = Smoothb(cur_val, isnumber(cutoff) and cutoff)
+        else:
+            cur_val = Const(cur_val)
+        return cur_val
+        
+
+
+def param(name, initial_value, optional op, low, high, keyword smooth):
+# make a Param_descr from a float or array or Ugen
+# if initial_value is a Param_descr, then we are a subinstrument and got
+# passed a Param_descr as parameter from a containing instrument. The
+# instrument should invoke subinstrument.set(name, conditioned value)
+# when it gets a set(attr, value) where attr is initial_value.name. So
+# we need to make a Param_descr for this subinstrument and add subinstrument
+# to the instrument's Param_descr for attr, which is just initial_value.
+    if isinstance(initial_value, Param_descr):
+        var source_pd = initial_value
+        initial_value = initial_value.get_current_value()
+        source_pd.add_subinstr_param(get_current_instrument(), name)
+    Param_descr(name, initial_value, op, low, high, smooth = smooth)
     
-
-# After instr_begin(), you can define a named "member" of the Instrument
-# You can access members by name, usually to send them an update, e.g.
-#    member(pwl(...), 'env')
-#    myinstr = Instrument(...)
-#    myinstr.get('env').start()
-# The ugen parameter can be an Instrument, in which case the "member"
-# is the instrument object, not the Ugen serving as the Instrument output.
-#
-//def member(ugen, name):
-//    var context = instr_stack.last()
-//    context[name] = ugen
-//    ugen
 
 
 class Instrument (Ugen):
@@ -204,6 +299,9 @@ class Instrument (Ugen):
     var mixer_id  // id used by mixer - every instance has a permanent mixer_id
     var pitch
     var vel
+    var reuse    // set to true after initial intialization. After that,
+                 // any set method should be considered to be updating or
+                 // reusing and existing instrument instance
 
     var parameter_bindings
     var output
@@ -222,18 +320,26 @@ class Instrument (Ugen):
             error("instr_stack is empty. Maybe you forgot to call " +
                   "instr_begin() at the beginning of your Instrument " +
                   "subclass's init() function")
-        parameter_bindings = instr_stack.unappend()
+        // super.init() is the last thing the subclass init() does, so:
+        // pop the stack, which gives Pair(x==this, y==Param_descr list)
+        parameter_bindings = instr_stack.unappend().y
+        reuse = true
+
+
+    def instr_begin():
+    # call this at beginning of a subclass's init() function to create
+    # a context in which to accumulate parameter bindings
+        instr_stack.append(Pair(this, {}))
 
 
     def get(input):
         parameter_bindings.get(input)
 
 
-    def set(name, value, optional reuse):
+    def set(name, value):
         var pds = parameter_bindings[name]
         if pds:
-            pds.value = value
-            pds.set(this, value, reuse)
+            pds.set(this, value)
 
 
     def finish(status, finisher, parameters):

@@ -53,25 +53,200 @@ Because of these complications, we will just send Synth-level updates
 to all active instruments. We also keep a cache of Synth-level
 parameter values and apply them when an instrument is reallocated.
 
+## Instrument Parameters
 To set instrument parameters, we extend the Instrument mechanisms with
-a more general way to define and update instrument parameters:
+a more general way to define and update instrument parameters. The
+main principle is that both primitive Ugens and constructed
+Instruments have the same interface: `set(attribute, value)`.
 
-Instruments have a dictionary called `parameter_bindings` that maps
-parameters by name to a description of how to update them. The
-description has 3 forms:
-- the parameter value can be mirrored in a Const_like ugen. Typically
-  each instrument instance will have a unique Const_like ugen for a
-  given parameter. The Const_like ugen can feed into and control
-  multiple ugens that implement the instrument.
-- the parameter value, when changed, can invoke a method of the
-  instrument, allowing computation to be performed on the value
-  before updating Arco ugens.
-- the parameter may be passed directly to another instrument, allowing
-  an instrument to be composed from one or more sub-instruments, where
-  instrument parameters are "inherited" by sub-instruments. (More
-  generally, there can be any sort of mapping from parent instrument
-  parameters to sub-instrument parameters by invoking a method to do
-  the mapping (see previous item on parameter methods).
+### From Instrument Attribute to Ugen Attribute
+Thus, `Instrument.set(atttribute, value)` must have some kind of map
+from Instrument attribute to component and component
+attribute. Instruments will all have a map with entries of the form:
+
+>   attribute -> (component, attribute)
+
+The syntax we would like to use names the Instrument attribute at the
+site where the component is initialized. E.g. within an instrument
+that uses a Sine Ugen, we might write
+```
+    s = Sine(freq, Param('gain', 0.5))
+```
+after which `instrument.set('gain', 0.6)` will invoke `s.set('amp', 0.6)`
+since the second parameter to `Sine()` is named `'amp'`. The trick to
+implement this is that `Param` will register an incomplete mapping for
+the instrument and the `Ugen()` initialization, used by all Ugen
+subclasses, will fill in the mapping with the Sine instance and the
+parameter name.
+
+### From Instrument Attribute to Instrument Method
+For completeness, Instruments need at least one alternate mapping of
+the form:
+
+>    attribute -> (component, method)
+
+so that the instrument can do custom processing by invoking a method,
+e.g. setting `'wet'` might set one gain to x and another to 1-x.
+
+If the attribute is not a float, the method will get a float array or
+Ugen as its parameter. It is up to the Instrument to at least warn the
+user if it can only handle floats.
+
+### Clipping, Scaling, Smoothing
+
+Other options, when we call Param, are:
+  - clipping the value to lower and upper bounds
+  - possibly mapping the range 0 to 1 to the range from lower to upper
+    bound (independent of clipping)
+  - Using Smoothb instead of Const for float parameters
+  - Including a time constant for Smoothb
+  
+Clipping and Scaling apply even when a method is invoked. Smoothing
+can *only* apply when a parameter is mapped to attributes of
+components.
+
+Clipping and Scaling can *only* apply to float updates. If you want to
+replace a Const-like input with a non-Const-like signal input, the
+signal is connected directly to input(s) of Ugen(s) and no
+conditioning is applied. This could be very confusing, so for now,
+this is not allowed. In the future, it might make sense to have a
+Conditionerb Ugen that takes a signal input and applies scaling and
+clipping and then run Instrument signal inputs through a Conditionerb
+which would then be connected to Ugen inputs just like is done with
+Const or Smoothb.
+
+### Fanout
+
+Within an instrument, a `Param` can be passed to multiple Ugens, in
+which case the mapping must contain *multiple* targets:
+
+> attribute -> [(component, attribute), (component, attribute), ...])
+
+Fanout is limited:
+  1. The same scaling, clipping and smoothing is shared by all
+     consumers of the parameter value.
+  2. The consumers must all be Ugen inputs, in which case a Const-like
+     Ugen is constructed and shared by all inputs, or all methods,
+     in which case each method is called with a float value.
+
+To work around these limitations, you can always just map the
+attribute to a single Instrument method, which can perform any
+computation on incoming float, array, and Ugen parameter values and
+control any number of sub-instrument and Ugen components.
+
+### Subinstruments
+
+Subinstruments are not a special class, but simply Instruments that
+are used as components of another Instrument. Subinstruments and the
+approach to fanout present a problem: Scaling, clipping and smoothing
+happen at the instrument level and floats are converted to Const-like
+Ugens that are connected to components of the instrument. But if a
+subinstrument *also* want to apply scaling or smoothing, it needs to
+see the original float value.
+
+Therefore, to implement `set(attribute, value)` at the Instrument
+level, we need to treat subinstruments separately from Ugens. For
+subinstruments, we apply conditioning (scaling and clipping) and then
+simply invoke the subinstrument's `set` method to possibly do further
+scaling and clipping.
+
+
+### Setting Different Types of Values
+
+Also, the type of value in set(attribute, value) can be:
+  - float - if the prior value was a float, map attribute to a Ugen's 
+    <attr> and send `.../set_<attr>` to the Ugen on channel 0. Otherwise, 
+    create a Const-like Ugen and `.../repl_<attr>` to the created Ugen.
+  - array of float - if the prior value was a float, map attribute to 
+    a Ugen's <attr> and send `.../set_<attr>` to the Ugen for each 
+    channel. Otherwise, create a multi-channel Const-like Ugen and 
+    `.../repl_<attr>` to the created Ugen.
+  - Ugen - map attribute to a Ugen's <attr> and send
+    `.../repl_<attr>` to the Ugen.
+
+Therefore, the values for Param can be the same: float, array of
+float, or Ugen, which creates Const-like Ugens as needed.
+
+The Parameter descriptor, or Param_descr, has these fields:
+  - `name` - the symbol name of the parameter
+  - `ugen_users` - a `Pair` or list of `Pair` consisting of:
+    - `x` - the Ugen (or Instrument) that receives updated values.
+    - `y` - the attribute of the target to set
+  - `methods` - a `Pair` or list of `Pair` consisting of:
+    - `x` - the Ugen (or Instrument) that receives updated values.
+    - `y` - a method to invoke on `first` passing the value.
+  - `subinstrs` - a `Pair` or list of `Pair` consisting of:
+    - `x` - an Instrument (a subinstrument component to which
+      values are passed)
+    - `y` - the attribute of the subinstrument to set.
+  - `smooth` - Pair of Smoothb and cutoff for smoothing iff floats
+      should be directed through a Smoothb
+  - `conditioner` - a Conditioner consisting low, high (clipping values)
+      and operation ('clip', 'map' and 'mapclip' for clipping and mapping)
+  - `value` - the most recent value, used to determine if/when to create 
+      a Const-like Ugen and to filter redundant values. If the value
+      is a Const-like Ugen and the parameter is a float or array of
+      floats, we send the updates to the Const-like Ugen, which is
+      already attached to every `Param_target`.
+
+### Implementation Note on Const-like Parameters
+
+"Constant" Ugen parameters are actually block-rate signals coming from
+a Const Ugen or a Smoothb Ugen, both of which are controlled by
+setting them to float values, which they then output. (Although
+Smoothb output is more signal-like in that transitions to new values
+are smoothed.)
+
+There are two ways to update a Ugen input with a float:
+  1. Direct: Send a `set` message to the Const-like Ugen that is
+     connected to one of the Ugen's signal inputs. This requires
+     keeping track of the Const-like Ugen's ID, which differs from the
+     ID of the Ugen you are ultimately affecting.
+  2. Via Ugen: Send a `set_<attr>` message to the Ugen. Since the Ugen
+     knows where the input for its `<attr>` parameter comes from, it
+     can call the `Const:set` method for that input. This allows the
+     creator of the Ugen to update Ugen parameter values without
+     keeping track of all the Consts used to provide those
+     parameters. (But this does not work for Smoothb: the input *must*
+     be a Const, and this is checked in the code before coercing the
+     input pointer from `Ugen` to `Const`.)
+     
+The Via Ugen method is used for primitive Ugens since it allows the
+control code to just keep track of a single Ugen ID, but for
+Instruments, there are two disadvantages:
+  1. If the parameter is smoothed (a nice option), you cannot use the
+     Direct method.
+  2. If there is fanout, you can use the same Const-like Ugen for all
+     Ugen inputs, which means you can update a single Const-like Ugen
+     with a single message and the value will propagate (fan out) to
+     all inputs, reducing message traffic and computation.
+     
+Therefore, Param_descr uses the Direct method and retains the ID of
+the Const-like Ugen when there is one. When there is fanout, the first
+Ugen that uses the parameter,
+
+## Instrument Implementation
+See [design.md](./design.md) for notes on how to implement an Instrument subclass.
+
+#### * old stuff (ignore)*
+*Instruments*
+
+*Instruments have a dictionary called `parameter_bindings` that maps*
+*parameters by name to a description of how to update them. The*
+*description has 3 forms:*
+*- the parameter value can refer to a component subinstrument or ugen.*
+  *Calling*
+*- the parameter value can be mirrored in a Const\_like ugen that*
+  *can feed into and control multiple ugens that implement the instrument.*
+*- the parameter value, when changed, can invoke a method of the*
+  *instrument, allowing computation to be performed on the value*
+  *before updating Arco ugens.*
+*- the parameter may be passed directly to another instrument, allowing*
+  *an instrument to be composed from one or more sub-instruments, where*
+  *instrument parameters are "inherited" by sub-instruments. (More*
+  *generally, there can be any sort of mapping from parent instrument*
+  *parameters to sub-instrument parameters by invoking a method to do*
+  *the mapping (see previous item on parameter methods).*
   
 ## Synthesizers and the Synth class
 

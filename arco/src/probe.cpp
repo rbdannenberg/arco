@@ -36,7 +36,7 @@ void Probe::real_run()
     if (state == PROBE_WAITING) { // look for threshold crossing
         next = 0;
         if (direction > 0) {
-            while (next < BL) {
+            while (next < input_len) {
                 Sample s = input_samps[next];
                 if ((prev_sample < threshold) && (s >= threshold)) {
                     goto start_collect;
@@ -45,7 +45,7 @@ void Probe::real_run()
                 next++;
             }
         } else if (direction < 0) {
-            while (next < BL) {
+            while (next < input_len) {
                 Sample s = input_samps[next];
                 if ((prev_sample > threshold) && (s <= threshold)) {
                     goto start_collect;
@@ -68,7 +68,7 @@ void Probe::real_run()
         return;
     }
  collect:
-    while (next < BL) {
+    while (next < input_len) {
         // copy the next frame from input_samps. Since we claimed we have one
         // channel, input_stride will be zero and not helpful, so we need to
         // use input_len, a local variable computed above.
@@ -105,7 +105,7 @@ void Probe::real_run()
             }
         }
     }
-    next -= BL;
+    next -= input_len;
     return;
  start_collect:
     state = PROBE_COLLECTING;

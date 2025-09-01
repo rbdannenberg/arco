@@ -21,7 +21,7 @@ public:
     Wavetables *lender;  // when non-null, wavetables are fetched from lender,
                          // allowing wavetables to be shared by many oscillators
 
-    Wavetables(int id, int nchans) : Ugen(id, 'a', nchans), wavetables(0) {
+    Wavetables(int id, char rate, int nchans) : Ugen(id, rate, nchans), wavetables(0) {
         lender = nullptr;
     }
 
@@ -49,7 +49,7 @@ public:
 
     Wavetable *get_table(int i) {
         Vec<Wavetable> &w = (lender ? lender->wavetables : wavetables);
-        if (i >= w.size()) {
+        if (i < 0 || i >= w.size()) {  // convert invalid index to index 0
             if (w.size() > 0) {
                 i = 0;
             } else {

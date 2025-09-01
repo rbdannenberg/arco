@@ -34,7 +34,9 @@ public:
 
     Blendb(int id, int nchans, Ugen_ptr x1_, Ugen_ptr x2_, Ugen_ptr b_, 
            int mode_) :
-            Ugen(id, 'a', nchans) {
+            Ugen(id, 'b', 1) {
+        assert(nchans == 1);  // multichannel is not implemented at b-rate 
+                              // (no good reason)
         x1 = x1_;
         x2 = x2_;
         b = b_;
@@ -58,7 +60,7 @@ public:
     void print_sources(int indent, bool print_flag) {
         x1->print_tree(indent, print_flag, "x1");
         x2->print_tree(indent, print_flag, "x2");
-        b->print_tree(indent, print_flag, "b");
+        b->print_tree(indent, print_flag, "bc");
     }
 
     void repl_x1(Ugen_ptr ugen) {

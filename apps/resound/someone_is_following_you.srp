@@ -32,30 +32,30 @@ class Someone_is_following_you (Movement):
         dly1 = delay(input_ugen, dly1_value, 0.1, 2.0, 2)
         dly2 = delay(input_ugen, dly2_value, 0.1, 2.0, 2)
         fade_value = fl_slide.value()
-        latency_slider.add_target_method(this, 'latency_handler')
+        latency_slider.add_target_method(this, 'latency_handler', 'x')
 
 
     def setup_ui():
     # Setting up Movement1's UI
         Checkbox(win, "VII. Someone is Following You", init_x + 5, init_y + 5, 
                  300, 'H', 'followcheck') // checkbox doubling as title
-        followcheck.add_target_method(this, 'followcheck_handler')
+        followcheck.add_target_method(this, 'followcheck_handler', 'x')
 
         // Sliders
         Labeled_slider(win, "del1", init_x+5, init_y + 50, 250, 28, 65,
                        0.8, 1.2, 1, 'linear', 'd1_slide', prefs = prefs)
-        d1_slide.add_target_method(this, 'delay1_handler')
+        d1_slide.add_target_method(this, 'delay1_handler', 'x')
 
         Labeled_slider(win, "del2", init_x+5, 'D', 250, 28, 65,
                        1.8, 2.2, 2, 'linear', 'd2_slide', prefs = prefs)
-        d2_slide.add_target_method(this, 'delay2_handler')
+        d2_slide.add_target_method(this, 'delay2_handler', 'x')
 
         Labeled_slider(win, "fadelen", init_x+5, 'D', 250, 28, 65,
                        0.1, 4, 2.5, 'exponential', 'fl_slide', prefs = prefs)
-        fl_slide.add_target_method(this, 'fadelen_handler')
+        fl_slide.add_target_method(this, 'fadelen_handler', 'x')
         
 
-    def latency_handler(obj, x):
+    def latency_handler(x):
     # handler for global audio latency slider
         latency_value = x * 0.001
         dly1_value = max(0, d1_slide.value() - latency_value)
@@ -66,7 +66,7 @@ class Someone_is_following_you (Movement):
             dly2.set('dur', dly2_value)
                 
 
-    def followcheck_handler(obj, event, x, y)
+    def followcheck_handler(x)
         display "followcheck_handler", x, dly1_value, dly2_value
         if x:
             if fade_lock:  // we're busy, so retry later
@@ -108,19 +108,19 @@ class Someone_is_following_you (Movement):
         fade_lock = false  // all done
 
 
-    def delay1_handler(obj, x)
+    def delay1_handler(x)
         dly1_value = x - latency_value
         if dly1:
             dly1.set('dur', x)
 
 
-    def delay2_handler(obj, x)
+    def delay2_handler(x)
         dly2_value = x - latency_value
         if dly2:
             dly2.set('dur', x)
 
 
-    def fadelen_handler(obj, x)
+    def fadelen_handler(x)
         fade_value = x
 
 

@@ -22,6 +22,8 @@ require "synth"
 require "supersaw"
 require "supersawdemo"
 require "steps"
+require "mididevice"
+require "chorusrbd"
 
 SIMPLE = false
 DEBUG_ACTIONS = true  // override default
@@ -68,6 +70,7 @@ def arco_ready():
 # called when arco is intialized and ready to make sound or when
 # arco audio stream has been reopened
     display "**** arco audio is running! ****", ready_count
+    
     ready_count = ready_count + 1
     if ready_count > 1:
         display "arco_ready called again", ready_count
@@ -76,23 +79,25 @@ def arco_ready():
     if ui_initialized:
         return
 
-    display "arco_ready", wxs_h, wxs_space,
-    display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
+    display "arco_ready called in init.srp"
+    midi_devices = Midi_devices(prefs, latency = 0)
+
+    // display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
     var WIDTH = 170
     var COLUMN_X = 5  // changes to 200 for Column 2
     var COLUMN_TWO = 200
 
     Checkbox(win, "Simple test", COLUMN_X, 5, WIDTH, 20, 'stcheckbox')
-    stcheckbox.add_target_method(nil, 'play_simple_test')
+    stcheckbox.add_callback('play_simple_test', 'x')
 
     Checkbox(win, "Cleanup test", 'S', 'D', WIDTH, 20, 'simtoncheckbox')
-    simtoncheckbox.add_target_method(nil, 'play_simple_tone')
+    simtoncheckbox.add_callback('play_simple_tone', 'x')
 
     Checkbox(win, "Finish test", 'S', 'D', WIDTH, 20, 'finishcheckbox')
-    finishcheckbox.add_target_method(nil, 'play_finish_test')
+    finishcheckbox.add_callback('play_finish_test', 'x')
 
     Checkbox(win, "Mixer test", 'S', 'D', idiv(WIDTH, 2), 'S', 'mtcheckbox')
-    mtcheckbox.add_target_method(nil, 'play_mixer_test')
+    mtcheckbox.add_callback('play_mixer_test', 'x')
 
     Choice(win, 'R', 'S', 'S', 'S', 'mixmodechoice')
     mixmodechoice.append("a. linear")
@@ -102,78 +107,78 @@ def arco_ready():
 
     wxs_x = COLUMN_X
     Checkbox(win, "Atonal sequence", 'S', 'D', WIDTH, 'S', 'atcheckbox')
-    atcheckbox.add_target_method(nil, 'play_atone_test')
+    atcheckbox.add_callback('play_atone_test', 'x')
 
     Button(win, "Play sound file", 'S', 'D', 'S', 'S', 'psfbutton')
-    psfbutton.add_target_method(nil, 'play_sound_file')
+    psfbutton.add_callback('play_sound_file', 'x')
 
     Checkbox(win, "Record Output", 'S', 'D', 'S', 'S', 'rocheckbox')
-    rocheckbox.add_target_method(nil, 'record_output')
+    rocheckbox.add_callback('record_output', 'x')
 
     Checkbox(win, "Record Output Stereo", 'S', 'D', 'S', 'S', 'ro2checkbox')
-    ro2checkbox.add_target_method(nil, 'record_output_2')
+    ro2checkbox.add_callback('record_output_2', 'x')
 
     Checkbox(win, "Play Recorded Output", 'S', 'D', 'S', 'S', 'procheckbox')
-    procheckbox.add_target_method(nil, 'play_recorded_output')
+    procheckbox.add_callback('play_recorded_output', 'x')
 
     Checkbox(win, "Play Recorded Up", 'S', 'D', 'S', 'S', 'proucheckbox')
-    proucheckbox.add_target_method(nil, 'play_recorded_output_up')
+    proucheckbox.add_callback('play_recorded_output_up', 'x')
 
     Checkbox(win, "Play Recorded Down", 'S', 'D', 'S', 'S', 'prodncheckbox')
-    prodncheckbox.add_target_method(nil, 'play_recorded_output_down')
+    prodncheckbox.add_callback('play_recorded_output_down', 'x')
 
     Checkbox(win, "Delay Test", 'S', 'D', 'S', 'S', 'dlycheckbox')
-    dlycheckbox.add_target_method(nil, 'delay_test')
+    dlycheckbox.add_callback('delay_test', 'x')
 
     Checkbox(win, "Pitch Shift Test", 'S', 'D', 'S', 'S', 'pscheckbox')
-    pscheckbox.add_target_method(nil, 'pstest')
+    pscheckbox.add_callback('pstest', 'x')
 
     Checkbox(win, "Feedback Test", 'S', 'D', 'S', 'S', 'fbcheckbox')
-    fbcheckbox.add_target_method(nil, 'fbtest')
+    fbcheckbox.add_callback('fbtest', 'x')
 
     Checkbox(win, "Granstream Test", 'S', 'D', 'S', 'S', 'gscheckbox')
-    gscheckbox.add_target_method(nil, 'gstest')
+    gscheckbox.add_callback('gstest', 'x')
 
     Checkbox(win, "Gran. with Feedback", 'S', 'D', 'S', 'S',
              'gsfbcheckbox')
-    gsfbcheckbox.add_target_method(nil, 'gsfbtest')
+    gsfbcheckbox.add_callback('gsfbtest', 'x')
 
     Checkbox(win, "Reverb", 'S', 'D', 'S', 'S',
              'rvbcheckbox')
-    rvbcheckbox.add_target_method(nil, 'rvbtest')
+    rvbcheckbox.add_callback('rvbtest', 'x')
 
     Checkbox(win, "PWE Update", 'S', 'D', 'S', 'S',
              'pweucheckbox')
-    pweucheckbox.add_target_method(nil, 'pweutest')
+    pweucheckbox.add_callback('pweutest', 'x')
 
     Checkbox(win, "PWL Update", 'S', 'D', 'S', 'S',
              'pwlucheckbox')
-    pwlucheckbox.add_target_method(nil, 'pwlutest')
+    pwlucheckbox.add_callback('pwlutest', 'x')
 
 
     Button(win, "Pwl/Pwe Test", 'S', 'D', 'S', 'S', 'pwecheckbox')
-    pwecheckbox.add_target_method(nil, 'pwetest')
+    pwecheckbox.add_callback('pwetest', 'x')
 
     Button(win, "Allpass Test", 'S', 'D', 'S', 'S', 'alpcheckbox')
-    alpcheckbox.add_target_method(nil, 'alptest')
+    alpcheckbox.add_callback('alptest', 'x')
 
     Button(win, "Flsyn Test", 'S', 'D', 'S', 'S', 'flscheckbox')
-    flscheckbox.add_target_method(nil, 'flstest')
+    flscheckbox.add_callback('flstest', 'x')
 
     Checkbox(win, "Phase vocoder", 'S', 'D', 'S', 'S', 'pvcheckbox')
-    pvcheckbox.add_target_method(nil, 'pvtest')
+    pvcheckbox.add_callback('pvtest', 'x')
     
     Button(win, "File Play/Record", 'S', 'D', 'S', 'S', 'fprbutton')
-    fprbutton.add_target_method(nil, 'file_play_record')
+    fprbutton.add_callback('file_play_record', 'x')
 
     Checkbox(win, "Yin", 'S', 'D', 55, 'S', 'yincheckbox')
-    yincheckbox.add_target_method(nil, 'yintest')
+    yincheckbox.add_callback('yintest', 'x')
 
     Statictext(win, "", 'R', wxs_y + 2, 100, wxs_h - 2, 'yintext')
     
     wxs_x = COLUMN_X
     Checkbox(win, "Trig", 'S', 'D', 55, 'S', 'trigcheckbox')
-    trigcheckbox.add_target_method(nil, 'trigtest')
+    trigcheckbox.add_callback('trigtest', 'x')
 
     TRIG_ON_TEXT = "◼ Trig"
     TRIG_OFF_TEXT = "◻ Trig"
@@ -185,7 +190,7 @@ def arco_ready():
 
     wxs_x = COLUMN_X
     Checkbox(win, "Fade", 'S', 'D', 60, 'S', 'fadecheckbox')
-    fadecheckbox.add_target_method(nil, 'fadetest')
+    fadecheckbox.add_callback('fadetest', 'x')
 
     Choice(win, COLUMN_X + 10, 'D', WIDTH, 'S', 'fadechoice')
     fadechoice.append("a. 1.000 sec, linear")
@@ -212,69 +217,69 @@ def arco_ready():
 
     wxs_x = COLUMN_X
     Checkbox(win, "Add Test", 'S', 'D', 'S', 'S', 'addcheckbox')
-    addcheckbox.add_target_method(nil, 'addtest')
+    addcheckbox.add_callback('addtest', 'x')
 
     Checkbox(win, "Sub Test", 'S', 'D', 'S', 'S', 'subcheckbox')
-    subcheckbox.add_target_method(nil, 'subtest')
+    subcheckbox.add_callback('subtest', 'x')
 
     Checkbox(win, "Div Test", 'S', 'D', 'S', 'S', 'divcheckbox')
-    divcheckbox.add_target_method(nil, 'divtest')
+    divcheckbox.add_callback('divtest', 'x')
 
     Checkbox(win, "Max Test", 'S', 'D', 'S', 'S', 'maxcheckbox')
-    maxcheckbox.add_target_method(nil, 'maxtest')
+    maxcheckbox.add_callback('maxtest', 'x')
 
     Checkbox(win, "Min Test", 'S', 'D', 'S', 'S', 'mincheckbox')
-    mincheckbox.add_target_method(nil, 'mintest')
+    mincheckbox.add_callback('mintest', 'x')
 
     Checkbox(win, "Clip Test", 'S', 'D', 'S', 'S', 'clpcheckbox')
-    clpcheckbox.add_target_method(nil, 'clptest')
+    clpcheckbox.add_callback('clptest', 'x')
 
     Checkbox(win, "Pow Test", 'S', 'D', 'S', 'S', 'powcheckbox')
-    powcheckbox.add_target_method(nil, 'powtest')
+    powcheckbox.add_callback('powtest', 'x')
 
     Checkbox(win, "Lessthan Test", 'S', 'D', 'S', 'S', 'ltcheckbox')
-    ltcheckbox.add_target_method(nil, 'lttest')
+    ltcheckbox.add_callback('lttest', 'x')
 
     Checkbox(win, "Greaterthan Test", 'S', 'D', 'S', 'S', 'gtcheckbox')
-    gtcheckbox.add_target_method(nil, 'gttest')
+    gtcheckbox.add_callback('gttest', 'x')
 
     Checkbox(win, "Soft Clip Test", 'S', 'D', 'S', 'S', 'scpcheckbox')
-    scpcheckbox.add_target_method(nil, 'scptest')
+    scpcheckbox.add_callback('scptest', 'x')
 
     Checkbox(win, "Integer Power Test", 'S', 'D', 'S', 'S', 'pwicheckbox')
-    pwicheckbox.add_target_method(nil, 'pwitest')
+    pwicheckbox.add_callback('pwitest', 'x')
 
     Checkbox(win, "Random Test", 'S', 'D', 'S', 'S', 'rndcheckbox')
-    rndcheckbox.add_target_method(nil, 'rndtest')
+    rndcheckbox.add_callback('rndtest', 'x')
 
     Checkbox(win, "Sample Hold Test", 'S', 'D', 'S', 'S', 'shcheckbox')
-    shcheckbox.add_target_method(nil, 'shtest')
+    shcheckbox.add_callback('shtest', 'x')
 
     Checkbox(win, "Quantization Test", 'S', 'D', 'S', 'S', 'qntcheckbox')
-    qntcheckbox.add_target_method(nil, 'qnttest')
+    qntcheckbox.add_callback('qnttest', 'x')
     
     Checkbox(win, "RandLinInterp Test", 'S', 'D', 'S', 'S', 'rlicheckbox')
-    rlicheckbox.add_target_method(nil, 'rlitest')
+    rlicheckbox.add_callback('rlitest', 'x')
     
     
     Checkbox(win, "Chorddetect Test", 'S', 'D', 'S', 'S', 'chorddetectcheckbox')
-    chorddetectcheckbox.add_target_method(nil, 'chorddetecttest')
+    chorddetectcheckbox.add_callback('chorddetecttest', 'x')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'chorddetecttext')
     Statictext(win, "----", 'S', 'D', 'S', 'S', 'chorddetectintdata')
     
     wxs_x = COLUMN_X
     Checkbox(win, "Spectral Centroid Test", 'S', 'D', 'S', 'S', 'spectralcentroidcheckbox')
-    spectralcentroidcheckbox.add_target_method(nil, 'spectralcentroidtest')
+    spectralcentroidcheckbox.add_callback('spectralcentroidtest', 'x')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'spectralcentroidtext')
     
     wxs_x = COLUMN_X
     Checkbox(win, "Spectral Rolloff Test", 'S', 'D', 'S', 'S', 'spectralrolloffcheckbox')
-    spectralrolloffcheckbox.add_target_method(nil, 'spectralrollofftest')
+    spectralrolloffcheckbox.add_callback('spectralrollofftest', 'x')
     Statictext(win, "----", 'R', 'S', 'S', 'S', 'spectralrollofftext')
 
     wxs_x = COLUMN_X
     Checkbox(win, "Onset", 'S', 'D', 55, 'S', 'onsetcheckbox')
-    onsetcheckbox.add_target_method(nil, 'onsettest')
+    onsetcheckbox.add_callback('onsettest', 'x')
     
     ONSET_ON_TEXT = "◼ Onset"
     ONSET_OFF_TEXT = "◻ Onset"
@@ -282,23 +287,31 @@ def arco_ready():
 
     wxs_x = COLUMN_X
     Checkbox(win, "O2audioio Test", 'S', 'D', WIDTH, 'S', 'o2audioiocheckbox')
-    o2audioiocheckbox.add_target_method(nil, 'o2audioiotest')
+    o2audioiocheckbox.add_callback('o2audioiotest', 'x')
     
     Checkbox(win, "Zitarev Test", 'S', 'D', WIDTH, 'S', 'zitarevcheckbox')
-    zitarevcheckbox.add_target_method(nil, 'zitarevtest')
+    zitarevcheckbox.add_callback('zitarevtest', 'x')
 
     Checkbox(win, "sttest", 'S', 'D', WIDTH, 'S', 'sttestcheckbox')
-    sttestcheckbox.add_target_method(nil, 'sttesttest')
+    sttestcheckbox.add_callback('sttesttest', 'x')
 
     Checkbox(win, "tableosc", 'S', 'D', WIDTH, 'S', 'tableosccheckbox')
-    tableosccheckbox.add_target_method(nil, 'tableosctest')
+    tableosccheckbox.add_callback('tableosctest', 'x')
 
     Checkbox(win, "supersaw", 'S', 'D', WIDTH, 'S', 'supersawcheckbox')
-    supersawcheckbox.add_target_method(nil, 'supersawtest')
+    supersawcheckbox.add_callback('supersawtest', 'x')
 
     Checkbox(win, "overdrive", 'S', 'D', WIDTH, 'S', 'overdrivecheckbox')
-    overdrivecheckbox.add_target_method(nil, 'overdrivetest')
+    overdrivecheckbox.add_callback('overdrivetest', 'x')
     
+    Checkbox(win, "MidiIn", 'S', 'D', WIDTH, 'S', 'midiincheckbox')
+    midiincheckbox.add_callback('midiintest', 'x')
+
+    Checkbox(win, "delayvi", 'S', 'D', WIDTH, 'S', 'delayvicheckbox')
+    delayvicheckbox.add_callback('delayvi_test', 'x')
+
+    Checkbox(win, "Chorusrbd", 'S', 'D', WIDTH, 'S', 'choruscheckbox')
+    choruscheckbox.add_callback('chorustest', 'x')
 
     ui_initialized = true
     default_window.fit_to_children()
@@ -346,7 +359,7 @@ def host_openaggr_init()
 ######### Synthesis Tests ##############
 
 // handler for stcheckbox: play/stop some sine tones
-def play_simple_test(obj, event, x, y):
+def play_simple_test(x):
     display "play_simple_test", x
     if x:
         sin1 = sine(440.0, 0.01).play()
@@ -364,21 +377,25 @@ def play_simple_test(obj, event, x, y):
         sin4 = nil
 
 
+def make_simple_tone(optional dur = 3):
+    var env = pweb(start = true, lin = true, 0.5, 1, dur, 1, dur + 1)
+    env.term()
+    var sin1 = sine(440.0, 0.01)
+    var sin2 = sine(880.0, 0.01)
+    var sin3 = sine(1320.0, 0.007)
+    var sin4 = sine(1760.0, 0.005)
+    var sum = sum().ins(sin1, sin2, sin3, sin4)
+    return mult(sum, env)
+        
+
 // handler for simtoncheckbox: play/stop some sine tones
-def play_simple_tone(obj, event, x, y):
+def play_simple_tone(x):
 # this is a cleanup test: in this version, env termination propagates
 # through mult to the output sum, which releases the calculation tree
 # after unchecking the box releases simton_out.
     display "play_simple_tone", x
     if x:
-        var env = pweb(start = true, lin = true, 0.5, 1, 3, 1, 4)
-        env.term()
-        var sin1 = sine(440.0, 0.01)
-        var sin2 = sine(880.0, 0.01)
-        var sin3 = sine(1320.0, 0.007)
-        var sin4 = sine(1760.0, 0.005)
-        var sum = sum().ins(sin1, sin2, sin3, sin4)
-        simton_out = mult(sum, env).play()
+        simton_out = make_simple_tone().play()
     else:
         simton_out = nil
 
@@ -417,7 +434,7 @@ class Finishtest:
 
 
 // handler for finishcheckbox: play/stop some sine tones
-def play_finish_test(obj, event, x, y):
+def play_finish_test(x):
 # this is a test for atend(FINISH, this): when box is unchecked, noteoff
 # sends ending to envelope, which sends finish() to instrument, which 
     display "play_simple_tone", x
@@ -443,7 +460,7 @@ def play_finish_test(obj, event, x, y):
 
 
 // handler for mtcheckbox: play/stop some sine tones
-def play_mixer_test(obj, event, x, y):
+def play_mixer_test(x):
     var which = mixmodechoice.value()
     var mode = ord(which) - ord("a")
     if x:
@@ -496,7 +513,7 @@ def mixer_gain_change_2():
 
 recplay1 = nil
 
-def record_output(obj, event, x, y, optional chans = 1):
+def record_output(x, optional chans = 1):
     display "record_output", x, chans
     if x:
         if not recplay1 or recplay1.chans != chans:
@@ -516,12 +533,12 @@ def record_output(obj, event, x, y, optional chans = 1):
         recplay1.unrun()  # does not need to be active now
 
 
-def record_output_2(obj, event, x, y):
+def record_output_2(x):
     display "record_output_2", x
-    record_output(obj, event, x, y, 2)
+    record_output(x, 2)
 
 
-def play_recorded_output(obj, event, x, y, optional speed = 1):
+def play_recorded_output(x, optional speed = 1):
     display "play_recorded_output", x, speed
     if x and recplay1:
         // note that Recplay might end playback immediately upon starting,
@@ -533,20 +550,20 @@ def play_recorded_output(obj, event, x, y, optional speed = 1):
         recplay1.stop()  // atend is already set up to mute when finished
 
 
-def play_recorded_output_up(obj, event, x, y):
+def play_recorded_output_up(x):
     display "play_recorded_output_up", x
-    play_recorded_output(obj, event, x, y, 1.2)
+    play_recorded_output(x, 1.2)
 
 
-def play_recorded_output_down(obj, event, x, y):
+def play_recorded_output_down(x):
     display "play_recorded_output_up", x
-    play_recorded_output(obj, event, x, y, 0.8)
+    play_recorded_output(x, 0.8)
 
 
 ############ ATONE: INSTRUMENT AND NOTE SEQUENCE ##############
 
 // handler for atcheckbox: play/stop an algorithmic composition
-def play_atone_test(obj, event, x, y)
+def play_atone_test(x)
     atone_running = x
     if x:
         sched_select(vtsched)  // vtsched stops when audio stops
@@ -574,7 +591,7 @@ def play_sound_file(rest ignore):
 
 ########## DELAY TEST ################
 
-def delay_test(obj, event, x, y):
+def delay_test(x):
     display "delay_test", x
     if x:
         dly1 = delay(input_ugen, 1.0, 0.1, 2.0, 2)
@@ -585,10 +602,10 @@ def delay_test(obj, event, x, y):
 
 ########## PITCH SHIFT TEST #############
 
-def pstest(obj, event, x, y):
+def pstest(x):
     display "pstest - pitch shift", x
     if x:
-        ps1 = ola_pitch_shift(input_ugen, 1.25, 0.01, 0.05)
+        ps1 = olapitchshift(input_ugen, 1.25, 0.01, 0.05)
         ps1.play()
     else:
         ps1.mute()  // immediate stop
@@ -596,7 +613,7 @@ def pstest(obj, event, x, y):
 
 ########## FEEDBACK TEST #############
 
-def fbtest(obj, event, x, y):
+def fbtest(x):
 # create a delay with no internal feedback and use a feedback ugen to
 # produce feedback. The delay test used 0.1 gain on feedback so we do
 # the same here, and set delay to 1 second as with delay test.
@@ -616,7 +633,7 @@ def fbtest(obj, event, x, y):
 
 ########## GRANSTREAM TEST #############
 
-def gstest(obj, event, x, y):
+def gstest(x):
 # create a granstream to granulate microphone input
     display "gstest - granstream applied microphone input ", x
     if x:
@@ -641,7 +658,7 @@ def gstest(obj, event, x, y):
 // uses a very short duration so input gets "smeared" by only 0.3s
 // allowing us to clearly hear the feedback that comes 2s later.
 
-def gsfbtest(obj, event, x, y):
+def gsfbtest(x):
 # create a granstream to granulate microphone input
     display "gstest - granstream applied microphone input ", x
     if x:
@@ -667,7 +684,7 @@ def gsfbtest(obj, event, x, y):
 ########## REVERB TEST #############
 // Creates a reverb and puts noise into reverb while checked.
 
-def rvbtest(obj, event, x, y):
+def rvbtest(x):
     display "rvbtest - test a reverb with noise input"
     if x:
         var noise = ugen_rand(-0.1, 0.1)
@@ -683,7 +700,7 @@ def rvbtest(obj, event, x, y):
 ########## PWE UPDATE TEST #############
 // Creates a long PWE, but when you uncheck, it decays to zero
 
-def pweutest(obj, event, x, y):
+def pweutest(x):
     display "pweutest - test pweb noise envelope", x
     if x:
         var noise = ugen_rand(-0.5, 0.5)
@@ -696,12 +713,11 @@ def pweutest(obj, event, x, y):
         pweu1.start()
         pweu1 = nil  // all should be freed in 6 sec
 
-print "defined pweutest"
 
 ########## PWL UPDATE TEST #############
 // Creates a long PWL, but when you uncheck, it decays to zero
 
-def pwlutest(obj, event, x, y):
+def pwlutest(x):
     display "pwlutest - test a reverb with noise input"
     if x:
         var noise = ugen_rand(-0.5, 0.5)
@@ -717,7 +733,7 @@ def pwlutest(obj, event, x, y):
 
 ########## PWE TEST #############
 
-def pwetest(obj, event, x, y):
+def pwetest(x):
 # create a tone with pwe envelope
     display "pwetest - tones with pwl and pwe envelopes"
     pwlnote()
@@ -741,7 +757,7 @@ def pwenote()
 
 ########## ALLPASS TEST #############
 
-def alptest(obj, event, x, y):
+def alptest(x):
 # This test performs a sequence of sounds:
 # 1. create and apply an allpass filter to a frequency sweep
 # 2. same test, but use a comb filter instead
@@ -804,13 +820,16 @@ def rvbfinish():
 
 flsyn_ugen = nil
 
-def flstest(obj, event, x, y):
+def create_flsyn():
+    flsyn_ugen = Flsyn(SOUNDFONT)
+    flsyn_ugen.play()
+    print "Created Flsyn unit generator with sound font"
+    print "    ", SOUNDFONT
+
+def flstest(x):
     if not flsyn_ugen:
-        flsyn_ugen = Flsyn(SOUNDFONT)
-        print "Created Flsyn unit generator with sound font"
-        print "    ", SOUNDFONT
+        create_flsyn()
         print "**** CLICK Flsyn Test BUTTON AGAIN TO PLAY *****"
-        flsyn_ugen.play()
         return
     sched_select(rtsched)
     flsyn_ugen.program_change(0, 0)
@@ -834,7 +853,7 @@ def fls_sequence(program, pitch):
 ########## PHASE VOCODER TEST #############
 
 // handler for pvcheckbox: play/stop phase vocoder test
-def pvtest(obj, event, x, y):
+def pvtest(x):
     display "pvtest", x
     if x:
         pv = pv(input_ugen, 0.5, 2048, 512, 8, 1)
@@ -865,7 +884,7 @@ def actl_yin(timestamp, address, types, pitch, harmonicity, rms)
 
     
 // handler for yincheckbox: play/stop yin analysis of input
-def yintest(obj, event, x, y):
+def yintest(x):
     display "yintest", x
     if x:
         if not yin_handler_installed:
@@ -894,7 +913,7 @@ def actl_onset(timestamp, address, types, idnum, channel) //idnum, rms are parem
 
     
 // handler for onsetcheckbox: play/stop onset analysis of input
-def onsettest(obj, event, x, y):
+def onsettest(x):
     display "onsettest", x
     if x:
         if not onset_handler_installed:
@@ -921,15 +940,14 @@ def actl_chorddetect(timestamp, address, types, root_note_str, quality, interval
     chorddetectintdata.set_string(int_result)
 
         
-def chorddetecttest(obj, event, x, y):
+def chorddetecttest(x):
     display "chorddetect", x
     if x:
         if not chorddetect_handler_installed:
             o2_method_new("/actl/chorddetect", "ssifii", 'actl_chorddetect', t)
             print "installed chorddetect handler"
             chorddetect_handler_installed = true
-        CD = chorddetect("/actl/chorddetect")
-        CD.set('input', input_ugen)
+        CD = chorddetect(input_ugen, "/actl/chorddetect")
         CD.run()
     else:
         CD.unrun()
@@ -943,15 +961,14 @@ def actl_spectralcentroid(timestamp, address, types, centroid)
     spectralcentroidtext.set_string(str(centroid))
 
         
-def spectralcentroidtest(obj, event, x, y):
+def spectralcentroidtest(x):
     display "spectralcentroid", x
     if x:
         if not spectralcentroid_handler_installed:
             o2_method_new("/actl/spectralcentroid", "f", 'actl_spectralcentroid', t)
             print "installed spectralcentroid handler"
             spectralcentroid_handler_installed = true
-        sc_ugen = spectralcentroid("/actl/spectralcentroid")
-        sc_ugen.set('input', input_ugen)
+        sc_ugen = spectralcentroid(input_ugen, "/actl/spectralcentroid")
         sc_ugen.run()
     else:
         sc_ugen.unrun()
@@ -965,15 +982,14 @@ def actl_spectralrolloff(timestamp, address, types, rolloff_freq)
     spectralrollofftext.set_string(str(rolloff_freq))
 
         
-def spectralrollofftest(obj, event, x, y):
+def spectralrollofftest(x):
     display "spectralrolloff", x
     if x:
         if not spectralrolloff_handler_installed:
             o2_method_new("/actl/spectralrolloff", "f", 'actl_spectralrolloff', t)
             print "installed spectralrolloff handler"
             spectralrolloff_handler_installed = true
-        sr_ugen = spectralrolloff("/actl/spectralrolloff", 0.5)
-        sr_ugen.set('input', input_ugen)
+        sr_ugen = spectralrolloff(input_ugen, "/actl/spectralrolloff", 0.5)
         sr_ugen.run()
     else:
         sr_ugen.unrun()
@@ -996,7 +1012,7 @@ def actl_onoff(timestamp, address, types, idnum, onoff)
 
     
 // handler for trigcheckbox: play/stop trig analysis of input
-def trigtest(obj, event, x, y):
+def trigtest(x):
     display "trigtest", x
     if x:
         if not trig_handler_installed:
@@ -1037,7 +1053,7 @@ class File_play_record:
 
 
 // handler for fprbutton: play file and record it
-def file_play_record(obj, event, x, y):
+def file_play_record(x):
     display "file_play_record", x
     print "\n---------\nNote: file_play_record makes no sound."
     print "It plays sound from a fileplay ugen as input to a filerec ugen."
@@ -1058,7 +1074,7 @@ def file_play_record(obj, event, x, y):
 
 to_be_faded = nil
 
-def fadetest(obj, event, x, y):
+def fadetest(x):
     display "fadetest", x
     var which = fadechoice.value()
     which = ord(which) - ord("a")
@@ -1080,7 +1096,7 @@ def fadetest(obj, event, x, y):
 
 adder = nil
 
-def addtest(obj, event, x, y):
+def addtest(x):
     display "addtest", x
     if x:
         adder = add(sine(880, [0.3, 0.3]), sine(1000, 0.2)).play()
@@ -1096,7 +1112,7 @@ def addtest(obj, event, x, y):
 
 subout = nil
 
-def subtest(obj, event, x, y):
+def subtest(x):
     display "subtest", x
     if x:
         subout = sine(880, subb(0.5, pwlb(4, 1))).play()
@@ -1110,7 +1126,7 @@ def subtest(obj, event, x, y):
 
 divout = nil
 
-def divtest(obj, event, x, y):
+def divtest(x):
     display "divtest", x
     if x:  # gain should be from 1/1.9 to 1/0.1, or ~0.5 to 10:
         divout = ugen_div(sine(880, 0.1), addb(1, sineb(1, 0.9))).play()
@@ -1126,7 +1142,7 @@ def divtest(obj, event, x, y):
 
 maxout = nil
 
-def maxtest(obj, event, x, y):
+def maxtest(x):
     display "maxtest", x
     if x:
         maxout = ugen_max(sine(440, 0.3), addb(-0.1, sineb(0.5, 0.3))).play()
@@ -1141,7 +1157,7 @@ def maxtest(obj, event, x, y):
 
 minout = nil
 
-def mintest(obj, event, x, y):
+def mintest(x):
     display "mintest", x
     if x:
         minout = ugen_min(sine(220, 0.3), addb(0.1, sineb(0.5, 0.3))).play()
@@ -1155,7 +1171,7 @@ def mintest(obj, event, x, y):
 
 clipout = nil
 
-def clptest(obj, event, x, y):
+def clptest(x):
     display "cliptest", x
     if x:
         clipout = ugen_clip(sine(220, sineb(0.2, 2)), 0.3).play()
@@ -1169,7 +1185,7 @@ def clptest(obj, event, x, y):
 
 powout = nil
 
-def powtest(obj, event, x, y):
+def powtest(x):
     display "powtest", x
     if x:
         powout = add(ugen_pow(add( sine(220, 0.5), 0.5),
@@ -1184,7 +1200,7 @@ def powtest(obj, event, x, y):
 
 ltout = nil
 
-def lttest(obj, event, x, y):
+def lttest(x):
     display "lttest", x
     if x:
         ltout = sub(ugen_less(sine(220, 0.5), sineb(0.2, 0.4)), 0.5).play()
@@ -1198,7 +1214,7 @@ def lttest(obj, event, x, y):
 
 gtout = nil
 
-def gttest(obj, event, x, y):
+def gttest(x):
     display "gttest", x
     if x:
         gtout = sine(880, ugen_greaterb(sineb(3, 1), 0)).play()
@@ -1212,7 +1228,7 @@ def gttest(obj, event, x, y):
 
 scpout = nil
 
-def scptest(obj, event, x, y):
+def scptest(x):
     display "scptest", x
     if x:
         scpout = ugen_soft_clip(sine(220, addb(1, sineb(0.2, 1))), 0.3).play()
@@ -1226,7 +1242,7 @@ def scptest(obj, event, x, y):
 
 pwiout = nil
 
-def pwitest(obj, event, x, y):
+def pwitest(x):
     display "pwitest", x
     if x:
         pwiout = mult(0.3, ugen_powi(sine(220, 1),
@@ -1242,7 +1258,7 @@ def pwitest(obj, event, x, y):
 
 rndout = nil
 
-def rndtest(obj, event, x, y):
+def rndtest(x):
     display "rndtest", x
     if x:
         rndout = ugen_rand(addb(-0.5, sineb(0.3, 0.5)),
@@ -1257,7 +1273,7 @@ def rndtest(obj, event, x, y):
 
 shout = nil
 
-def shtest(obj, event, x, y):
+def shtest(x):
     display "shtest", x
     if x:
         shout = sine(sample_hold(ugen_rand(220.0, 880.0),
@@ -1275,7 +1291,7 @@ def shtest(obj, event, x, y):
 
 qntout = nil
 
-def qnttest(obj, event, x, y):
+def qnttest(x):
     display "qnttest", x
     var q = (13 / 0x10000) * 0.5
     if x:
@@ -1292,7 +1308,7 @@ def qnttest(obj, event, x, y):
 
 rliout = nil
 
-def rlitest(obj, event, x, y):
+def rlitest(x):
     display "rlitest", x
     if x:
         var freq = addb(523.251, ugen_rlib(6, 50))
@@ -1304,7 +1320,7 @@ def rlitest(obj, event, x, y):
 
 ########## O2audioio Test ##############
 
-def o2audioiotest(obj, event, x, y):
+def o2audioiotest(x):
     display "o2audioiotest", x
     if x:
        o2audioioout = o2audioio(input_ugen, "/audtest", 1, 1,
@@ -1318,11 +1334,11 @@ def o2audioiotest(obj, event, x, y):
 
 ########## Zitarev Test ##############
 
-def zitarevtest(obj, event, x, y):
+def zitarevtest(x):
     display "zitarevtest", x
     if x:
         var noise = ugen_rand(-0.1, 0.1)
-        zrev = zitarev(noise, 0.5, 0.5)  // snd, wet, gain
+        zrev = zitarev(noise, 0.5, 0.5, 3.0)  // snd, wet, gain, rt60
         zrev.play()
     else:
         zrev.set('input', zero_ugen)
@@ -1333,7 +1349,7 @@ def zitarevtest(obj, event, x, y):
 
 ########## Sttest Test ##############
 
-def sttesttest(obj, event, x, y):
+def sttesttest(x):
     display "sttesttest", x
     if x:  # play unfiltered noise followed by stereo lowpass with
            # cutoffs of 200 and 4000
@@ -1363,7 +1379,7 @@ def tblosc_update(freq):
         sched_cause(1, nil, 'tblosc_update', freq)
 
 
-def tableosctest(obj, event, x, y):
+def tableosctest(x):
     display "tableosctest", x
     if x:  # make/play tone with tableosc borrowing from another
         var tblosc0 = tableosc(1, 1)
@@ -1401,7 +1417,7 @@ def ssstatus():
     else:
         display "STATUS", sssynth
 
-def supersawtest(obj, event, x, y):
+def supersawtest(x):
     display "supersawtest", x
     if x:  # make/play tone with Supersaw
         sssynth = synth_create(SUPERSAW1, detune = 0.3, chans = 2).play()
@@ -1417,8 +1433,9 @@ def supersawtest(obj, event, x, y):
         return
         sss.mute()
 
+########## Overdrive Test ##############
 
-def overdrivetest(obj, event, x, y):
+def overdrivetest(x):
     display "overdrivetest", x
     if x:
         var tones = sine(sample_hold(ugen_rand(220.0, 880.0),
@@ -1435,23 +1452,83 @@ def overdrivetest(obj, event, x, y):
         sched_cause(1, ovd, 'mute')
         ovd = nil
 
-//    if x:  # process tone with overdrive
-//        // use existing tones to make a chord that will emphasize
-//        // harmonic distortion
-//        var odchord = sum(2).ins(Atone(step_to_hz(60), 5, 15).start(),
-//                                 Atone(step_to_hz(64), 5, 15).start(),
-//
-//                                 Atone(step_to_hz(69), 5, 15).start())
-//        // odchord = sine(440, 1)
-//        odchord = mult(odchord, pwlb(3, 50, 5))
-//        odsound = overdrive(odchord, 0.3, 1.0, 1.0)
-//        odsound.play()
-//    else:
-//        odsound.mute()
-//        odchord = nil
-//        return
-//        sss.mute()
+########## MidiIn Test ##############
 
+def midiintest(x):
+    display "midiintest", x
+    if x:
+        if not flsyn_ugen:
+            create_flsyn()
+    midi_enabled = x
+
+class Midi2flsyn (Midi_handler_default):
+    def noteon(ch, p, v):
+        if midi_enabled:
+            sched_cause(0, flsyn_ugen, 'noteon', ch, p, v)
+        else:
+            print "(Ignoring)",
+        print "midi2flsyn: noteon", ch, p, v
+
+    def noteoff(ch, p, v):
+        if midi_enabled:
+            sched_cause(0, flsyn_ugen, 'noteoff', ch, p)
+        else:
+            print "(Ignoring)",
+        print "midi2flsyn: noteoff", ch, p, v
+
+    def control(ch, c, val):
+        if midi_enabled:
+            sched_cause(0, flsyn_ugen, 'control_change', ch, c, val)
+        else:
+            print "(Ignoring)",
+        print "midi2flsyn: control", ch, c, val
+
+    def program(ch, val):
+        if midi_enabled:
+            sched_cause(0, flsyn_ugen, 'program_change', ch, val)
+        else:
+            print "(Ignoring)",
+        print "midi2flsyn: program", ch, val
+
+    def pitchbend(ch, val):
+        if midi_enabled:
+            sched_cause(0, flsyn_ugen, 'pitch_bend', ch, val)
+        else:
+            print "(Ignoring)",
+        print "midi2flsy: pitchbend", ch, val
+
+midi_handler = Midi2flsyn()
+midi_enabled = false
+
+
+########## DELAY TEST ################
+
+def delayvi_test(x):
+    display "delayvi_test", x
+    if x:
+        // warble with 11ms +- 10 ms, with maximum of 25 msec
+        dlyvi = delayvi(sine(880.0, 0.2), add(sineb(4.0, 0.01), 0.011), 0.025)
+        dlyvi.play()
+    else:
+        dlyvi.mute()  // immediate stop
+        dlyvi = nil   // eventual cleanup when GC frees it
+
+
+########## Chorus Test ##############
+
+def chorustest(x):
+    display "chorustest", x
+    if x:
+        var tone = make_simple_tone(10)  // don't start yet
+        chorusout = Chorusrbd(tone, 0.02, 0.04,      // depth, maxdepth
+                              0.02, 0.4, 0.02, 0.6,  // depths and freqs
+                              0.2, 0.7, 0.5, 2)      // feedback, wet, gain, chans
+        chorusout.play()
+        // sched_select(rtsched)
+        // sched_cause(0.2, tone, 'start')  // note ends automatically
+    else:
+        chorusout.mute()
+        chorusout = nil
 
 
 ########## Main Initialization ################
@@ -1459,6 +1536,7 @@ def overdrivetest(obj, event, x, y):
 def arco_prugens_handler(rest ignore):
     // this tells Arco to print the Ugen tree -- it can be useful for
     //     debugging.
+
     o2_send_cmd("/arco/prtree", 0, "")
     // also print the list of Ugens accessible by integer ID:
     o2_send_cmd("/arco/prugens", 0, "")

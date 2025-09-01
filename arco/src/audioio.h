@@ -29,9 +29,10 @@ const int FIRST = 4;
 const int RUNNING = 5 + DO_AUDIO_CALLBACK_BIT + COMPUTE_AUDIO_BIT;
 const int STOPPING = 7 + DO_AUDIO_CALLBACK_BIT;
 const int AUDIO_STOPPED = 8 + USE_MAIN_THREAD_BIT;
-const int RESET_SENT = 9 + USE_MAIN_THREAD_BIT;
-const int QUIT_SENT = 11 + USE_MAIN_THREAD_BIT;
-const int FINISHED = 12 + USE_MAIN_THREAD_BIT;
+const int RESET_SENT = 9 + USE_MAIN_THREAD_BIT;  // not used
+const int QUIT_SENT = 11 + USE_MAIN_THREAD_BIT;  // not used
+const int FINISH1 = 12 + USE_MAIN_THREAD_BIT;
+const int FINISHED = 13 + USE_MAIN_THREAD_BIT;
 
 
 // actual values used to open audio device

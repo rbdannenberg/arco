@@ -82,6 +82,14 @@ public:
             arco_warn("stdistr_ins: input rate is not 'a', ignore insert");
             return;
         }
+        if (input->chans == 0) {
+            arco_warn("stdistr_ins: input has zero output channels");
+            return;
+        }
+        if (input->chans > 1) {
+            arco_warn("stdistr_ins: input has %d channel but only the"
+                      " first is used", input->chans);
+        }
         if (i < inputs.size()) {  // input is not already in stdistr; append it
             if (inputs[i]) {
                 inputs[i]->unref();

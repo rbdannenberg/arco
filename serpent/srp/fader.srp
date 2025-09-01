@@ -13,7 +13,7 @@
 # will remove the fader, or fade() will remove the fader from
 # the dictionary.
 
-print "INCLUDING fader.srp"
+// print "INCLUDING fader.srp"
 
 fade_in_lookup = {}  // maps ugen to its fader
 
@@ -31,11 +31,14 @@ def fader(input, current, optional dur, goal, chans):
 
 
 class Fader (Ugen):
-    def init(input, current, chans):
+    var mode
+
+    def init(input, current, chans, keyword mode = nil):
+        this.mode = mode
         if not chans:
             chans = max_chans(1, input)
-        super.init(create_ugen_id(), "fader", chans, 'a', "Ufi",
-                   'input', input, 'current', current)
+        super.init(create_ugen_id(), "fader", chans, 'a', "Uf",
+                   'input', input, "a", 'current', current, "f")
 
 
     def set_current(current, optional chan):
@@ -52,8 +55,9 @@ class Fader (Ugen):
         this
 
 
-    def set_mode(mode):
-        o2_send_cmd("/arco/fader/mode", 0, "Ui", id, mode)
+    def set_mode(mode_):
+        mode = mode_
+        o2_send_cmd("/arco/fader/mode", 0, "Ui", id, mode_)
         this
 
 
@@ -64,6 +68,11 @@ class Fader (Ugen):
             o2_send_cmd("/arco/fader/goal", 0, "Uif", id, i,
                         goal if isnumber(goal) else goal[i])
         this
+
+
+    def set(x, optional chan):
+        set_goal(x, chan)
+        set_mode(mode or FADE_SMOOTH)  // use SMOOTH if not set
 
 
     def fade_in_complete(ugen):

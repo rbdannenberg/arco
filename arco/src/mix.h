@@ -62,8 +62,8 @@ public:
         }
         if (gain->chans != 1 && input->chans != 1 &&
             gain->chans != input->chans) {
-            arco_warn("mix_ins: input has %d chans, gain has %d chans",
-                      input->chans, gain->chans);
+            arco_warn("mix_ins: %s input has %d chans, gain has %d chans",
+                      name, input->chans, gain->chans);
             return;
         }
         int i = find(name, false);
@@ -242,6 +242,26 @@ public:
             if (input_desc->input->chans != input_desc->prev_gain.size()) {
                 input_desc->prev_gain.zero();
             }
+        }
+    }
+
+
+    void repl_in(char *name, Ugen_ptr ugen) {
+        int i = find(name, false);
+        Input *input_desc;
+        if (i >= 0) {  // name already exists; replace input
+            input_desc = &inputs[i];
+            Ugen_ptr gain = input_desc->gain;
+            if (gain->chans != 1 && ugen->chans != 1 &&
+                gain->chans != ugen->chans) {
+                arco_warn("mix_rep_in: %s input has %d chans, gain has %d"
+                          " chans", name, ugen->chans, gain->chans);
+                return;
+            }
+            Ugen_ptr input = input_desc->input;
+            input->unref();
+            gain->unref();
+            init_param(ugen, input_desc->input, &input_desc->input_stride);
         }
     }
 

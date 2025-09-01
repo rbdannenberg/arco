@@ -89,7 +89,10 @@ public:
     }
 
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_input(Ugen_ptr ugen) {
+        assert(ugen->rate == 'a');
+        init_param(ugen, input, &input_stride);
+    }
 
 
     void set_cutoff(float hz) {

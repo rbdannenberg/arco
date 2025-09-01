@@ -569,7 +569,7 @@ class Sep_mixer:
     var trigger_threshold
 
 
-    def set_trig_thresh(obj, x):
+    def set_trig_thresh(x):
     # handler for trig_thresh_sl
         display "set_trig_threshold", x
         trigger_mgr.trig_ugen.set_threshold(x)
@@ -584,7 +584,7 @@ class Sep_mixer:
 
         Labeled_slider(win, "Threshold", 'S', 'D', 'S', 'S',
                        80, 0, 2, 0.1, 'linear', 'trig_thresh_sl', prefs = prefs)
-        trig_thresh_sl.add_target_method(this, 'set_trig_thresh')
+        trig_thresh_sl.add_target_method(this, 'set_trig_thresh', 'x')
 
         Labeled_slider(win, "Capture Dly", 'S', 'D', 'S', 'S', 80, 0, 0.5,
                        0.3, 'linear', 'capture_dly_sl', prefs = prefs)
@@ -594,20 +594,20 @@ class Sep_mixer:
                            'db', SLIDER_SYMBOLS[i], prefs = prefs)
 
         Button(win, "Save", 'S', 'D', 'S', 'S', 'save_bt')
-        save_bt.add_target_method(this, 'save_button_handler')
+        save_bt.add_target_method(this, 'save_button_handler', 'x')
         
         Button(win, "Reload", 'S', 'D', 'S', 'S', 'reload_bt')
-        reload_bt.add_target_method(this, 'reload_button_handler')
+        reload_bt.add_target_method(this, 'reload_button_handler', 'x')
         
         win.fit_to_children()
 
 
-    def save_button_handler(rest ignore)
+    def save_button_handler(x)
     # handler for Save button
         prefs.save()
         
 
-    def reload_button_handler(rest ignore)
+    def reload_button_handler(x)
     # handler for Reload button
         display "reload_button_handler", prefs
         prefs.init(prefs.file_name) // reload prefs from file to restore values

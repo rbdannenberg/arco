@@ -14,7 +14,7 @@ class Pitchdly (Instrument):
          // but the "regen" parameter was zero, and the delay was zero,
          // so only the pitch shifter was actually used for anything
          // Also, input gain was always 1, so we don't need the input fader
-         var pshift = ola_pitch_shift(input, ratio, xfade, window)
+         var pshift = olapitchshift(input, ratio, xfade, window)
          super.init("Pitchdly", pshift)
 
     def set_ratio(ratio)

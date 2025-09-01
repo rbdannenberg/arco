@@ -1,0 +1,20 @@
+# noisegate.ugen -- Noise Gate
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+noisegate(input: a, threshold: b, attack: b, hold: b, release: b): a
+
+FAUST
+
+declare name "noisegate";
+declare description "Noisegate Unit Generator for Arco";
+
+import("stdfaust.lib");
+
+process(input, threshold, attack, hold, release) =
+    input : ef.gate_mono(linear2db(max(threshold, 0.000001)),
+                         attack, hold, release) with
+    {
+        linear2db(x) = 20*log10(x);
+    };

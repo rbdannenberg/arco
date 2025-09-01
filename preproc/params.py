@@ -130,6 +130,19 @@ class Signature:
                     return;
                     
 
+class Sig_lines:
+    def __init__(self, src):
+        self.lines = src
+        self.line_count = 0
+
+    def next_line(self):
+        if len(self.lines) == 0:
+            return (self.line_count, None)
+        line = self.lines[0]
+        self.lines = self.lines[1 :]
+        self.line_count += 1
+        return (self.line_count, line.strip())
+
 
 def get_signatures(src):
     """Find all arco type signatures.
@@ -144,42 +157,52 @@ def get_signatures(src):
 
     Return a list of Signatures, one for each signature found in src.
     """
+    global sig_lines
+    sig_lines = Sig_lines(src)
+
     signature_set = []
-    for i, line in enumerate(src):
-        line = line.strip()
+
+    while True:
+        (i, line) = sig_lines.next_line()
+        if line is None or line == "FAUST":
+            return signature_set
         if len(line) == 0:
             continue
         if line[0] == "#":
             continue
-        if line == "FAUST":
-            break
 
         # we found a signature line
-        signature_set.append(parse_signature(line, i + 1))  # first line = 1
-    return signature_set
+        signature_set.append(parse_signature(i, line))  # first line = 1
 
 
 
-def parse_signature(line, line_no):
+def parse_signature(line_no, line):
     """Parse an arco signature line into a Signature object."""
-    line = line.strip()
+    global sig_lines
     loc = line.find("(")
     name = line[0 : loc].strip()
-    loc = loc + 1
-    param_list = []
-    line = line[loc : ].replace(" ", "").replace("\t", "")
     pend = line.find(")")
-    if pend < 0:
-        print("Error in line", line_no, "Expected ) after parameters.")
-        return
+    while pend < 0:
+        (i, con) = sig_lines.next_line()
+        if line == "FAUST":
+            print("Error near line", line_no, "Expected ) after parameters.")
+            return None
+        line = line + con
+        pend = line.find(")")
+    print("parse_signature found one spec:", line)
+    loc = loc + 1
+    line = line[loc : ].replace(" ", "").replace("\t", "")
     param_list = []
+    pend = line.find(")")  # line changed, so find the ")" again
     for p in line[0 : pend].split(","):
-       if p.find(":") < 0:
-              print("Error in line", line_no, "Expected <name>: in parameter.")
-              return
-       param_list.append(Param(p))
+        # print("parse loop, p", p)
+        if p.find(":") < 0:
+            print("Error near line", line_no, "Expected <name>: in parameter.")
+            return
+        param_list.append(Param(p))
+    # print("parse_signature found one spec:", line, pend, line[pend : pend + 2])
     if line[pend : pend + 2] != "):":
-        print("Error in line", line_no, "Expected ): after parameters.")
+        print("Error near line", line_no, "Expected ): after parameters.")
         return
     output_type = Param(line[pend + 1 : ])  # uses the ":" to indicate no name
     update_params(param_list, output_type)

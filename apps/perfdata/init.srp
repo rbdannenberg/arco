@@ -97,8 +97,7 @@ def spectralcentroid_start(x):
             o2_method_new("/actl/spectralcentroid", "f", 'actl_spectralcentroid', t)
             print "installed spectralcentroid handler"
             spectralcentroid_handler_installed = true
-        sc_ugen = spectralcentroid("/actl/spectralcentroid")
-        sc_ugen.set('input', input_ugen)
+        sc_ugen = spectralcentroid(input_ugen, "/actl/spectralcentroid")
         sc_ugen.run()
     else:
         sc_ugen.unrun()

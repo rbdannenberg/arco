@@ -110,6 +110,7 @@ def main():
             print("#!/bin/sh", file=genf)
         print('echo "In', shellfilename, 'running', PY, 'path=$PATH"',
               file=genf)
+        print(PY, "rm -f *.h *.cpp *.dsp *.fh")
         for cn in classnames:
             print(PY, "../../preproc/f2a.py", cn, file=genf)
         for cn in classnames:
@@ -129,7 +130,46 @@ def main():
             typestring = ""
             for p in s.params:
                 decl += (p.name + ", ")
-                srpparams += ", '" + p.name + "', " + p.name
+                # This is a bit confusing. In .ugen files, 'c' means a
+                # constant at instantiation, but FAUST does not
+                # support structural changes at "instantiation", only
+                # at compile time (e.g. if max delay is an Arco
+                # parameter, FAUST does not allocate only that
+                # amount. Instead, it allocates enough for >1 second
+                # at 192K. It will only allocate according to max delay
+                # if it is known at compile-time constant, e.g. 0.1.)
+                # Therefore, although you can write 'c' in a .ugen file
+                # FAUST treats it as 'b', but it is still interpreted
+                # on the Arco side as a value that is not a signal, and
+                # you can only change it with .set_attr(x) methods or
+                # messages. It is a local instance variable rather than
+                # a block-rate input.
+                #
+                # In Serpent, we use 'c' for the rate of Const even
+                # though it looks like a 'b' rate to any consumer.
+                # We also use 'f' (for "fixed" or "float") for parameters
+                # that are "fixed" or "set" at instantiation time and
+                # maybe are updateable using methods. The 'f' type is
+                # needed to avoid confusion with Const which is c-rate.
+                # Since we have some type checking to avoid connecting
+                # an a-rate to a b-rate only input, but we want to
+                # allow connecting a c-rate (Const) to a b-rate input,
+                # we have to convert all the types here for Serpent:
+                # "ab" becomes "abc", "b" becomes "bc". "c" becomes "f".
+                # There should not be an "ac", "abc", or "bc" in the
+                # .ugen file.
+                # 
+                # The O2 typestring becomes "U" for any signal denoted
+                # in .ugen as "a", "b", or "ab", and it is "f" (float)
+                # for any .ugen parameter with a "c" designation.
+                #
+                types = p.abtype
+                if types == "ab":
+                    types = "abc"
+                elif types == "b":
+                    types = "bc"
+                srpparams += (", '" + p.name + "', " + p.name +
+                              ', "' + types + '"')
                 typestring += ("f" if p.abtype == 'c' else "U")
 
             # allow optional chans parameter unless the inputs/outputs are
@@ -144,19 +184,19 @@ def main():
             # Also generate list of channels for max function
             chans_list = "" if s.output.fixed else "1"
             for p in s.params:
-                if p.abtype == 'a':
-                    print("    if", p.name + ".rate != 'a':", file=srpf)
-                    print('        print "ERROR:', "'" + p.name + \
-                          "' input to Ugen '" + c + "'",
-                          'must be audio rate"', file=srpf)
-                    print("        return nil", file=srpf)
-                elif p.abtype == 'b':
-                    print("    if not isnumber(" + p.name + ") and",
-                          p.name + ".rate == 'a':", file=srpf)
-                    print('        print "ERROR:', "'" + p.name + \
-                          "' input to Ugen '" + c + "'",
-                          'must be block rate"', file=srpf)
-                    print("        return nil", file=srpf)
+#                if p.abtype == 'a':
+#                    print("    if", p.name + ".rate != 'a':", file=srpf)
+#                    print('        print "ERROR:', "'" + p.name + \
+#                          "' input to Ugen '" + c + "'",
+#                          'must be audio rate"', file=srpf)
+#                    print("        return nil", file=srpf)
+#                elif p.abtype == 'b':
+#                    print("    if not isnumber(" + p.name + ") and",
+#                          p.name + ".rate == 'a':", file=srpf)
+#                    print('        print "ERROR:', "'" + p.name + \
+#                          "' input to Ugen '" + c + "'",
+#                          'must be block rate"', file=srpf)
+#                    print("        return nil", file=srpf)
                 if p.fixed:
                     achans = p.name + ".chans"
                     if p.chans == 1:

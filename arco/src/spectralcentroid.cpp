@@ -1,11 +1,7 @@
-//
 //  spectralcentroid.cpp
-//
-//
 
 #include "arcougen.h"
 #include "spectralcentroid.h"
-
 
 const char *SpectralCentroid_name = "SpectralCentroid";
 
@@ -13,12 +9,11 @@ void SpectralCentroid::real_run()
 {
     input_samps = input->run(current_block);
     
-    // Note: processAudioFrame assumes input_samps has length BL, so it only processes the first channel of input and the rest are ignored.
-    
+    // Note: processAudioFrame assumes input_samps has length BL, so it
+    // only processes the first channel of input and the rest are ignored.
     fftcalc.processAudioFrame(input_samps);
+
     if (fftcalc.isReady()) { // only runs if we have enough samples
-        
-        
         float* magnSpec = fftcalc.getMagnitudeSpectrum();
         float* FFTFreqs = fftcalc.getFFTFrequencies();
         
@@ -72,24 +67,29 @@ static void arco_spectralcentroid_repl_input(O2SM_HANDLER_ARGS)
     int32_t input_id = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(SpectralCentroid, spectralcentroid, id, "arco_spectralcentroid_repl_input");
+    UGEN_FROM_ID(SpectralCentroid, spectralcentroid, id,
+                 "arco_spectralcentroid_repl_input");
     ANY_UGEN_FROM_ID(input, input_id, "arco_spectralcentroid_repl_input");
     spectralcentroid->repl_input(input);
-    // printf("spectralcentroid input set to %p (%s)\n", ugen, ugen->classname());
+    // printf("spectralcentroid input set to %p (%s)\n", ugen,
+    //        ugen->classname());
 }
 
 
 
-/* O2SM INTERFACE: /arco/spectralcentroid/new int32 id, int32 chans, string reply_addr;
+/* O2SM INTERFACE: /arco/spectralcentroid/new int32 id, int32 input_id,
+       string reply_addr;
  */
 static void arco_spectralcentroid_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    char *reply_addr = argv[1]->s;
+    int32_t input_id = argv[1]->i;
+    char *reply_addr = argv[2]->s;
     // end unpack message
 
-    new SpectralCentroid(id, reply_addr);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_spectralcentroid_new");
+    new SpectralCentroid(id, input, reply_addr);
 }
 
 
@@ -100,7 +100,7 @@ static void spectralcentroid_init()
                     NULL, true, true);
     o2sm_method_new("/arco/spectralcentroid/repl_input", "ii",
                     arco_spectralcentroid_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/spectralcentroid/new", "is", arco_spectralcentroid_new,
+    o2sm_method_new("/arco/spectralcentroid/new", "iis", arco_spectralcentroid_new,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
 }

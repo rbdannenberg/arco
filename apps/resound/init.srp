@@ -257,7 +257,7 @@ def arco_ready():
     # Setup latency slider
     Labeled_slider(default_win, "Latency", COL3, 5, 350, 28, 80,
                    0, 200, 50, 'integer', 'latency_slider', prefs = prefs)
-    latency_slider.add_target_method(nil, 'resound_latency_handler')
+    latency_slider.add_target_method(nil, 'resound_latency_handler', 'x')
     resound_latency = latency_slider.value() * 0.001
 
     # four_of_a_kind.srp initialization
@@ -285,8 +285,8 @@ def arco_ready():
     default_window.fit_to_children()
   
 
-def resound_latency_handler(obj, val):
-    prefs.set('latency', val)
+def resound_latency_handler(val):
+    prefs.set('latency', val)  // redundant? rename to 'latency_slider'?
     val = val * 0.001
     resound_latency = val
 

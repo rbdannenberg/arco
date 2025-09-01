@@ -164,7 +164,7 @@ public:
     void real_run() {
         freq_samps = freq->run(current_block);  // update input
         amp_samps = amp->run(current_block);  // update input
-        Sineb_state *state = &states[0];
+        Sineb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             float fSlow0 = float(amp_samps[0]);
             float fSlow1 = fConst0 * float(freq_samps[0]);

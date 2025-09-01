@@ -140,7 +140,10 @@ class Ola_pitch_shift: public Ugen {
     }
 
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_input(Ugen_ptr ugen) {
+        assert(ugen->rate == 'a');
+        init_param(ugen, input, &input_stride);
+    }
 
     void set_ratio(float r) {
         ratio = r;

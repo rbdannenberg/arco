@@ -64,7 +64,7 @@ class The_bell_tower (Movement):
         // main audio on/off checkbox, y - 4 to align with other text:
         Checkbox(window, "IV. The Bell Tower", x, y - 4, 175, 'H',
                  'btcheckbox')
-        btcheckbox.add_target_method(this, 'btcheckbox_handler')
+        btcheckbox.add_target_method(this, 'btcheckbox_handler', 'x')
 
         # Creates global with Bell_obj's for bell1, bell2, bell3:
         bells = [Bell_obj(window, i) for i = 0 to 3]
@@ -117,33 +117,33 @@ class The_bell_tower (Movement):
         // Micwet
         Labeled_slider(win, "micwet", 'S', 'D', 275, 30, 75, 0, 1, 0.1,
                        'linear', 'micwet_slider', prefs = prefs)
-        micwet_slider.add_target_method(this, 'micwet_handler')
+        micwet_slider.add_target_method(this, 'micwet_handler', 'x')
 
         // Bellwet
         Labeled_slider(win, "bellwet", 'S', 'D', 275, 30, 75, 0, 1, 0.1,
                        'linear', 'bellwet_slider', prefs = prefs)
-        bellwet_slider.add_target_method(this, 'bellwet_handler')
+        bellwet_slider.add_target_method(this, 'bellwet_handler', 'x')
 
         // RT60
         Labeled_slider(win, "rt60", 'S', 'D', 275, 30, 75, 0, 10, 5,
                        'linear', 'rt60_slider', prefs = prefs)
-        rt60_slider.add_target_method(this, 'rt60_handler')
+        rt60_slider.add_target_method(this, 'rt60_handler', 'x')
 
         // Filter -  lowest cutoff set to 1 due to dist.
         Labeled_slider(win, "filter", 'S', 'D', 275, 30, 75, 1, 20000, 9000,
                        'integer', 'filter_slider', prefs = prefs)
-        filter_slider.add_target_method(this, 'filter_handler')
+        filter_slider.add_target_method(this, 'filter_handler', 'x')
 
         // Fadeout
         Checkbox(win, "fadeout", 'S', 'D', 150, 'H', 'btfadeout')
-        btfadeout.add_target_method(this, 'fadeout_handler')
+        btfadeout.add_target_method(this, 'fadeout_handler', 'x')
 
         // Fadelength
         Labeled_slider(win, "fadelen", 'S', 'D', 275, 30, 75, 0, 30, 30,
                        'integer', 'fadelen_slider', prefs = prefs)
 
 
-    def fadeout_handler(obj, event, x, y):
+    def fadeout_handler(x):
         // Create pwe envelope
         if not output:
             return
@@ -155,33 +155,33 @@ class The_bell_tower (Movement):
             output.set('x2', 1)
 
 
-    def btcheckbox_handler(obj, event, x, y):
+    def btcheckbox_handler(x):
         if x and not bell_mixer:
             audio_init()
         else:
             audio_finish()
 
 
-    def rt60_handler(obj, x):
+    def rt60_handler(x):
     # Set the reverb time (RT60 time)
         if rvb:
             rvb.set_rt60(max(0.1, x))
 
 
-    def bellwet_handler(obj, x):
+    def bellwet_handler(x):
     # Determines the wetness of the currently active bell
         if bell_mixer:
             for bell in bells:
                 rvb_mixer.set_gain(bell.name, x)
 
 
-    def micwet_handler(obj, x):
+    def micwet_handler(x):
     # Determines the wetness of the mic
         if bell_mixer:
             rvb_mixer.set_gain('mic', x)
 
 
-    def filter_handler(obj, x):
+    def filter_handler(x):
     # Change the frequency of the lowpass filter
         if rvb:
             rvb.set_cutoff(x)

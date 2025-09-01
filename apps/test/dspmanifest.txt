@@ -13,6 +13,7 @@ fileplay
 filerec
 recplay
 delay
+delayvi
 allpass
 olapitchshift
 feedback
@@ -28,8 +29,9 @@ spectralcentroid
 spectralrolloff
 o2audioio
 sttest
-# zitarev
+zitarev
 tableosc*
 blend*
 stdistr
 overdrive
+

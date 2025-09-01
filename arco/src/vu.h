@@ -23,7 +23,7 @@ public:
 
     // setting output type to 0 because there is no output. chans is ignored.
     Vu(int id, int chans, char *reply_addr, float period) : Ugen(id, 0, 0) {
-        printf("Vu constructor id %d classname %s\n", id, classname());
+        // printf("Vu constructor id %d classname %s\n", id, classname());
         vu_reply_addr = NULL;
         input = NULL;
         running = false;
@@ -33,7 +33,7 @@ public:
     }
 
     ~Vu() {
-        printf("~Vu called. id %d input->id %d\n", id, input->id);
+        // printf("~Vu called. id %d input->id %d\n", id, input->id);
         if (input) {
             input->unref();
         }

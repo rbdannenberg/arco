@@ -146,7 +146,7 @@ public:
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]);
             state->fVec0[0] = fTemp0;
-            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1])));
+            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (state->fVec0[1] + fTemp0)));
             output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
@@ -175,7 +175,7 @@ public:
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-        Lowpass_state *state = &states[0];
+        Lowpass_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
             state++;

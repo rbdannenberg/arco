@@ -28,8 +28,6 @@ class Arco_scope:
     var direction
     var setting_threshold
     var period // set this to change scope sweep rate (default is 0.25 s)
-    var y_up
-    var y_dn
     var scope
     var pending_sweep // pending_sweep tells us we are accumulating data
                       // and planning to display and recall sweep()
@@ -48,8 +46,7 @@ class Arco_scope:
         probe_channel = 0  // default is show first channel
         scope = Scope(window, label, x, y, w, h, sample_rate,
                       panel_color = PANEL_COLOR, screen_color = SCREEN_COLOR,
-                      screen_grid = GRID_COLOR)
-        scope.target = this // handle mouse and zoom events here
+                      screen_grid = GRID_COLOR, zoom_x_handler = this)
         scope.set_channels(1)
 
 
@@ -124,26 +121,23 @@ class Arco_scope:
             scope.set_sample_rate(sample_rate / skip)
 
 
-    def mouse_event(event, x, y):
+    def mouse_event(control, event, x, y):
         if event == WXS_LEFT_DOWN:
             threshold = y
             direction = 0
             setting_threshold = true
             // direction is set when you move 3 pixels up or down
-            y_up = scope.screen.unmap_y(scope.screen.map_y(y) - 3)
-            y_dn = scope.screen.unmap_y(scope.screen.map_y(y) + 3)
 
         if setting_threshold and (event == WXS_LEFT_UP or event == WXS_MOVE):
             // here we wait for the mouse to move to indicate direction
             // or for a left up, indicating direction == 0
-            if y > y_up:
-                direction = 1
-            if y < y_dn:
+            if y < threshold - 2:
                 direction = -1
+            if y > threshold + 2:
+                direction = +1
                
             if direction != 0 or event == WXS_LEFT_UP:
-                probe.thresh(threshold, direction, 0.02)
-                display "thresh", threshold, direction
+                probe.thresh(scope.screen.unmap_y(threshold), direction, 0.02)
                 scope.set_threshold(threshold, direction)
                 setting_threshold = false
 

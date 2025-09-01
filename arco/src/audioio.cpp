@@ -95,8 +95,9 @@ get it running first, then switch over to actually using it.
   you will get a /host/reset message to acknowledge the reset
   occurred)
 
-- states for quit are IDLE, FINISHED
-  IDLE->FINISHED is done by arco/quit
+- states for quit are IDLE, FINISH1, FINISHED
+  IDLE->FINISH1 is done when /fileio/quit is sent
+  FINISH1->FINISHED is done by arco/quit when fileio_finished is detected
 
  - When audio processing starts, we set source to audio thread and
    start incrementing the time when each block arrives.
@@ -270,6 +271,7 @@ See doc/design.md
 #endif
 #include "sum.h"
 #include "thru.h"
+#include "fileio.h"  // for fileio_finished declaration
 
 
 static const int ZERO_PAD_COUNT = 4410;  // how many zeros to write when closing
@@ -281,6 +283,8 @@ const char *aud_state_name[] = {
 */
 
 using std::min;
+
+static void arco_close(O2SM_HANDLER_ARGS);
 
 // Note: audio processing can be carried out by more than one thread.
 // When the audio callback happens, we set the thread_local o2_ctx
@@ -573,28 +577,81 @@ static void arco_reset(O2SM_HANDLER_ARGS)
 }
 
 
+// send a message to address with no parameters after 2 msec
+static void schedule_arco_wait(const char *address)
+{
+    o2_send_start();
+    O2message_ptr msg =
+    o2_message_finish(o2sm_time_get() + 0.002, address, true);
+    msg->next = o2_ctx->schedule_head;
+    o2_ctx->schedule_head = msg;
+    if (!msg->next) {  // queue was empty, so now tail should be msg
+        o2_ctx->schedule_tail = msg;
+    }
+    // o2sm_poll() will deliver the message in about 2 msec
+}
+
+
 /* O2SM INTERFACE: /arco/quit;
    Arco is quitting -- shut down the whole application, audio first
 */
 static void arco_quit(O2SM_HANDLER_ARGS)
 {
-    if (aud_state == IDLE) {
+    assert(aud_state != FINISHED);  // message delivery should be stopped
+                                    // if aud_state is FINISHED
+
+    if (aud_state == RUNNING) {
+        arco_close(NULL, "", NULL, 0, NULL);
+        // now aud_state is STOPPING and we have to wait for callback to
+        // switch to AUDIO_STOPPED and then this thread to switch to IDLE
+        // o2sm_poll does not support getting messages out of time order,
+        // but if we schedule for just 2 msec in the future and put the
+        // message at the head of the queue, then at most we will delay
+        // any other message by 2 msec, and we're shutting down anyway,
+        // so a pending message at this point is facing a race condition
+        // anyway.
+        // DO NOT RETURN YET! - fall through to schedule_arco_wait and return
+    }
+
+    if (aud_state != IDLE && aud_state != FINISH1 && aud_state != FINISHED) {
+        schedule_arco_wait("/arco/wait_idle");
+        return;
+    }
+
+    // now aud_state == IDLE, we also need fileio to be finished
+    if (aud_state == IDLE && !fileio_finished) {
+        aud_state = FINISH1;
         o2sm_send_cmd("/fileio/quit", 0, "");
+        schedule_arco_wait("/arco/quit");
+        return;
+    }
 
-        arco_free_all_ugens();
-        ugen_table.finish();
-        
-        assert(run_set.size() == 0);
-        run_set.finish();
-        
-        assert(output_set.size() == 0);
-        output_set.finish();
+    // finally we can free the audio thread resources
+    arco_free_all_ugens();
+    ugen_table.finish();
 
-        o2sm_finish();
+    assert(run_set.size() == 0);
+    run_set.finish();
 
-        aud_state = FINISHED;
+    assert(output_set.size() == 0);
+    output_set.finish();
+
+    o2sm_finish();
+
+    aud_state = FINISHED;
+}
+
+
+/* O2SM INTERFACE: /arco/wait_idle;
+   Reschedule callbacks until IDLE, then call arco_quit().
+*/
+static void arco_wait_idle(O2SM_HANDLER_ARGS)
+{
+    if (aud_state == IDLE) {
+        printf("arco_wait_idle calling arco_quit now that state is IDLE\n");
+        arco_quit(NULL, "", NULL, 0, NULL);
     } else {
-        arco_warn("arco_quit ignored because aud_state is %d\n", aud_state);
+        schedule_arco_wait("/arco/wait_idle");
     }
 }
 
@@ -628,7 +685,30 @@ static void arco_devinf(O2SM_HANDLER_ARGS)
     // end unpack message
 
     char audio_info_buff[ARCO_STRINGMAX];
-    PaDeviceIndex num_devs = Pa_GetDeviceCount();
+    PaDeviceIndex num_devs;
+    PaError err;
+
+    printf("arco_devinf aud_state %d\n", aud_state & 255);
+    if (aud_state != IDLE) {  // must not be playing audio!
+        goto error;
+    }
+    
+    // re-initialized PortAudio in case there are new devices
+    err = Pa_Terminate();
+    if (err != paNoError) {
+        printf("ERROR: PortAudio failed to terminate.\n");
+        goto error;
+    }
+
+    
+    err = Pa_Initialize();
+    if (err != paNoError) {
+        printf("FATAL CONDITION: PortAudio failed to initialize.\n");
+        goto error;
+    }
+
+
+    num_devs = Pa_GetDeviceCount();
     for (int id = 0; id < num_devs; id++) {
         const PaDeviceInfo *info = Pa_GetDeviceInfo(id);
         const char *name = info->name;
@@ -642,6 +722,7 @@ static void arco_devinf(O2SM_HANDLER_ARGS)
         audio_info_buff[ARCO_STRINGMAX - 1] = 0; // just in case
         o2sm_send_cmd(address, 0, "s", audio_info_buff);
     }
+  error:
     // terminate list with empty string:
     o2sm_send_cmd(address, 0, "s", "");
 }
@@ -949,8 +1030,8 @@ static void arco_run(O2SM_HANDLER_ARGS)
     ugen->flags |= IN_RUN_SET;
     run_set.push_back(ugen);
     ugen->ref();
-    printf("arco_run %s %d @ %p inserted, flags %x\n", ugen->classname(),
-           id, ugen, ugen->flags);
+    // printf("arco_run %s %d @ %p inserted, flags %x\n", ugen->classname(),
+    //        id, ugen, ugen->flags);
 }
 
 
@@ -1004,6 +1085,9 @@ static void arco_open(O2SM_HANDLER_ARGS)
         return;
     }
 
+    arco_print("+-------------------------------------------+\n");
+    arco_print("| arco_open: Starting to open audio devices |\n");
+    arco_print("+-------------------------------------------+\n");
     aud_frames_done = 0;
     num_devices = Pa_GetDeviceCount();
 
@@ -1018,21 +1102,21 @@ static void arco_open(O2SM_HANDLER_ARGS)
     in_chans = req_in_chans(in_chans);
     if (in_chans == 0) {
         actual_in_id = paNoDevice;
-        arco_print("Zero input channels, so no input device to open.\n");
+        arco_print("    Zero input channels, so no input device to open.\n");
         actual_in_chans = 0;
     } else {
         const PaDeviceInfo *info = Pa_GetDeviceInfo(actual_in_id);
         if (!info) {
-            arco_print("Aura has no actual input device\n");
+            arco_print("    Arco has no actual input device.\n");
             actual_in_chans = 0;
             suggested_latency = 0.01;
         }
         else {
-            arco_print("Aura selects input device: %s\n", info->name);
+            arco_print("    Arco selects input device: %s\n", info->name);
             actual_in_chans = in_chans;
            if (info->maxInputChannels < in_chans) {
-                arco_print("\n    WARNING: only %d input channels available.\n",
-                           info->maxInputChannels);
+                arco_print("        WARNING: only %d input channels",
+                           " available.\n", info->maxInputChannels);
                 actual_in_chans = info->maxInputChannels;
             }
             suggested_latency = info->defaultLowInputLatency;
@@ -1042,14 +1126,14 @@ static void arco_open(O2SM_HANDLER_ARGS)
     out_chans = req_out_chans(out_chans);
     if (out_chans == 0) {
         actual_out_id = paNoDevice;
-        arco_print("Zero output channels, so no output device to open.\n");
+        arco_print("    Zero output channels, so no output device to open.\n");
         actual_out_chans = 0;
     } else {
         const PaDeviceInfo *info = Pa_GetDeviceInfo(actual_out_id);
-        arco_print("Aura selects output device: %s\n", info->name);
+        arco_print("    Arco selects output device: %s\n", info->name);
         actual_out_chans = out_chans;
         if (info->maxOutputChannels < out_chans) {
-            arco_print("\n    WARNING: only %d output channels available.\n",
+            arco_print("        WARNING: only %d output channels available.\n",
                        info->maxOutputChannels);
             actual_out_chans = info->maxOutputChannels;
         }
@@ -1064,7 +1148,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
 
     // override prefs with specified latency in open call
     actual_latency_ms = (latency_ms >= 0 ? latency_ms : actual_latency_ms);
-    arco_print("Audio latency = %d ms\n", actual_latency_ms);
+    arco_print("    Audio latency = %d ms\n", actual_latency_ms);
     suggested_latency = actual_latency_ms * 0.001;
 
     input_params.device = actual_in_id;
@@ -1085,11 +1169,11 @@ static void arco_open(O2SM_HANDLER_ARGS)
     }
     if (actual_buffer_size % BL) {  // enforce buffer_size multiple of BL
         actual_buffer_size = ((actual_buffer_size + (BL - 1)) / BL) * BL;
-        arco_print("WARNING: audioio open buffer_size rounded up to %d\n",
+        arco_print(    "WARNING: audioio open buffer_size rounded up to %d\n",
                    actual_buffer_size);
     }
     if (actual_buffer_size > BL) {  // warn of big buffers (higher latency)
-        arco_print("WARNING: audioio open buffer_size is %d\n",
+        arco_print("    WARNING: audioio open buffer_size is %d\n",
                    actual_buffer_size);
     }
     if (actual_in_chans == 0 || actual_in_id == -1) {
@@ -1109,11 +1193,11 @@ static void arco_open(O2SM_HANDLER_ARGS)
         }
         int status;
         while ((status = request_record_status()) == 0) {
-            arco_print("Waiting for authorization...\n");
+            arco_print("    Waiting for authorization...\n");
             sleep(1);
         }
         if (status != 3) {
-            arco_warn("Audio input not authorized. Input will be zero.\n");
+            arco_warn("    Audio input not authorized. Input will be zero.\n");
         }
 #endif
     }
@@ -1142,22 +1226,27 @@ static void arco_open(O2SM_HANDLER_ARGS)
         (err = Pa_StartStream(audio_stream)) != paNoError) {
         Pa_CloseStream(&audio_stream);  // ignore any close error
     } else {
-        arco_print("audioio open completed\n");
+        arco_print("    arco_open: audio open completed successfully\n");
     }
-
-    arco_print("Requested input chans: %d\n", req_in_chans(in_chans));
-    arco_print("Requested output chans: %d\n", req_out_chans(out_chans));
-    arco_print("Actual device input chans: %d\n", actual_in_chans);
-    arco_print("Actual device output chans: %d\n", actual_out_chans);
-    arco_print("Input device: %d\n", actual_in_id);
-    arco_print("Output device: %d\n", actual_out_id);
+    char *indent = "        ";
+    arco_print("%sRequested input chans: %d\n", indent, req_in_chans(in_chans));
+    arco_print("%sRequested output chans: %d\n", indent,
+               req_out_chans(out_chans));
+    arco_print("%sActual device input chans: %d\n", indent, actual_in_chans);
+    arco_print("%sActual device output chans: %d\n", indent, actual_out_chans);
+    arco_print("%sInput device: %d\n", indent, actual_in_id);
+    arco_print("%sOutput device: %d\n", indent, actual_out_id);
     const PaStreamInfo *stream_info = Pa_GetStreamInfo(audio_stream);
     if (stream_info) {
-        arco_print("Reported input latency: %g\n", stream_info->inputLatency);
-        arco_print("Reported output latency: %g\n", stream_info->outputLatency);
-        arco_print("Reported sample rate: %g\n", stream_info->sampleRate);
+        arco_print("%sReported input latency: %g\n", indent,
+                   stream_info->inputLatency);
+        arco_print("%sReported output latency: %g\n", indent,
+                   stream_info->outputLatency);
+        arco_print("%sReported sample rate: %g\n", indent,
+                   stream_info->sampleRate);
     } else {
-        arco_warn("Pa_GetStreamInfo returned NULL after audio open\n");
+        arco_warn("Pa_GetStreamInfo returned NULL after audio open\n",
+                  indent);
     }
     if (err < 0) {  // print a PortAudio error
          arco_error("Audio open error: %d, %s\n", err, Pa_GetErrorText(err));
@@ -1238,7 +1327,6 @@ void arco_thread_poll()
         return;
     }
     if (aud_state == AUDIO_STOPPED) {
-        o2sm_send_start();
         aud_state = IDLE;
         o2sm_send_start();
         // 1 == successful transition from RUNNING to AUDIO_STOPPED:
@@ -1250,7 +1338,7 @@ void arco_thread_poll()
         return;  // audio thread is polling; don't do it here
     }
 
-    // now, aud_state == IDLE
+    // now, aud_state == IDLE or FINISH1
     arco_wall_time = o2_native_time() + arco_wall_time_offset;
 
     assert(aud_o2_ctx);
@@ -1290,6 +1378,7 @@ int audioio_initialize()
     o2sm_method_new("/arco/prugen", "is", arco_prugen, NULL, true, true);
     o2sm_method_new("/arco/reset", "", arco_reset, NULL, true, true);
     o2sm_method_new("/arco/quit", "", arco_quit, NULL, true, true);
+    o2sm_method_new("/arco/wait_idle", "", arco_wait_idle, NULL, true, true);
     o2sm_method_new("/arco/devinf", "s", arco_devinf, NULL, true, true);
     o2sm_method_new("/arco/run", "i", arco_run, NULL, true, true);
     o2sm_method_new("/arco/unrun", "i", arco_unrun, NULL, true, true);

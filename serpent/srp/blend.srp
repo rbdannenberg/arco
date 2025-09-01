@@ -1,4 +1,4 @@
-# blend.srp -- granular synthesis from input stream unit generator
+# blend.srp -- fade between two inputs
 #
 # Roger B. Dannenberg
 # June 2023
@@ -8,10 +8,10 @@ BLEND_POWER = 1
 BLEND_45 = 2
 
 class Blend (Ugen):
-    def init(chans, x1, x2, b, mode, init_b):
-        super.init(create_ugen_id(), "Blend", chans, 'a', "UUUfif",
-	           'x1', x1, 'x2', x2, 'b', b,
-                   'mode', mode, 'init_b', init_b)
+    def init(chans, x1, x2, b, init_b, mode):
+        super.init(create_ugen_id(), "Blend", chans, 'a', "UUUfi",
+	           'x1', x1, "abc", 'x2', x2, "abc", 'b', b, "abc",
+                   'init_b', init_b, "f", 'mode', mode)
 
     def set_gain(gain)
         o2_send_cmd("/arco/blend/gain", 0, "Uf", id, gain)
@@ -23,9 +23,9 @@ class Blend (Ugen):
 
 
 def blend(x1, x2, b, optional chans, mode, keyword gain = 1, init_b = 0.5):
-    chans = chans or max(x1.chans, max(x2.chans, b.chans))
+    chans = chans or max_chans(max_chans(max_chans(1, x1), x2), b)
     mode = mode or BLEND_POWER
-    var ugen = Blend(chans, x1, x2, b, mode, init_b)  # blend as a function
+    var ugen = Blend(chans, x1, x2, b, init_b, mode)  # blend as a function
     if gain != 1:  // default for Arco
         ugen.set_gain(gain)
     return ugen
@@ -33,8 +33,9 @@ def blend(x1, x2, b, optional chans, mode, keyword gain = 1, init_b = 0.5):
 
 class Blendb (Ugen):
     def init(chans, x1, x2, b, mode):
-        super.init(create_ugen_id(), "Blendb", chans, 'b', "UUUfif",
-	           'x1', x1, 'x2', x2, 'b', b, 'mode', mode)
+        super.init(create_ugen_id(), "Blendb", chans, 'b', "UUUi",
+	           'x1', x1, "bc", 'x2', x2, "bc", 'b', b, "bc",
+                   'mode', mode, "f")
 
     def set_gain(gain)
         o2_send_cmd("/arco/blendb/gain", 0, "Uf", id, gain)
@@ -46,7 +47,7 @@ class Blendb (Ugen):
 
 
 def blendb(x1, x2, b, optional chans, mode, keyword gain = 1):
-    chans = chans or max(x1.chans, max(x2.chans, b.chans))
+    chans = chans or max_chans(max_chans(max_chans(1, x1), x2), b)
     mode = mode or BLEND_POWER
     var ugen = Blendb(chans, x1, x2, b, mode)  # blend as a function
     if gain != 1:  // default for Arco

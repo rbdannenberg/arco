@@ -13,8 +13,8 @@ public:
     Ugen_ptr alternate;  // allow input to come from another Ugen
 
     Thru(int id, int nchans, Ugen_ptr input) : Ugen(id, 'a', nchans) {
-        printf("Thru@%p created, id %d, ugen_table[id] %p\n",
-               this, id, ugen_table[id]);
+        // printf("Thru@%p created, id %d, ugen_table[id] %p\n",
+        //        this, id, ugen_table[id]);
         init_input(input);
         alternate = NULL;
     };
@@ -50,7 +50,10 @@ public:
     }
 
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_input(Ugen_ptr ugen) {
+        assert(ugen->rate == 'a');
+        init_param(ugen, input, &input_stride);
+    }
 
 
     void real_run() {

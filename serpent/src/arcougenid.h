@@ -43,7 +43,7 @@ public:
         ugen_id_table[UGEN_TABLE_SIZE - 1] = -1; // end-of-list at end
         free_count = UGEN_TABLE_SIZE - 10;
         initialized = true;
-        printf("***** Ugen_id table (re)initialized *****\n");
+        printf("**** Ugen_id table (re)initialized ****\n");
     }
 
 

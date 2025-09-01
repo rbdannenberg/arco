@@ -1,33 +1,19 @@
-//
 //  spectralrolloff.cpp
-//
-//
 
 #include "arcougen.h"
 #include "spectralrolloff.h"
-
 
 const char *SpectralRolloff_name = "SpectralRolloff";
 
 void SpectralRolloff::real_run()
 {
-    // Value for constant input is close to zero.
-    // but value for sine wave input fluctuates fast?
     input_samps = input->run(current_block);
     
-//    for (int i = 0; i < BL; i ++) {
-//        input_samps[i] = sin(2.0 * M_PI * 440.0 * testing_cnt / AR);
-//        
-//        testing_cnt++;
-//    }
-    
-    // Note: processAudioFrame assumes input_samps has length BL, so it only processes the first channel of input and the rest are ignored.
+    // Note: processAudioFrame assumes input_samps has length BL, so it
+    // only processes the first channel of input and the rest are ignored.
     fftcalc.processAudioFrame(input_samps);
     
-    
     if (fftcalc.isReady()) { // only runs if we have enough samples
-        
-        
         float* magnSpec = fftcalc.getMagnitudeSpectrum();
         float* FFTFreqs = fftcalc.getFFTFrequencies();
         
@@ -55,7 +41,6 @@ void SpectralRolloff::real_run()
         o2sm_add_float(result);
         o2sm_send_finish(0, cd_reply_addr, false);
     }
-    
 }
 
 
@@ -71,13 +56,13 @@ void SpectralRolloff::start(const char *reply_addr) {
  */
 static void arco_spectralrolloff_start(O2SM_HANDLER_ARGS)
 {
-
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     char *reply_addr = argv[1]->s;
     // end unpack message
 
-    UGEN_FROM_ID(SpectralRolloff, spectralrolloff, id, "arco_spectralrolloff_start");
+    UGEN_FROM_ID(SpectralRolloff, spectralrolloff, id,
+                 "arco_spectralrolloff_start");
     spectralrolloff->start(reply_addr);
 }
 
@@ -94,37 +79,39 @@ static void arco_spectralrolloff_repl_input(O2SM_HANDLER_ARGS)
     UGEN_FROM_ID(SpectralRolloff, spectralrolloff, id, "arco_spectralrolloff_repl_input");
     ANY_UGEN_FROM_ID(input, input_id, "arco_spectralrolloff_repl_input");
     spectralrolloff->repl_input(input);
-    // printf("spectralrolloff input set to %p (%s)\n", ugen, ugen->classname());
+    // printf("spectralrolloff input set to %p (%s)\n", ugen,
+    //        ugen->classname());
 }
 
 
-
-/* O2SM INTERFACE: /arco/spectralrolloff/new int32 id, int32 chans, string reply_addr, float threshold;
+/* O2SM INTERFACE: /arco/spectralrolloff/new int32 id, int32 input_id,
+       string reply_addr, float threshold;
  */
 static void arco_spectralrolloff_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    char *reply_addr = argv[1]->s;
-    float threshold = argv[2]->f;
+    int32_t input_id = argv[1]->i;
+    char *reply_addr = argv[2]->s;
+    float threshold = argv[3]->f;
     // end unpack message
 
-    new SpectralRolloff(id, reply_addr, threshold);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_spectralrolloff_new");
+    new SpectralRolloff(id, input, reply_addr, threshold);
 }
 
 
 static void spectralrolloff_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/spectralrolloff/start", "is", arco_spectralrolloff_start,
-                    NULL, true, true);
+    o2sm_method_new("/arco/spectralrolloff/start", "is",
+                    arco_spectralrolloff_start, NULL, true, true);
     o2sm_method_new("/arco/spectralrolloff/repl_input", "ii",
                     arco_spectralrolloff_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/spectralrolloff/new", "isf", arco_spectralrolloff_new,
-                    NULL, true, true);
+    o2sm_method_new("/arco/spectralrolloff/new", "iisf",
+                    arco_spectralrolloff_new, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
-
 
 
 Initializer spectralrolloff_init_obj(spectralrolloff_init);

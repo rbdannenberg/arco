@@ -17,7 +17,8 @@ public:
     Sum(int id, int nchans, int wrap_) : Ugen(id, 'a', nchans) {
         gain = 1;
         prev_gain = 1;
-        wrap = (wrap_ != 0); };
+        wrap = (wrap_ != 0);
+    }
 
     ~Sum() {
         for (int i = 0; i < inputs.size(); i++) {

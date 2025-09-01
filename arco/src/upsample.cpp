@@ -8,7 +8,7 @@
 
 const char *Upsample_name = "Upsample";
 
-/* O2SM INTERFACE: /arco/new/upsample int32 id, int32 chans, int32 input;
+/* O2SM INTERFACE: /arco/upsample/new int32 id, int32 chans, int32 input;
  */
 void arco_upsample_new(O2SM_HANDLER_ARGS)
 {
@@ -54,10 +54,11 @@ static void arco_upsample_set_input(O2SM_HANDLER_ARGS)
 }
 
 
+
 static void upsample_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/new/upsample", "iii", arco_upsample_new, NULL,
+    o2sm_method_new("/arco/upsample/new", "iii", arco_upsample_new, NULL,
                     true, true);
     o2sm_method_new("/arco/upsample/repl_input", "ii",
                     arco_upsample_repl_input, NULL, true, true);
@@ -65,4 +66,7 @@ static void upsample_init()
                     arco_upsample_set_input, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
-
+        
+Initializer upsample_init_obj
+ 
+ (upsample_init);

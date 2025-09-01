@@ -63,8 +63,8 @@ recommended because the client can free its direct reference to the
 Const object. Also, it seems more direct to set an *input* parameter
 of the ugen as opposed to an *output* parameter of a Const.
 
-As a further convenience and matter of style, the client can allocate fixed
-Arco ID numbers for Const construction. When you want a "c-rate"
+As a further convenience and matter of style, the client can allocate
+fixed Arco ID numbers for Const construction. When you want a "c-rate"
 (i.e. Const) input, send `/arco/const/new` using the fixed ID, use
 `/arco/const/set` to set the value(s), and then use this Const as a
 parameter for a new Ugen. Immediately send `/arco/free` to free the
@@ -72,7 +72,8 @@ Const. Since the const is still referenced by the new Ugen, you can
 use messages like `/arco/fmosc/set_freq` to change the Const value, so
 you really do not need to retain a direct reference to the Const, and
 now you can reuse the fixed ID number for the next Const parameter you
-need. Since Ugens can have multiple parameters, you should reserve a handful of Const IDs. We use 5, 6, 7, 8, and 9.
+need. Since Ugens can have multiple parameters, you should reserve a
+handful of Const IDs. We use 5, 6, 7, 8, and 9.
 
 In summary, the pattern for starting Ugens with one or more Const inputs is:
 1. Create Const objects for each Const parameter using fixed Arco ID numbers.
@@ -348,7 +349,7 @@ id `dur_id`.
 `/arco/allpass/set_fb id chan fb` - Set feedback to float value `fb`.
 
 
-### blend
+### blend, blendb
 ```
 BLEND_LINEAR = 0
 BLEND_POWER = 1
@@ -432,6 +433,7 @@ with id `input_id`.
 const(x, [chans])  // x is number or array
 .set(x)            // x is number or array
 .set_chan(chan, x) // x is number
+.values  // an array of current values 
 ```
 
 `/arco/const/new id chans` - Create a c-rate output ugen. This behaves
@@ -455,7 +457,8 @@ delay(input, dur, fb, maxdur [, chans])
 `/arco/delay/new id chans input dur fb maxdur` - Create a new feedback
 delay generator with audio input and output. All channels have the
 same maximum duration (`maxdur`), but each channel can have a
-different delay (`dur`) and feedback (`fb`). `id` is the object id.
+different delay (`dur`) and feedback (`fb`). `id` is the object id. If
+`dur` is changing smoothly, see `delayvi`.
 
 `/arco/delay/max id dur` - Reallocates delay memory for a maximum
 duration of `dur`.
@@ -468,13 +471,46 @@ id `dur_id`.
 
 `/arco/delay/set_dur id chan dur` - Set duration to a float value `dur`.
 
-`/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`.
+`/arco/delay/repl_fb id fb_id` - Set feedback to object with id `fb_id`. 
 
-`/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`.
+`/arco/delay/set_fb id chan fb` - Set feedback to float value `fb`. 
+
+
+### delayvi
+```
+delayvi(input, dur, maxdur [, chans])
+```
+
+`/arco/delayvi/new id chans input dur maxdur` - Create a new variable
+delay unit generator with audio input and output, based on FAUST's
+fdelaylti, with N = 2. All channels have the same maximum duration
+(`maxdur`), which cannot be changed, but each channel can have a
+different delay (`dur`).  Fractional delays use a 2nd-order polynomial
+interpolation and `dur` can be a block-rate or audio-rate
+signal. Block-rate `dur` values are *not* interpolated within the
+inner loop (even though FAUST documentation says the "lti" version of
+its fdelay is supposed to be good for rapidly changing durations), so
+if `dur` is variable, you should at least run the signal through
+`upsample()` (described below) to get an audio rate signal with linear
+interpolation. This will be slower, but recomputes the Lagrange
+interpolation at every sample and avoids clearly audible artifacts
+when `dur` is changing. On the other hand, if `dur` if you do not care
+if there are some glitches when `dur` changes or if delays are rounded
+to an integral number of samples, `delay` is even more efficient, so
+it is the best choice.
+
+`/arco/delayvi/repl_dur id dur_id` - Set input to object with id
+`input_id`.
+
+`/arco/delayvi/repl_dur id dur_id` - Set duration input to object with
+id `dur_id`.
+
 
 ### dnsampleb
 ```
 dnsampleb(input, mode [, chans])
+.set_cutoff(hz)
+.set_mode(mode)
 ```
 
 `/arco/dnsampleb/new id chans input mode` - Create a new dnsampleb
@@ -534,7 +570,13 @@ apply to all channels in multi-channel instances.
 
 ### fader
 ```
-fader(input, current [, dur] [, goal] [, chans])
+FADE_LINEAR = 0
+FADE_EXPONENTIAL = 1
+FADE_LOWPASS = 2
+FADE_SMOOTH = 3 (default)
+
+fader(input, current [, dur] [, goal] [, chans], [mode = m)
+.set(x [,chan]) // set goal and start the fade
 .set_current(val [,chan]) // val can be an array of numbers
 .set_dur(dur)  // if not set, default is 0.1 seconds
 .set_mode(mode)  // starts fade with latest parameters
@@ -555,6 +597,12 @@ is set, so you will never get `ACTION_EVENT | ACTION_END` without
 
 As always, an action message is only sent if action_id is set and
 `status & mask` is non-zero.
+
+The `set(x, chan)` method is shorthand for a sequence `set_goal(x,
+chan); set_mode(mode)`, where `mode` is an instance variable that
+can be set with the constructor and is updated each time `set_mode` is
+called. It can also be set directly (`fader.mode = FADE_SMOOTH`).
+The `set` method will use FADE_SMOOTH if `mode` has not been set.
 
 `/arco/fader/new id chans input current` - Create an
 envelope-controlled multiplier. The initial gain is `current`
@@ -582,50 +630,123 @@ any, and takes effect when `/arco/fader/mode` is sent.
 
 ### feedback
 ```
-feedback(input, from, gain [, chans])
+feedback(input [, chans])
+.fb(feedback, gain)
 ```
+Output the sum of a-rate `input` and `feedback * gain`, where
+`feedback` is the output of an a-rate Ugen that is delayed by the
+block length (32 samples) to avoid circular dependencies in the Ugen
+graph.
 
-`/arco/feedback/new id chans input from gain` - Create a cycle in the
-graph of unit generators. Output from the unit generator specified
-by `from` (an id for another ugen) will be scaled by `gain` and mixed
-with `input` to form the output. The signal from `from` will be delayed
-by one block (default size is 32 samples) because up-to-date output
-from `from` may depend on our output, creating a circular dependency.
+#### Some Background Information and Rationale for the feedback Ugen
 
-The detailed operation is this: A buffer is initialized to zero. To
-compute output from this feedback ugen, both `input` and `gain`, but
-not `from`, are updated so they hold current values. The buffer is
-scaled by `gain` and added to the input (`input`) to form the output.
-Then, `from` is updated to hold current values (it may in fact
-depend directly or indirectly on our output, which is now up-to-date).
-The output of `from` is copied to our buffer to prepare for the next
+Normally, Ugens are connected to form a directed acyclic graph. No
+cycles are allowed because the graph is "computed" as follows:
+
+ - a block counter is incremented to determine the next block to
+   compute
+ - the audio output and Ugens on the run list are called to update
+   their outputs to the new block number
+ - each Ugen updates its output by requesting all inputs to update
+   *their* outputs first; then the output is computed based on those
+   inputs.
+ - Requests propagate "backward" through the graph and update
+   calculations cause signals to flow "forward" through the graph.
+   
+You can create a cycle by replacing the input of some Ugen with a Ugen
+that depends on it directly or indirectly. If there is a cycle, the
+recursive requests to update inputs will follow around the cycle until
+the stack overflows. Creating a cycle is fatal, and the program will
+crash (at least in the current implementation).
+
+#### Creating Cycles with the feedback Ugen
+
+The `feedback` Ugen avoids the dependency problem by introducing a
+one-block delay, so that the signal samples used for feedback were
+actually computed in the previous pass through the graph. Creating a
+feedback loop is performed in two steps. Let's assume you have
+
+ - `input` - some Ugen providing input to a graph with feedback
+ - `output` - some Ugen whose output is to be fed back into the graph
+   by mixing it with `input`.
+```
+  input ---> feedback ---> (more Ugens) ---> output ---> 
+                ^                              |
+                |                              |
+                +------------------------------+
+```
+To make this configuration:
+
+ - Create the feedback Ugen: `f = feedback()`,
+ - Create more Ugens to process `f` and produce `output`,
+ - Create the feedback loop by inserting output into the `f`:
+   `f.fb(output, 0.1)` (the second parameter is gain, and it can be a
+   signal too).
+
+For example, let's say you want an echo effect with a variable
+delay. You can do this directly with `delay`, but now you want to use
+the higher-quality `delayvi`, which does not have feedback built-in.
+```
+    # assume del_in is to be the effect's input signal
+    var f = feedback()
+    dvi = delayvi(f, dur, 0.5)  # delay controlled by dur
+    f.fb(dvi, fbgain)  # feedback gain controlled by fbgain
+    # now dvi is the output of the effect
+```
+    
+
+`/arco/feedback/new id chans input` - Create a feedback unit
+generator with the given input. Initially there is no feedback, but
+feedback can be inserted with the `feedback/fb` message.
+
+`/arco/feedback/repl_from id from` - Set the source of the feedback
+(called "from") to the object with id `from`. This is used to create
+the initial cycle and is send by the `.fb()` method.  Output from the
+unit generator specified by `from` (an id for another Ugen) will be
+scaled by `gain` and mixed with `input` to form the output. The signal
+from `from` will be delayed by one block (default size is 32 samples)
+because up-to-date output from `from` may depend on our output,
+creating a circular dependency.
+
+This is also used to set `from` to the zero ugen, thus breaking any
+cycles, before freeing the `feedback` ugen. (See "Cycle breaking"
+paragraph below.)
+
+The detailed operation is this: A buffer is initialized to zero. To 
+compute output from this feedback ugen, both `input` and `gain`, but 
+not `from`, are updated so they hold current values. The buffer is 
+scaled by `gain` and added to the input (`input`) to form the output. 
+Then, `from` is updated to hold current values (it may in fact 
+depend directly or indirectly on our output, which is now up-to-date). 
+The output of `from` is copied to our buffer to prepare for the next 
 block computation.
 
-IMPORTANT:  If `from` depends directly or indirectly on the output of
-this `feedback` object, a cycle is created, and Arco will be unable to
-free any unit generators participating in the cycle. You can break the
-cycle by replacing `from`. For example, before deleting this `feedback`
-unit generator, you should probably replace `from` (see the `repl_from`
-description below) with the built-in zero unit generator, which does
-not depend on anything. Not that "freeing" or "deleting" a unit
-generator simply removes any reference to it from a table that
-translates ids to unit generators. This reduces the reference count on
-the unit generator, but the memory is not freed unless the reference
-count goes to zero, which cannot happen if there is a cycle.
+**Reference counting:** When `from` is provided, its reference count
+is incremented. Since a cycle is created, the reference count must be
+at least 2. In the future, if the reference count drops to 1,
+`feedback` can automatically disconnect the `from` signal, allowing
+reference counts to propagate and free the entire cycle. However, this
+requires `feedback` to check the reference count, but if the the cycle
+is detached from any output, it will become dormant and there is no
+opportunity for `feedback` to check `from`'s reference count.
+
+**Cycle breaking:** You can break the cycle by replacing `from`. For
+example, before deleting this `feedback` unit generator, you should
+probably replace `from` (see the `repl_from` description below) with
+the built-in zero unit generator, which does not depend on
+anything. In a future, Arco should keep a list of `feedback` ugens and
+scan them for `from` Ugens that have reference counts of one. Then,
+they could be freed automatically.
 
 `/arco/feedback/repl_input id input_id` - Set input to the object with id
 `input_id`.
-
-`/arco/feedback/repl_from id from` - Set the source of the feedback
-(called "from") to the object with id `from`. This is especially useful
-for setting `from` to the zero ugen, thus breaking any cycles, before
-freeing the `feedback` ugen. (See "IMPORTANT" paragraph above.)
 
 `/arco/feedback/repl_gain id gain` - Set gain signal to the object
 with id `gain`.
 
 `/arco/feedback/set_gain id chan gain` - Set the gain for the given
-channel (`chan`) to a the float value `gain`.
+channel (`chan`) to a the float value `gain`. This is also sent by the
+`.fb()` method.
 
 ### fileplay
 ```
@@ -996,6 +1117,7 @@ mix([chans], wrap = true)
 .rem(name, [, dur] [, mode])
 .find_name_of(ugen)
 .set_gain(name, gain [, chan])
+.set_in(name, input)
 ```
 
 Mix accepts any number of inputs. Each input has a name and an
@@ -1033,12 +1155,14 @@ mismatched Ugens will have no effect other than printing a warning.
 A single channel input signal will be duplicated n times if the gain
 has n channels, and a single gain channel will be duplicated n times
 if the input signal has n channels, forming n audio channels as the
-input signal. These n channels are added to mixer output channels
-starting at channel 0 and, if `wrap` is non-zero and n is greater
-than the number of output channels, input channel i is added to
-output channel i mod m, where m is the number of output channels,
-i.e. inputs channels are "wrapped." If `wrap` is zero, extra
-input channels are dropped.
+input signal.
+
+The n input channels, with n = 1 or more, are added to mixer output
+channels starting at channel 0 and, if `wrap` is non-zero and n is
+greater than the number of output channels, input channel i is added
+to output channel i mod m, where m is the number of output channels,
+i.e. inputs channels are "wrapped." If `wrap` is zero, extra input
+channels are dropped.
 
 Note that the number of channels in any given input does not need to
 match the number of mixer output channels. Also note that a single
@@ -1046,6 +1170,7 @@ input channel is *never* expanded to the number of mixer
 channels. E.g., mono input is routed to stereo left (only). To place a
 mono channel in the middle of a stereo field, use a 2-channel gain,
 which could be as simple as a Const Ugen with values [0.7, 0.7].
+(See also `route` for more elaborate multi-channel signal routing.)
 
 When an input signal or an input gain terminates or if input is
 "removed" by `rem` and any fade-out completes, the input is removed
@@ -1068,8 +1193,11 @@ according to `mode` (see above).
 `/arco/repl_gain id name gain_id` - Set the gain for input `name` to
 object with id `gain_id`.
 
-`/arco/set_gain id name chan gain` - Set the gain for input `name` on
-channel `chan` to the float value `gain`.
+`/arco/set_gain id name chan gain` - Set the gain for input `name` on 
+channel `chan` to the float value `gain`. 
+
+`/arco/set_in id name chan input` - Set the input for input `name`
+to the a-rate Ugen `input`.
 
 
 ### multx
@@ -1108,6 +1236,50 @@ value `x1`.
 value `x2`.
 
 
+### noisegate
+
+```
+noisegate(input, threshold, attack, hold, release, [, chans])
+```
+
+`/arco/noisegate/new id chans input threshold attack hold release` -
+Create a new noisegate based on FAUST `gate_mono`, where `input` is
+the input signal id, `threshold` is a *linear* threshold, `attack` is
+the rise time in seconds, `hold` is the hold time in seconds, and
+`release` is the fall time in seconds. Since `threshold` is converted
+internally to dB for compatibility with FAUST and non-positive values
+cannot be represented as dB, `noisegate` uses the maximum of 0.000001
+(approximately -120 dB) and `threshold`.
+
+`/arco/noisegate/repl_input id input_id` - Set the input to the object 
+with id `input_id`. 
+
+`/arco/noisegate/repl_threshold id threshold_id` - Set the threshold
+to the object with id `threshold_id`. 
+
+`/arco/noisegate/set_threshold id chan threshold` - Set channel `chan`
+of threshold to float value `threshold`.
+
+`/arco/noisegate/repl_attack id attack_id` - Set the attack
+to the object with id `attack_id`. 
+
+`/arco/noisegate/set_attack id chan attack` - Set channel `chan`
+of attack to float value `attack`.
+
+`/arco/noisegate/repl_hold id hold_id` - Set the hold
+to the object with id `hold_id`. 
+
+`/arco/noisegate/set_hold id chan hold` - Set channel `chan`
+of hold to float value `hold`.
+
+`/arco/noisegate/repl_release id release_id` - Set the release
+to the object with id `release_id`. 
+
+`/arco/noisegate/set_release id chan release` - Set channel `chan`
+of release to float value `release`.
+
+
+
 ### olapitchshift
 
 ```
@@ -1136,7 +1308,7 @@ amount.
 `/arco/olaps/windur id windur` - Set the window duration to `windur`
 (float).
 
-`/arco/granstream/repl_input id input_id` - Set the input to the ugen
+`/arco/olaps/repl_input id input_id` - Set the input to the ugen
 with id `input_id`.
 
 ## probe
@@ -1500,7 +1672,7 @@ channel `chan` to float value `bandwidth`.
 
 ### route
 ```
-route([chans])
+route(chans)
 .ins(input, src, dst [, src, dst]*)  // route from src to dst channel
 .rem(input, src, dst [, src, dst]*)  // remove routes from src to dst
 .reminput(input)  // remove all routes from this input
@@ -1556,61 +1728,62 @@ float value `freq`.
 `/arco/sine/set_amp id chan amp` - Set amplitude of channel `chan` to 
 float value `amp`.
 
-The `sineb` unit generator addresses begin with `/arco/sineb` and the
-output is b-rate.
+The `sineb` unit generator addresses begin with `/arco/sineb` and the 
+output is b-rate. 
 
-### smoothb
+### smooth, smoothb
 ```
-smoothb(x, [cutoff = 10], [chans])
+smooth(x, [cutoff = 10], [chans])
 .set_cutoff(cutoff)
 .set(x)             // x is a number or an array
 .set_chan(chan, x)  // x is a number
+.values  // an array of current (target) values 
 ```
 
 **Smooth** is similar to **Const**, but updates are smoothed with a
 simple filter to avoid abrupt step functions. See also **Fader**.
 
-`/arco/smoothb/new id chans cutoff` - Create a b-rate ugen. This behaves
+`/arco/smooth/new id chans cutoff` - Create a b-rate ugen. This behaves
 like `const` except that the output values are low-pass filtered with a
 first-order IIR filter (exponential smoothing). `cutoff` is the cutoff
 frequency of the filter.
 
-`/arco/smoothb/newn id cutoff x0 x1 x2 ...` - Similar to `new`, but the
+`/arco/smooth/newn id cutoff x0 x1 x2 ...` - Similar to `new`, but the
 number of channels depends on the number of floats, which become initial
 values. At least one float (channel) is required.
 
-`/arco/smoothb/set id chan value` - Set the output indexed by chan to value.
+`/arco/smooth/set id chan value` - Set the output indexed by chan to value.
 (Value is actually the filter input, so the output will converge to value
 smoothly.)
 
-`/arco/smoothb/setn id x0 x1 x2 ...` - Set output channels to `x0` through
+`/arco/smooth/setn id x0 x1 x2 ...` - Set output channels to `x0` through
 `xn-1`. Extra values are ignored. Each output channel is smoothed as in `set`.
 
-`/arco/smoothb/cutoff id cutoff` - set the cuoff frequency of the filter
+`/arco/smooth/cutoff id cutoff` - set the cuoff frequency of the filter
 (same cutoff for all channels).
+
+The `smoothb` unit generator addresses begin with `/arco/smoothb` and the 
+output is b-rate.
 
 ### spectralcentroid
 ```
-spectralcentroid(reply_addr)
-.set('input', ugen)
+spectralcentroid(input, reply_addr)
 ```
 
 Calculates the spectral centroid every 1024 samples and sends it to 
 `reply_addr` as a float.
 
-`/arco/spectralcentroid/new id reply_addr` - Creates a new `spectralcentroid` 
-ugen
+`/arco/spectralcentroid/new id input reply_addr` - Creates a new
+`spectralcentroid` ugen.
 
 `/arco/spectralcentroid/repl_input id input_id` - Set the input to object
-
 with id `input_id`.
 
 
 ### spectralrolloff
 
 ```
-spectralrolloff(reply_addr, threshold)
-.set('input', ugen)
+spectralrolloff(input, reply_addr, threshold)
 ```
 
 Calculates the spectral rolloff, which is the frequency below which a 
@@ -1636,6 +1809,12 @@ A stereo panner for multiple inputs. Inputs 0 through n-1 are panned
 from 0.5-width/2 to 0.5+width/2 where 0 means full left, 1 means full
 right, and width is variable from 0 (all center) to 1 (full
 distribution from full left to full right). width and gain default to 1.
+Both width and gain are float values and cannot be signals; however,
+there is internal linear smoothing when values change to avoid
+discontinuities, with a slew rate of 0 to 1 in 50 msec.
+
+After creating the Ugen, call the `.ins` method *n* times to set the
+*n* single-channel audio-rate inputs to be panned and mixed.
 
 `/arco/stdistr/new id n width` - Creates a new `stdistr` ugen
 
@@ -1643,11 +1822,55 @@ distribution from full left to full right). width and gain default to 1.
 
 `/arco/stdistr/rem id i` - Remove an input
 
-`/arco/stdistr/repl_width id width - Replace width with a new ugen
-
 `/arco/stdistr/set_width id width - Set width to a float value width
 
 `/arco/stdistr/gain id gain - Set gain to float value gain
+
+
+### stnoisegate
+
+```
+stnoisegate(input, threshold, attack, hold, release, [, chans])
+```
+
+`/arco/stnoisegate/new id chans input threshold attack hold release` -
+Create a new stnoisegate based on FAUST `gate_stereo`. This is like
+`noisegate` (see `noisegate` description above) except this is always
+a stereo effect where both channels are controlled by a single gate
+envelope, the parameters are all single-channel, and the thresholding
+is performed on the sum of the two input channels. In contrast, if you
+put a stereo signal into a `noisegate`, you get a stereo effect
+consisting of two independent mono gates, and there is the possibility
+of different parameters for each, e.g., `threshold` could be a
+two-channel constant or block-rate control with left and right
+thresholds.
+
+`/arco/stnoisegate/repl_input id input_id` - Set the input to the object 
+with id `input_id`. 
+
+`/arco/stnoisegate/repl_threshold id threshold_id` - Set the threshold
+to the object with id `threshold_id`. 
+
+`/arco/stnoisegate/set_threshold id chan threshold` - Set channel `chan`
+of threshold to float value `threshold`.
+
+`/arco/stnoisegate/repl_attack id attack_id` - Set the attack
+to the object with id `attack_id`. 
+
+`/arco/stnoisegate/set_attack id chan attack` - Set channel `chan`
+of attack to float value `attack`.
+
+`/arco/stnoisegate/repl_hold id hold_id` - Set the hold
+to the object with id `hold_id`. 
+
+`/arco/stnoisegate/set_hold id chan hold` - Set channel `chan`
+of hold to float value `hold`.
+
+`/arco/stnoisegate/repl_release id release_id` - Set the release
+to the object with id `release_id`. 
+
+`/arco/stnoisegate/set_release id chan release` - Set channel `chan`
+of release to float value `release`.
 
 
 ### sum, sumb
@@ -1676,13 +1899,14 @@ the sum of inputs. Changes to gain are smoothed.
 
 ### tableosc, tableoscb
 ```
-tableosc(freq, amp [, chans] [, phase = 0])
+tableosc(freq, amp [, chans] [, phase = nil])
 .set('freq', freq)
 .set('amp', amp)
+.set_phase(chan, phase)
 .select(index)
 .borrow(ugen)
 .create_tas(index, tlen, ampspec)
-.create_tcs(index, teln, spec)
+.create_tcs(index, tlen, spec)
 .create_ttd(index, samps)
 ```
 
@@ -1691,22 +1915,32 @@ table-lookup oscillator. `freq` and `amp` are unit generator ids. The
 table is specified separately (see the create methods for
 details). Phase is a float in degrees.
 
-`/arco/tableosc/select id index` -- Select a waveform by index.
+o`/arco/tableosc/select id index` -- Select a waveform by index.
 (See create methods to create wavefoms.)
 
 `/arco/tableosc/repl_freq id freq_id` -- Replace the frequency
 control input with another unit generator.
 
-`/arco/tableosc/set_freq id chan freq` -- Set the frequency
+y`/arco/tableosc/set_freq id chan freq` -- Set the frequency
 constant to a floating point value. Only the specifid channel
 is changed.
 
-`/arco/tableosc/repl_amp id freq_id` -- Replace the amplitude
+`/arco/tableosc/repl_amp id amp_id` -- Replace the amplitude
 control input with another unit generator.
 
-`/arco/tableosc/set_amp id chan amp` -- Set the amplitude
-constant to a floating point value. Only the specified channel
-is changed.
+`/arco/tableosc/set_amp id chan amp` -- Set the amplitude 
+constant to a floating point value. Only the specified channel 
+is changed. 
+
+`/arco/tableosc/set_phase id chan phase` -- Set the phase (in degrees)
+to a floating point value. Only the specified channel is changed.
+Normally this is not used because you can set all phases with the
+keyword parameter `phases` (see also `/arco/tableosc/new`).
+Use this message to set different initial phases across multiple
+channels. This should be done at creation time before using the
+oscillator but _after_ setting and selecting the wavetable, since
+the initial phase internally may be based on the wavetable length.
+The `phase` parameter is in degrees; use 180 rather than PI.
 
 `/arco/tableosc/sel in index` -- select table at index.
 
@@ -1756,7 +1990,7 @@ that if you play n channels which is fewer than exist in the output,
 only the first n output channels will receive a signal.)
 
 Thru objects are also used for audio input (the audio input is written
-directly into the thru object's outputs and `input_id` is ignored) and
+directly into the thru object's outputs and `input` is ignored) and
 to make the audio output available with a one-block delay (after
 computing the output, it is written to the thru object's outputs and
 `input_id` is ignored.) These special thru objects have index `INPUT_ID`
@@ -1876,6 +2110,27 @@ value `x1`.
 The `mathb` messages begin with `/arco/unaryb` and output is b-rate. 
 
 
+### upsample
+```
+upsample(input)
+```
+Upsamples a block-rate input to an audio-rate output using linear interpolation
+
+`/arco/upsample/new id reply_addr period` - Create a `upsample` object, which
+measures the peak values of input channels over every `period` (float,
+in seconds) and sends the values as floats to `reply_addr` (string
+representing a complete O2 address). No messages are sent until input
+is set with `repl_input`.
+
+`/arco/upsample/repl_input id input_id` - Set the input to be upsampled to
+`input_id`. If `input_id` names a unit generator of class Zero, analysis
+is stopped; otherwise, processing will start or resume, sending a peak
+every period.
+
+`/arco/upsample/set_input id chan value` - Set channel `chan` of input
+to float value `x1` (current input must be a Const object).
+
+
 ### vu
 ```
 vu(reply_addr, period)
@@ -1899,7 +2154,7 @@ every period.
 `/arco/vu/start id reply_addr period` - Change the `reply_addr` and
 `period` of this vu object.
 
-## yin
+### yin
 ```
 yin(input, minstep, maxstep, hopsize, address, [chans]))
 .thresh(x)
@@ -1941,4 +2196,39 @@ zero()
 (Note that this always returns the unique system zero ugen.)
 
 `/arco/zero/new id` - Create a signal consisting of all-zeros.
+
+### zitarev
+
+```
+zitarev(input, wet, gain, rt60)
+.set('wet', wet)
+.set('gain', gain)
+.set('rt60', rt60)
+```
+
+`/arco/zitarev/new id input_id wet_id gain_id rt60_id` - Creates a
+Zitarev reverberator (from the FAUST library.  `wet` should range from 0 to 1 
+and controls a linear mix of dry (0) and wet (1) signals; `gain` is a 
+linear gain factor, and `rt60` is the reverb time. In the FAUST code, 
+there are separate decay times for mid-range (`t60m`) and low 
+frequencies (`t60dc`), but here, both are set to the `rt60` parameter. 
+The input and output are stereo.
+
+`/arco/zitarev/repl_wet id wet_id` -- Replace the wetuency
+control input with another unit generator.
+
+`/arco/zitarev/set_wet id chan wet` -- Set the wet
+constant to a floating point value.  `chan` should be 0.
+
+`/arco/zitarev/repl_gain id gain_id` -- Replace the gain
+control input with another unit generator.
+
+`/arco/zitarev/set_gain id chan gain` -- Set the gain
+constant to a floating point value. `chan` should be 0.
+
+`/arco/zitarev/repl_rt60 id rt60_id` -- Replace the rt60
+control input with another unit generator.
+
+`/arco/zitarev/set_rt60 id chan rt60` -- Set the rt60
+constant to a floating point value. `chan` should be 0.
 

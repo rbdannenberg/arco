@@ -75,11 +75,16 @@ void riffts(float *data, long M, long Rows)
 
 /* compute the log2 of an integer rounded up to an integer
    if n > 0 then 2^ilog2(n) >= n > 2^(ilog2(n) - 1)
+
+   This is optimized for smaller values of n, as each loop
+   will execute 2x on average for n < 64K. Above 16 bits,
+   the first loop will run about log2(n) / 4 times, or up
+   to 15 iterations for 2^63.
  */
 int ilog2(int n)
 {
     int m = 0;
-    while (n > (0x100 << m)) m += 8;
+    while (n > (0x100 << m)) m += 4;
     while (n > (1 << m)) m++;
     return m;
 }

@@ -61,6 +61,12 @@ A_RATE = 'a'
 B_RATE = 'b'
 C_RATE = 'c'
 
+A_RATES = "a"
+B_RATES = "b"
+C_RATES = "c"
+I_RATES = ""
+AB_RATES = "ab"
+
 // BPS is set to zero when audio stops to avoid activity that
 // cannot be processed by the audio server. BPS is restored
 // using this variable:
@@ -80,7 +86,7 @@ saved_vtsched_bps = 1.0  // default "tempo"
 # (Note: ANY state can transition to 'quitting' when arco_quit() is called.
 #  'quitting' is the final state, you cannot transition out of it.)
 #
-#    nil: start state
+#    'init': start state
 #        Action: none
 #        -> 'discovery' when arco_init() called by main program
 #    'discovery': polling for "arco" service
@@ -131,29 +137,41 @@ saved_vtsched_bps = 1.0  // default "tempo"
 #    poll_for_no_arco detects Arco finish with 
 #        o2_shmem_inst_count() == 0 and calls exit()
 #        
-arco_state = nil
-arco_allowed_state_transitions = {  // maps new state to allowed current states
-    'discovery': [nil],
-    'initializing': 'discovery',
-    'devinf': 'initializing',
-    'opening': ['devinf', 'stopped'],
-    'running': 'opening',
-    'stopped': ['opening', 'running', 'devinf', 'devinf2'],
-    'devinf2': ['initializing2', 'stopped'],
-    'initializing2': 'stopped'}
+arco_state = 'init'
+
+# Inverse transitions: for each next state, allowed current state
+#    'discovery': [nil],
+#    'initializing': 'discovery',
+#    'devinf': 'initializing',
+#    'opening': ['devinf', 'stopped'],
+#    'running': 'opening',
+#    'stopped': ['opening', 'running', 'devinf', 'devinf2'],
+#    'devinf2': ['initializing2', 'stopped'],
+#    'initializing2': 'stopped'}
+
+arco_allowed_state_transitions = {  // maps current state to allowed new states
+    'init': ['discovery', 'quitting'],
+    'discovery': ['initializing', 'quitting'],
+    'initializing': ['devinf', 'quitting'],
+    'initializing2': ['devinf2', 'quitting'],
+    'devinf': ['opening', 'stopped', 'quitting'],
+    'devinf2': ['stopped', 'quitting'],
+    'stopped': ['stopped', 'opening', 'devinf2', 'initializing2', 'quitting'],
+    'opening': ['stopped', 'running', 'quitting'],
+    'running': ['stopped', 'quitting']}
 
 # This function checks if a transition to newstate is legal. If legal,
 # arco_state is changed and return value is true. Otherwise, stay in the
 # current state, print a warning and return false.
-def set_arco_state(newstate): 
-    if newstate != 'quitting':
-        allowed = arco_allowed_state_transitions[newstate]
-        if arco_state != allowed and ((not isarray(allowed)) or 
-                                      (arco_state not in allowed)):
-            print "*****************************************************"
-            print "* WARNING: Unexpected state transition from", 
-            print arco_state, "to", newstate; "."
-            return false
+def set_arco_state(newstate):
+    // display "set_arco_state", arco_state, newstate
+    var allowed = arco_allowed_state_transitions[arco_state]
+    // display "set_arco_state", arco_state, allowed, newstate
+    if newstate not in allowed:
+        print "*****************************************************"
+        print "* WARNING: Unexpected state transition from", 
+        print arco_state, "to", newstate; ". Keeping", arco_state; "."
+        return false
     display "arco_state change to", newstate
     arco_state = newstate
     if config_win:
@@ -342,14 +360,14 @@ class Arco_window (Window):
         elif p:
             prefs = p
             var rect = prefs.get(varname)
-            display "Arco_window got prefs", varname, rect
+            // display "Arco_window got prefs", varname, rect
             if rect:  // restore the window coordinates and size
                 set_position(rect[0], rect[1])
                 set_size(rect[2], rect[3])
             else:  // store the current coordinates
                 prefs.set(varname,
                           [get_left(), get_top(), get_width(), get_height()])
-                display "Arco_window set prefs", varname, prefs.get(varname)
+                // display "Arco_window set prefs", varname, prefs.get(varname)
 
 
     def on_size(width, height, optional x, y):
@@ -358,7 +376,7 @@ class Arco_window (Window):
             x = x or get_left()
             y = y or get_top()
             prefs.set(varname, [x, y, width, height])
-            display "Arco_window on_size", varname, prefs.get(varname)
+            // display "Arco_window on_size", varname, prefs.get(varname)
 
 
     def on_move(x, y):
@@ -388,8 +406,8 @@ class Default_arco_window (Arco_window):
         varname = 'default_window'
         control_map[0] = this
         // in case any handlers are already attached to the old window:
-        target = default_window.target
-        method = default_window.method
+        contact = default_window.contact
+
 
 default_window = Default_arco_window()
 
@@ -437,8 +455,8 @@ if get_os() == 'linux':
 def actl_devinf(timestamp, address, types, info):
 # callback to address /actl/devinf from arco's /arco/devinf.
 # info is a string describing an audio device, or "" at end of list.
+    print "/actl/devinf reports device info\n    "; repr(info)
     if info == "":  // we now have all the audio device info so we can proceed
-        display "actl_devinf", repr(info), arco_state
         if arco_state == 'devinf':
             // auto-open in discovery->initializing->devinf->opening->running
             //     sequence:
@@ -449,7 +467,8 @@ def actl_devinf(timestamp, address, types, info):
                 // Apparently, if you jump right into opening audio, someone
                 // accesses the File menu before it is even created. So delay
                 // auto_open_audio() to allow window creation first:
-                print "************** WRONG!!! FIX ME!! *******************"
+                print "delaying auto_open_audio to give time to create window"
+                print "    and menu. There is probably a less time-dependent way."
                 sched_select(rtsched)
                 sched_cause(0.05, nil, 'auto_open_audio')
             else:
@@ -512,9 +531,9 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
 #           File:"Arco Ugen GC Info"
 
     prefs = Prefs(appname)
-    display "arco_init setting default window prefs", default_window, prefs
+    // display "arco_init setting default window prefs", default_window, prefs
     default_window.set_prefs(prefs)
-    arco_master_gain = prefs.get('master_gain', -12.0)
+    arco_master_gain = prefs.get('master_slider', -12.0)
 
     if not set_arco_state('discovery'):
         return
@@ -525,8 +544,8 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
         if not color:
             color = [160, 210, 210]
         default_window.set_rgb(color[0], color[1], color[2])
-//        default_window.add_target_method(nil, 'arco_main_win_handler')
-        display "####### arco_init GETTING File MENU FROM", default_window
+        // default_window.add_target_method(nil, 'arco_main_win_handler')
+        // display "####### arco_init GETTING File MENU FROM", default_window
         var file_menu = default_window.get_menu("File")
         if dbgmenu:
             file_menu.item("Print Ugen Info", "print Ugen tree and table",
@@ -549,7 +568,6 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
         print "arco_initialize() (called from Serpent) failed"
         exit(1)
     o2_service_new("actl")
-    print "service actl created"
     o2_method_new("/actl/devinf", "s", 'actl_devinf', t)
     o2_method_new("/actl/act", "iii", 'actl_act', t)
     o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
@@ -715,7 +733,7 @@ def poll_for_arco():
     else:
         print "**** discovered arco service. initialization starting ****"
         arco_heartbeat(0)  // initially, block count printing is off
-        print "*** SENT arco_heartbeat(0) from poll_for_arco ***"
+        print "**** SENT arco_heartbeat(0) from poll_for_arco ****"
         reset_arco()
 
 
@@ -730,10 +748,10 @@ def actl_starting(timestamp, address, types, in_id, out_id, in_chans, out_chans,
                   latency_ms, buffer_size):
                   
     vtsched.set_bps(saved_vtsched_bps)  // continue advancing time
-    print "Audio stream is starting: in", in_id, "("; in_chans, "chan),",
-    print "out", out_id, "("; out_chans, "chan),", "latency", latency_ms,
-    print "ms, block size", buffer_size
-    display "actl_starting", arco_state
+    // print "Audio stream is starting: in", in_id, "("; in_chans, "chan),",
+    // print "out", out_id, "("; out_chans, "chan),", "latency", latency_ms,
+    // print "ms, block size", buffer_size
+    // display "actl_starting", arco_state
     if in_chans == 0 and out_chans == 0:
         print "WARNING: failed to open audio device"
         set_arco_state('stopped')
@@ -760,6 +778,8 @@ def actl_stopped(timestamp, address, types, status):
 def max_chans(chans, ugen):
 # compute the maximum of chans and the channels implied by ugen, where
 # ugen may be a number (Const), array (Const) or Ugen
+    if isinstance(ugen, Param_descr):
+        ugen = ugen.value()  // gets either a float or const-like
     max(chans, 1 if isnumber(ugen) else
                (len(ugen) if isarray(ugen) else ugen.chans))
 
@@ -829,9 +849,14 @@ class Ugen:
         // calling const() if needed will send a message, so
         // we coerce all numbers to const() BEFORE constructing
         // the /arco/*/new message:
-        for i = 1 to len(inputs_) by 2:
-            if types_[idiv(i, 2)] == "U" and (isnumber(inputs_[i]) or
-                                              isarray(inputs_[i])):
+        for i = 1 to len(inputs_) by 3:
+            var inpi = inputs_[i]  // actual input value
+            if isinstance(inpi, Param_descr):  // update with info
+                inpi.add_ugen_user(this, inputs_[i - 1], inputs_[i + 1])
+                inpi = inpi.get_ugen_value(classname, inputs_[i - 1])
+                inputs_[i] = inpi
+            // if input is (still) float or array, convert to Const Ugen:
+            if types_[idiv(i, 3)] == "U" and (isnumber(inpi) or isarray(inpi)):
                 inputs_[i] = const(inputs_[i])
         o2_send_start()  // build and send new method
         o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
@@ -840,13 +865,13 @@ class Ugen:
         // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
 
         // send the "new" message with parameters to create the Ugen:
-        for i = 0 to len(inputs_) by 2:
+        for i = 0 to len(inputs_) by 3:
             var inp = inputs_[i + 1]
-            if types_[idiv(i, 2)] == "U":  // it's a Ugen
+            if types_[idiv(i, 3)] == "U":  // it's a Ugen
                 o2_add_int32(arco_ugen_id(inp.id))
                 inputs[inputs_[i]] = inp  // build dictionary of inputs
             else:  // add a normal value, use code from o2msgutil.srp:
-                funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 2)]], inp)
+                funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 3)]], inp)
             // print inputs_[i], inp.id,
         o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
         // print
@@ -991,12 +1016,17 @@ def zerob(): zerob_ugen
 
 class Const_like (Ugen):
 # abstract superclass for Const and Smoothb, which are similar
+    var values_array  // we cache the value(s) here
+
+    def value():
+        values_array[0] if chans == 1 else values_array
 
     def add_floats(x, msg):
     # finish a message with address msg by adding float values from x
         for i = 0 to chans:
             var f = x if isnumber(x) else (x[i] if len(x) > i else 0)
             o2_add_float(real(f))
+            values_array[i] = f
         o2_send_finish(0, msg, true)
 
 
@@ -1011,6 +1041,8 @@ class Const (Const_like):
     # channels from len(x) are initialized to zero
         var chans_default = max(len(x), 1) if isarray(x) else 1
         chans = chans if chans else chans_default
+        // create with default values of 0, set below
+        values_array = array(chans, 0)
         super.init(create_ugen_id(), "Const", chans, C_RATE, "", no_msg = true)
         o2_send_start()
         o2_add_int32(arco_ugen_id(id))
@@ -1024,7 +1056,9 @@ class Const (Const_like):
 
 
     def set_chan(chan, x):
-        o2_send_cmd("/arco/const/set", 0, "Uif", id, chan, x)
+        if chan < chans:
+            values_array[chan] = x
+            o2_send_cmd("/arco/const/set", 0, "Uif", id, chan, x)
 
 
 def const(x, optional chans):

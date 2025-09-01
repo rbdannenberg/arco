@@ -132,8 +132,8 @@ class Synth (Instrument):
                 var pd = instr.parameter_bindings.get(param)
                 // if parameter is setable, there will be a Param_desc in
                 // parameter_bindings
-                if value and pd and (value != pd.value):
-                    instr.set(param, value, true)
+                if value and pd and (value != pd.value()):
+                    instr.set(param, value)
             instr.pitch = pitch
             instr.vel = vel
             instr.set_pitch_vel()

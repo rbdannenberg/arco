@@ -34,24 +34,30 @@ in the same sine subdirectory named ugens/sine/
 The makefile also makes allugens.srp by appending all the ugen.srp
 files corresponding to classes in the manifest. allugens.srp is
 written to the same folder as dspmanifest.txt.
+
+Math ugens, implemented by mathugen and mathugenb, including mult, add,
+greater, hz_to_step, and many others (see MATHUGENS and UNARYUGENS list
+below) are *ALWAYS* included, so any and all math unit generators can be
+omitted from dspmanifest.txt.
 """
 
-NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay", \
-            "allpass", "mix", "fileplay", "filerec", "fileio", "nofileio", \
-            "recplay", "olapitchshift", "feedback", "granstream", "pwe", \
-            "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb", \
-            "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen", \
-            "mathugenb", "unaryugen", "unaryugenb", "onset", "chorddetect", "o2audioio", \
-            "spectralcentroid", "spectralrolloff", "tableosc", "tableoscb", \
-            "stdistr", "blend", "blendb"]
+NONFAUST = ["thru", "zero", "zerob", "vu", "probe", "pwl", "pwlb", "delay",
+            "allpass", "mix", "fileplay", "filerec", "fileio", "nofileio",
+            "recplay", "olapitchshift", "feedback", "granstream", "pwe",
+            "pweb", "flsyn", "pv", "yin", "trig", "dualslewb", "dnsampleb",
+            "smoothb", "route", "multx", "fader", "sum", "sumb", "mathugen",
+            "mathugenb", "unaryugen", "unaryugenb", "onset", "chorddetect",
+            "o2audioio", "spectralcentroid", "spectralrolloff", "tableosc",
+            "tableoscb", "stdistr", "blend", "blendb", "upsample", "delayvi"]
 
-MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min", \
-             "ugen_clip", "ugen_pow", "ugen_less", "ugen_greater", "ugen_soft_clip", \
-             "ugen_powi", "ugen_rand", "ugen_sample_hold", "ugen_quantize", "ugen_rli", \
-             "ugen_hzdiff", "ugen_tan", "ugen_atan2", "ugen_sin", "ugen_cos"]
+MATHUGENS = ["mult", "add", "sub", "ugen_div", "ugen_max", "ugen_min",
+             "ugen_clip", "ugen_pow", "ugen_less", "ugen_greater",
+             "ugen_soft_clip", "ugen_powi", "ugen_rand", "ugen_sample_hold",
+             "ugen_quantize", "ugen_rli", "ugen_hzdiff", "ugen_tan",
+             "ugen_atan2", "ugen_sin", "ugen_cos"]
 
-UNARYUGENS = ["ugen_abs", "ugen_neg", "ugen_exp", "ugen_log", "ugen_log10", \
-              "ugen_log2", "ugen_sqrt", "ugen_step_to_hz", "ugen_hz_to_step", \
+UNARYUGENS = ["ugen_abs", "ugen_neg", "ugen_exp", "ugen_log", "ugen_log10",
+              "ugen_log2", "ugen_sqrt", "ugen_step_to_hz", "ugen_hz_to_step",
               "ugen_vel_to_lin", "ugen_lin_to_vel"]
 
 # compute all names for which there is an a-rate or b-rate version, but not
@@ -80,7 +86,7 @@ def append_to_srp_srcs(spec, path, nonfaust):
     """
     global srp_srcs
     if nonfaust and not os.path.isfile(path):
-        print('ERROR: dspmanifest.txt specifies "', spec, '" but "', \
+        print('ERROR: dspmanifest.txt specifies "', spec, '" but "',
               path, '" does not exist.', sep = "", file=sys.stderr)
     else:
         srp_srcs.append(path)
@@ -91,7 +97,7 @@ def make_makefile(arco_path, manifest, outf):
     """make the makefile for faust-based dsp .cpp and .h files"""
     global srp_srcs
 
-    print("# dspmakefile - a makefile for Arco unit generator dsp sources", \
+    print("# dspmakefile - a makefile for Arco unit generator dsp sources",
           file=outf)
     print("#\n", file=outf)
 
@@ -112,8 +118,8 @@ def make_makefile(arco_path, manifest, outf):
             # special case: mult.srp selects to instantiate either Mult or
             # Multx, and the Serpent code is in srp_path, but named math.srp:
             if basename == "multx":
-                if "math" in manifest or "mathb" in manifest or \
-                   "math*" in manifest:
+                if ("math" in manifest or "mathb" in manifest or
+                    "math*" in manifest):
                     continue  # multx is handled by math, already in list
                 else:
                     basename = "mathugen"
@@ -125,7 +131,7 @@ def make_makefile(arco_path, manifest, outf):
                                     # not ugens_path:
                 append_to_srp_srcs(ugen, srp_path + "mult.srp", True)
             elif basename != "fader":  # fader is included by arco.srp
-                append_to_srp_srcs(ugen, ugens_path + basename + "/" + \
+                append_to_srp_srcs(ugen, ugens_path + basename + "/" +
                                          basename + ".srp", False)
 
     print("all:  ", end="", file=outf)
@@ -148,9 +154,9 @@ def make_makefile(arco_path, manifest, outf):
             # For Windows NMake, the cd command can go on a
             # separate line (and I don't think ";" would work):
             cdsep = "\n\t"
-        print(source + ": " + sans_extension + ".ugen " + \
+        print(source + ": " + sans_extension + ".ugen " +
               arco_path + "/preproc/u2f.py", file=outf)
-        print("\tcd " + src_path + cdsep + PY + " " + arco_path + \
+        print("\tcd " + src_path + cdsep + PY + " " + arco_path +
               "/preproc/u2f.py " + basename, file=outf)
         print("\tcd " + src_path + cdsep + cmd, file=outf)
         # does NMake not restore the current directory? Not sure.
@@ -180,7 +186,7 @@ def make_makefile(arco_path, manifest, outf):
     for src in srp_srcs:
         if WIN32:
             print('\techo. >> allugens.srp', file=outf)
-            print('\techo # ---- included from', src, \
+            print('\techo # ---- included from', src,
                   '----" >> allugens.srp', file=outf)
             print('\techo. >> allugens.srp', file=outf)
             src = src.replace('/', '\\')  # convert to Windows path
@@ -188,7 +194,7 @@ def make_makefile(arco_path, manifest, outf):
             # this newline also is needed for files with no final newline:
             print("\techo. >> allugens.srp", file=outf)  # blank line separator
         else:
-            print('\techo "\\n# ---- included from', src, \
+            print('\techo "\\n# ---- included from', src,
                   '----\\n" >> allugens.srp', file=outf)
             print("\tcat", src, ">> allugens.srp", file=outf)
             # this newline also is needed for files with no final newline:
@@ -213,8 +219,8 @@ def make_inclfile(arco_path, manifest, outf):
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
     #
-    if ("fileplay" in manifest) or ("filerec" in manifest) or \
-       ("fileio" in manifest):
+    if (("fileplay" in manifest) or ("filerec" in manifest) or
+        ("fileio" in manifest)):
         needed = "fileio"
         rejected = "nofileio"
     else:
@@ -278,8 +284,8 @@ def make_inclfile(arco_path, manifest, outf):
     if "spectralrolloff" in manifest:  # add FFTCalculator implementation files
         need_fft = True
 
-    if "tableosc" in manifest or "tableoscb" in manifest or \
-       "tableosc*" in manifest:
+    if ("tableosc" in manifest or "tableoscb" in manifest or
+        "tableosc*" in manifest):
         need_wavetables = True
 
     ## Include source files to satisfy dependencies
@@ -329,12 +335,12 @@ def make_inclfile(arco_path, manifest, outf):
         if basename in NONFAUST:
             src = "src/"
             if basename in NONEXIST:
-                print('ERROR: dspmanifest.txt specifies "', ugen, \
-                      '" but "',  basename, '.cpp" does not exist.', \
+                print('ERROR: dspmanifest.txt specifies "', ugen,
+                      '" but "',  basename, '.cpp" does not exist.',
                      sep = "", file=sys.stderr)
             if both and (basename + "b") in NONEXIST:
-                print('ERROR: dspmanifest.txt specifies "', ugen, \
-                      '" but "', basename, 'b.cpp" does not exist.', \
+                print('ERROR: dspmanifest.txt specifies "', ugen,
+                      '" but "', basename, 'b.cpp" does not exist.',
                       sep = "", file=sys.stderr)
         else:
             src = arco_path + "/ugens/" + basename + "/"
@@ -345,8 +351,8 @@ def make_inclfile(arco_path, manifest, outf):
         print(sources, file=outf)
         print(sources)
         if both:
-            sources = "    " + src + basename + "b.cpp " + src + \
-                      basename + "b.h"
+            sources = ("    " + src + basename + "b.cpp " + src +
+                       basename + "b.h")
             print(sources, file=outf)
             print(sources)
         if basename == "flsyn":
@@ -454,10 +460,9 @@ def need_ugen(manifest, name):
     """ Take names of the form xxx or xxxb (but not xxx*) and insert them
     as needed into manifest. If you insert both, in any order, they will
     be replaced with the form xxx*. If you try to insert a duplicate, it
-    will be ignored.  Also, if the name or name - "b" is in MATHUGENS,
-    use "mathugen" or "mathugenb" in place of name since "mathugen" and
-    "mathugenb" implement all of the names in MATHUGENS.  Similarly for
-    UNARYUGENS.
+    will be ignored.  Also, if the name or name - "b" is in MATHUGENS or
+    UNARYUGENS, the name will be ignored because mathugen, mathugenb, 
+    unaryugen, and unaryugenb are *always* included.
     """
     base = None
     if name[-1] == "b":
@@ -472,18 +477,18 @@ def need_ugen(manifest, name):
 
     # check for MATHUGENS:
     if (base and (base in MATHUGENS)):  # must be xxxb form
-        need_ugen(manifest, "mathugenb")
+        # need_ugen(manifest, "mathugenb")
         return
     elif (name in MATHUGENS):  # no base, so must be xxx form
-        need_ugen(manifest, "mathugen")
+        # need_ugen(manifest, "mathugen")
         return
 
     # check for UNARYUGENS:
     if (base and (base in UNARYUGENS)):  # must be xxxb form
-        need_ugen(manifest, "unaryugenb")
+        # need_ugen(manifest, "unaryugenb")
         return
     elif (name in UNARYUGENS):  # no base, so must be xxx form
-        need_ugen(manifest, "unaryugen")
+        # need_ugen(manifest, "unaryugen")
         return
 
     # now we know name is not covered by manifest yet, insert something:
@@ -500,7 +505,7 @@ def need_ugen(manifest, name):
 def main():
     global arco_app_path
     if len(sys.argv) != 5:
-        print("Usage: " + PY + " makedspmakefile.py arco_path " + \
+        print("Usage: " + PY + " makedspmakefile.py arco_path " + 
               "dspmanifest.txt dspmakefile dspsources.cmakeinclude")
         exit(-1)
     arco_path = sys.argv[1]
@@ -523,8 +528,9 @@ def main():
     manifest = [ugen[:-1] for ugen in manifest]
     # remove trailing blanks
     manifest = [ugen.strip() for ugen in manifest]
-    # remove duplicates and subsets
-    manifest2 = []
+    # remove duplicates and subsets, but include some "standard" ugens:
+    manifest2 = ["mathugen*", "unaryugen*", "thru", "zero*",
+                 "fader", "sum"]
     # remove duplicates; remove xxx if xxx* exists;
     # remove xxxb if xxx* exists; replace xxx and xxxb
     # with xxx* if both xxx and xxxb exist:
@@ -536,11 +542,11 @@ def main():
         else:
             need_ugen(manifest2, ugen)
 
-    need_ugen(manifest2, "thru")
-    need_ugen(manifest2, "zero")
-    need_ugen(manifest2, "zerob")
-    need_ugen(manifest2, "fader")
-    need_ugen(manifest2, "sum")
+    # need_ugen(manifest2, "thru")
+    # need_ugen(manifest2, "zero")
+    # need_ugen(manifest2, "zerob")
+    # need_ugen(manifest2, "fader")
+    # need_ugen(manifest2, "sum")
 
     manifest = manifest2  # use the "cleaned up" and canonical manifest
 

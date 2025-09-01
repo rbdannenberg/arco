@@ -1,22 +1,13 @@
-def spectralrolloff(reply_addr, threshold):
-    return SpectralRolloff(reply_addr, threshold)
+def spectralrolloff(input, reply_addr, threshold):
+    return SpectralRolloff(input, reply_addr, threshold)
 
 
 class SpectralRolloff (Ugen):
-    def init(reply_addr, threshold)
-        super.init(create_ugen_id(), "SpectralRolloff", 0, '', "sf",
-        omit_chans = 1, 'reply_addr', reply_addr, 'threshold_', threshold)
+    def init(input, reply_addr, threshold)
+        super.init(create_ugen_id(), "SpectralRolloff", 0, '', "Usf",
+                   omit_chans = 1, 'input', input, "a",
+                   'reply_addr', reply_addr, "f", 'threshold_', threshold, "f")
 
     def start(reply_addr):
         o2_send_cmd("/arco/spectralrolloff/start", 0, "Us", id, reply_addr)
         this
-
-    def set(input, value):  // patterned after Ugen.set()
-        // Note that the only thing you can set is 'input'
-        inputs['input'] = value
-        display "SpectralRolloff set", id, value.id
-        o2_send_cmd("/arco/spectralrolloff/repl_input", 0, "UU", id, value.id)
-        this
-
-
-

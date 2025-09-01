@@ -12,7 +12,7 @@ class Filerec (Ugen):
 
     def init(chans, filename, input):
         super.init(create_ugen_id(), "Filerec", chans, '', "sU",
-                   'filename', filename, 'input', input)
+                   'filename', filename, "f", 'input', input, "a")
 
     def go(optional rec_flag = true):
         o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)

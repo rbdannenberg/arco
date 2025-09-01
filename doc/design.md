@@ -468,60 +468,172 @@ a designated output unit generator that represents the output of the
 generators in the `Instrument`.
 
 To define an `Instrument`, the `init` method of a subclass calls
-`instr_begin` which initializes a container for components of the
-instrument. As each component is created, you call `member` to say
-that the created Ugen is a member of the instrument, e.g.,
+`instr_begin()` which initializes a container for
+components of the instrument. Let's create an instrument `Twoharm`
+that simply adds two sinusoids to create two harmonics:
+<!--
+### *member() is obsolete*
+*As each component is created, you call*
+*`member` to say that the created Ugen is a member of the instrument,*
+*e.g.,*
 ```
     var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
 ```
-This example creates a piece-wise linear envelope generator (`pwlb`),
-adds it as a member to the instrument, and gives it the name
-`'env'`. It also keeps a reference to the `Pwlb` in the local variable
-`env`. Later, you can use `instrument.get('env')` to retrieve the
-`pwlb` component, e.g. to start the envelope:
+*This example creates a piece-wise linear envelope generator (`pwlb`),*
+*adds it as a member to the instrument, and gives it the name*
+*`'env'`. It also keeps a reference to the `Pwlb` in the local variable*
+*`env`. Later, you can use `instrument.get('env')` to retrieve the*
+*`pwlb` component, e.g. to start the envelope:*
 ```
     instrument.get('env').start()
 ```
-Alternatively, you could also store it
-as an instance variable and write a `start` method for the instrument,
-e.g.:
+-->
 ```
-    def start(): env.start()  // new method in instrument
-...
-    instrument.start()  // called to start the instrument's envelope
+class Twoharm (Instrument): 
+    def init(): 
+        instr_begin() 
+        var twoharm = add(sine(220.0, 0.1), sine(440.0, 0.1)) 
+        super.init("Twoharm", twoharm) 
 ```
-You can also create named, setable parameters. The problem here is
-that you might want your instrument to have parameters `freq` or
-`amp`, but the instrument is not a real unit generator and has no
-inherent parameters. You could write a method for each parameter, but
-that is a little awkward. Consider implementing a settable frequency:
-```
-    var mysine  // this is in the class declaration
+Here, `"Twoharm"` is the instrument name (used for text descriptions
+in console output) and `twoharm` is passed to `super.init` to indicate
+the output. For example, you can now write `Twoharm().play()` to play
+the instrument and the Ugen represented in `init` by `twoharm` will be
+the one connected to the output mixer.
 
-    def init():
-        ...
-        mysine = member(sine(220.0, 0.5), 'sine')
-        ...
+## Parameters
 
-    def set_freq(f): mysine.set('freq', 440.0)
-```
-Then, you can change frequency by calling: `instrument.set_freq(440.0)`.
+### Simple Methods 
 
-Alternatively, there is a special `set` method in Instrument that
-avoids defining a method for every parameter.  To make this work, call
-`param` in `init`. For example, consider this from the instrument
-`init` function:
+You can implement methods to update parameters. For example, here is
+a simple way to change the frequency of a `Twotone`:
 ```
-    def init():
-        ...
-        var mysine = sine(220.0, 0.5)`, you can call:
-        param(mysine, 'freq', 'myfreq')
-        ...
-```
-This creates a Sine Ugen in the instrument and says that `'myfreq'`
-will name the sine's `'freq'` parameter. Then, you can call
-`instrument.set('myfreq', 440.0)`.
+class Twoharm (Instrument): 
+    var h1, h2
 
+    def init(freq): 
+        instr_begin() 
+        h1 = sine(freq, 0.1)
+        h2 = sine(freq * 2, 0.1)) 
+        var twoharm = add(h1, h2)
+        super.init("Twoharm", twoharm) 
+
+    def set_freq(x):
+        h1.set('freq', x)
+        h2.set('freq', x * 2)
+```
+Now you can write `var twoharm = Twoharm(220.0)` to play a 220 Hz tone
+and then `twoharm.set_freq(330.0)` to change the frequency to 330 Hz.
+
+You could almost pass in a signal to the `Twoharm` constructor to get
+continuous frequency control, but to make this work, you would need to
+change `freq * 2` to `mult(freq, 2)` since the `*` operator only works
+on numbers.
+
+### Implementing `set()` Style Updates
+
+The "standard" way to update Ugens is to call `ugen.set('attr',
+value), where `'attr'` is some attribute name like `'freq'` or
+`'amp'`. This interface is recommended for Instruments as well, and is
+supported by some special functions. To change our `Twoharm` example
+to accept `.set('freq', x)`, we rewrite it as follows:
+```
+class Twoharm (Instrument): 
+
+    def init(freq): 
+        instr_begin()
+        freq = param('freq', freq)
+        var twoharm = add(sine(freq, 0.1), sine(multb(freq, 2), 0.1))
+        super.init("Twoharm", twoharm) 
+```
+A bit of "magic" here is that `param` returns a `Param_descr` that you
+can (mostly) treat as a signal that you can pass as a parameter to any
+Ugen. Note how we can write `sine(freq, 0.1)` and `multb(freq,
+2)`. However, now when you write `twoharm.set('freq', x)` the value of
+`x` (either a signal or a float or an array of floats) will be
+propagated to every Ugen the previously received the `Param_descr`.
+
+For example, if you write `twoharm.set('freq', 330.0)`, it will update
+the frequency of an instance of `Twoharm`, changing both harmonics.
+
+Note that we no longer need explicit instance variables `h1` and
+`h2` to remember the `Sine` ugens, and `def set_freq ...` is no longer
+needed. The `param` function works with `instr_begin()`,
+`Instrument.init()`, and `Ugen.init()` (called by `Sine.init()`) to
+create a mapping from the attribute `'freq'` to the inputs of the
+`Sine` and `Mathb` (implementing `multb`) Ugens.
+
+### The param Function and Options
+The `param` function has some optional parameters that allow the
+incoming parameter to the Instrument to be linearly mapped from a
+range of [0, 1] to any range [low, high]. You can also clip the input
+values to the range [low, high] (with or without initial mapping).
+
+You can also apply smoothing to float updates with a setable time
+constant. For example, if you connect a slider control to an
+amplitude, smoothing the signal will avoid "zipper" noise due to small
+but sudden changes in amplitude. See `param`'s implementation in
+`instr.srp`.
+
+Because of the mapping and clipping feature, it is convenient to
+"convert" an incoming parameter like `freq` into a `Param_descr` as
+shown in the previous example. If `myparm` is a parameter to an
+Instrument subclass, then `myparm = param('myparm', myparm, 'clip', 0,
+1)` converts `myparm` to a `Param_descr`. However, if `myparm` was
+passed in as a float, you could write `myparm * 2` or any other float
+operation. Now you cannot do that. If `param` does any mapping But
+instead, you can write `myparm.value() * 2`. This is probably better
+than saving and using the original float parameter because
+`myparm.value()` has clipping applied. Note that if the original
+parameter was an array of floats (representing a multi-channel
+"float") or a non-Const-like Ugen, then `myparm.value()` will
+return either the array of floats or the Ugen.
+
+A "Const-like" Ugen is either a Const or Smoothb. Both of these are
+Ugens with block-rate outputs that essentially output constant values
+as opposed to time-varying signals. The can be set with a `.set(x)`
+method, and they can have multiple channels. The roll of Const-like
+Ugens is to allow floats to be used as Ugen inputs without
+implementing a special case within every Ugen. Instead, the floats are
+coerced to either a Const or Smoothb. A float is coerced to a
+Const-like when `Param_descr` is provided as a Ugen signal input.
+Smoothb Ugens differ from Const mainly by applying smoothing so their
+outputs do not change instantly.
+
+### Implementing Updates with Methods
+
+Sometimes, the functional style of `param` is not enough and you need
+to invoke a method to implement an operation like `.set('freq',
+x)`. Modifying our example again, here is how to do it:
+
+```
+class Twoharm (Instrument): 
+    var h1, m2
+
+    def init(freq): 
+        instr_begin()
+        freq_param = param('freq', freq)
+        param.add_method(this, 'set_freq')
+        h1 = sine(freq, 0.1)
+        m2 = multb(freq, 2)
+        var twoharm = add(h1, sine(m2, 0.1))
+        super.init("Twoharm", twoharm) 
+
+    def set_freq(x):
+        h1.set('freq', x)
+        m2.set('x1', x)
+```
+Here, we revert back to saving some Ugens as instance variables so we
+ can reference them in the `set_freq` method. This version uses `m2`
+ for the 2nd harmonic's multiplier Ugen (`multb`) rather than the
+ `Sine` so that  `set_freq` will work with signals as well as
+ floats. (This comes at the small cost of running the multiply for
+ *every* block of 32 samples rather than doing it once at update
+ time. You could optimize this with some careful coding in `set_freq`
+ but the savings would be minimal.)
+
+See also [Instrument Parameters](./instruments.md) and the `param()`
+function described there.
 
 ## End-of-Sound Actions
 

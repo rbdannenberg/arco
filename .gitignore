@@ -148,3 +148,9 @@ srp.log
 /benchmarks/data-jan20/
 
 /ugens/mult/mult.srp
+
+/apps/test/run
+
+/ugens/chorcore_hidden/
+
+/ugens/delayvi_hidden/

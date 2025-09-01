@@ -47,7 +47,7 @@ def arco_ready():
 
     Labeled_slider(win, "Smooth Hz", 'S', 'D', SLWIDTH, 'S', 70, 0.1, 10, 5,
                    'exponential', 'smoothhz')
-    smoothhz.add_target_method(nil, 'set_smooth')
+    smoothhz.add_target_method(nil, 'set_smooth', 'x')
 
 
 // handler for /host/openaggr messages with param info (a string)
@@ -103,7 +103,7 @@ def show_data_click(obj, event, x, y):
     show_data = x
 
 
-def set_smooth(slider, hz):
+def set_smooth(hz):
     for sf at i in sinfreqs:
         if not sf:  // if smoothb's are deleted, ignore slider
             return

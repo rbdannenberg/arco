@@ -210,16 +210,16 @@ public:
         float fSlow0 = std::pow(1e+01f, 2.0f * (float(volume_samps[0]) + -1.0f));
         float fSlow1 = 1.0f / std::tan(fConst1 * (4.15e+03f * float(tone_samps[0]) + 3.5e+02f));
         float fSlow2 = 1.0f / (fSlow1 + 1.0f);
-        float fSlow3 = 1.0f - fSlow1;
-        float fSlow4 = std::pow(1e+01f, 2.0f * float(gain_samps[0]));
+        float fSlow3 = std::pow(1e+01f, 2.0f * float(gain_samps[0]));
+        float fSlow4 = 1.0f - fSlow1;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]) + float(input1[i0]);
             state->fVec0[0] = fTemp0;
             state->fRec1[0] = -(fConst3 * (fConst4 * state->fRec1[1] - fConst2 * (fTemp0 - state->fVec0[1])));
-            float fTemp1 = std::max<float>(-1.0f, std::min<float>(1.0f, fSlow4 * state->fRec1[0]));
+            float fTemp1 = std::max<float>(-1.0f, std::min<float>(1.0f, fSlow3 * state->fRec1[0]));
             float fTemp2 = fTemp1 * (1.0f - 0.33333334f * Overdrive_faustpower2_f(fTemp1));
             state->fVec1[0] = fTemp2;
-            state->fRec0[0] = -(fSlow2 * (fSlow3 * state->fRec0[1] - (fTemp2 + state->fVec1[1])));
+            state->fRec0[0] = fSlow2 * (state->fVec1[1] + fTemp2 - fSlow4 * state->fRec0[1]);
             float fTemp3 = fSlow0 * state->fRec0[0];
             output0[i0] = FAUSTFLOAT(fTemp3);
             output1[i0] = FAUSTFLOAT(fTemp3);
@@ -235,7 +235,7 @@ public:
         gain_samps = gain->run(current_block);  // update input
         tone_samps = tone->run(current_block);  // update input
         volume_samps = volume->run(current_block);  // update input
-        Overdrive_state *state = &states[0];
+        Overdrive_state *state = states.get_array();
         (this->*run_channel)(state);
     }
 };

@@ -84,9 +84,9 @@ class Yin : public Windowed_input {
 
 
     void init_inp(Ugen_ptr ugen) {
-        init_param(ugen, inp, &inp_stride);
         // TODO: we should fail gracefully in this case:
-        assert(inp->rate == 'a');
+        assert(ugen->rate == 'a');
+        init_param(ugen, inp, &inp_stride);
     }
 
 

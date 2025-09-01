@@ -7,7 +7,7 @@ class Mix (Ugen):
     
     def init(chans_, wrap):
         super.init(create_ugen_id(), "Mix", chans_, A_RATE,
-                   "i", 'wrap', 1 if wrap else 0)
+                   "i", 'wrap', 1 if wrap else 0, "f")
         register_action(this, ACTION_REM, this, 'action_rem')
 
 
@@ -25,18 +25,43 @@ class Mix (Ugen):
 
 
     def ins(name, ugen, gain, optional dur, mode, keyword atend):
+        var gain_param
+        var input_param
+
         if isnumber(gain) or isarray(gain):
             gain = const(gain)
+        elif isinstance(gain, Param_descr):
+            gain_param = gain
+            gain = gain_param.get_ugen_value("Mix", 'gain')
         elif gain.rate == 'a':
             print "WARNING: In Mix.ins, audio-rate mix gain must not be audio."
             return
+
+        if isinstance(ugen, Param_descr):
+            ugen_param = ugen
+            ugen = ugen_param.get_ugen_value("Mix", 'in')
+        if ugen.rate != 'a':
+            print "ERROR: In Mix.set_in(), new input for", repr(name),
+            print     "has non-audio-rate", repr(ugen.rate);
+            print     ". Ignoring this input."
+            return
+        if ugen.chans != 1 and gain.chans != 1 and ugen.chans != gain.chans:
+            print "WARNING: In Mix.set_in("; repr(name), "...), input and",
+            print     "gain Ugens have mismatched channel counts. Ignoring",
+            print     "this input."
+            return
+    
         if not dur:
             dur = 0
         if not mode:
             mode = FADE_SMOOTH
         inputs[name] = [name, ugen, gain]
-        o2_send_cmd("/arco/mix/ins", 0, "UsUUfi", id, str(name), ugen.id, 
+        o2_send_cmd("/arco/mix/ins", 0, "UsUUfi", id, str(name), ugen.id,
                                                       gain.id, dur, mode)
+        if gain_param:  // we actually added the input, so tell param_descrs:
+            gain_param.add_method(this, ['set_gain', name])
+            ugen_param.add_method(this, ['set_in', name])
+
         if atend:
             var env = ugen.get['envelope']
             if atend == SIGNAL and issubclass(ugen, Instrument) and env:
@@ -97,6 +122,24 @@ class Mix (Ugen):
             inputs[name][2] = gain
             // display "mix set_gain, calling /repl_gain", id, name, gain.id
             o2_send_cmd("/arco/mix/repl_gain", 0, "UsU", id, str(name), gain.id)
+        this
+
+
+    def set_in(name, input):
+    # general set input to an a-rate Ugen
+        if not inputs.has_key(name):
+            print "ERROR: Mix.set_in() cannot find input", name
+            return
+        var in_ugen = inputs[name][1]
+        display "in set_in", inputs[name], in_ugen, repr(in_ugen.rate)
+        if input.rate != 'a':
+            print "ERROR: In Mix.set_in(), new input for", repr(name),
+            print     "has non-audio-rate", repr(input.rate);
+            print     ". Input not replaced."
+            return
+        inputs[name][1] = input
+        // display "mix set_in, calling /repl_in", id, name, input.id
+        o2_send_cmd("/arco/mix/repl_in", 0, "UsU", id, str(name), input.id)
         this
 
 

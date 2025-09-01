@@ -1,0 +1,22 @@
+# stnoisegate.ugen -- Noise Gate
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+stnoisegate(input: 2a, threshold: b, attack: b, hold: b, release: b): 2a
+
+FAUST
+
+declare name "stnoisegate";
+declare description "Stereo Noisegate Unit Generator for Arco";
+
+import("stdfaust.lib");
+
+stnoisegate = _,_ <: ef.gate_stereo(linear2db(max(threshold, 0.001),
+                                    attack, hold, release) with
+    {
+        linear2db(x) = 20*log10(x);
+    };
+
+process(left, right) = 
+    left,right: stnoisegate;

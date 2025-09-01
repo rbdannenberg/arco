@@ -6,7 +6,7 @@
 class Stdistr (Ugen):
     def init(n, width):
         super.init(create_ugen_id(), "Stdistr", 2, 'a', "if",
-	           'n', n, 'width', width, omit_chans = true)
+	           'n', n, "f", 'width', width, "f", omit_chans = true)
 
     def set_gain(gain)
         o2_send_cmd("/arco/stdistr/gain", 0, "Uf", id, gain)

@@ -1,0 +1,76 @@
+# chorusrbd.srp -- chorus effect based on chorcore
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+# requires route, tableoscb in dspmanifest.txt
+
+// some possible settings:
+// delay: 5-15ms natural
+//       15-25ms fuller, noticeable
+//       20-50ms shimmering, dramatic, flanger-like
+// freq: 0.1-1hz slow, gentle, lush
+//         0.4hz with short delay is "classic"
+//         1-2hz vibrant
+//          >2hz jarring, robotic, special effect
+
+class Chorusrbd (Instrument):
+# A chorus effect with setable parameters
+# Combines two sine oscillators for modulation and uses delayvi
+# for delays. Expands to multi-channel with randomized phase
+# in depth modulation oscillators.
+
+    def init(input, delay, maxdelay, depth1, freq1, depth2, freq2,
+             feedback, wet, gain, optional chans):
+        // convert zero-channel input to zero_ugen and print error:
+        if input.chans < 1:
+            print "ERROR: Chorusrbd got 0-chan input", input,
+            print     "substituting silence (zero_ugen)."
+            input = zero_ugen
+        // make sure chans is valid
+        if chans:
+            if chans < 1:
+                print "ERROR: Chorusrbd got", chans, "channels. Using 1."
+                chans = 1
+        else: // chans defaults to input.chans
+            chans = input.chans
+        
+        instr_begin()
+        input = param('input', input)
+        delay = param('delay', delay)
+        delay_max = maxdelay  // fudge factor
+        depth1 = param('depth1', depth1)
+        freq1 = param('freq1', freq1)
+        depth2 = param('depth2', depth2)
+        freq2 = param('freq2', freq2)
+        feedback = param('feedback', feedback, 'clip', 0, 1)
+        wet = param('wet', wet, 'clip', 0, 1)
+        gain = param('gain', gain)
+
+        // if this is multi-channel, we need to build depth modulation signals
+        var mod1 = tableoscb(freq1, depth1, chans)
+        mod1.create_tas(0, 128, [1])
+        var mod2 = tableoscb(freq2, depth2, chans)
+        display "created tableoscb's", mod1, mod2
+        mod2.borrow(mod1)  // use the same sine table for mod2:
+        // spread initial phases across channels:
+        for i = 0 to chans:
+            var phase = 360 * i / chans
+            mod1.set_phase(i, phase)
+            mod2.set_phase(i, phase)
+        var dly1 = ugen_maxb(ugen_minb(addb(delay, mod1), delay_max), 0)
+        dly1 = addb(dly1, 0.001)  // offset by 1 msec for safety
+        var dly2 = ugen_maxb(ugen_minb(addb(delay, mod2), delay_max), 0)
+        dly2 = addb(dly2, 0.001)  // offset by 1 msec for safety
+        
+        var inputfb = feedback(input)
+        var delay1 = delayvi(inputfb, dly1, delay_max + 0.002)
+        var delay2 = delayvi(inputfb, dly2, delay_max + 0.002)
+        // send delay line output into inputfb:
+        var delay12 = add(delay1, delay2)
+        inputfb.fb(delay12, feedback)
+        var out = mix(chans)
+        out.ins('dry', input, subb(1, wet))
+        out.ins('delay12', delay12, wet)
+        super.init("Chorusrbd", out)
+

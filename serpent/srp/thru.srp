@@ -7,7 +7,7 @@ class Thru (Ugen):
 
     def init(input, optional chans = 1, id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Thru", chans, 'a', "U", 'input', input)
+                   "Thru", chans, 'a', "U", 'input', input, "a")
 
     def set_alternate(alt):
         o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
