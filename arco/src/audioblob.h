@@ -44,7 +44,7 @@ class Audioblob {
         } else {  // 16-bit
             int16_t *outptr = ((int16_t *) blob->data) + next * chans;
             for (int i = 0; i < BL; i++) {
-                 *outptr++ = FLOAT_TO_INT16(*src++);
+                 *outptr++ = FLOAT_TO_INT16(FLOAT_CLIP(*src++));
             }
         }
         next += BL;

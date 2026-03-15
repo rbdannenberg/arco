@@ -1,0 +1,706 @@
+# init.srp -- for tpt application
+#
+# Roger B. Dannenberg
+# Sep 2024
+
+require "debug"
+require "wxserpent"
+require "pair"
+require "arco"
+require "allugens"
+require "utils"
+require "string"
+require "tempoctrl"
+require "notes"
+require "drums"
+require "plotnotes"
+require "soundfont"  // for fluidsynth
+require "autofx"
+require "autofxctrl"
+require "vaecontrol"
+require "harmony"
+require "programs"
+require "chorusrbd"
+require "stylectrl"
+require "labellog"
+
+SAVE_DATA = false
+display "CONFIGURATION NOTICE", SAVE_DATA
+
+SIMPLE = false
+PITCH_LOW = 51
+PITCH_HIGH = 87
+
+DEFAULT_SYNTH_RT60 = 3.0
+DEFAULT_CHORDVOL_OFFSET = -40
+
+ui_initialized = false
+replay_transcription = true
+ready_count = 0
+
+def arco_ready():
+# called when arco is intialized and ready to make sound or when
+# arco audio stream has been reopened
+    display "**** arco audio is running! ****", ready_count
+    ready_count = ready_count + 1
+    if ready_count > 1:
+        display "arco_ready called again", ready_count
+        breakpoint()
+    var win = default_window
+    if ui_initialized:
+        return
+
+    display "arco_ready", wxs_h, wxs_space,
+
+    o2_method_new("/actl/phrase", "s", 'actl_phrase', t)
+    // see stylectrl.srp for actl_style() definition:
+    o2_method_new("/actl/style", "fff", 'actl_style', t)
+
+    display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
+    var WIDTH = 170
+    Checkbox(win, "Collect Data", 5, 5, 100, 20, 'cdcheckbox')
+    cdcheckbox.add_callback('collect_data', 'x')
+    cdcheckbox.set_and_act(true)
+    var top_y = wxs_y
+    Statictext(win, "", 'R', top_y + 2, 25, wxs_h - 2, 'yintext')
+    Checkbox(win, "Auto", 'R', top_y, 55, 20, 'auto_cb')
+    auto_cb.set_value(true)
+    Checkbox(win, "Replay", 'R', 5, 70, 20, 'replaycheckbox')
+    replaycheckbox.add_callback('replay_handler', 'x')
+    replaycheckbox.set_and_act(false)
+    Statictext(win, "", 'R', wxs_y + 2, 60, 'S', 'tempotext')
+    display "tempotext", tempotext.get_left(), tempotext.get_top()
+
+    Plot_notes(default_window, 5, 210, 400, 450, 'plot_notes')
+    note_transcriber = Notes()
+    phrase_maker = Phrase_maker()
+    style_estimation = Style_estimation()
+    Tempo_control()  // starts a Periodic assigned to 'tempo_control'
+    // Tempo_control calls 'every_16th' every 16th
+    phrase_player = Phrase_player()
+    drummer = Drummer()
+
+    var flsyn_gain = 20.0
+    var flchdsyn_gain = 24.0 // 16.0 was ok, trying louder still
+                // 10 was low, 16 is based on how low 10 sounded
+    flsyn_ugen = Flsyn(SOUNDFONT)
+    display "in arco_ready", flsyn_ugen
+    // flsyn_chorus_ugen = chorusrbd(flsyn_ugen, 0.02, 0.04,
+    // 0.02, 0.4, 0.02, 0.6,
+    // 0.2, 0.7, 0.5)
+    flsyn_chorus_ugen = flsyn_ugen
+    flsyn_mix = mix(2)
+    flsyn_mix.ins("nonchd", flsyn_chorus_ugen, [flsyn_gain, flsyn_gain])
+    
+    flchdsyn_ugen = Flsyn(SOUNDFONT)
+    gran_ugen = granstream(flchdsyn_ugen, 20, 0.3, true)
+
+    flsyn_mix.ins("chord", gran_ugen, [flchdsyn_gain, flchdsyn_gain])
+
+    zrev_ugen = zitarev(flsyn_mix, 0.5, 0.5, 1.0)
+    highpass_ugen = highpass(zrev_ugen, 20.0)  // remove "DC"
+    highpass_ugen.play()
+    flsyn_ugen.program_change(0, 0)
+
+    Checkbox(win, "drums", 'S', 25, 60, 20, 'drumscheckbox')
+    drumscheckbox.add_callback('drums_enable_handler', 'x')
+    drumscheckbox.set_and_act(true)
+
+    wxs_space = -2  // tight spacing
+
+    Checkbox(win, "hold", 'S', 'D', 60, 'S', 'holdcheckbox')
+    holdcheckbox.add_callback('hold_enable_handler', 'x')
+
+    Checkbox(win, "dense", 'S', 'D', 60, 'S', 'densecheckbox')
+    densecheckbox.add_callback('dense_fill_handler', 'x')
+
+    Checkbox(win, "echo", 'S', 'D', 60, 'S', 'echocheckbox')
+    echocheckbox.add_callback('echo_handler', 'x')
+    echocheckbox.set_and_act(true)
+
+    Checkbox(win, "poly", 'S', 'D', 60, 'S', 'polycheckbox')
+    polycheckbox.add_callback('poly_handler', 'x')
+    polycheckbox.set_and_act(false)
+
+    Checkbox(win, "quant", 'S', 'D', 60, 'S', 'quantcheckbox')
+    quantcheckbox.add_callback('quant_handler', 'x')
+    quantcheckbox.set_and_act(true)
+
+    Checkbox(win, "boost", 'S', 'D', 60, 'S', 'boostcheckbox')
+    boostcheckbox.add_callback('boost_handler', 'x')
+    boostcheckbox.set_and_act(false)
+
+    Checkbox(win, "short", 'S', 'D', 60, 'S', 'shortcheckbox')
+    shortcheckbox.add_callback('short_handler', 'x')
+    shortcheckbox.set_and_act(false)
+
+    Checkbox(win, "chords", 'S', 'D', 60, 'S', 'chordcheckbox')
+    chordcheckbox.add_callback('chord_handler', 'x')
+    chordcheckbox.set_and_act(false)
+
+    Checkbox(win, "dbltim", 'S', 'D', 60, 'S', 'dbltimcheckbox')
+    dbltimcheckbox.add_callback('dbltim_handler', 'x')
+    dbltimcheckbox.set_and_act(false)
+    
+    var lab_w = 50
+
+    wxs_space = 2
+
+    Labeled_slider(win, "Sustain", 70, 25, 340, 22, lab_w,
+                   1.0, 3.0, 1.5, 'linear', 'sustain_slider')
+    sustain_slider.add_callback('sustain_handler', 'x')
+
+    Labeled_slider(win, "Rt60", 'S', 'D', 'S', 'S', lab_w,
+                   1.0, 20.0, DEFAULT_SYNTH_RT60, 'linear', 'rt60_slider')
+    rt60_slider.add_callback('rt60_handler', 'x')
+
+    Labeled_slider(win, "Wet", 'S', 'D', 'S', 'S', lab_w,
+                   0.0, 1.0, 0.5, 'linear', 'wet_slider')
+    wet_slider.add_callback('wet_handler', 'x')
+
+    Labeled_slider(win, "Gain", 'S', 'D', 'S', 'S', lab_w,
+                   -120, 0, -6, 'dblinear', 'gain_slider')
+    gain_slider.add_callback('gain_handler', 'x')
+    gain_slider.set_and_act(0.5)
+    
+    Labeled_slider(win, "Transp", 'S', 'D', 'S', 'S', lab_w,
+                   -24, 12, 0, 'integer', 'transpose_slider')
+    transpose_slider.add_callback('transpose_handler', 'x')
+
+    drumvol_offset = -30
+    Labeled_slider(win, "Drumvol", 'S', 'D', 'S', 'S', lab_w,
+                   -80, 0, drumvol_offset, 'integer', 'drumvol_slider')
+    drumvol_slider.add_callback('drumvol_handler', 'x')
+
+    chordvol_offset = DEFAULT_CHORDVOL_OFFSET
+    Labeled_slider(win, "Chdvol", 'S', 'D', 'S', 'S', lab_w,
+                   -80, 0, chordvol_offset, 'integer', 'chordvol_slider')
+    chordvol_slider.add_callback('chordvol_handler', 'x')
+
+    wxs_space = WXS_DEFAULT_SPACE // restore spacing
+
+    effects = Autofx(input_ugen)
+    effects_ctrl = Autofx_ctrl(win, 425, 10, 340, effects)
+    effects.play()
+
+    vaecontrol_init(default_window, 770, 5)
+
+    display "phrasetext", wxs_x, wxs_y, wxs_w, wxs_h
+    Statictext(win, "", 'S', 'D', 240, 'H', 'phrasetext')
+    wxs_y = wxs_y + 15  // same x but below phrasetext
+    programs_init(default_window, wxs_x, wxs_y)
+    wxs_y = wxs_y + 15
+    style_init()
+
+    solo_boxes_init()
+
+    win.fit_to_children()
+
+    labellog_init()
+
+    
+
+
+def every_16th():
+# action invoked by Tempo_control every 16th note period
+    note_transcriber.poll()  // update pitch and duration fields
+    var phase = round(sched_vtime * 4) % 32
+    phrase_maker.poll(phase)  // accumulate pitches into phrase
+    style_estimation.poll()   // accumulate pitches into windows
+    tempo_control.compute_tempo(phase)
+    drummer.play_drums(phase)
+    plot_notes.every_16th(phase)
+
+
+def show_tempo(bps):
+    tempotext.set_string(str(bps * 60) + " BPM")
+
+def wet_handler(x):
+    print "wet_handler", x
+    zrev_ugen.set('wet', x)
+
+def gain_handler(x):
+    print "gain_handler", x
+    zrev_ugen.set('gain', x)
+
+def transpose_handler(x):
+    phrase_player.transposition = x
+
+def drumvol_handler(x):
+    drumvol_offset = x
+
+def chordvol_handler(x):
+    chordvol_offset = x
+
+zrev_rt60 = 1.0
+
+def rt60_handler(val):
+    zrev_rt60 = val
+    zrev_ugen.set('rt60', zrev_rt60)
+
+
+sustain_factor = 1.0
+
+def sustain_handler(val):
+    sustain_factor = val
+
+
+drums_enabled = false
+def drums_enable_handler(x): drums_enabled = x
+
+hold_enabled = false
+def hold_enable_handler(x): hold_enabled = x
+
+fill_in_for_density = false
+def dense_fill_handler(x):
+    fill_in_for_density = x
+    labellog_label("dense " + str(x))
+
+echo_enable = false
+def echo_handler(x):
+    echo_enable = x
+
+poly_enable = false
+def poly_handler(x):
+    if poly_enable == x:
+        return
+    poly_enable = x
+    o2_send_start()
+    o2_add_int32(1 if poly_enable else 0)
+    o2_send_finish(0.0, "/vae/normal", true)
+    labellog_label("poly " + str(x))
+
+quant_enable = false
+def quant_handler(x): quant_enable = x
+
+boost_enable = false
+def boost_handler(x):
+    if boost_enable != x:
+        labellog_label("boost " + str(x))
+    boost_enable = x
+
+short_enable = false
+def short_handler(x): short_enable = x
+
+chord_enable = false
+def chord_handler(x): chord_enable = x
+
+dbltim_enable = false
+def dbltim_handler(x): dbltim_enable = x
+
+
+def actl_yin(timestamp, address, types, pitch, harmonicity, rms)
+    var text = ""
+    if harmonicity < 0.1 and rms > 0.01:
+        text = float_places(pitch, 1)
+    yintext.set_string(text)
+    save_data("yin", pitch, harmonicity, rms)
+    // display "actl_yin", timestamp, sched_time_get() - timestamp
+    note_transcriber.yin_input(pitch, harmonicity, rms)
+        
+
+yin_handler_installed = false
+YIN_SAMPLE_RATE = 50  // should divide into 44100 evenly
+YIN_PERIOD = 1.0 / YIN_SAMPLE_RATE
+YIN_PERIOD_INCR = YIN_PERIOD * 0.95  // for estimating yin input time
+
+// handler for yincheckbox: play/stop yin analysis of input
+def yin_start(x):
+    display "yintest", x
+    if x:
+        if not yin_handler_installed:
+            o2_method_new("/actl/yin", "fff", 'actl_yin', t)
+            print "installed yin handler"
+            yin_handler_installed = true
+        yininp = input_ugen
+        yin = yin(yininp, PITCH_LOW, PITCH_HIGH, idiv(44100, YIN_SAMPLE_RATE),
+                  "/actl/yin")
+        yin.run()
+    else:
+        yin.unrun()
+        yin = nil
+        yininp = nil
+
+
+onset_handler_installed = false
+
+def actl_onset(timestamp, address, types, idnum, channel) //idnum, rms are paremeters
+    // display "ONSET DETECTED:", idnum, channel
+    save_data("onset")
+        
+    
+// handler for onsetcheckbox: play/stop onset analysis of input
+def onset_start(x):
+    if x:
+        if not onset_handler_installed:
+            o2_method_new("/actl/onset", "if", 'actl_onset', t)
+            print "installed onset handler"
+            onset_handler_installed = true
+        onset = onset(input_ugen, "/actl/onset")
+        onset.run()
+    else:
+        onset.unrun()
+        onset = nil
+
+
+spectralcentroid_handler_installed = false
+
+def actl_spectralcentroid(timestamp, address, types, centroid)
+    save_data("centroid", centroid)
+
+        
+def spectralcentroid_start(x):
+    if x:
+        if not spectralcentroid_handler_installed:
+            o2_method_new("/actl/spectralcentroid", "f", 'actl_spectralcentroid', t)
+            print "installed spectralcentroid handler"
+            spectralcentroid_handler_installed = true
+        sc_ugen = spectralcentroid(input_ugen, "/actl/spectralcentroid")
+        sc_ugen.run()
+    else:
+        sc_ugen.unrun()
+        sc_ugen = nil
+
+
+spectralrolloff_handler_installed = false
+
+def actl_spectralrolloff(timestamp, address, types, rolloff_freq)
+    save_data("rolloff", rolloff_freq)
+
+        
+def spectralrolloff_start(x):
+    if x:
+        if not spectralrolloff_handler_installed:
+            o2_method_new("/actl/spectralrolloff", "f", 'actl_spectralrolloff', t)
+            print "installed spectralrolloff handler"
+            spectralrolloff_handler_installed = true
+        sr_ugen = spectralrolloff("/actl/spectralrolloff", 0.5)
+        sr_ugen.set('input', input_ugen)
+        sr_ugen.run()
+    else:
+        sr_ugen.unrun()
+        sr_ugen = nil
+
+
+def save_data(id, rest data):
+# save a row to data_file (a .csv file). Row contains time, id, and data.
+# The fast way shown here to build a string is to make an array of strings
+# and flatten it. It saves copying the string so far to append something.
+    if not data_file:
+        if SAVE_DATA:
+            display "save_data", id, data
+        return
+    var row = [str(o2_time_get()), ",", id]
+    for d in data:
+        row.append(",")
+        row.append(str(d))
+    row.append("\n")
+    data_file.write(flatten(row))
+
+
+data_file = nil
+data_file_id = 1
+
+
+def start_poll_test():
+    sched_select(rtsched)
+    sched_cause(0.002, nil, 'poll_callback')
+    poll_last_time = sched_time_get()
+    poll_count = 0
+    poll_short_count = 0
+    poll_long_count = 0
+    poll_shortest = 1.0
+    poll_longest = 0
+
+
+def poll_callback():
+    var now = sched_time_get()
+    var delay = now - poll_last_time
+    if delay < 0.001:
+        poll_short_count = poll_short_count + 1
+    elif delay > 0.005:
+        poll_long_count = poll_long_count + 1
+    if data_file:
+        print "delay", delay
+    poll_count = poll_count + 1
+    poll_shortest = min(poll_shortest, delay)
+    poll_longest = max(poll_longest, delay)
+    poll_last_time = now
+    sched_cause(0.002, nil, 'poll_callback')
+    
+
+// handler for cdcheckbox: start/stop analysis
+def collect_data(x):
+    display "collect_data", x
+    yin_start(x)
+    if not SAVE_DATA:
+        return
+    onset_start(x)
+    spectralcentroid_start(x)
+    spectralrolloff_start(x)
+    if x:
+        // DEBUG
+        // start_poll_test()
+
+        if not data_file:
+            data_file_name = "perfdata" + leftpad(data_file_id, 3, "0") + ".csv"
+            data_file = open(data_file_name, "r")
+            while data_file:
+                data_file.close()
+                data_file_id = data_file_id + 1
+                data_file_name = "perfdata" + leftpad(data_file_id, 3, "0") +
+                                 ".csv"
+                data_file = open(data_file_name, "r")
+            # now, data_file_name does not already exist, so safe to write
+            data_file = open(data_file_name, "w")
+    else:
+        // DEBUG
+        // display "poll test", poll_shortest, poll_longest, poll_count
+        // display "         ", poll_short_count, poll_long_count
+
+        data_file.close()
+        data_file = nil
+        print "------------------------------"
+        print "Wrote", data_file_name
+        print "------------------------------"
+
+
+def replay_handler(x):
+    replay_transcription = x
+    display "replay_handler", replay_transcription
+
+
+def arco_prugens_handler(rest ignore):
+    // this tells Arco to print the Ugen tree -- it can be useful for
+    //     debugging.
+    o2_send_cmd("/arco/prtree", 0, "")
+    // also print the list of Ugens accessible by integer ID:
+    o2_send_cmd("/arco/prugens", 0, "")
+
+
+def arco_ugen_gc_info_handler(rest ignore):
+    arco_ugen_gc_info()
+
+// ==== INFERENCE AND PLAY NEW PHRASE ====
+
+poly_count = 0
+first_phrase_time = nil
+active_since = 0
+take_the_lead = false
+lay_out = false
+lay_out_ended = 0
+lay_out_until = 0
+
+# Laying out - we have a mechanism for stopping synthesis and letting
+# the trumpet solo with lots of reverb and effects still enabled.
+# STARTING - we record the time when all synthesis output stops, called
+# tacet_since. This indicates that the trumpet is not playing much either,
+# although it could have just been waiting for things to calm down and
+# might be playing as soon as synthesis stops. So we can also record the
+# last time the trumpet played, calling it rest_start. We will poll every
+# second (in compute_activity()) for the condition:
+#    sched_rtime > tacet_since + 1 and sched_rtime > rest_start + 1
+# which can become true in 1 to 2 seconds (due to polling rate) after there
+# is no playing at all. We restrict this further in 2 ways:
+# 1. only act if not lay_out, so avoid extending the already started mode
+# 2. only act if we have not started lay_out for at least 60 sec
+# STOPPING - lay_out will run for 15 to 30 sec, but we want to EXTEND the
+# mode as long as the player wants to take advantage of the space using
+# isolated playing and letting the reverb ring. So, we only end lay_out
+# if the initial timeout has occurred AND the trumpet played without a 1 sec
+# rest for at least 2 sec. For this we need active_since to be updated in
+# Run_length_process as it processes YIN input.
+
+
+ 
+
+def compute_activity():
+# called every 1 sec by tempoctrl.compute_tempo to notice
+# pauses in playing: If no pause in 60 sec, we want to
+# lay out for 15 to 25 sec.  A pause is 3 sec.
+# If there's a pause for 15 sec, we should take the lead
+# until trumpet plays again.
+    if run_length_process.rest_dur > 3:
+        active_since = sched_rtime
+
+    // take_the_lead does not actually do anything now
+    if run_length_process.rest_dur > 15:
+        if not take_the_lead:
+            display "MODE", take_the_lead, sched_rtime
+        take_the_lead = true
+    if take_the_lead and run_length_process.rest_dur < 1:
+        if take_the_lead:
+            display "MODE", take_the_lead, sched_rtime
+        take_the_lead = false
+    // lay_out computation
+    if sched_rtime > tacet_since + 1 and not poly_enable and
+       sched_rtime > run_length_process.rest_dur + 1 and
+       not lay_out and
+       sched_rtime > max(run_length_process.start_time, lay_out_ended) + 60:
+        lay_out = true
+        lay_out_until = sched_rtime + pr_unif(15, 30)
+        labellog_label("lay_out begin")
+        fxrevbrt60.set_and_act(12)
+        fxdlygain.set_and_act(0.2)
+        effects.delay_ugen.set('dur', 0.2)
+        effects.delay_ugen.set('fb', 0.4)
+        print "lay_out begin"
+    if lay_out and sched_rtime > lay_out_until and
+       sched_rtime > run_length_process.active_since + 2:
+        lay_out = false
+        lay_out_ended = sched_rtime
+        labellog_label("lay_out end")
+        print "lay_out end"
+        // let auto() change reverb on the next gap
+
+
+//  old version:
+//    if sched_rtime - active_since > 60 and not lay_out:
+//        lay_out_until = sched_rtime + pr_unif(15, 25)
+//        lay_out = true
+//        display "MODE", lay_out, sched_rtime
+//    if lay_out and sched_rtime > lay_out_until:
+//        lay_out = false
+//        display "MODE", lay_out, sched_rtime
+
+
+def time_since_last_pause():
+    sched_rtime - most_recent_phrase_time
+
+
+def send_to_vae(phrase):
+    if not first_phrase_time:
+        first_phrase_time = sched_rtime
+    most_recent_phrase_time = sched_rtime
+
+    o2_send_start()
+    for p at i in phrase:
+        // convert nil to -1
+        o2_add_int32(p or -1)
+    o2_send_finish(0.0, "/vae/run", true)
+
+
+def vae_process(phrase, short):
+# use o2inference (via O2) to transform input, which is
+# an array of pitches with nil for rest
+#
+# To interpret results properly, keep poly_count: 
+# increment for each vae_process used for poly_enable.
+# actl_phrase will decrement the count. Iff the count
+# is zero, handle the return phrase by playing it in
+# time as mono.
+    // send data as integers to vae/run
+    vae_phrase_is_short = short
+    if poly_enable and not phrases_playing:
+        // get 16 variants
+        for i = 0 to 16:
+            poly_count = poly_count + 1
+            send_to_vae(phrase)
+            // disable more poly in 1 sec and re-enable when phrase_player
+            // finishes playing all resulting phrases
+            sched_select(rtsched)
+            sched_cause(1, nil, 'disable_poly')
+    elif echo_enable:  // play VAE phrases normally (subject to lay_out)
+        vae_process_start = rtsched.time
+        send_to_vae(phrase)
+        print "vae_process", phrase2str(phrase)
+    
+
+phrases_playing = false
+def disable_poly():
+    phrases_playing = true
+
+
+
+def actl_phrase(timestamp, address, types, pitches):
+    var phrase = string_split(pitches, " ")
+    phrase = [int(p) for p in phrase]
+    if vae_phrase_is_short:
+        phrase.set_len(16)
+    if poly_count == 0:
+        var inference_time = rtsched.time - vae_process_start
+        display "INFERENCE COMPLETE", inference_time
+        phrase_player.start(phrase)
+        // play same phrase delayed by 8 beats and transposed down
+        sched_cause(8, phrase_player, 'start', phrase, LEAD2_CHAN, -12)
+    else:
+        print "POLY:", phrase2str(phrase)
+        var transpose = -12 if poly_count >= 11 else
+                        (0 if poly_count >= 5 else 12)
+        var delay = max(0, 4 - poly_count * 0.25) // shorter ones get delayed
+        sched_select(rtsched)
+        var stretch = 1 + poly_count * 0.2
+        if dbltim_enable:
+            stretch = stretch * 0.5
+        // use channels 2 through 9 (represented as 1 through 8)
+        // (channel 10 is drums, channel 11 is chords), with is_poly = true
+        sched_cause(delay, phrase_player, 'start', phrase,
+                    poly_count % 8 + 1, transpose, stretch, true)
+        if boost_enable:
+            transpose = 12
+            sched_cause(delay + 4, phrase_player, 'start', phrase,
+                        (poly_count + 2) % 8 + 1, transpose, stretch, true)
+            transpose = -24
+//            if transpose > 24:
+//                transpose = -12
+            sched_cause(delay + 3, phrase_player, 'start', phrase,
+                        (poly_count + 2) % 8 + 1, transpose, stretch, true)
+            
+            
+        poly_count = poly_count - 1
+
+
+def style_init():
+# set up for style classification
+    var left = wxs_x
+    wxs_y = wxs_y + 10
+    style_guages = []
+    style_labels = []
+    for sname at i in STYLE_NAMES:
+        style_labels.append(Statictext(default_window, sname,
+                                       'S', wxs_y + 15, 60, 'H'))
+        var g = Gauge(default_window, 1000, 'R', wxs_y - 4, 100, 'H')
+        style_guages.append(g)
+        wxs_x = left
+    style_start_poll()
+
+
+def solo_boxes_init():
+    var win = default_window
+    var left = wxs_x
+    Checkbox(win, "lead", 'S', 'D', 55, 'H', 'leadsolocheckbox')
+    leadsolocheckbox.set_and_act(true)
+    Checkbox(win, "lead2", 'R', 'S', 60, 'H', 'lead2solocheckbox')
+    lead2solocheckbox.set_and_act(true)
+    Checkbox(win, "chord", 'R', 'S', 60, 'H', 'chordsolocheckbox')
+    chordsolocheckbox.set_and_act(true)
+    Checkbox(win, "drums", 'R', 'S', 60, 'H', 'drumsolocheckbox')
+    drumsolocheckbox.set_and_act(true)
+    wxs_x = left  // restore left margin for other controls
+    Checkbox(win, "tpt", 'S', 'D', 50, 'H', 'tptsolocheckbox')
+    tptsolocheckbox.add_callback('tptsolo_handler', 'x')
+    tptsolocheckbox.set_and_act(true)
+
+    
+def tptsolo_handler(x):
+    master_fx_ugen.set(1 if x else 0)
+
+
+def main():
+    o2_debug_flags("") // ("SsBl")
+    var files = ["trumpet.wav", "descend.wav", "fast.wav", "slow.wav"]
+    arco_set_input_files(["/Users/rbd/algocomp/rbd25/audio/" + file
+                          for file in files])
+    arco_init(ensemble = "rbdperfdata", latency = 10, network = false,
+              title = "Tpt", appname = "tpt", ins = 1)
+    o2lite_initialize()
+    arco_run()
+    sched_select(rtsched)
+
+    var file_menu = default_window.get_menu("File")
+    file_menu.item("Print Ugen Info", "print Ugen tree and table",
+                   nil, nil, 'arco_prugens_handler')
+    file_menu.item("Arco Ugen GC Info", "print info about Ugen IDs",
+                   nil, nil, 'arco_ugen_gc_info_handler')
+
+main()

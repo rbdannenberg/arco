@@ -1,0 +1,35 @@
+# statemgr.srp -- save/restore state of a set of labeled_sliders
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+# Usage:
+#
+# statemgr = Statemgr()
+# statemgr.insert(symbol) -- add variable name to the set of Labled_sliders
+#    (symbol must be bound to a Labled_slider)
+# d = statemgr.get_state() -- return a dictionary of slider values
+# statemgr.set_state(d) -- set slider values according to dictionary d
+
+class Statemgr:
+    var names  // symbol names of all sliders managed with autofx
+
+    def init():
+        names = []
+
+    def add_slider(sym):
+        names.append(sym)
+
+    def get_state():
+        var d = {}
+        for name in names:
+            var s = symbol_value(name)
+            d[name] = s.val // current value from slider goes into dictionary
+        return d
+
+    def set_state(d):
+        for name in names:
+            var s = symbol_value(name)
+            var x = d.get(name, nil)
+            if x:
+                s.set_and_act(x)

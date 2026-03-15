@@ -74,3 +74,7 @@ class Chorusrbd (Instrument):
         out.ins('delay12', delay12, wet)
         super.init("Chorusrbd", out)
 
+def chorusrbd(input, delay, maxdelay, depth1, freq1, depth2, freq2,
+              feedback, wet, gain, optional chans = 1):
+    Chorusrbd(input, delay, maxdelay, depth1, freq1, depth2, freq2,
+              feedback, wet, gain, chans)

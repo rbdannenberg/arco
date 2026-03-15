@@ -19,23 +19,40 @@ public:
         alternate = NULL;
     };
 
-    ~Thru() { input->unref(); }
+    ~Thru() {
+        input->unref(&input);
+        if (alternate) {
+            alternate->unref(&alternate);
+        }
+    }
 
     const char *classname() { return Thru_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // input always present; alternate may be NULL
+        if (i == 0) {        *child = input;
+        } else if (i == 1) { *child = alternate;
+        } else return false;
+        return true;
+    }
+#endif
 
     void print_sources(int indent, bool print_flag) {
         input->print_tree(indent, print_flag, "input");
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
     void set_alternate(Ugen_ptr alt) {
         assert(alt);
         if (alternate) {
-            alternate->unref();
+            alternate->unref(&alternate);
         }
         if (alt->id == ZERO_ID) {  // clear the alternate by setting to Zero
             alternate = NULL;

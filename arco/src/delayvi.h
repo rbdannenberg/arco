@@ -86,8 +86,8 @@ public:
     }
 
     ~Delayvi() {
-        input->unref();
-        delay->unref();
+        input->unref(&input);
+        delay->unref(&delay);
         for (int i = 0; i < chans; i++) {
             O2_FREE(states[i].delay_buf);
             states[i].delay_buf = nullptr;
@@ -95,6 +95,22 @@ public:
     }
 
     const char *classname() { return Delayvi_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 2 inputs
+        if (i == 0) {
+            *child = input;
+        } else if (i == 1) {
+            *child = delay;
+        } else {
+            return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         // continue processing delays and leave signal in delay_buf
@@ -124,13 +140,13 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
         update_run_channel();
     }
 
     void repl_delay(Ugen_ptr ugen) {
-        delay->unref();
+        delay->unref(&delay);
         init_delay(ugen);
         update_run_channel();
     }

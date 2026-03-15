@@ -38,13 +38,25 @@ public:
         for (int i = 0; i < inputs.size(); i++) {
             Ugen_ptr input = inputs[i].input;
             if (input != ugen_table[ZERO_ID]) {
-                input->unref();
+                input->unref(&input);
             }
         }
     }
 
 
     const char *classname() { return Route_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        if (i < 0 || i >= inputs.size()) {
+            return false;
+        }
+        *child = inputs[i].input;
+        return true;
+    }
+#endif
 
 
     // find the index of Ugen input -- linear search
@@ -149,7 +161,7 @@ public:
 
         if (--inputs[ii].refcount == 0) {
             inputs.remove(ii);
-            input->unref();
+            input->unref(&input);
         }
     }
 
@@ -182,8 +194,9 @@ public:
  
         // remove input from inputs
         inputs.remove(ii);
-        input->unref();
-    }        
+        input->unref(&input); // &input is just the local parameter, but
+                 // we removed the actual reference by inputs.remove(ii)
+    }
         
 
     void print_sources(int indent, bool print_flag) {

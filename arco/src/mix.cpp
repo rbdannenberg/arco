@@ -16,8 +16,8 @@ Mix::~Mix()
     if (n > 0) {
         Input *input = &inputs[0];
         for (int i = 0; i < n; i++) {
-            input->input->unref();
-            input->gain->unref();
+            input->input->unref(&(input->input));
+            input->gain->unref(&(input->gain));
             input->prev_gain.finish();
             input++;
         }

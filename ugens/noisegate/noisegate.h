@@ -100,14 +100,28 @@ public:
     }
 
     ~Noisegate() {
-        input->unref();
-        threshold->unref();
-        attack->unref();
-        hold->unref();
-        release->unref();
+        input->unref(&input);
+        threshold->unref(&threshold);
+        attack->unref(&attack);
+        hold->unref(&hold);
+        release->unref(&release);
     }
 
     const char *classname() { return Noisegate_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = threshold;
+        } else if (i == 2) { *child = attack;
+        } else if (i == 3) { *child = hold;
+        } else if (i == 4) { *child = release;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -157,31 +171,31 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
         update_run_channel();
     }
 
     void repl_threshold(Ugen_ptr ugen) {
-        threshold->unref();
+        threshold->unref(&threshold);
         init_threshold(ugen);
         update_run_channel();
     }
 
     void repl_attack(Ugen_ptr ugen) {
-        attack->unref();
+        attack->unref(&attack);
         init_attack(ugen);
         update_run_channel();
     }
 
     void repl_hold(Ugen_ptr ugen) {
-        hold->unref();
+        hold->unref(&hold);
         init_hold(ugen);
         update_run_channel();
     }
 
     void repl_release(Ugen_ptr ugen) {
-        release->unref();
+        release->unref(&release);
         init_release(ugen);
         update_run_channel();
     }
@@ -233,14 +247,14 @@ public:
         float fSlow11 = ((iSlow10) ? 0.0f : std::exp(-(fConst1 / ((iSlow10) ? 1.0f : fSlow0))));
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]);
-            state->fRec1[0] = fSlow5 * std::fabs(fTemp0) + state->fRec1[1] * fSlow4;
+            state->fRec1[0] = std::fabs(fTemp0) * fSlow5 + state->fRec1[1] * fSlow4;
             int iTemp1 = state->fRec1[0] > fSlow6;
             state->iVec0[0] = iTemp1;
             state->iRec2[0] = std::max<int>(iSlow7 * (iTemp1 < state->iVec0[1]), state->iRec2[1] + -1);
             float fTemp2 = std::fabs(std::max<float>(float(iTemp1), float(state->iRec2[0] > 0)));
             float fTemp3 = ((fTemp2 > state->fRec0[1]) ? fSlow11 : fSlow9);
             state->fRec0[0] = fTemp2 * (1.0f - fTemp3) + state->fRec0[1] * fTemp3;
-            output0[i0] = FAUSTFLOAT(state->fRec0[0] * fTemp0);
+            output0[i0] = FAUSTFLOAT(fTemp0 * state->fRec0[0]);
             state->fRec1[1] = state->fRec1[0];
             state->iVec0[1] = state->iVec0[0];
             state->iRec2[1] = state->iRec2[0];

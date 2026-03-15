@@ -477,7 +477,7 @@ void Recplay::borrow(int lender_id)
     UGEN_FROM_ID(Recplay, lender, lender_id, "arco_recplay_borrow lender");
 
     if (borrowing) { // return buffers to lender
-        lender_ptr->unref();
+        lender_ptr->unref((Ugen **) &lender_ptr);
         borrowing = false;
         for (int i = 0; i < chans; i++) {
             states[i].buffers = NULL;

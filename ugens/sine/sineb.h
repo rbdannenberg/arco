@@ -117,11 +117,22 @@ public:
     }
 
     ~Sineb() {
-        freq->unref();
-        amp->unref();
+        freq->unref(&freq);
+        amp->unref(&amp);
     }
 
     const char *classname() { return Sineb_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = freq;
+        } else if (i == 1) { *child = amp;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -140,12 +151,12 @@ public:
     }
 
     void repl_freq(Ugen_ptr ugen) {
-        freq->unref();
+        freq->unref(&freq);
         init_freq(ugen);
     }
 
     void repl_amp(Ugen_ptr ugen) {
-        amp->unref();
+        amp->unref(&amp);
         init_amp(ugen);
     }
 

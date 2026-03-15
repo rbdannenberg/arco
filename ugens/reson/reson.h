@@ -83,12 +83,24 @@ public:
     }
 
     ~Reson() {
-        input->unref();
-        center->unref();
-        q->unref();
+        input->unref(&input);
+        center->unref(&center);
+        q->unref(&q);
     }
 
     const char *classname() { return Reson_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = center;
+        } else if (i == 2) { *child = q;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -130,19 +142,19 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
         update_run_channel();
     }
 
     void repl_center(Ugen_ptr ugen) {
-        center->unref();
+        center->unref(&center);
         init_center(ugen);
         update_run_channel();
     }
 
     void repl_q(Ugen_ptr ugen) {
-        q->unref();
+        q->unref(&q);
         init_q(ugen);
         update_run_channel();
     }
@@ -176,7 +188,7 @@ public:
         float fSlow5 = 2.0f * (1.0f - 1.0f / Reson_faustpower2_f(fSlow1));
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             state->fRec0[0] = float(input0[i0]) - fSlow3 * (fSlow4 * state->fRec0[2] + fSlow5 * state->fRec0[1]);
-            output0[i0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + 2.0f * state->fRec0[1] + state->fRec0[0]));
+            output0[i0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }
@@ -193,7 +205,7 @@ public:
             float fTemp0 = 1.0f / std::max<float>(float(input1[i0]), 0.1f);
             float fTemp1 = fSlow1 * (fSlow1 + fTemp0) + 1.0f;
             state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * (fSlow1 * (fSlow1 - fTemp0) + 1.0f) + fSlow2 * state->fRec0[1]) / fTemp1;
-            output0[i0] = FAUSTFLOAT((state->fRec0[2] + 2.0f * state->fRec0[1] + state->fRec0[0]) / fTemp1);
+            output0[i0] = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp1);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }
@@ -208,8 +220,8 @@ public:
             float fTemp0 = std::tan(fConst0 * std::max<float>(float(input1[i0]), 0.1f));
             float fTemp1 = 1.0f / fTemp0;
             float fTemp2 = (fSlow0 + fTemp1) / fTemp0 + 1.0f;
-            state->fRec0[0] = float(input0[i0]) - (((fTemp1 - fSlow0) / fTemp0 + 1.0f) * state->fRec0[2] + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp2;
-            output0[i0] = FAUSTFLOAT((state->fRec0[0] + 2.0f * state->fRec0[1] + state->fRec0[2]) / fTemp2);
+            state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * ((fTemp1 - fSlow0) / fTemp0 + 1.0f) + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp2;
+            output0[i0] = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp2);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }

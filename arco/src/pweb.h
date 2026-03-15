@@ -36,6 +36,14 @@ public:
 
     const char *classname() { return Pweb_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        return false;  // Pweb has no Ugen children
+    }
+#endif
+
     void real_run() {
         while (seg_togo == 0) { // set up next segment
             current = final_value;  // make output value exact

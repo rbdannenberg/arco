@@ -1,0 +1,10 @@
+# manifest for point (Pointillism)
+vu
+probe
+sine
+pwl*
+pwe*
+unaryugen*
+mix
+mult*
+fileplay

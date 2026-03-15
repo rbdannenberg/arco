@@ -65,12 +65,26 @@ public:
     }
 
     ~Blend() {
-        x1->unref();
-        x2->unref();
-        b->unref();
+        x1->unref(&x1);
+        x2->unref(&x2);
+        b->unref(&b);
     }
 
     const char *classname() { return Blend_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 3 inputs
+        *child = NULL;
+        if (i == 0) {         *child = x1;
+        } else if (i == 1) {  *child = x2;
+        } else if (i == 2) {  *child = b;
+        } else return false;
+        return true;
+    }
+#endif
 
     void initialize_channel_states(float b_init) {
         for (int i = 0; i < chans; i++) {
@@ -96,19 +110,19 @@ public:
     }
 
     void repl_x1(Ugen_ptr ugen) {
-        x1->unref();
+        x1->unref(&x1);
         init_x1(ugen);
         update_run_channel();
     }
 
     void repl_x2(Ugen_ptr ugen) {
-        x2->unref();
+        x2->unref(&x2);
         init_x2(ugen);
         update_run_channel();
     }
 
     void repl_b(Ugen_ptr ugen) {
-        b->unref();
+        b->unref(&b);
         init_b(ugen);
         update_run_channel();
     }

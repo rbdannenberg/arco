@@ -1,0 +1,38 @@
+# labellog.srp -- record labels to display along with output recordings
+#
+# Roger B. Dannenberg
+
+
+def labellog_init():
+    audio_recording_notice = 'audio_recording_notice'
+
+
+labellogf = nil
+def audio_recording_notice(in_or_out, x):
+    if in_or_out == 'out':
+        if x:
+            if labellogf:
+                print "WARNING: Overwriting closed labellog.txt!"
+            labellogf = open("labellog.txt", "w")
+        else:
+            labellog_finish()
+
+
+
+def labellog_finish():
+    if labellogf and not labellogf.closed():
+        labellogf.close()
+
+
+
+def labellog_label(txt, optional dur):
+    if not audio_logout_start_time:
+        return  // only write labels when recording
+    var timestr = str(sched_rtime - audio_logout_start_time )
+    var endstr = timestr
+    if dur:
+        endstr = str(sched_rtime + dur - audio_logout_start_time)
+    if labellogf and not labellogf.closed():
+        labellogf.write(timestr + "\t" + endstr + "\t" + txt + "\n")
+        labellogf.flush()
+

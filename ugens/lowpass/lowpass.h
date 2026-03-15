@@ -74,11 +74,22 @@ public:
     }
 
     ~Lowpass() {
-        input->unref();
-        cutoff->unref();
+        input->unref(&input);
+        cutoff->unref(&cutoff);
     }
 
     const char *classname() { return Lowpass_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = cutoff;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -114,13 +125,13 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
         update_run_channel();
     }
 
     void repl_cutoff(Ugen_ptr ugen) {
-        cutoff->unref();
+        cutoff->unref(&cutoff);
         init_cutoff(ugen);
         update_run_channel();
     }
@@ -146,7 +157,7 @@ public:
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]);
             state->fVec0[0] = fTemp0;
-            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (state->fVec0[1] + fTemp0)));
+            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1])));
             output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];

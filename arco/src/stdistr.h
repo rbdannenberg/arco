@@ -43,13 +43,25 @@ public:
     ~Stdistr() {
         for (int i = 0; i < inputs.size(); i++) {
             if (inputs[i]) {
-                inputs[i]->unref();
+                inputs[i]->unref(&(inputs[i]));
             }
         }
         // since inputs is a member, ~Vec will run now and delete it
     }
 
     const char *classname() { return Stdistr_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        if (i < 0 || i >= inputs.size()) {
+            return false;
+        }
+        *child = inputs[i];
+        return true;
+    }
+#endif
 
 
     void print_sources(int indent, bool print_flag) {
@@ -92,7 +104,7 @@ public:
         }
         if (i < inputs.size()) {  // input is not already in stdistr; append it
             if (inputs[i]) {
-                inputs[i]->unref();
+                inputs[i]->unref(&inputs[i]);
             }
             inputs[i] = input;
             input->ref();
@@ -109,7 +121,7 @@ public:
     // remove operation finds the signal and removes it and its gain
     void rem(int i) {
         if (i >= 0 && i < inputs.size()) {
-            inputs[i]->unref();
+            inputs[i]->unref(&(inputs[i]));
             inputs[i] = nullptr;
         }
     }
@@ -188,7 +200,7 @@ public:
             }
             Sample_ptr input_ptr = input->run(current_block);
             if (input->flags & TERMINATED) {
-                input->unref();
+                input->unref(&(inputs[i]));
                 inputs.remove(i);
                 continue;
             }

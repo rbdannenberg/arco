@@ -31,9 +31,23 @@ public:
             wavetables[i].finish();
         }
         if (lender) {
-            lender->unref();
+            lender->unref((Ugen **) &lender);
         }
     }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // lender is the only Ugen child
+        *child = NULL;
+        if (i == 0) {
+            *child = lender;
+            return true;
+        }
+        return false;
+    }
+#endif
 
 
     void borrow(Wavetables *wt) {

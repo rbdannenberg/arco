@@ -1,0 +1,17 @@
+# highpass.ugen -- highpass unit generator
+#
+# Roger B. Dannenberg
+# Nov 2022
+# highpass(sound, cutoff)
+
+highpass(input: a, cutoff: ab): a
+highpassb(input: b, cutoff: b): b
+
+FAUST
+
+declare description "Highpass Unit Generator for Arco";
+declare terminate "input";
+
+import("filters.lib");
+
+process(input, cutoff) = input : highpass(1, cutoff);

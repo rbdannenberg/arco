@@ -55,15 +55,15 @@ class Yin : public Windowed_input {
     int middle;  // middle index of window
     float *results;  // temporary storage for yin
     
-    Yin(int id, int chans, Ugen_ptr inp, int minstep, int maxstep,
-        int hopsize, const char *address_) : Windowed_input(id, chans, inp) {
+    Yin(int id, int chans, Ugen_ptr input, int minstep, int maxstep,
+        int hopsize, const char *address_) : Windowed_input(id, chans, input) {
         yin_states.set_size(chans);
         middle = std::ceil(AR / step_to_hz(minstep));
         int window_size = middle * 2;
         Windowed_input::init(window_size + BL * 2, window_size, hopsize);
         m = AR / step_to_hz(maxstep);
         results = O2_MALLOCNT(middle - m + 1, float);
-        init_inp(inp);
+        init_input(input);
         new_estimates = false;
         address = o2_heapify(address_);
     }
@@ -78,15 +78,15 @@ class Yin : public Windowed_input {
     const char *classname() { return Yin_name; }
 
     void repl_input(Ugen_ptr ugen) {
-        inp->unref();
-        init_inp(ugen);
+        input->unref(&input);
+        init_input(ugen);
     }
 
 
-    void init_inp(Ugen_ptr ugen) {
+    void init_input(Ugen_ptr ugen) {
         // TODO: we should fail gracefully in this case:
         assert(ugen->rate == 'a');
-        init_param(ugen, inp, &inp_stride);
+        init_param(ugen, input, &input_stride);
     }
 
 

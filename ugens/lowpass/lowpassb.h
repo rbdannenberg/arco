@@ -75,11 +75,22 @@ public:
     }
 
     ~Lowpassb() {
-        input->unref();
-        cutoff->unref();
+        input->unref(&input);
+        cutoff->unref(&cutoff);
     }
 
     const char *classname() { return Lowpassb_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = cutoff;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -98,12 +109,12 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
     void repl_cutoff(Ugen_ptr ugen) {
-        cutoff->unref();
+        cutoff->unref(&cutoff);
         init_cutoff(ugen);
     }
 

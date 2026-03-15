@@ -47,6 +47,21 @@ public:
 
     const char *classname() { return Mix_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // two references per input: input and gain
+        int n = inputs.size();
+        if (i < 0 || i >= 2 * n) {
+            return false;
+        }
+        Input &in = inputs[i / 2];
+        *child = (i & 1) ? in.gain : in.input;
+        return true;
+    }
+#endif
+
     void print_sources(int indent, bool print_flag);
 
     // insert operation takes a signal and a gain
@@ -70,8 +85,8 @@ public:
         Input *input_desc;
         if (i >= 0) {  // name already exists; replace input
             input_desc = &inputs[i];
-            input_desc->input->unref();
-            input_desc->gain->unref();
+            input_desc->input->unref(&(input_desc->input));
+            input_desc->gain->unref(&(input_desc->gain));
         } else {  // allocate space for new input and initialize
             input_desc = inputs.append_space(1);
             input_desc->prev_gain.init(0);
@@ -190,10 +205,8 @@ public:
     void remove_input(int i, Input *input_desc) {
         O2_FREE((void *) input_desc->name);
         input_desc->name = NULL;
-        input_desc->input->unref();
-        input_desc->input = NULL;
-        input_desc->gain->unref();
-        input_desc->gain = NULL;
+        input_desc->input->unref(&(input_desc->input));
+        input_desc->gain->unref(&(input_desc->gain));
         inputs.remove(i);
     }
 
@@ -206,7 +219,7 @@ public:
             if (gain_ugen->rate == 'c') {
                 gain_ugen->const_set(chan, gain, "Mix::set_gain");
             } else if (chan == 0) {
-                gain_ugen->unref();
+                gain_ugen->unref(&(input_desc->gain));
                 init_param(new Const(-1, 1, gain), input_desc->gain,
                            &input_desc->gain_stride);
                 input_desc->prev_gain.set_size(input_desc->input->chans, true);
@@ -234,7 +247,7 @@ public:
                               gain->chans);
                     return;
             }
-            input_desc->gain->unref();
+            input_desc->gain->unref(&(input_desc->gain));
             init_param(gain, input_desc->gain, &input_desc->gain_stride);
             int new_chans = MAX(input_desc->input->chans, gain->chans);
             input_desc->prev_gain.set_size(new_chans, true);
@@ -259,8 +272,8 @@ public:
                 return;
             }
             Ugen_ptr input = input_desc->input;
-            input->unref();
-            gain->unref();
+            input->unref(&(input_desc->input));
+            gain->unref(&(input_desc->gain));
             init_param(ugen, input_desc->input, &input_desc->input_stride);
         }
     }

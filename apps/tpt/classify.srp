@@ -1,0 +1,341 @@
+# classify.srp - classifier code
+#
+# Roger B. Dannenberg
+# Sep 2025
+
+require "debug"
+require "utils"
+require "read_value"
+require "phraserecorder"
+require "notes"
+require "writecsv"
+require "statistics"
+
+CDBG = false  // extra output for debugging
+
+WINDOW_LEN = 4  // measures
+MEASURE_LEN = 16  // subdivisions per measure
+WIN16THS = WINDOW_LEN * MEASURE_LEN
+
+def all_rest(window):
+    for p in window:
+        if p != -1:
+            return false
+    return true
+
+
+def non_rest(window):
+    for p in window:
+        if p != -1:
+            return true
+    return false
+
+
+def windows(measures):
+# create sequences of WINDOW_LEN that are not all rest
+    var win = []
+    var result = []
+    for m in measures:
+        win = win + m
+        if len(win) >= WIN16THS:
+            result.append(win)
+            win = subseq(win, MEASURE_LEN)  // remove first
+    if len(result) == 0:
+        print "ERROR: windows() got only", len(measures), "measures, and did"
+        print "    not create a single window."
+        exit(1)
+    return result
+
+
+def get_notes(seq):
+# return notes as array of Note_info
+    var notes = []
+    var start
+    var prev = -1 // pitch if any starting at start
+    for p at i in seq:
+        if prev != p:
+            if prev != -1:
+                notes.append(Note_info(start, prev, i - start))
+            start = i
+            prev = p
+    if prev != -1:
+        notes.append(Note_info(start, prev, 64 - start))
+    return notes
+
+
+def transpose_window(w, interval):
+    var result = array(len(w), -1)
+    for p at i in w:
+        if p != -1:
+            result[i] = p + interval
+    return result
+
+
+def drop_window(w):
+# drop from 1 to 10 random columns:
+    w = w.copy()
+    var n = irandom(10) + 1
+    var cols = [irandom(len(w)) for i = 0 to n]
+    for c in cols:
+        w.uninsert(c)
+        w.append(-1)  // make up length
+    return w
+
+
+def delete_some_window(w):
+# change from 1 to 10 columns into rests
+    w = w.copy()
+    var n = irandom(10) + 1
+    for i = 0 to n:
+        w[irandom(len(w))] = -1
+    return w
+
+
+def replace_some_window(w):
+# replace from 1 to 10 columns with random selection from another column
+    w = w.copy()
+    var n = irandom(10) + 1
+    var cols = [irandom(len(w)) for i = 0 to n]
+    for i = 0 to n:
+        w[irandom(len(w))] = w[irandom(len(w))]
+    return w
+
+
+def aug_update(result, w):
+    if non_rest(w):
+        result.append(w)
+
+
+def augment_one(result, w):
+# do augmentation for one window, appending to result
+    for i = -3 to 4:
+        aug_update(result, transpose_window(w, i))
+        aug_update(result, drop_window(w))
+        aug_update(result, delete_some_window(w))
+        aug_update(result, replace_some_window(w))
+
+
+def augment(windows):
+# augment list of windows, returning bigger list
+    var result = []
+    for w in windows:
+        augment_one(result, w)
+
+
+SPLIT_NAME = ["val", "test", "train"]
+
+def get_features(measures):
+# measures is just an array of measures, with full-rest measure
+# sequences reduced to single measures of rests
+# We want to create separate groups of features in ratios
+# 0.2, 0.2, 0.6, so we split off 0.2 and 0.2 and then take what's
+# left as 0.6. Since we have measures, and we removed most rests,
+# we can split the data at any point.
+    var n = len(measures) // n is number of measures
+    var measures_per_small_group = idiv(n, 5)
+    var features = []
+    var start = 0  // first phrase in group
+    var end = 0    // one past last phrase in group
+    for i = 0 to 3:  // split off 2 groups of windows
+        end = start + measures_per_small_group
+        if i == 2:  // last case, training, is everything
+            end = n
+        var group = trim_rests(subseq(measures, start, end))
+        while len(group) < WINDOW_LEN:
+            group.append(array(MEASURE_LEN, -1))
+        if len(group) > 0:
+            if CDBG: display "get_features group", start, end, len(group)
+            get_some_features(features, SPLIT_NAME[i], group)
+        start = end
+    return features
+
+
+def get_some_features(features, split, measures)
+# average weighted pitch
+# stdev of weighted pitch
+# average interval magnitude
+# stdev of interval magnitude
+# proportion of small downward windows of length 8
+# proportion of small upward windows of length 8
+# proportion of large downward windows of length 8
+# proportion of large upward windows of length 8
+# average ioi
+# stdev ioi
+# density
+# duty
+    var windows = windows(measures)
+    var windows = augment(windows)
+    for w in windows:
+        assert(non_rest(w))
+        get_one_window_features(features, split, w)
+    return features
+
+
+def get_one_window_features(features, split, w)
+# compute features for w and append to features
+    var ps = Statistics()
+    // these count pitch-to-pitch interval counts at delay 8
+    var sdc = 0  // small downward count (3 or less)
+    var suc = 0  // small downward count (3 or less)
+    var ldc = 0  // large downward count (4 or more)
+    var luc = 0  // large downward count (4 or more)
+
+    for p at i in w:
+        if p != -1:
+            ps.point(p)
+        if i >= 8 and w[i - 8] != -1 and p != -1:
+            var interval = p - w[i - 8]
+            if abs(interval) < 4:  // small
+                if interval > 0:
+                    suc = suc + 1
+                elif interval < 0:
+                    sdc = sdc + 1
+            else:
+                if interval > 0:
+                    luc = luc + 1
+                else:
+                    ldc = ldc + 1
+    var iois = Statistics()
+    var ims = Statistics()
+    var notes = get_notes(w)
+    var prev_start = nil
+    var prev_pitch = nil
+    for n at i in notes:
+        if prev_start:
+            iois.point(n.time - prev_start)
+        if prev_pitch:
+            ims.point(abs(n.pitch - prev_pitch))  // interval mag
+        prev_pitch = n.pitch
+
+    var wpit_avg = ps.get_mean()
+    assert(wpit_avg)  // because there's always at least one noteq
+    var wpit_std = ps.get_stddev() or 0
+    var dens = len(notes) / WIN16THS
+    var duty = ps.count / WIN16THS
+    var intmag_avg = ims.get_mean() or 0
+    var intmag_std = ims.get_stddev() or 0
+    // display "features", intmag_avg, intmag_std, ims.count
+    var ioi_avg = iois.get_mean() or WIN16THS
+    var ioi_std = iois.get_stddev() or 0
+    var all = max(suc + sdc + luc + ldc, 1)  // avoid div-by-zero
+    var sui_pro = suc / all
+    var sdi_pro = sdc / all
+    var lui_pro = luc / all
+    var ldi_pro = ldc / all
+    features.append({'split': split,
+                     'wpit_avg': wpit_avg, 'wpit_std': wpit_std,
+                     'dens': dens, 'duty': duty,
+                     'intmag_avg': intmag_avg, 'intmag_std': intmag_std,
+                     'ioi_avg': ioi_avg, 'ioi_std': ioi_std,
+                     'sui_pro': sui_pro, 'sdi_pro': sdi_pro,
+                     'lui_pro': lui_pro, 'ldi_pro': ldi_pro})
+    return features
+
+
+def remove_runs_of_rests(measures):
+# replace runs of full-measure rests with one measure of rest
+    m_describe("before remove_runs_of_rests", measures)
+    result = []
+    # trim initial rest measures
+    m_index = 0
+    while m_index < len(measures) and all_rest(measures[m_index]):
+        m_index = m_index + 1
+
+    # look for runs
+    while m_index < len(measures):
+        if non_rest(measures):
+            result.append(measures[m_index])
+            m_index = m_index + 1
+        else:  # append only 1 rest measure
+            result.append(measures[m_index])
+            m_index = m_index + 1
+            while m_index < len(measures) and all_rest(measures[m_index]):
+                m_index = m_index + 1
+    m_describe("after remove_runs_of_rests", result)
+    return result
+
+
+def m_describe(msg, measures):
+    if not CDBG:
+        return
+    print msg,
+    for m in measures:
+        if all_rest(m): print "0";
+        else: print "1";
+    print
+
+def trim_rests(measures):
+# remove phrases that are all rests from first and last phrases
+    var start = 0
+    var end = len(measures)
+    m_describe("before trim_rests", measures)
+    while not non_rest(measures[start]):
+        start = start + 1
+        if start == end:
+            return []
+    while not non_rest(measures[end - 1]):
+        end = end - 1
+    if CDBG: display "trim_rests", start, end, len(measures)
+    return subseq(measures, start, end)
+
+
+def process_file(inpname, outpname):
+    outpname = outpname + ".csv"
+    print "process_file", inpname, "to", outpname
+    var phrase_data = phrase_reader(inpname)
+    measures = []
+    for phrase in phrase_data:
+        for i = 0 to len(phrase) by 16
+            measures.append(subseq(phrase, i, i + 16))
+    measures = trim_rests(remove_runs_of_rests(measures))
+    var features = get_features(measures)
+    writecsv(features, outpname,
+             ['split',
+              'wpit_avg', 'wpit_std', 'dens', 'duty',
+              'intmag_avg', 'intmag_std', 'ioi_avg', 'ioi_std',
+              'sui_pro', 'sdi_pro', 'lui_pro', 'ldi_pro'])
+    print "    wrote", len(features), "rows"
+    
+
+FEATURES = ['wpit_avg', 'wpit_std', 'dens', 'duty',
+            'intmag_avg', 'intmag_std', 'ioi_avg', 'ioi_std',
+            'sui_pro', 'sdi_pro', 'lui_pro', 'ldi_pro']
+
+def check_features(filename):
+    var inf = open(filename, "r")
+    var window = read_value(inf)
+    while window:
+        var features = read_value(inf)
+        // now see if windows has features:
+        var features_list = []
+        get_one_window_features(features_list, "split", window)
+        // now features_list has one dictionary
+        var f = features_list[0]
+        var our_features = [f[h] for h in FEATURES]
+        for f at i in features:
+            if not within(f, our_features[i], 0.001):
+                print "ERROR: features differ"
+                print "WINDOW", window
+                print "PYTHON FEATURES", features
+                print "SERPENT FEATURES", our_features
+                display "DIFFER AT", i, features[i], our_features[i]
+                exit()
+        window = read_value(inf)
+    print("ALL FEATURES MATCH WITHIN 0.001")
+
+
+def main()
+    segment_id = 0
+    process_file("transcriptions003.dat", "descend")
+    process_file("transcriptions004.dat", "fast")
+    process_file("transcriptions005.dat", "slow")
+
+    // for debugging, read all original windows and
+    // produce features for comparison to Python
+
+    check_features("../../../algocomp/rbd25/classifier/windows.dat")
+    
+
+
+main()
+exit(0)

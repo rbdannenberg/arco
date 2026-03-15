@@ -123,6 +123,11 @@ def make_makefile(arco_path, manifest, outf):
                     continue  # multx is handled by math, already in list
                 else:
                     basename = "mathugen"
+            elif basename[-1 : ] == 'b':
+                # serpent file is named for a-rate ugen (without 'b') in most
+                # cases.
+                if basename[0 : -1] in NONFAUST:  # both a- and b-rate exist
+                    basename = basename[0 : -1]
             source = srp_path + basename + ".srp"
             append_to_srp_srcs(ugen, source, True)
         else:
@@ -216,6 +221,16 @@ def make_inclfile(arco_path, manifest, outf):
                             # (for o2audioio)
     need_wavetables = False  # need to compile and link with wavetables.{cpp,h}
     
+    # "standard" for Serpent GUI are vu, probe, and filerec:
+    if "filerec" not in manifest:
+        print('WARNING: "filerec" is not in dspmanifest.txt but it is needed')
+        print('    for input and output recording offered in the Arco')
+        print('    Monitor window.')
+    if "probe" not in manifest or "vu" not in manifest:
+        print('WARNING: "probe" and "vu" are not in dspmanifest.txt but are')
+        print('    needed for meters in the Arco Monitor window.')
+
+
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest
     #

@@ -132,6 +132,7 @@ class Param_descr:
             conditioner = Conditioner(op, low, high, name_)
         cur_val = condition(value_)
         cutoff = smooth
+        display "Param_descr.init", instr_stack, instr_stack.last()
         var context = instr_stack.last().y
         if context.get(name):
             print "ERROR: param() called twice with the same name", repr(name)

@@ -207,9 +207,10 @@ ugens_created = 0
 
 def create_ugen_id():
     var uid = arco_ugen_new()
+    display "create_ugen_id", uid
     // Debug: track who makes an Ugen:
-    // if arco_ugen_id(uid) == 13:
-    //     breakpoint()
+    // if arco_ugen_id(uid) == 54:
+    //      breakpoint()
     if arco_ugen_id(uid) > max_ugen_id_used:
         max_ugen_id_used = arco_ugen_id(uid)
     ugens_created = ugens_created + 1
@@ -426,6 +427,7 @@ def arco_quit(rest ignore):
     o2_send_cmd("/arco/quit", 0)
     poll_for_no_arco()
 
+dbg_exit_function = 'arco_quit'  // shut down arco if debugger exits program
 
 def poll_for_no_arco()
     print "poll for no arco"
@@ -440,11 +442,6 @@ def poll_for_no_arco()
 IS_WXSERPENT = symbol_value('WXS_DEFAULT_WINDOW') == 0  // is this wxserpent?
 
 audio_devices = []
-
-if IS_WXSERPENT:
-    display "####### arco.srp GETTING File MENU FROM", default_window
-    audio_devices_menu = default_window.get_menu("File")
-    require "audiodev"
 
 arco_open_msg = ""
 if get_os() == 'linux':
@@ -533,6 +530,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     prefs = Prefs(appname)
     // display "arco_init setting default window prefs", default_window, prefs
     default_window.set_prefs(prefs)
+    // arco_master_gain is the output gain in dB; also applies to logged output
     arco_master_gain = prefs.get('master_slider', -12.0)
 
     if not set_arco_state('discovery'):
@@ -574,6 +572,7 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     o2_method_new("/actl/stopped", "i", 'actl_stopped', t)
     o2_method_new("/actl/reset", "i", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
+    o2_method_new("/actl/free", "i", 'actl_free', t)
     sched_select(rtsched)
     sched_cause(0.1, nil, 'poll_for_arco')
     if IS_WXSERPENT:
@@ -688,13 +687,20 @@ def arco_poll_to_free_ugens(id):
         // that the Serpent garbage collector has collected
         sched_cause(0.1, nil, 'arco_poll_to_free_ugens',
                     arco_poll_to_free_ugens_id)
-    return
+    // return
     // debugging information tells when GC happens (disabled)
     if last_gc_cycles != gc_cycles():
         print "******************************************",
         print "Completed", gc_cycles() - last_gc_cycles, 
         print "more GC cycles. Cycle count", gc_cycles()
+        arco_ugen_gc_info()
         last_gc_cycles = gc_cycles()
+
+
+def actl_free(timestamp, address, types, id):
+# called when "/actl/free" received signaling the freeing of a
+# unit generator and its Arco id.
+    arco_ugen_is_free(id)
 
 
 def actl_reset(timestamp, address, types, status):
@@ -862,7 +868,7 @@ class Ugen:
         o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
         if not omit_chans: // some Ugens, (Probe), do not have chans parameter
             o2_add_int32(chans)
-        // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
+        print "sent", "/arco/" + tolower(classname) + "/new, id", id,
 
         // send the "new" message with parameters to create the Ugen:
         for i = 0 to len(inputs_) by 3:
@@ -870,11 +876,12 @@ class Ugen:
             if types_[idiv(i, 3)] == "U":  // it's a Ugen
                 o2_add_int32(arco_ugen_id(inp.id))
                 inputs[inputs_[i]] = inp  // build dictionary of inputs
+                print inputs_[i], inp.id,
             else:  // add a normal value, use code from o2msgutil.srp:
                 funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 3)]], inp)
-            // print inputs_[i], inp.id,
+                print inputs_[i], inp
         o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
-        // print
+        print
 
 
     def to_str():
@@ -966,7 +973,6 @@ class Ugen:
                 print     "of type", type(input)
             else:
                 print "ERROR:", input, "not found in", classname
-            breakpoint()
             return
         if isnumber(value):
             if previous.rate == C_RATE:
@@ -975,7 +981,6 @@ class Ugen:
                     print "ERROR: const", input, "of", classname, "has",
                     print previous.chans, "channels but attempt to set channel",
                     print chan
-                    breakpoint()
                     return
                 o2_send_cmd("/arco/" + tolower(classname) +
                             "/set_" + str(input), 0, "Uif", id, chan, value)
@@ -1007,6 +1012,12 @@ class Ugen:
 
 
 require "instr"
+
+// AFTER Ugen and Instrument:
+if IS_WXSERPENT:
+    display "####### arco.srp GETTING File MENU FROM", default_window
+    audio_devices_menu = default_window.get_menu("File")
+    require "audiodev"
 
 
 def zero(): zero_ugen

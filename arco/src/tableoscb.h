@@ -38,7 +38,8 @@ public:
     }
 
     ~Tableoscb() {
-        freq->unref();
+        freq->unref(&freq);
+        amp->unref(&amp);
     }
 
     const char *classname() { return Tableoscb_name; }
@@ -58,7 +59,7 @@ public:
     }
 
     void repl_freq(Ugen_ptr ugen) {
-        freq->unref();
+        freq->unref(&freq);
         init_freq(ugen);
         update_run_channel();
     }
@@ -70,7 +71,7 @@ public:
     void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, &freq_stride); }
 
     void repl_amp(Ugen_ptr ugen) {
-        amp->unref();
+        amp->unref(&amp);
         init_amp(ugen);
         update_run_channel();
     }

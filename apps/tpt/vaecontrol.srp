@@ -1,0 +1,34 @@
+# vaecontrol - sliders to perturb latent space
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+vae_sliders = array(16)
+
+def vaecontrol_init(win, x, y):
+# create sliders and handler for vae control
+    wxs_x = x
+    wxs_y = y
+    wxs_h = -wxs_space
+    var label_w = 30
+    for i = 0 to 16:
+        var s = Labeled_slider(win, str(i), 'S', 'D', 200, 20, label_w,
+                               -1, 1, 0, 'linear')
+        s.add_callback('vae_handler', 'objx')
+        vae_sliders[i] = s
+    Button(win, "clear", 'S', 'D', 60, 'H', 'clearbutton')
+    clearbutton.add_callback('clearbutton_handler', 'x')
+
+
+def vae_handler(slider, x):
+    o2_send_start()
+    for s at i in vae_sliders:
+        o2_add_float(s.value())
+    o2_send_finish(0.0, "/vae/perturb", true)
+
+def clearbutton_handler(x):
+    for s in vae_sliders:
+        s.set_value(0)
+    vae_sliders[0].set_and_act(0)
+
+    

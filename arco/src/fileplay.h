@@ -101,6 +101,15 @@ public:
     const char *classname() { return Fileplay_name; }
 
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        return false;  // Fileplay has no Ugen children
+    }
+#endif
+
+
     void print_details(int indent) {
         arco_print("started %s stopped %s action %d",
                    btos(started), btos(stopped), action_id);

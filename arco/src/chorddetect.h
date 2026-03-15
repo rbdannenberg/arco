@@ -34,7 +34,7 @@ public:
     }
 
     ~Chorddetect() {
-        input->unref();
+        input->unref(&input);
         if (cd_reply_addr) {
             O2_FREE(cd_reply_addr);
         }
@@ -45,6 +45,16 @@ public:
     const char *classname() {
         return Chorddetect_name;
     }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
 
     const char* ChordQualityToString(int quality);
     
@@ -62,7 +72,7 @@ public:
 
     
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         if (ugen->chans > 1) {
             printf("WARNING: Chorddetect input has more than one channel, only "
                    "the first channel is used for chord detection.\n");

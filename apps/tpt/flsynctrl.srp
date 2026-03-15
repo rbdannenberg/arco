@@ -1,0 +1,59 @@
+# flsynctrl.srp -- interface to fluidsynth in arco
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+# protection against multiple note-on and note-offs (unisons)
+
+LEAD_CHAN = 0
+DRUM_CHAN = 9
+CHORD_CHAN = 10
+LEAD2_CHAN = 11
+
+flsyn_note_counts = [array(128, 0) for i = 0 to 16]  // 128 pitches, 16 channels
+all_note_count = 0
+tacet_since = 1000000  // wait for something to happen
+solo_timeout = 0  // suppress output if solo_timeout > sched_rtime
+
+def play_drum(drum, vel):
+    flsyn_note_on(9, drum, max(1, vel + drumvol_offset))
+    sched_cause(0.2, nil, 'flsyn_note_on', 9, drum, 0)
+
+
+def flsyn_vol(ch, vol):
+# change the volume control
+    var fl_ugen = flchdsyn_ugen if ch == CHORD_CHAN else flsyn_ugen
+    fl_ugen.control_change(ch, 7, vol)
+
+
+def flsyn_note_on(ch, pitch, vel):
+    var pcounts = flsyn_note_counts[ch]
+    var count = pcounts[pitch]
+    var fl_ugen = flchdsyn_ugen if ch == CHORD_CHAN else flsyn_ugen
+    // display "### flsyn_note_on", ch, pitch, vel, count
+    if vel > 0:
+        if count == 0:
+            // respect solo boxes:
+            var mute = (ch == LEAD_CHAN and not leadsolocheckbox.value()) or
+                       (ch == LEAD2_CHAN and not lead2solocheckbox.value()) or
+                       (ch == CHORD_CHAN and not chordsolocheckbox.value()) or
+                       (ch == DRUM_CHAN and not drumsolocheckbox.value())
+            if not mute and solo_timeout < sched_rtime:
+                fl_ugen.noteon(ch, pitch, vel)
+        pcounts[pitch] = count + 1
+        all_note_count = all_note_count + 1
+        tacet_since = sched_rtime + 1000000  // not tacet
+    else:
+        if count == 1:
+            fl_ugen.noteoff(ch, pitch)
+        pcounts[pitch] = count - 1
+        all_note_count = all_note_count - 1
+        if all_note_count == 0:
+            tacet_since = sched_rtime
+            // display "TACET BEGINS", tacet_since
+    assert(count >= 0)
+
+
+def flsyn_program_change(ch, program):
+    var fl_ugen = flchdsyn_ugen if ch == CHORD_CHAN else flsyn_ugen
+    fl_ugen.program_change(ch, program)

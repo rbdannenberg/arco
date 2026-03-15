@@ -51,6 +51,14 @@ public:
     
     const char *classname() { return Pwe_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        return false;  // Pwe has no Ugen children
+    }
+#endif
+
     void real_run() {
         int togo = BL;  // how many samples left to compute before returning
         do {

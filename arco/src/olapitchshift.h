@@ -121,13 +121,23 @@ class Ola_pitch_shift: public Ugen {
     }
 
     ~Ola_pitch_shift() {
-        input->unref();
+        input->unref(&input);
         for (int i = 0; i < chans; i++) {
             states[i].delaybuf.finish();
         }
     }
 
     const char *classname() { return Ola_pitch_shift_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
 
     
     void print_details(int indent) {
@@ -163,7 +173,7 @@ class Ola_pitch_shift: public Ugen {
         
     
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 

@@ -324,6 +324,7 @@ static int actual_out_id = -1;
 
 static int aud_zero_fill_count = 0;
 static PaStream *audio_stream;
+static bool audio_stream_open = false;  // used to insure proper protocols
 
 static Vec<Ugen_ptr> run_set;  // UG ID's to refresh every block
 static Vec<Ugen_ptr> output_set;  // list of UG ID's to sum to form output
@@ -401,7 +402,8 @@ static bool forget_ugen(Ugen_ptr ugen, Vec<Ugen_ptr> &set)
             for (int j = 0; j < set.size(); j++) printf(" %d", set[j]->id);
             */
             set.remove(i);
-            ugen->unref();
+            ugen->unref(&ugen);  // &ugen is just parameter, but it was
+                                 // already removed by set.remove(i)
             /*
             printf("    after remove, size %d contains", set.size());
             for (int j = 0; j < set.size(); j++) printf(" %d", set[j]->id);
@@ -532,11 +534,10 @@ void arco_free_all_ugens()
     output_set.clear();
     run_set.clear();
     for (int i = 0; i < ugen_table.size(); i++) {
-        Ugen_ptr ugen = ugen_table[i];
+        Ugen_ptr &ugen = ugen_table[i];
         if (ugen) {
             ugen->flags &= ~IN_RUN_SET;
-            ugen_table[i] = NULL;
-            ugen->unref();
+            ugen->unref(&ugen);
         }
     }
 }
@@ -1205,6 +1206,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
     err = Pa_OpenStream(&audio_stream, input_params_ptr, output_params_ptr,
                         AR, actual_buffer_size, paClipOff | paDitherOff, 
                         pa_callback, NULL);
+    audio_stream_open = true;
   done:
     if (err != paNoError) {    // failure is indicated by both 
         actual_in_chans = 0;   // actual_in_chans == 0 and 
@@ -1225,10 +1227,11 @@ static void arco_open(O2SM_HANDLER_ARGS)
     if (err == paNoError &&
         (err = Pa_StartStream(audio_stream)) != paNoError) {
         Pa_CloseStream(&audio_stream);  // ignore any close error
+        audio_stream_open = false;
     } else {
         arco_print("    arco_open: audio open completed successfully\n");
     }
-    char *indent = "        ";
+    const char *indent = "        ";
     arco_print("%sRequested input chans: %d\n", indent, req_in_chans(in_chans));
     arco_print("%sRequested output chans: %d\n", indent,
                req_out_chans(out_chans));
@@ -1236,7 +1239,10 @@ static void arco_open(O2SM_HANDLER_ARGS)
     arco_print("%sActual device output chans: %d\n", indent, actual_out_chans);
     arco_print("%sInput device: %d\n", indent, actual_in_id);
     arco_print("%sOutput device: %d\n", indent, actual_out_id);
-    const PaStreamInfo *stream_info = Pa_GetStreamInfo(audio_stream);
+    const PaStreamInfo *stream_info = NULL;
+    if (audio_stream_open) {
+        stream_info = Pa_GetStreamInfo(audio_stream);
+    }
     if (stream_info) {
         arco_print("%sReported input latency: %g\n", indent,
                    stream_info->inputLatency);
@@ -1275,7 +1281,7 @@ static void arco_close(O2SM_HANDLER_ARGS)
 void arco_cpu(O2SM_HANDLER_ARGS)
 {
     float load = 0;
-    if (audio_stream) {
+    if (audio_stream_open) {
         load = Pa_GetStreamCpuLoad(audio_stream);
     }
     o2sm_send_start();
@@ -1327,6 +1333,14 @@ void arco_thread_poll()
         return;
     }
     if (aud_state == AUDIO_STOPPED) {
+        if (audio_stream_open) {
+            audio_stream_open = true;
+            PaError err = Pa_CloseStream(&audio_stream);
+            if (err < 0) {  // print a PortAudio error
+                arco_error("Audio open error: %d, %s\n",
+                           err, Pa_GetErrorText(err));
+            }
+        }
         aud_state = IDLE;
         o2sm_send_start();
         // 1 == successful transition from RUNNING to AUDIO_STOPPED:

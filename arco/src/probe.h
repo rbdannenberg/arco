@@ -135,12 +135,23 @@ class Probe : public Ugen {
 
     ~Probe() {
         printf("~Probe destructor called, id %d; does nothing.\n", id);
+        input->unref(&input);
     }
 
     const char *classname() { return Probe_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
+
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 

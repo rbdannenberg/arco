@@ -139,20 +139,16 @@ def arco_ready():
     Checkbox(win, "Granstream Test", 'S', 'D', 'S', 'S', 'gscheckbox')
     gscheckbox.add_callback('gstest', 'x')
 
-    Checkbox(win, "Gran. with Feedback", 'S', 'D', 'S', 'S',
-             'gsfbcheckbox')
+    Checkbox(win, "Gran. with Feedback", 'S', 'D', 'S', 'S', 'gsfbcheckbox')
     gsfbcheckbox.add_callback('gsfbtest', 'x')
 
-    Checkbox(win, "Reverb", 'S', 'D', 'S', 'S',
-             'rvbcheckbox')
+    Checkbox(win, "Reverb", 'S', 'D', 'S', 'S', 'rvbcheckbox')
     rvbcheckbox.add_callback('rvbtest', 'x')
 
-    Checkbox(win, "PWE Update", 'S', 'D', 'S', 'S',
-             'pweucheckbox')
+    Checkbox(win, "PWE Update", 'S', 'D', 'S', 'S', 'pweucheckbox')
     pweucheckbox.add_callback('pweutest', 'x')
 
-    Checkbox(win, "PWL Update", 'S', 'D', 'S', 'S',
-             'pwlucheckbox')
+    Checkbox(win, "PWL Update", 'S', 'D', 'S', 'S', 'pwlucheckbox')
     pwlucheckbox.add_callback('pwlutest', 'x')
 
 
@@ -313,8 +309,13 @@ def arco_ready():
     Checkbox(win, "Chorusrbd", 'S', 'D', WIDTH, 'S', 'choruscheckbox')
     choruscheckbox.add_callback('chorustest', 'x')
 
+    Button(win, "All Fast", 'S', 'D', 'S', 'S', 'afbutton')
+    afbutton.add_callback('allfast_test', 'x')
+
     ui_initialized = true
     default_window.fit_to_children()
+
+    initialize_control_lists()
 
 
 def atone_sequence():
@@ -620,13 +621,13 @@ def fbtest(x):
     display "fbtest - feedback", x
     if x:
         // initially "from" is zero; then we replace it with delay
-        fb1 = feedback(input_ugen, zero_ugen, 0.5)
+        fb1 = feedback(input_ugen)
         fb2 = delay(fb1, 1.0, 0.0, 2.0)
-        fb1.set('from', fb2)  // feedback from delay output
+        fb1.fb(fb2, 0.5)  // feedback from delay output
         fb2.play()
     else:
         fb2.mute()  // immediate stop
-        fb1.set('from', zero_ugen)  // break the cycle to allow GC
+        fb1.fb(zero_ugen, 0.5)  // break the cycle to allow GC
         fb1 = nil   // eventual cleanup when GC frees it
         fb2 = nil
 
@@ -812,8 +813,9 @@ def rvbsweep2()
     sched_cause(6, nil, 'rvbfinish')
 
 def rvbfinish():
-    rvb.mute()
-    rvb = nil  // allow GC
+    if rvb:
+        rvb.mute()
+        rvb = nil  // allow GC
 
 
 ########## FLSYN TEST #############
@@ -833,21 +835,27 @@ def flstest(x):
         return
     sched_select(rtsched)
     flsyn_ugen.program_change(0, 0)
-    fls_sequence(0, 50)
+    fls_sequence(0, 50, 27)
 
-def fls_sequence(program, pitch):
+def fls_sequence(program, pitch, vol):
     var delay = 0.2
+    vol = min(127, vol)
+    flsyn_ugen.control_change(0, 7, vol)
     flsyn_ugen.noteon(0, pitch, 100)
     sched_cause(1.0, flsyn_ugen, 'noteoff', 0, pitch)
     pitch = pitch + 5
     if pitch > 70:
+        if vol == 127:
+            program = program + 1
+            if program > 20:
+                return
+        else:  // after first arpeggio, repeat same program with
+               // volume turned up to 100 to see if it matters:
+            vol = vol + 25
         pitch = 50
-        program = program + 1
-        if program > 20:
-            return
-        flsyn_ugen.program_change(0, program)
-        delay = 1.0
-    sched_cause(delay, nil, 'fls_sequence', program, pitch)
+        sched_cause(1.09, flsyn_ugen, 'program_change', 0, program)
+        delay = 1.1
+    sched_cause(delay, nil, 'fls_sequence', program, pitch, vol)
 
 
 ########## PHASE VOCODER TEST #############
@@ -1529,6 +1537,51 @@ def chorustest(x):
     else:
         chorusout.mute()
         chorusout = nil
+
+######### All Fast Test #############
+
+def initialize_control_lists():
+    all_checkboxes = [stcheckbox, simtoncheckbox, finishcheckbox, mtcheckbox,
+                  atcheckbox, rocheckbox, ro2checkbox, procheckbox,
+                  proucheckbox, prodncheckbox, dlycheckbox, pscheckbox,
+                  fbcheckbox, gscheckbox, gsfbcheckbox, rvbcheckbox,
+                  pweucheckbox, pwlucheckbox, pvcheckbox, yincheckbox,
+                  trigcheckbox, fadecheckbox, addcheckbox, subcheckbox,
+                  divcheckbox, maxcheckbox, mincheckbox, clpcheckbox,
+                  powcheckbox, ltcheckbox, gtcheckbox, scpcheckbox,
+                  pwicheckbox, rndcheckbox, shcheckbox, qntcheckbox,
+                  rlicheckbox, chorddetectcheckbox, spectralcentroidcheckbox,
+                  spectralrolloffcheckbox, onsetcheckbox,
+                  zitarevcheckbox, sttestcheckbox, tableosccheckbox,
+                  supersawcheckbox, overdrivecheckbox, midiincheckbox,
+                  delayvicheckbox, choruscheckbox]
+
+    all_buttons = [psfbutton, pwecheckbox, alpcheckbox, flscheckbox,
+                   fprbutton]
+
+def allfast_test(x):
+# run everything briefly
+    display "allfast_test - runs everything quickly"
+    sched_select(rtsched)
+    do_all_buttons(0)
+
+def do_all_buttons(n):
+    if n < len(all_buttons):
+        all_buttons[n].set_and_act()
+        sched_cause(1, nil, 'do_all_buttons', n + 1)
+    else:
+        do_all_checkboxes(0, true)
+
+def do_all_checkboxes(n, on):
+    print "---- do_all_checkboxes", n, on
+    if n < len(all_checkboxes):
+        all_checkboxes[n].set_and_act(on)
+        if on:
+            sched_cause(0.6, nil, 'do_all_checkboxes', n, false)
+        else:
+            sched_cause(0.1, nil, 'do_all_checkboxes', n + 1, true)
+    else:
+        print "**** DONE WITH ALL TESTS ****"
 
 
 ########## Main Initialization ################

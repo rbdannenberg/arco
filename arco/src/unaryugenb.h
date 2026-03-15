@@ -35,17 +35,27 @@ public:
     }
 
     ~Unaryb() {
-        x1->unref();
+        x1->unref(&x1);
     }
 
     const char *classname() { return Unaryb_name; }
+
+  #if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+      // 1 input
+      if (i == 0) { *child = x1; return true; }
+      return false;
+    }
+  #endif
 
     void print_sources(int indent, bool print_flag) {
         x1->print_tree(indent, print_flag, "x1");
     }
 
     void repl_x1(Ugen_ptr ugen) {
-        x1->unref();
+        x1->unref(&x1);
         init_x1(ugen);
     }
 

@@ -1,0 +1,147 @@
+# samps.srp -- sample management
+#
+# Roger B. Dannenberg
+# March 2026
+
+dynamic_range = 33.0  // dB
+
+file_names = [array(12) for i = 0 to 12]
+file_rms =  [array(12) for i = 0 to 12]
+sample_data_loaded = false
+
+FILE_START_PITCH = 69
+
+
+def load_sample_data()
+# loads and parses data about sample files
+    load_sample_dir("set1")
+    load_sample_dir("set2")
+    sample_data_loaded = true
+    print "load_sample_data: data loaded"
+
+
+def load_sample_dir(dirname)
+# loads and parses sample data from one directory
+    var map_name = "./samples/" + dirname + "/map.txt"
+    var mapf = open(map_name, "r")
+    if not mapf:
+        error("Could not open " + map_name)
+    var line = mapf.readline()
+    while line:
+        var sp = String_parse(line)
+        var pitch = int(sp.get_integer())
+        var dyn = int(sp.get_integer())
+        var filename = "./samples/" + dirname + "/" + sp.get_nonspace()
+        file_names[pitch - FILE_START_PITCH][dyn] = filename
+        var rms = real(sp.get_real())
+        file_rms[pitch - FILE_START_PITCH][dyn] = rms
+        line = mapf.readline()
+
+
+sounding_notes = []
+
+class Sounding
+    var pitch
+    var dyn
+    var file
+    var player
+    var env
+
+    def init(p, d, f, id, e)
+        pitch = p
+        dyn = d
+        file = f
+        player = id
+        env = e
+
+    def to_str():
+        "<Sounding " + str(pitch) + " " + str(dyn) + " "  +
+        str(file) + " " + str(player) + " " + str(env) + ">"
+
+
+def print_sounding_notes():
+    print "sounding_notes:"
+    for s in sounding_notes:
+        print "    "; s
+
+
+def remove_sounding_note(pitch, dyn)
+# remove a pitch/dyn pair from sounding_notes
+    for s at i in sounding_notes:  // s is a Sounding
+        if s.pitch == pitch and s.dyn == dyn:
+            var player = s.player
+            sounding_notes.uninsert(i)
+            return s
+    print "WARNING: remove_sounding_note did not find", pitch, dyn
+    return nil
+
+
+recent_files = []
+
+def file_play_with_env(file, gain)
+# an instrument to play from a file
+# if file is one of the last 3 files played, pick a random offset
+# for the beginning and fade in to avoid reproducing attack sounds
+# exactly.
+# Returns the Arco output Ugen, returns pwe ugen in global rslt
+    var start = 0
+    if file in recent_files:
+        start = pr_unif(0.1, 0.5)
+    if len(recent_files) > 2:
+        recent_files = subseq(recent_files, -2)
+    recent_files.append(file)
+    var fply = fileplay(file, 1, start)
+    print "fileplay created for "; file;
+    // 20 msec rise time if start is not zero
+    var env
+    if start == 0:
+        env = pwe(init = gain, start = false, lin = true)
+        env.set(gain)  // just to make sure
+    else:
+        print " ***", start;
+        env = pwe(0.02, gain, start = false, lin = true)
+        env.set(0)  // just to make sure it starts at 0
+    env.decay(0.3)
+    var mul = mult(fply, env)
+    rslt = env  // 2nd return value
+    sched_cause(0.02, nil, 'file_play_start', mul, fply, env)
+    print " starting:"
+    display "    ", mul
+    display "    ", fply
+    display "    ", env
+    return mul
+
+
+def file_play_start(mul, fply, env):
+# scheduled to start after preload (we hope)
+    mul.play()
+    fply.go()
+    env.start()  // no effect if start was 0 (start at beginning)
+
+
+def samps_note_on(pitch, dyn)
+# start playing a note
+    var file = file_names[pitch][dyn]
+    var samp_rms = file_rms[pitch][dyn]
+    // dyn goes from 0 (-33dB) to 11 (0dB)
+    var db = -dynamic_range + (dynamic_range / 11) * dyn
+    // 0.2 is a fudge factor: 0.1 rms gives peaks just below 1
+    var gain = db_to_linear(db) * 0.1 / samp_rms
+    display "samps_note_on", pitch, dyn, samp_rms, gain
+    var player = file_play_with_env(file, gain)
+    sounding_notes.append(Sounding(pitch, dyn, file, player, rslt))
+    print_sounding_notes()
+
+
+def samps_note_off(pitch, dyn)
+# stop playing a note
+    display "samps_note_off", pitch, dyn
+    var sounding = remove_sounding_note(pitch, dyn)
+    if not sounding:
+        display "samps_note_off could not find player", pitch, dyn
+        return
+    sounding.env.decay(0.3)
+    sched_cause(0.31, sounding.player, 'mute')
+    display "samps_note_off", recent_files
+
+    

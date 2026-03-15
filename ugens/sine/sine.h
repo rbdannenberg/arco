@@ -118,11 +118,22 @@ public:
     }
 
     ~Sine() {
-        freq->unref();
-        amp->unref();
+        freq->unref(&freq);
+        amp->unref(&amp);
     }
 
     const char *classname() { return Sine_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = freq;
+        } else if (i == 1) { *child = amp;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -165,13 +176,13 @@ public:
     }
 
     void repl_freq(Ugen_ptr ugen) {
-        freq->unref();
+        freq->unref(&freq);
         init_freq(ugen);
         update_run_channel();
     }
 
     void repl_amp(Ugen_ptr ugen) {
-        amp->unref();
+        amp->unref(&amp);
         init_amp(ugen);
         update_run_channel();
     }
@@ -196,7 +207,7 @@ public:
             state->iVec1[0] = 1;
             float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow0 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            output0[i0] = FAUSTFLOAT(ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))] * float(input0[i0]));
+            output0[i0] = FAUSTFLOAT(float(input0[i0]) * ftbl0SineSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
         }

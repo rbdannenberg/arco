@@ -35,7 +35,7 @@ public:
     ~Vu() {
         // printf("~Vu called. id %d input->id %d\n", id, input->id);
         if (input) {
-            input->unref();
+            input->unref(&input);
         }
         if (vu_reply_addr) {
             O2_FREE(vu_reply_addr);
@@ -46,6 +46,16 @@ public:
     const char *classname() {
         return Vu_name;
     }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input, may be NULL before repl_input()
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
 
     
     void print_details(int indent) {
@@ -61,7 +71,7 @@ public:
     
     void repl_input(Ugen_ptr ugen) {
         if (input) {
-            input->unref();
+            input->unref(&input);
         }
         assert(ugen->rate == 'a');
         init_param(ugen, input, &input_stride);

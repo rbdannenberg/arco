@@ -1,0 +1,180 @@
+# autofx.srp -- algorithmic effects
+#               
+# based on the "melo" section of Separation Logic,
+# based on previous implementation in Aura
+#
+# Roger B. Dannenberg
+# Aug 2025
+#
+# Description:
+# 
+# Input is passed through a noisegate, controls are:
+#     set_noisethreshold(x)
+#     set_ingain(x) -- post-noisegate gain; affects all output
+#     set_drygain(x) -- amount of dry input passed to output, post ingain
+# Then gated input passes through pitchshift and blended with wet/dry control
+#     set_olapswet(x) -- wet/dry control for olaps input to effects below
+#     set_olapsgain(x) -- amount of olapitchshift passed to output,
+#                         post ingain & drygain
+#     set_transpose(x) -- transposition for olapitchshift in steps
+# Blended-with-pitch-shift input passes into 4 main effects:
+#     ringmod -- ring modulation, controls are:
+#         set_rmfreq(x)
+#         set_rmgain(x)
+#     delay -- long delay, controls are:
+#         set_dlygain(x)
+#     warble -- frequency vibrato, controls are:
+#         set_warbledepth(x)
+#         set_warblefreq(x)
+#         set_warblegain(x)
+#     revb -- reverb (applied to all of the above), reverb inputs are all
+#             post output faders, e.g. the ringmod signal going to the
+#             reverb is the product of set_rmgain(x) and set_revbrm(x):
+#         set_revbinput(x) -- amount of direct input in reverb
+#         set_revbolaps(x) -- amount of pitch shifted input in reverb
+#         set_revbrm(x) -- amount of ringmod in reverb
+#         set_revbdly(x) -- amount of delay in reverb
+#         set_revbwarble(x) -- amount of warble in reverb
+#         set_rt60(x) -- reverb time
+#         set_revbgain(x) -- amount of reverb in output
+# There are secondary delays applied to delay, controls are:
+#     set_dly2gain(x) -- bypass reverb, sends direct to output
+# There is a frequency vibrato on the reverb output, control are:
+#     set_warblerevb(x) -- amount of warbled reverb to final mix
+
+
+
+autofx_mgr = nil
+
+class Autofx (Instrument):
+    var noisegate_ugen
+    var input_fade
+    var drygain_fade
+    var olaps  // pitch shifter
+    var inwetdry  // blend for wet/dry with pitch shifted signal
+    var olaps_wet  // smoothb to control inwetdry mix
+    var olaps_fade // direct output gain for olaps
+
+    var ringmod_osc
+    var ringmod_fade
+
+    var delay_ugen
+    var delay_fade
+
+    var warble_depth
+    var warble_osc
+    var warble_fade
+
+    var revbinput_fade
+    var revbolasps_fade
+    var revbrm_fade
+    var revbdly_fade
+    var revbwarble_fade
+    var revb_ugen
+
+    var dly2_fade
+    var warblerevb_fade
+    var mix_ugen
+    
+
+    def init(input):
+        instr_begin()
+        noisegate_ugen = noisegate(input, 0.001, 0.001, 0.1, 0.02)
+        input_fade = fader(noisegate_ugen, 0, 0.5)  // current, dur
+        drygain_fade = fader(input_fade, 0, 0.5)
+
+        // before independent effects, a pitch shift effect
+        olaps = olapitchshift(input_fade, 1.25, 0.01, 0.05)
+        olaps_wet = smoothb(0, 0.5)
+        inwetdry = blend(input_fade, olaps, olaps_wet)
+        olaps_fade = fader(olaps, 0, 5.0)
+
+        ringmod_osc = sine(220, 1.0)
+        ringmod_fade = fader(mult(inwetdry, ringmod_osc), 0, 0.5)
+
+        delay_ugen = delay(inwetdry, 2.5, 0, 4.0)
+        delay_fade = fader(delay_ugen, 0, 0.5)
+
+        // cutoff 50hz is above warble freq and well below BR:
+        // we use audio rate smooth so we have a per-sample update to delayvi delay
+        // warble_depth = smooth(0.02, 50.0)
+            // warble_osc = sine(0.2, warble_depth)
+            // var delayvi_ugen = delayvi(inwetdry, add(warble_osc,
+            //                                add(warble_depth, 0.01), 0.41))
+            // an alternative implementation would be use smoothb, sineb,
+            // and addb, and then interpolate the block rate signal to audio
+            // rate for delayvi:
+
+        warble_depth = smoothb(0.02, 5.0)
+        warble_osc = sineb(0.2, warble_depth)
+        // delay increases so that negative-going oscillations are offset
+        // there's a 0.01s offset added for safety
+        var warble_dly = upsample(addb(warble_osc, addb(warble_depth, 0.01)))
+        var delayvi_ugen = delayvi(inwetdry, warble_dly, 0.41)
+
+        warble_fade = fader(delayvi_ugen, 0, 0.5)
+
+        revbinput_fade = fader(drygain_fade, 0, 0.5)
+        revbolaps_fade = fader(olaps_fade, 0, 0.5)
+        revbrm_fade = fader(ringmod_fade, 0, 0.5)
+        revbwarble_fade = fader(warble_fade, 0, 0.5)
+
+        revbdly_fade = fader(delay_fade, 0, 0.5)
+        dly2_fade = fader(delay_fade, 0, 0.5)  # for secondary delays
+        var delay_left = delay(dly2_fade, 0.2, 0.7, 0.11)
+        var delay_right = delay(dly2_fade, 0.23, 0.6, 0.14)
+
+        var revb_in_sum = sum(1)
+        revb_in_sum.ins(revbwarble_fade)
+        revb_in_sum.ins(revbinput_fade)
+        revb_in_sum.ins(revbrm_fade)
+        revb_in_sum.ins(revbdly_fade)
+        revb_in_sum.ins(revbolaps_fade)
+        
+        revb_ugen = zitarev(revb_in_sum, 1.0, 1.0, 2.0)
+        var warblerevb_osc = addb(sineb(16, 0.005), 0.0055)
+        var delayvi2_ugen = delayvi(revb_ugen, warblerevb_osc, 0.011)
+        warblerevb_fade = fader(delayvi2_ugen, 0, 0.5)
+
+        mix_ugen = mix(2)
+        mix_ugen.ins("dry", drygain_fade, [1.0, 1.0])  # pan to center
+        mix_ugen.ins("olaps", olaps_fade, [1.0, 1.0])
+        mix_ugen.ins("ringmod", ringmod_fade, [1.0, 1.0])  # pan to center
+        mix_ugen.ins("delay", delay_fade, [1.0, 1.0])  # pan to center
+        mix_ugen.ins("warble", warble_fade, [0.7, 0.3])  # pan to mid-left
+        mix_ugen.ins("warblerevb", warblerevb_fade, [0.3, 0.7])  # mid-right
+        mix_ugen.ins("reverb", revb_ugen, [0.2, 0.2])  # pan to center
+        mix_ugen.ins("delay_left", delay_left, [1.0, 0.1])  # pan left
+        mix_ugen.ins("delay_right", delay_right, [0.1, 1.0])  # pan right
+
+        master_fx_ugen = fader(mix_ugen, 1)
+
+        super.init("Autofx", master_fx_ugen)
+
+
+    def set_noisethreshold(x): noisegate_ugen.set('threshold', x)
+    def set_ingain(x): input_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_drygain(x): drygain_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_olapswet(x): olaps_wet.set(x)
+    def set_olapsgain(x): olaps_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_ratio(x): olaps.set_ratio(x)
+    def set_transpose(x): set_ratio(step_to_ratio(x))
+    def set_rmfreq(x): ringmod_osc.set('freq', x);
+    def set_rmgain(x): ringmod_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_dlygain(x): delay_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    // must be 0 to 0.2s:
+    def set_warbledepth(x): warble_depth.set(x)
+    def set_warblefreq(x): warble_osc.set('freq', x)
+    def set_warblegain(x): warble_fade.set_goal(x).set_mode(FADE_SMOOTH)
+
+    def set_revbinput(x): revbinput_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_revbolaps(x): revbolaps_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_revbrm(x): revbrm_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_revbdly(x): revbdly_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_revbwarble(x): revbwarble_fade.set_goal(x).set_mode(FADE_SMOOTH)
+
+    def set_dly2gain(x): dly2_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_warblerevb(x): warblerevb_fade.set_goal(x).set_mode(FADE_SMOOTH)
+    def set_revbrt60(x): revb_ugen.set('rt60', x)
+    def set_revbgain(x): mix_ugen.set_gain("reverb", x)
+    

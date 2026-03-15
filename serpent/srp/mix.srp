@@ -75,7 +75,7 @@ class Mix (Ugen):
     
 
     def rem(name, dur, mode):
-        if inputs.has_key(name) or force:
+        if inputs.has_key(name):
             if not dur:
                 dur = 0
             if not mode:
@@ -99,7 +99,7 @@ class Mix (Ugen):
             print "ERROR: Mix.set_gain() cannot find input", name
             return
         var gain_ugen = inputs[name][2]
-        display "in set_gain", inputs[name], gain_ugen, repr(gain_ugen.rate)
+        // display "in set_gain", inputs[name], gain_ugen, repr(gain_ugen.rate)
         if isinstance(gain_ugen, Ugen) and gain_ugen.rate == C_RATE:
             if chan >= gain_ugen.chans:
                 print "WARNING: In Mix.set_gain(), gain for", name, "is a", 
@@ -131,7 +131,7 @@ class Mix (Ugen):
             print "ERROR: Mix.set_in() cannot find input", name
             return
         var in_ugen = inputs[name][1]
-        display "in set_in", inputs[name], in_ugen, repr(in_ugen.rate)
+        // display "in set_in", inputs[name], in_ugen, repr(in_ugen.rate)
         if input.rate != 'a':
             print "ERROR: In Mix.set_in(), new input for", repr(name),
             print     "has non-audio-rate", repr(input.rate);

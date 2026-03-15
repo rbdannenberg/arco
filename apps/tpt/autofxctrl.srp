@@ -1,0 +1,374 @@
+# autofxctrl - controls for autofx
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+//TODO: save state number and display it
+
+# require "positioner"
+require "statemgr"
+require "prob"
+require "steps"
+
+TRANSPOSITIONS = [-24, -19, -12, -11, -10, -9, -8, -7, -5, -4, -3, -2,
+                    2,   3,   4,   5,   7, 12]
+TRANS_WEIGHTS =  [ 10,   5,  15,   8,   6,  7,  7,  4,  4,  7,  8,  4,
+                    4,   5,   5,   7,   7,  9]
+
+actual_state = nil
+
+
+class Autofx_ctrl:
+    var statemgr
+    var states
+    var states2
+    var play_id
+    var waiting
+    var stop_waiting  // set to true when waiting and gap_detected
+
+    def init(win, x, y, w, autofx):
+    # pass in the Autofx object to control
+        statemgr = Statemgr()
+        states = []
+        states2 = []
+        play_id = 0
+
+        var textw = 80
+        # l0 = 
+        Labeled_slider(win, "ngate thresh", x, y, w, 'H', textw,
+                       -120, -20, -30, 'dblinear', 'fxngate_thresh')
+        fxngate_thresh.add_target_method(autofx, 'set_noisethreshold', 'x')
+        fxngate_thresh.set_and_act(db_to_linear(-30.0))
+        statemgr.add_slider('fxngate_thresh')
+        autofx.set_noisethreshold(db_to_linear(-20))
+
+        display "Creating input gain slider", prefs, prefs.get('fxingain')
+        Labeled_slider(win, "input gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 12.0, 6, 'dblinear', 'fxingain', prefs = prefs)
+        // note: input level 0 was too low, +6 is based on how low it seemed
+        display "    ", fxingain.value()
+        fxingain.add_target_method(autofx, 'set_ingain', 'x')
+        fxingain.set_and_act(fxingain.value())
+        // NOT IN STATE MANAGER SO YOU HAVE GLOBAL EFFECTS INPUT GAIN
+
+        Labeled_slider(win, "dry gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -3, 'dblinear', 'fxdrygain')
+        fxdrygain.add_target_method(autofx, 'set_drygain', 'x')
+        fxdrygain.set_and_act(db_to_linear(-3.0))
+        statemgr.add_slider('fxdrygain')
+
+        Labeled_slider(win, "pshift wet", 'S', 'D', 'S', 'H', textw,
+                       0, 1.0, 0, 'linear', 'fxolapswet')
+        fxolapswet.add_target_method(autofx, 'set_olapswet', 'x')
+        fxolapswet.set_and_act(0.0)
+        // statemgr.add_slider('fxolapswet')
+
+        Labeled_slider(win, "pshift gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxpsgain')
+        fxpsgain.add_target_method(autofx, 'set_olapsgain', 'x')
+        fxpsgain.set_and_act(0.0)
+        // statemgr.add_slider('fxpsgain')
+
+        Labeled_slider(win, "transpose", 'S', 'D', 'S', 'H', textw,
+                       -24, 12, -3, 'integer', 'fxtranspose')
+        fxtranspose.add_target_method(autofx, 'set_transpose', 'x')
+        fxtranspose.set_and_act(step_to_ratio(-3))
+        // statemgr.add_slider('fxtranspose')
+
+        Labeled_slider(win, "ringmod freq", 'S', 'D', 'S', 'H', textw,
+                       100, 1000, 220, 'exponential', 'fxrmfreq')
+        fxrmfreq.add_target_method(autofx, 'set_rmfreq', 'x')
+        fxrmfreq.set_and_act(220)
+        statemgr.add_slider('fxrmfreq')
+
+        Labeled_slider(win, "ringmod gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxrmgain')
+        fxrmgain.add_target_method(autofx, 'set_rmgain', 'x')
+        fxrmgain.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxrmgain')
+
+        Labeled_slider(win, "dly gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxdlygain')
+        fxdlygain.add_target_method(autofx, 'set_dlygain', 'x')
+        fxdlygain.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxdlygain')
+
+        Labeled_slider(win, "warble depth", 'S', 'D', 'S', 'H', textw,
+                       0.0001, 0.2, 0.02, 'exponential', 'fxwarbledepth')
+        fxwarbledepth.add_target_method(autofx, 'set_warbledepth', 'x')
+        fxwarbledepth.set_and_act(0.02)
+        statemgr.add_slider('fxwarbledepth')
+
+        Labeled_slider(win, "warble freq", 'S', 'D', 'S', 'H', textw,
+                       0.1, 20, 1.0, 'exponential', 'fxwarblefreq')
+        fxwarblefreq.add_target_method(autofx, 'set_warblefreq', 'x')
+        fxwarblefreq.set_and_act(1.0)
+        statemgr.add_slider('fxwarblefreq')
+
+        Labeled_slider(win, "warble gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxwarblegain')
+        fxwarblegain.add_target_method(autofx, 'set_warblegain', 'x')
+        fxwarblegain.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxwarblegain')
+
+        Labeled_slider(win, "input revb", 'S', 'D', 'S', 'H', textw,
+                       -60, 12, -120, 'dblinear', 'fxrevbinput')
+        fxrevbinput.add_target_method(autofx, 'set_revbinput', 'x')
+        fxrevbinput.set_and_act(db_to_linear(-10.0))
+        statemgr.add_slider('fxrevbinput')
+
+        Labeled_slider(win, "pshift revb", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxrevbolaps')
+        fxrevbolaps.add_target_method(autofx, 'set_revbolaps', 'x')
+        fxrevbolaps.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxrevbolaps')
+
+        Labeled_slider(win, "ringmod revb", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxrevbrm')
+        fxrevbrm.add_target_method(autofx, 'set_revbrm', 'x')
+        fxrevbrm.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxrevbrm')
+
+        Labeled_slider(win, "dly revb", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxrevbdly')
+        fxrevbdly.add_target_method(autofx, 'set_revbdly', 'x')
+        fxrevbdly.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxrevbdly')
+
+        Labeled_slider(win, "warble revb", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxrevbwarble')
+        fxrevbwarble.add_target_method(autofx, 'set_revbwarble', 'x')
+        fxrevbwarble.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxrevbwarble')
+
+        Labeled_slider(win, "rt60", 'S', 'D', 'S', 'H', textw,
+                       1, 10, 2, 'linear', 'fxrevbrt60')
+        fxrevbrt60.add_target_method(autofx, 'set_revbrt60', 'x')
+        fxrevbrt60.set_and_act(2.0)
+        statemgr.add_slider('fxrevbrt60')
+
+        Labeled_slider(win, "revb gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 12.0, -120, 'dblinear', 'fxrevbgain')
+        fxrevbgain.add_target_method(autofx, 'set_revbgain', 'x')
+        fxrevbgain.set_and_act(0.2)  // initial value in autofx.srp
+        statemgr.add_slider('fxrevbgain')
+
+        Labeled_slider(win, "dly2 gain", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxdly2gain')
+        fxdly2gain.add_target_method(autofx, 'set_dly2gain', 'x')
+        fxdly2gain.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxdly2gain')
+
+        Labeled_slider(win, "warble2", 'S', 'D', 'S', 'H', textw,
+                       -60, 0.0, -120, 'dblinear', 'fxwarblerevb')
+        fxwarblerevb.add_target_method(autofx, 'set_warblerevb', 'x')
+        fxwarblerevb.set_and_act(db_to_linear(-120))
+        statemgr.add_slider('fxwarblerevb')
+
+        Labeled_slider(win, "dur", 'S', 'D', 'S', 'H', textw,
+                       5, 15, 10, 'linear', 'fxdur')
+        statemgr.add_slider('fxdur')
+
+        Button(win, "Save", 'S', 'D', 60, 'H', 'fxsavebutton')
+        fxsavebutton.add_target_method(this, 'fxsave_handler', 'x')
+
+        Button(win, "Restore", 'R', 'S', 60, 'H', 'fxrestorebutton')
+        fxrestorebutton.add_target_method(this, 'fxrestore_handler', 'x')
+
+        Spinctrl(win, 1, 100, 1, 'R', 'S', 40, 30, 'fxsavespin')
+
+
+        wxs_x = wxs_x + 15  // horizontal space
+        Button(win, "Load All", 'R', 'S', 70, 'H', 'fxloadstates')
+        fxloadstates.add_target_method(this, 'load_states', 'x')
+
+        wxs_x = wxs_x + 5  // horizontal space
+        Checkbox(win, "Run Auto", 'R', 'S', 80, 'H', 'fxrunautocb')
+        fxrunautocb.add_target_method(this, 'run_auto', 'x')
+
+        load_states(true)
+        fxrunautocb.set_and_act(true)
+
+        # Positioner(win).add(l0)
+
+
+    def fxsave_handler(x):
+        var state = statemgr.get_state()
+        var base = "state" + str(fxsavespin.value())
+        var file_path = "states/" + base + ".dict"
+        if dict_write_file(file_path, state, base):
+            print "Wrote", base, "to", file_path
+        fxsavespin.set_value(fxsavespin.value() + 1)
+
+
+    def fxrestore_handler(x):
+        var base = "state" + str(fxsavespin.value())
+        var file_path = "states/" + base + ".dict"
+        var state = dict_read_file(file_path, base)
+        if not state:
+            print "Could not read", file_path
+            return
+        print "Read", base, "from", file_path
+        print state
+        statemgr.set_state(state)
+
+    def load_states(x):
+        var files = listdir("states")
+        states = []
+        for file in files:
+            if find(file, "state") == 0 and find(file, ".dict") > 0:
+                var d = dict_read_file("states/" + file)
+                var n = int(subseq(file, 5))
+                display "load_state got state", n
+                d['_STATENO_'] = n
+                states.append(d)
+        print "load_states() read", len(states), "states"
+
+
+    def auto(id):
+    # change state a soon as a gap occurs
+        // display "auto called", id, play_id, id != play_id, len(states)
+        if id != play_id:
+            return
+        if len(states) < 1:
+            print "Cannot run autofx because no states are loaded"
+            return
+        if not first_phrase_time or sched_rtime < first_phrase_time + 30:
+            if actual_state != states[0]:
+                actual_state = states[0]
+                statemgr.set_state(actual_state)
+            var delay = absolute(first_phrase_time + 30) if
+                            first_phrase_time else 1
+            sched_cause(delay, this, 'auto', id)
+            return
+        if not note_transcriber.gap_reported:  // not in a gap now
+            if not waiting:
+                display "autofxctrl waiting for gap", sched_rtime
+                waiting = sched_rtime
+                // poll every 0.3 sec:
+                sched_cause(0.3, this, 'auto', id)
+                return
+            // wait until gap or up to 20 sec
+            if not stop_waiting and waiting + 20 > sched_rtime:
+                sched_cause(0.3, this, 'auto', id)
+                return
+
+        print "auto ended wait at", sched_rtime
+        // actual_state is a global containing actual current settings
+        // which may differ from stored presets in states
+        actual_state = pr_choice(states2, states).copy()
+        fxsavespin.set_value(actual_state.get('_STATENO_', 99))
+        var delay = pr_unif(5, max(fxdur.val, 5))
+        display "auto change state to", actual_state, delay
+        labellog_label("autofx state" + str(actual_state['_STATENO_']))
+        // tweak the settings
+//         var solo = false
+//        display "TEST FOR SOLO", sched_rtime, solo_timeout, tacet_since, style
+//        if solo_timeout < sched_rtime:  // switch to solo mode possible
+//            solo = style != 'fast' and sched_rtime > tacet_since + 1
+//            if solo:
+//                solo_timeout = sched_rtime + pr_unif(10, 30)
+//                labellog_label("solo")
+//        if style == 'descend' or solo or lay_out or solo_timeout > sched_rtime:
+        if style == 'descend' and not lay_out:  # lay_out does its own reverb
+//            if solo or lay_out:
+//                display "DESCEND REVERB", lay_out, style
+            actual_state['fxrevbrt60'] = descend_rt60
+            actual_state['fxdlygain'] = 0.2
+            // not even sliders for these:
+            effects.delay_ugen.set('dur', 0.2)
+            effects.delay_ugen.set('fb', 0.4)
+        elif lay_out:
+            actual_state['fxrevbrt60'] = 12
+            actual_state['fxdlygain'] = 0.3
+            var delay_dur = pr_unif(0.18, 0.3)
+            var delay_fb = 0.8 - delay_dur // from 0.62 to 0.5
+            effects.delay_ugen.set('dur', delay_dur)
+            effects.delay_ugen.set('fb', delay_fb)
+            display "lay_out autofxctrl", delay_dur, delay_fb
+        else:  // may need to restore dely_ugen
+            effects.delay_ugen.set('dur', 2.5)
+            effects.delay_ugen.set('fb', 0)
+            
+        statemgr.set_state(actual_state)
+        # next state change will wait for delay, then wait for a gap
+        stop_waiting = false
+        waiting = false  // not yet waiting for a gap and new state
+        sched_cause(delay, this, 'auto', id)
+
+
+    def olaps_auto(id):
+    # automation for pitch shift - independent of state-based transitions
+    # when pitch shifting is happening, run next change in 4 to 6 sec
+    # when pitch shifting is not happening run next change in 5 to 10 sec
+    # do pitch shifting about 30% of the time
+    # pick a tranposition
+    # pick wet from 30 to 70
+    # pick a direct gain from 0 to 1
+        if id != play_id:
+            return
+        if pr_coin(0.3):  // pitch shift
+            var trans = TRANSPOSITIONS[pr_weighted_choice(TRANS_WEIGHTS)]
+            var wet = pr_unif(0.3, 0.7)
+            var direct = pr_unif(0.25)  // always more than 12dB down
+            fxtranspose.set_and_act(trans)
+            fxolapswet.set_and_act(wet)
+            fxpsgain.set_and_act(direct)  // linear gain
+            sched_cause(pr_unif(4, 6), this, 'olaps_auto', id)
+        else:
+            fxolapswet.set_and_act(0)  // all direct
+            fxpsgain.set_and_act(0)  // linear gain
+            sched_cause(pr_unif(5, 10), this, 'olaps_auto', id)
+
+
+    def run_auto(x):
+        display "run_auto", x, len(states)
+        play_id = play_id + 1  // stop any existing run
+        if x:
+            sched_select(rtsched)
+            sched_cause(0, this, 'auto', play_id)
+            sched_cause(0, this, 'olaps_auto', play_id)
+        
+    def gap_detected():
+        if waiting:
+            display "gap_detected", waiting, sched_time_get(), stop_waiting
+            stop_waiting = true
+
+
+    def style_rapid_notes(is_rapid):
+    # goal of this was to tame some reverb/delay when playing lots of notes,
+    # but this went too far because sometimes you get a rapid note report when
+    # in lay_out mode which features 12-sec reverb time. So we'll ignore this
+    # call when in lay_out mode.
+        if is_rapid and actual_state and not lay_out:  // suppress long reverb
+            if actual_state['fxrevbrt60'] > 3:
+                effects.delay_ugen.set('dur', 2.5)  // "normal" settings
+                effects.delay_ugen.set('fb', 0)
+                actual_state['fxdlygain'] = 0.1  // low for now, will be
+                                // replaced at next autofxctrl selection
+                actual_state['fxrevbrt60'] = 3
+                statemgr.set_state(actual_state)
+                print "**** reverb rt60 cut to 3 by style_rapid_notes ****"
+
+    
+def gap_detected():
+    effects_ctrl.gap_detected()
+
+
+# here's how state changes are enabled:
+#    'auto' is scheduled for some (minimum) delay
+#    at the end of the delay, auto wakes up, but because
+#        waiting is false, auto sets waiting to wait for a gap
+#    when a gap occurs *after* waiting is true, stop_waiting becomes true
+#        and waiting remains true
+#    when waiting and stop_waiting, the state changes,
+#        waiting and stop_waiting are set to false, and we start over
+#    
+#    There is a slight problem if while waiting for a gap, the gap ends.
+#    Therefore, at the end of the delay, if we're in a gap, state change
+#    immediately without testing waiting or stop_waiting flags.
+#
+#    Also, if the wait goes on too long, state change anyway. This is
+#    implemented by using the start-of-wait time as the "flag" that
+#    makes waiting true. Then while waiting for "not stop_waiting", if
+#    too much time (20 sec) elapse, just do the state change and reset flags.

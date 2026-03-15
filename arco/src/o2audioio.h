@@ -223,6 +223,16 @@ public:
 
     const char *classname() { return O2audioio_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
+
     const char *complete_address(const char *method_name) {
     // append method_name to destination base address and return the
     // completed O2 address. This string is only valid until the next
@@ -384,11 +394,14 @@ public:
     }
 
 
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_input(Ugen_ptr ugen) {
+        assert(ugen->rate == 'a');
+        init_param(ugen, input, &input_stride);
+    }
 
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 

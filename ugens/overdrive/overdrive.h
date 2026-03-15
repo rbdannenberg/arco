@@ -103,13 +103,26 @@ public:
     }
 
     ~Overdrive() {
-        snd->unref();
-        gain->unref();
-        tone->unref();
-        volume->unref();
+        snd->unref(&snd);
+        gain->unref(&gain);
+        tone->unref(&tone);
+        volume->unref(&volume);
     }
 
     const char *classname() { return Overdrive_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = snd;
+        } else if (i == 1) { *child = gain;
+        } else if (i == 2) { *child = tone;
+        } else if (i == 3) { *child = volume;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -155,25 +168,25 @@ public:
     }
 
     void repl_snd(Ugen_ptr ugen) {
-        snd->unref();
+        snd->unref(&snd);
         init_snd(ugen);
         update_run_channel();
     }
 
     void repl_gain(Ugen_ptr ugen) {
-        gain->unref();
+        gain->unref(&gain);
         init_gain(ugen);
         update_run_channel();
     }
 
     void repl_tone(Ugen_ptr ugen) {
-        tone->unref();
+        tone->unref(&tone);
         init_tone(ugen);
         update_run_channel();
     }
 
     void repl_volume(Ugen_ptr ugen) {
-        volume->unref();
+        volume->unref(&volume);
         init_volume(ugen);
         update_run_channel();
     }
@@ -210,16 +223,16 @@ public:
         float fSlow0 = std::pow(1e+01f, 2.0f * (float(volume_samps[0]) + -1.0f));
         float fSlow1 = 1.0f / std::tan(fConst1 * (4.15e+03f * float(tone_samps[0]) + 3.5e+02f));
         float fSlow2 = 1.0f / (fSlow1 + 1.0f);
-        float fSlow3 = std::pow(1e+01f, 2.0f * float(gain_samps[0]));
-        float fSlow4 = 1.0f - fSlow1;
+        float fSlow3 = 1.0f - fSlow1;
+        float fSlow4 = std::pow(1e+01f, 2.0f * float(gain_samps[0]));
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
             float fTemp0 = float(input0[i0]) + float(input1[i0]);
             state->fVec0[0] = fTemp0;
             state->fRec1[0] = -(fConst3 * (fConst4 * state->fRec1[1] - fConst2 * (fTemp0 - state->fVec0[1])));
-            float fTemp1 = std::max<float>(-1.0f, std::min<float>(1.0f, fSlow3 * state->fRec1[0]));
+            float fTemp1 = std::max<float>(-1.0f, std::min<float>(1.0f, fSlow4 * state->fRec1[0]));
             float fTemp2 = fTemp1 * (1.0f - 0.33333334f * Overdrive_faustpower2_f(fTemp1));
             state->fVec1[0] = fTemp2;
-            state->fRec0[0] = fSlow2 * (state->fVec1[1] + fTemp2 - fSlow4 * state->fRec0[1]);
+            state->fRec0[0] = -(fSlow2 * (fSlow3 * state->fRec0[1] - (fTemp2 + state->fVec1[1])));
             float fTemp3 = fSlow0 * state->fRec0[0];
             output0[i0] = FAUSTFLOAT(fTemp3);
             output1[i0] = FAUSTFLOAT(fTemp3);

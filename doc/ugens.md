@@ -628,6 +628,28 @@ period cosine shape.
 `chan` to `goal`. This has no effect on the current fade if
 any, and takes effect when `/arco/fader/mode` is sent.
 
+### multisend
+```
+multisend(id)
+.ins(target, addr, p1, p2, ..., pn)
+.send()
+```
+Send a message "simultaneously" to multiple objects.
+
+
+`/arco/multisend/new id - Create a multisend object
+with the given id.
+
+`/arco/multisend/ins id addr target p1 p2 ... pn` - Add a target and
+message to send. The addr parameter is the address string to be sent
+to the target. The target parameter is the Arco id of target ugen.
+Remaining parameters are arbitrary in type and number and given 
+by p1 through pn.  Currently, only int32 and float types are
+supported.
+
+`/arco/multisend/send` - Send the saved message to all objects now.
+
+
 ### feedback
 ```
 feedback(input [, chans])
@@ -831,7 +853,7 @@ flsyn(path)
 Fluidsynth is a popular open-source sample-based synthesizer. `flsyn`
 is a unit generator that uses the Fluidsynth engine to produce
 samples. This is a MIDI synthesizer, so you control it by sending Arco
-messages that correspond to MIDI messages.
+messages that correspond to MIDI messages. The output has 2 channels.
 
 *Note:* On macOS, Fluidsynth requires a dynamic library, `glib-2.0`,
 so the resulting Arco application using `flsyn` is not complete or
@@ -913,8 +935,15 @@ channel. The density of grains is already proportional to the number
 of channels, so feeding back to all channels would introduce much
 more feedback than feeding back to one input channel.
 
+Except for feedback, `granstream` acts as a 1-to-N channel process
+independently for *each* of N input channels, and the corresponding
+outputs are summed to form N output channels. Feedback mixes the
+final N outputs and adds the mix into input channel 1 *only*.
+(Since each input channel produces grains on every output channel,
+there is nothing special about channel 1.)
+
 The algorithm is as follows: A set of `polyphony` grain generators is
-allocated for each channel. Grain generators follow a sequence of
+allocated for each input channel. Grain generators follow a sequence of
 states: Pick a random delay based on `density`. Also pick a resampling
 ratio and a duration. After the delay, pick a starting point in the
 buffer of previous input samples. Read the grain starting at this
@@ -992,6 +1021,22 @@ for the feedback delay time before any feedback appears. You can avoid
 this by setting feedback to -90dB or at least 0.00003 instead of zero.
 This keeps the feedback delay buffer full and ready to provide feedback,
 but attenuates feedback to be almost inaudible.
+
+
+### highpass, highpassb
+```
+highpass, highpassb(input, cutoff [, chans])
+```
+First-order Butterworth highpass filter (-6 dB/octave) from FAUST.
+Attenuation is -3 dB at the cutoff frequency.
+
+
+### lowpass, lowpassb
+```
+lowpass, lowpassb(input, cutoff [, chans])
+```
+First-order Butterworth lowpass filter (-6 dB/octave) from FAUST.
+Attenuation is -3 dB at the cutoff frequency.
 
 
 ### math, mathb
@@ -1479,7 +1524,7 @@ the last breakpoint is not zero, then just `ACTION_EVENT` is send.
 
 A common use case is to create an envelope that ends on a positive
 value representing a "sustain" portion of a sound. To end the sound,
-`.set_points()` is called with and ending segment that ramps down to
+`.set_points()` is called with an ending segment that ramps down to
 zero and ends the pwe. If `.term()` was applied, then the pwe will
 terminate, setting its TERMINATE flag, and downstream, a mixer ugen
 might remove the ugen from the mix when it terminates. In this case,
@@ -1522,7 +1567,10 @@ instead of *exponential*. Linear onsets have a different and often more
 natural sound.
 
 `/arco/pwe/decay id dur` - decay from the current value of object with
-id to zero in `dur` (int32) blocks.
+id to zero in `dur` (int32) samples (audio rate for `pwe` and block
+rate for `pweb`.) The `decay` method's `dur` parameter is given in
+seconds and is converted to int32 to form this message.
+
 
 `/arco/pwe/set id y` - sets current output value to `y` (float). If
 the unit generator is in the middle of an envelope, this will create a

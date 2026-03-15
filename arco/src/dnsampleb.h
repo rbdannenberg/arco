@@ -66,11 +66,21 @@ public:
     }
 
     ~Dnsampleb() {
-        input->unref();
+        input->unref(&input);
     }
 
 
     const char *classname() { return Dnsampleb_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
 
 
     void print_sources(int indent, bool print_flag) {
@@ -79,7 +89,7 @@ public:
 
 
     void repl_input(Ugen_ptr input) {
-        input->unref();
+        input->unref(&input);
         init_input(input);
     }
 

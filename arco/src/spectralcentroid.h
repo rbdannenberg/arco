@@ -28,7 +28,7 @@ public:
 
 
     ~SpectralCentroid() {
-        input->unref();
+        input->unref(&input);
         if (cd_reply_addr) {
             O2_FREE(cd_reply_addr);
         }
@@ -39,6 +39,16 @@ public:
     const char *classname() {
         return SpectralCentroid_name;
     }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
     
     void print_details(int indent) {
         arco_print("SpectralCentroid running.\n");
@@ -57,7 +67,7 @@ public:
 
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         if (ugen->chans > 1) {
             printf("WARNING: Input has more than one channel, only the first "
                    "channel is used for spectral centroid calculation.\n");

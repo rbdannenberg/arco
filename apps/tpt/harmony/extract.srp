@@ -1,0 +1,95 @@
+# extract.srp - extract data from treebank.json
+#
+# Roger B. Dannenberg
+# Sep 2025
+
+require "debug"
+require "json"
+require "prob"
+require "read_value"
+require "../harmony.srp"
+
+def enter_transition(prev, next):
+    if prev == next:
+        return
+    var p = transitions.get(prev)
+    if p:
+        n = p.get(next)
+        if n:
+            p[next] = n + 1
+        else:
+            p[next] = 1
+    else:
+        transitions[prev] = {next: 1}  // new entry
+
+
+
+def open_score():
+    outf = open("chords.gro", "w")
+    ctime = 0
+
+
+def write_chord(notes):
+    for note in notes:
+        outf.write("T" + str(ctime) + " V1 P" + str(note) + " U2 L99\n")
+    ctime = ctime + 2
+
+
+def close_score():
+    outf.close()
+    outf = nil
+
+
+def compose_sequence():
+    open_score()
+    var chord = "C7"
+    var notes = [48, 55, 64, 70]
+    for i = 0 to 24:
+        write_chord(notes)
+        var trans = transitions[chord]
+        var keys = trans.keys()
+        var weights = [trans[key] for key in keys]
+        var index = pr_weighted_choice(weights)
+        chord = keys[index]
+        notes = voice_chord(notes, chord)
+    write_chord(notes)
+    close_score()
+
+
+def main():
+    transitions = {}
+    data = json_parse_file("treebank.json")
+    value = data["value"]
+    print type(value)
+    if not isarray(value):
+        error("expected json value to be an array")
+    for song in value:
+        var chords = song.get("chords")
+        for c at i in chords:
+            if i != 0:
+                enter_transition(chords[i-1], c)
+    var outf = open("transitions.dat", "w")
+    outf.write("{")
+    var need_comma = false
+    for key in transitions.keys():
+        if need_comma:
+            outf.write(",\n")
+        outf.write(repr(key) + ": ")
+        outf.write(repr(transitions[key]))
+        need_comma = true
+    outf.write("}\n")
+    outf.close()
+    var inf = open("transitions.dat", "r")
+    print repr(read_value(inf))
+    inf.close()
+    // for prev in transitions.keys():
+    //     print prev
+    //     var counts = transitions[prev]
+    //     for count_key in counts.keys():
+    //         print "    "; count_key; ": "; counts[count_key]
+
+    compose_sequence()
+            
+
+main()
+exit()

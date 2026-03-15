@@ -81,6 +81,16 @@ public:
 
     const char *classname() { return Filerec_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
+
 
     void print_details(int indent) {
         arco_print("isready %d recording %d stopped %d",
@@ -100,7 +110,7 @@ public:
 
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
@@ -210,7 +220,7 @@ public:
         for (int i = 0; i < BL; i++) {
             Sample_ptr in = input_samps + i;
             for (int ch = 0; ch < chans; ch++) {
-                *out++ = FLOAT_TO_INT16(*in);
+                *out++ = FLOAT_TO_INT16(FLOAT_CLIP(*in));
                 in += input_stride;
             }
         }

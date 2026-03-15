@@ -7,8 +7,8 @@
 #include "arcougen.h"
 #include "const.h"
 
+
 Vec<Ugen_ptr> ugen_table;
-int ugen_table_free_list = 1;
 
 // note table really goes from 0 to 1 over index range 2 to 102
 // there are 2 extra samples at either end to allow for interpolation and
@@ -74,13 +74,64 @@ Ugen::~Ugen() {
     // printf("Ugen delete %d\n", id);
 }
 
+#if ARCO_REF_DEBUG
+bool Ugen::find_reference_to(Ugen *ugen) {
+    if (this == ugen) {
+        return true;  // found reference to ugen after ugen's refcount was 0
+    }
+    if (ref_debug_mark) {  // we've been here before and didn't find ugen
+        return false;
+    }
+    int i = 0;
+    Ugen *child;
+    ref_debug_mark = true;
+    while (get_ref(i, &child)) {
+        if (child && child->find_reference_to(ugen)) {
+            printf("Ugen %d (%s) refcount is 0 but %d (%s) has a reference"
+                   " to it\n", ugen->id, ugen->classname(), id, classname());
+            assert(false);
+        }
+        i++;
+    }
+    ref_debug_mark = false;  // clear it so we can search again
+    return false;
+}
+#endif
 
-void Ugen::unref() {
+// unref - decrement reference count and possibly free Ugen. The ptr parameter
+//     should be the address of the actual reference that is being removed, and
+//     NULL will be written to the address to actually remove it. This is
+//     redundant if the referencer itself is in the process of being freed, but
+//     this is a "safe programming feature" to help make sure the reference is
+//     not used again. It is easy to circumvent, e.g. by passing the address of
+//     a copy of the reference, but at least it serves as a strong reminder.
+void Ugen::unref(Ugen **ptr) {
+#if ARCO_REF_DEBUG
+    *ptr = NULL;  // remove the pointer pointing to this Ugen so that the graph will
+                  // match the reference counts after we decrement refcount.
+#endif
+#if ARCO_REF_DEBUG > 1
+    arco_print("Ugen::unref id %d class %s old_refcount %d ptr %p\n",
+               id, classname(), refcount, this);
+#endif
     refcount--;
     // printf("Ugen::unref id %d %s new refcount %d\n",
     //        id, classname(), refcount);
     if (refcount == 0) {
+#if ARCO_REF_DEBUG
+        // make sure there are no more references to this ugen
+        for (int i = 0; i < UGEN_TABLE_SIZE; i++) {
+            if (i != id && ugen_table[i] &&
+                ugen_table[i]->find_reference_to(this)) {
+                printf("Ugen %d (%s) refcount is 0 but table[%d] (%s) has a"
+                       " (indirect?) reference to it\n",
+                       id, classname(), i, ugen_table[i]->classname());
+                assert(false);
+            }
+        }
+#endif
         on_terminate(ACTION_FREE);  // notify `atend` mechanism if it is
+        send_arco_ugen_free(id);
         // pending this should be in destructor, but destructors cannot
         // call inherited methods in c++.
         if (flags & UGENTRACE) {
@@ -218,8 +269,7 @@ void arco_free(O2SM_HANDLER_ARGS)
         if (ugen) {
             // printf("arco_free handler freeing %d #%d\n", id, ugen->refcount);
             // printf("arco_free %d (%s)\n", id, ugen->classname());
-            ugen->unref();
-            ugen_table[id] = NULL;  // must happen *after* destructor
+            ugen->unref(&ugen);
         }
     }
 }

@@ -1,0 +1,25 @@
+# manifest for perfdata
+vu
+probe
+filerec
+yin
+onset
+spectralcentroid
+spectralrolloff
+sine*
+flsyn
+zitarev
+noisegate
+delayvi
+delay
+mix
+fileplay
+upsample
+smoothb
+olapitchshift
+blend
+delayvi
+feedback
+tableoscb
+granstream
+highpass

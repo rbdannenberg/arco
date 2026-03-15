@@ -38,10 +38,10 @@ class Feedback : public Ugen {
     }
 
     ~Feedback() {
-        input->unref();
-        gain->unref();
-        from->unref();  // actually, if from is referenced, then it probably
-        // forms a cycle, so we cannot be deconstructed. Normally, you have
+        input->unref(&input);
+        gain->unref(&gain);
+        from->unref(&from);  // actually, if from is referenced, then probably
+        // it forms a cycle, so we cannot be deconstructed. Normally, you have
         // to break the cycle by setting the feedback to the zero Ugen, which
         // never gets freed, so we don't really have to unref it; however, it
         // is possible that from is not downstream and there's no cycle, so
@@ -49,6 +49,19 @@ class Feedback : public Ugen {
     }
 
     const char *classname() { return Feedback_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 3 inputs
+        if (i == 0) {         *child = input;
+        } else if (i == 1) {  *child = gain;
+        } else if (i == 2) {  *child = from;
+        } else return false;
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -78,17 +91,17 @@ class Feedback : public Ugen {
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
     void repl_from(Ugen_ptr f) {
-        from->unref();
+        from->unref(&from);
         init_from(f);
     }
 
     void repl_gain(Ugen_ptr g) {
-        gain->unref();
+        gain->unref(&gain);
         init_gain(g);
         update_run_channel();
     }

@@ -22,8 +22,8 @@ set(ARCO_TARGET_NAME daserpent)
 # Add custom files -- .cpp and .h -- to be compiled and included
 set(CUSTOM_ARCO )
 
-# icon file must be named daserpent.icns, but you can specify where to get it,
-#   it must end in a slash so we can prepend it to wxserpent.icns
+# icon file must be named wxserpent.icns, but you can specify where to get it,
+#   it must end in a slash so we can prepend it to "wxserpent.icns"
 set(WXSICON_DIRECTORY "${CMAKE_SOURCE_DIR}/")
 
 # CMake requires this as a top-level command. Don't change it.

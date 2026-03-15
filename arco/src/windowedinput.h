@@ -32,19 +32,29 @@ class Windowed_input : public Ugen {
     int window_size;  // size of window
     int hopsize;
     
-    Ugen_ptr inp;
-    int inp_stride;
-    Sample_ptr inp_samps;
+    Ugen_ptr input;
+    int input_stride;
+    Sample_ptr input_samps;
 
-    Windowed_input(int id, int chans, Ugen_ptr inp) : Ugen(id, 'a', chans) {
+    Windowed_input(int id, int chans, Ugen_ptr input) : Ugen(id, 'a', chans) {
         states.init(chans);
         states.set_size(chans);  // just to make size correct
         states_initialized = false;
-        init_inp(inp);
+        init_input(input);
         tail = 0;
     }
 
     virtual void process_window(int i, Sample_ptr window) = 0;
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
     
     void init(int buffer_size, int window_size_, int hopsize_) {
         buffer_size = MAX(buffer_size, window_size + BL * 2);
@@ -66,22 +76,22 @@ class Windowed_input : public Ugen {
     }
 
 
-    void repl_inp(Ugen_ptr inp_) {
-        inp->unref();
-        init_inp(inp_);
+    void repl_input(Ugen_ptr input_) {
+        input->unref(&input);
+        init_input(input_);
     }
 
 
-    void init_inp(Ugen_ptr ugen) {
-        init_param(ugen, inp, &inp_stride);
+    void init_input(Ugen_ptr ugen) {
+        init_param(ugen, input, &input_stride);
         // TODO: we should fail gracefully in this case:
-        assert(inp->rate == 'a');
+        assert(input->rate == 'a');
     }
 
 
     void real_run() {
         assert(states_initialized);
-        inp_samps = inp->run(current_block);
+        input_samps = input->run(current_block);
         Windowed_input_state *state = &states[0];
         if (state->samps.size() + BL > state->samps.get_allocated()) {
             int erase = MIN(tail, state->samps.size());
@@ -96,8 +106,8 @@ class Windowed_input : public Ugen {
         state = &states[0];
         assert(state->samps.size() + BL <= state->samps.get_allocated());
         for (int i = 0; i < chans; i++) {
-            state->samps.append(inp_samps, BL);  // append samples to window
-            inp_samps += inp_stride;
+            state->samps.append(input_samps, BL);  // append samples to window
+            input_samps += input_stride;
             state++;
         }
 

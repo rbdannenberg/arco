@@ -1211,12 +1211,22 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
     ## Generate the destructor
     constructor += f"    ~{classname}() {{\n"
     for p in ab_params:
-        constructor += f"        {p}->unref();\n"
+        constructor += f"        {p}->unref(&{p});\n"
     constructor += "    }\n\n"
 
-    ## Generate name() method
+    ## Generate classname() method
     constructor += f"    const char *classname() {{"
     constructor += f" return {classname}_name; }}\n\n"
+
+    ## Generate the ARCO_REF_DEBUG get_ref method
+    constructor += "#if ARCO_REF_DEBUG\n    // for tracing tree of Ugens\n"
+    constructor += "    bool get_ref(int i, Ugen **child) {\n"
+    for i, p in enumerate(sig_params):
+        if signature.params[i].abtype != 'c':
+            condition = "        " + ("if" if i == 0 else "} else if")
+            constructor += f"{condition} (i == {i}) {{ *child = {p};\n"
+    constructor += "        } else { return false;\n        }\n"
+    constructor += "        return true;\n    }\n#endif\n\n"
 
     ## Generate update_run_channel method to set the run_channel
     update_run_channel = ""
@@ -1236,7 +1246,7 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
     ## Generate repl_* methods to set inputs
     for p in ab_params:
         methods += f"    void repl_{p}(Ugen_ptr ugen) {{\n"
-        methods += f"        {p}->unref();\n"
+        methods += f"        {p}->unref(&{p});\n"
         methods += f"        init_{p}(ugen);\n"
         if rate == 'a':
             methods += "        update_run_channel();\n"

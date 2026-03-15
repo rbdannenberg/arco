@@ -224,6 +224,7 @@ public:
         if (!file_is_open) {
             arco_print("Fileio_writer: Failed to open %s\n", fn);
         }
+        sf_command(snd_out, SFC_SET_CLIPPING, NULL, SF_TRUE);
         // o2sm_send_cmd("/arco/filerec/ready", 0, "hB", addr, rslt >= 0)
         o2_send_start();
         o2_add_int64(addr);

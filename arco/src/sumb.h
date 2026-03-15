@@ -22,6 +22,18 @@ public:
 
     const char *classname() { return Sumb_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        if (i < 0 || i >= inputs.size()) {
+            return false;
+        }
+        *child = inputs[i];
+        return true;
+    }
+#endif
+
 
     void print_sources(int indent, bool print_flag) {
         for (int i = 0; i < inputs.size(); i++) {
@@ -41,6 +53,7 @@ public:
         int i = find(input, false);
         if (i < 0) {  // input is not already in sum; append it
             inputs.push_back(input);
+            input->ref();
         }
     }
 

@@ -16,7 +16,7 @@ const char *Filerec_name = "Filerec";
 
 Filerec::~Filerec()
 {
-    input->unref();
+    input->unref(&input);
 }
 
 

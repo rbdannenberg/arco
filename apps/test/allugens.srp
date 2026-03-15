@@ -344,11 +344,11 @@ class Zerob (Ugen)
 fade_in_lookup = {}  // maps ugen to its fader
 
 
-def fader(input, current, optional dur, goal, chans):
+def fader(input, current, optional dur, goal, chans, keyword mode = nil):
 # Create a Fader, with optional intialization. Example:
 #     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
 #     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
-    var fader = Fader(input, current, chans)
+    var fader = Fader(input, current, chans, mode = mode)
     if dur:
         fader.set_dur(dur)
     if goal:
@@ -390,9 +390,10 @@ class Fader (Ugen):
     def set_goal(goal, optional chan):
         if chan:
             o2_send_cmd("/arco/fader/goal", 0, "Uif", id, chan, goal)
-        for i = 0 to chans:
-            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, i,
-                        goal if isnumber(goal) else goal[i])
+        else:
+            for i = 0 to chans:
+                o2_send_cmd("/arco/fader/goal", 0, "Uif", id, i,
+                            goal if isnumber(goal) else goal[i])
         this
 
 
@@ -700,7 +701,7 @@ class Mix (Ugen):
     
 
     def rem(name, dur, mode):
-        if inputs.has_key(name) or force:
+        if inputs.has_key(name):
             if not dur:
                 dur = 0
             if not mode:
@@ -724,7 +725,7 @@ class Mix (Ugen):
             print "ERROR: Mix.set_gain() cannot find input", name
             return
         var gain_ugen = inputs[name][2]
-        display "in set_gain", inputs[name], gain_ugen, repr(gain_ugen.rate)
+        // display "in set_gain", inputs[name], gain_ugen, repr(gain_ugen.rate)
         if isinstance(gain_ugen, Ugen) and gain_ugen.rate == C_RATE:
             if chan >= gain_ugen.chans:
                 print "WARNING: In Mix.set_gain(), gain for", name, "is a", 
@@ -756,7 +757,7 @@ class Mix (Ugen):
             print "ERROR: Mix.set_in() cannot find input", name
             return
         var in_ugen = inputs[name][1]
-        display "in set_in", inputs[name], in_ugen, repr(in_ugen.rate)
+        // display "in set_in", inputs[name], in_ugen, repr(in_ugen.rate)
         if input.rate != 'a':
             print "ERROR: In Mix.set_in(), new input for", repr(name),
             print     "has non-audio-rate", repr(input.rate);
