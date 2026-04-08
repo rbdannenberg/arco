@@ -79,7 +79,7 @@ void prefs_read()
     int n;
     char *line_ptr = line;
     size_t line_len = 80;
-    while (getline(&line_ptr, &line_len, pf) > 0) {
+    while (fgets(line_ptr, (int) line_len, pf) != NULL) {
         if (strstr(line_ptr, "audio_in_name:") != 0) {
             get_name(line_ptr + 14, device);
             prefs_set_in_name(device);
@@ -96,9 +96,8 @@ void prefs_read()
             prefs_set_latency(n);
         }
     }
-    if (line_ptr != line) {
-        free(line_ptr);
-    }
+    // Note: original used POSIX getline which could realloc line_ptr.
+    // fgets always uses the provided buffer, so no free needed.
 }
 
 

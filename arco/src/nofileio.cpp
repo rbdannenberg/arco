@@ -8,7 +8,9 @@
 
 #include <stdio.h>
 #include <fcntl.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include "nofileio.h"
 
 bool fileio_finished = false;

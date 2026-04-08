@@ -10,8 +10,50 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include "cmtio.h"
+
+#ifdef _WIN32
+#include <conio.h>
+#include <signal.h>
+
+int     IOinputfd;
+int     IOnochar;
+
+static void IOdiegracefully(int sig)
+{
+    IOcleanup();
+    exit(2);
+}
+
+int IOsetup(int inputfd)
+{
+    IOinputfd = inputfd;
+    IOnochar = NOCHAR;
+    signal(SIGINT, IOdiegracefully);
+    return 0;
+}
+
+int IOcleanup(void)
+{
+    return 0;
+}
+
+int IOgetchar(void)
+{
+    if (_kbhit()) {
+        return _getch();
+    }
+    return IOnochar;
+}
+
+int IOwaitchar()
+{
+    return _getch();
+}
+
+#else /* Unix */
+
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -193,3 +235,4 @@ int IOwaitchar()
 }
 
 #endif /* not UNIX_MACH */
+#endif /* _WIN32 */

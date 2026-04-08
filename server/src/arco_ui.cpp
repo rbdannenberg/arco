@@ -30,11 +30,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
+#ifndef _WIN32
 #include <fcntl.h>
 #include <unistd.h>
-#include <assert.h>
 #include <curses.h>
 #include <form.h>
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+// Stub types for form.h - curses UI is not available on Windows
+typedef void FIELD;
+typedef void FORM;
+#define REQ_NEXT_FIELD 0
+#define REQ_PREV_FIELD 0
+#define REQ_END_LINE 0
+#define REQ_NEXT_CHAR 0
+#define REQ_PREV_CHAR 0
+#define REQ_DEL_PREV 0
+#define REQ_DEL_CHAR 0
+#define REQ_VALIDATION 0
+#define REQ_BEG_FIELD 0
+#endif
 #include "cmtio.h"
 #include "o2internal.h"
 #include "prefs.h"
@@ -46,11 +63,14 @@ Vec<O2string> arco_device_info;
 
 static FILE *ttyfd = NULL;
 static FILE *logfile = NULL;  // for debugging
+#ifndef _WIN32
 static SCREEN *uiscr = NULL;
-
 static int out_pipe[2];
 static int save_out;
 static int save_err;
+#else
+static void *uiscr = NULL;  // always NULL on Windows
+#endif
 
 static int direct_mode = true;
 static int menu_mode = false;
@@ -70,9 +90,11 @@ static int out_col = 0;
 
 int stop = false;
 
+#ifndef _WIN32
 Vec<FIELD *> fields;
 Vec<Dminfo> dminfo;
 FORM *dmform;
+#endif
 void ui_end_dialog(bool good);
 
 
@@ -82,7 +104,8 @@ static void print_extras()
 }
 
 
-const char *help_strings2[] = {   
+#ifndef _WIN32
+const char *help_strings2[] = {
     "p - scroll back one line",
     "b - scroll back one page",
     "n - scroll forward one line",
@@ -120,8 +143,10 @@ static void show_help()
     }
     direct_mode = false;
 }
+#endif /* !_WIN32 */
 
 
+#ifndef _WIN32
 // scroll the screen: 1 or -1 -> 1 line, 2 or -2 -> 1 page
 //
 static void advance(int n)
@@ -317,11 +342,17 @@ static void refresh_screen()
     noecho();
     advance(0);
 }
+#endif /* !_WIN32 - end of curses-only display functions */
 
 
 int ui_init(int count)  // count is how many output lines to save
 {
     logfile = fopen("log.txt", "w");
+#ifdef _WIN32
+    // No curses on Windows - use plain console mode
+    IOsetup(0);
+    return -1;  // has_curses will be false
+#else
     ttyfd = fopen("/dev/tty", "r+");
     if (!ttyfd) {
         return -1;  // fail
@@ -342,6 +373,7 @@ int ui_init(int count)  // count is how many output lines to save
 
     refresh_screen();
     return 0;
+#endif
 }
 
 const int BUFFER_LEN = 80;
@@ -361,6 +393,7 @@ void ui_get_string(const char *prompt, void (*callback)(const char *s))
     buffer_x = 0;
     getting_string = true;
     got_string_fn = callback;
+#ifndef _WIN32
     if (uiscr) {
         int x, y;
         getmaxyx(curscr, y, x);
@@ -370,7 +403,9 @@ void ui_get_string(const char *prompt, void (*callback)(const char *s))
         printw(": ");
         clrtoeol();
         skip_newlines = 0;
-    } else {
+    } else
+#endif
+    {
         skip_newlines = 1;
         printf("%s: ", prompt);
     }
@@ -385,9 +420,11 @@ static void got_a_char(int ch)
         buffer[buffer_x] = 0;
         (*got_string_fn)(buffer);
         getting_string = false;
+#ifndef _WIN32
         if (uiscr) {  // restore screen erased by prompt and input:
             advance(0);
         }
+#endif
     }
     if (buffer_x < BUFFER_LEN - 1) {
         buffer[buffer_x++] = ch;
@@ -406,7 +443,11 @@ int ui_poll(int delay_ms)
     DEBUGGING */
     int ch;
     if (!uiscr) {  // interface is just simple command line, for Xcode debugger
+#ifdef _WIN32
+        Sleep(delay_ms);
+#else
         usleep(delay_ms * 1000);
+#endif
         ch = IOgetchar();
         if (ch <= 0) {
             return false;
@@ -432,6 +473,7 @@ int ui_poll(int delay_ms)
         }
         return false;
     }
+#ifndef _WIN32
     fd_set s_rd, s_wr, s_ex;
     static int msgcnt = 0;
     struct timeval tv;
@@ -529,6 +571,7 @@ int ui_poll(int delay_ms)
             return action(ch);
         }
     }
+#endif /* !_WIN32 - curses event handling */
     return false;
 }
 
@@ -536,8 +579,12 @@ int ui_poll(int delay_ms)
 int ui_finish()
 {
     if (!uiscr) {
+#ifdef _WIN32
+        IOcleanup();
+#endif
         return -1;  // fail
     }
+#ifndef _WIN32
     endwin();
     delscreen(uiscr);
     fclose(ttyfd);
@@ -549,6 +596,7 @@ int ui_finish()
     close(out_pipe[1]);
     close(save_out);
     close(save_err);
+#endif
     for (int i = 0; i < lines_max; i++) {
         if (lines[i]) {
             free(lines[i]);
@@ -556,14 +604,16 @@ int ui_finish()
     }
     free(lines);
     fclose(logfile);
+#ifndef _WIN32
     fields.finish();
+#endif
     puts("back to normal");
     return false;
 }
 
 
 /************************* dialog manager **********************/
-
+#ifndef _WIN32
 int field_top;
 
 void ui_start_dialog()
@@ -716,3 +766,13 @@ void ui_end_dialog(bool good)
     }
     fields.clear();
 }
+#endif /* !_WIN32 - end of dialog manager */
+
+// Windows stubs for dialog functions (never called when has_curses == false)
+#ifdef _WIN32
+void ui_start_dialog() {}
+void ui_int_field(const char *prompt, int *value, int min, int max,
+                 int actual, int pref) {}
+void ui_run_dialog(const char *title) {}
+void ui_end_dialog(bool good) {}
+#endif
