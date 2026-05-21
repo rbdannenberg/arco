@@ -622,4 +622,42 @@ Stop recording and close the files. This is asynchronous, so it is
 possible that some files will be longer than others.
 
 
+### Overdrive 
+```
+require "overdrive"
+```
 
+Note: requires the dspmanifest file to include `monodistortion`.
+
+This class wraps a mono effect with a more general implementation
+that will mix multiple input channels, apply the effect, and route
+the effect to all output channels with wetdry control. Create an
+overdrive processor with
+
+```
+odr = overdrive(input, gain, tone, volume) 
+```
+
+Input channels are first summed and then multiplied by gain.
+
+The processing chain contains a first-order high-pass filter set at 720 Hz, 
+which removes low-frequency components. The filtered signal is then passed 
+through a cubic nonlinear distortion function, which shapes the 
+signal by introducing harmonic content and saturation. After 
+distortion, the signal is passed through a low-pass filter with a cutoff 
+frequency determined by the `tone` parameter (in Hz), allowing for control 
+over the brightness or warmth of the effect. Finally, the signal is 
+multiplied by the `volume` parameter divided by the square root of the
+number of channels (implementing the equal power law). The output is
+then added to each input channel to form the output.
+
+The following methods can be used to change parameters including the
+input (but the number of input channels should not be changed):
+
+```
+.set_input(input)
+.set_gain(gain)
+.set_tone(freq)
+.set_volume(volume)
+.set_wetdry(wetdry)
+```

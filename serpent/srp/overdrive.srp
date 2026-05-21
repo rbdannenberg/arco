@@ -10,6 +10,8 @@ class Overdrive(Instrument):
     var scale_factor
     var vol_scale_ugen
     var processed  // the monodistortion ugen
+    var input_mult
+    var drywet
 
     // there are 4 volume possibilities:
     // 1. multiple channel input (scale_factor != 1)
@@ -22,6 +24,7 @@ class Overdrive(Instrument):
 
 
     def init(input, gain, tone, volume, wetdry):
+        instr_begin()
         if isnumber(gain):
             gain = const(gain)
         if isnumber(tone):
@@ -53,15 +56,16 @@ class Overdrive(Instrument):
             vol_scale_ugen = mult(scale_factor, volume)
             processed = monodistortion(mono_input, gain, tone, vol_scale_ugen)
                                        
-
-        final_output = add(mult(input, subb(1, wetdry)),
-                           mult(processed, wetdry))
-
+        drywet = subb(1, wetdry)
+        input_mult = mult(input, drywet)
+        effect_mult = mult(processed, wetdry)
+        final_output = add(input_mult, effect_mult)
         super.init("Overdrive", final_output)
 
 
     def set_input(input):
         processed.set('input', input)
+        input_mult.set('x1', input)
 
     def set_gain(gain):
         processed.set('gain', gain)
@@ -74,6 +78,10 @@ class Overdrive(Instrument):
             processed.set('volume', volume)
         else:
             vol_scale_ugen.set('x1', volume)
+
+    def set_wetdry(wetdry):
+        drywet.set('x2', wetdry)
+        effect_mult.set('x2', wetdry)
 
 
 

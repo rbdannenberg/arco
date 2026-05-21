@@ -24,6 +24,7 @@ require "supersawdemo"
 require "steps"
 require "mididevice"
 require "chorusrbd"
+require "overdrive"
 
 SIMPLE = false
 // DEBUG_ACTIONS = true  // override default
@@ -312,9 +313,6 @@ def arco_ready():
 
     Button(win, "All Fast", 'S', 'D', 'S', 'S', 'afbutton')
     afbutton.add_callback('allfast_test', 'x')
-
-    Checkbox(win, "Overdrive Test", 'S', 'D', WIDTH, 'S', 'overdrivecheckbox')
-    overdrivecheckbox.add_target_method(nil, 'overdrivetest')
 
     # start a 2nd column
     COLUMN_X = COLUMN_THREE
@@ -1462,14 +1460,15 @@ def overdrivetest(x):
                                  sineb(8, 1)), 0.3)
         // illustrate increasing distortion with amplitude:
         tones = mult(tones, pweb(4, 2))
-        ovd = overdrive(tones, 0.85, 4000.0, 0.8)  // snd, gain, tone, volume
+        //              input, gain, tone, volume, wetdry:
+        ovd = overdrive(tones, 1.0, 4000.0, 0.2, 0.8)
         ovd.play()
     else:
         // see if setting input works. Sound should stop even though
-        // ugen will run for 1 more second.
-        ovd.set('snd', zero_ugen)
+        // ugen will run for 2 more seconds.
+        ovd.set_input(zero_ugen)
         sched_select(rtsched)
-        sched_cause(1, ovd, 'mute')
+        sched_cause(2, ovd, 'mute')
         ovd = nil
 
 ########## MidiIn Test ##############

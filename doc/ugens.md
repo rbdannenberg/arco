@@ -1227,7 +1227,35 @@ to the a-rate Ugen `input`.
 ### monodistortion
 
 This unit generator is used in the overdrive effect.
-See overdrive.
+See overdrive in instruments.md.
+
+
+<!-- The monodistortion ugen is accessed via the Overdrive class.
+
+`/arco/monodistortion/new id chans gain tone volume` - Create a new 
+monodistortion unit generator with `gain`, `tone`, and `volume` control 
+inputs, along with an audio input and output. 
+
+`/arco/monodistortion/repl_gain id gain_id` - Set gain to object with id 
+`gain_id`. 
+
+`/arco/monodistortion/set_gain id chan gain` - Set gain of channel `chan` to 
+float value `gain`. 
+
+`/arco/monodistortion/repl_tone id tone_id` - Set tone to object with id 
+`tone_id`. 
+
+`/arco/monodistortion/set_tone id chan tone` - Set tone of channel `chan` to 
+float value `tone`. 
+
+`/arco/monodistortion/repl_volume id volume_id` - Set volume to object with 
+id `volume_id`. 
+
+`/arco/monodistortion/set_volume id chan volume` - Set volume of channel 
+`chan` to float value `volume`. 
+
+-->
+
 
 ### multisend 
 ```
@@ -1508,54 +1536,6 @@ ratio. Greater than 1 means raise the pitch.
 `arco/pv/repl_input id input_id` - Set the input to the object with id
 `input_id`.
 
-
-### overdrive 
-```
-overdrive(input, gain, tone, volume)
-.set_input(input)
-.set_gain(gain)
-.set_tone(freq)
-.set_volume(volume)
-```
-
-Input channels are first summed and then multiplied by gain.
-
-The processing chain contains a first-order high-pass filter set at 720 Hz, 
-which removes low-frequency components. The filtered signal is then passed 
-through a cubic nonlinear distortion function, which shapes the 
-signal by introducing harmonic content and saturation. After 
-distortion, the signal is passed through a low-pass filter with a cutoff 
-frequency determined by the `tone` parameter (in Hz), allowing for control 
-over the brightness or warmth of the effect. Finally, the signal is 
-multiplied by the `volume` parameter divided by the square root of the
-number of channels (implementing the equal power law). The output is
-then added to each input channel to form the output.
-
-<!-- The monodistortion ugen is accessed via the Overdrive class.
-
-`/arco/monodistortion/new id chans gain tone volume` - Create a new 
-monodistortion unit generator with `gain`, `tone`, and `volume` control 
-inputs, along with an audio input and output. 
-
-`/arco/monodistortion/repl_gain id gain_id` - Set gain to object with id 
-`gain_id`. 
-
-`/arco/monodistortion/set_gain id chan gain` - Set gain of channel `chan` to 
-float value `gain`. 
-
-`/arco/monodistortion/repl_tone id tone_id` - Set tone to object with id 
-`tone_id`. 
-
-`/arco/monodistortion/set_tone id chan tone` - Set tone of channel `chan` to 
-float value `tone`. 
-
-`/arco/monodistortion/repl_volume id volume_id` - Set volume to object with 
-id `volume_id`. 
-
-`/arco/monodistortion/set_volume id chan volume` - Set volume of channel 
-`chan` to float value `volume`. 
-
--->
 
 
 ### pwe, pweb

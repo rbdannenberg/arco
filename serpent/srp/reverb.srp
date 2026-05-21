@@ -29,7 +29,7 @@ class Reverb (Instrument):
         instr_begin()
         combs = array(len(REVERB_COMBDELAY))
         allpasses = array(len(REVERB_ALLPASSDELAY))
-        instr_begin()
+
         var rvb = sum(1)
         for delay at i in REVERB_COMBDELAY:
             combs[i] = delay(input, delay,

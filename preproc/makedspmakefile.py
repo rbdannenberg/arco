@@ -221,6 +221,7 @@ def make_inclfile(arco_path, manifest, outf):
     need_audioblob = False  # need to compile and link with audioblob.h
                             # (for o2audioio)
     need_wavetables = False  # need to compile and link with wavetables.{cpp,h}
+    need_monodistortion = False  # need to compile and link with monodistortion
     
     # "standard" for Serpent GUI are vu, probe, and filerec:
     if "filerec" not in manifest:
@@ -304,6 +305,7 @@ def make_inclfile(arco_path, manifest, outf):
         "tableosc*" in manifest):
         need_wavetables = True
 
+
     ## Include source files to satisfy dependencies
     if need_ringbuf:
         print("    src/ringbuf.h", file=outf)
@@ -339,6 +341,7 @@ def make_inclfile(arco_path, manifest, outf):
 
     if need_wavetables:
         print("    src/wavetables.cpp src/wavetables.h", file=outf)
+
 
     ## Add source files for specified ugens
     print("Adding these unit generator implementations to the executable:")
