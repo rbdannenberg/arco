@@ -83,12 +83,24 @@ public:
     }
 
     ~Reson() {
-        input->unref();
-        center->unref();
-        q->unref();
+        input->unref(&input);
+        center->unref(&center);
+        q->unref(&q);
     }
 
     const char *classname() { return Reson_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = center;
+        } else if (i == 2) { *child = q;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -130,19 +142,19 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
         update_run_channel();
     }
 
     void repl_center(Ugen_ptr ugen) {
-        center->unref();
+        center->unref(&center);
         init_center(ugen);
         update_run_channel();
     }
 
     void repl_q(Ugen_ptr ugen) {
-        q->unref();
+        q->unref(&q);
         init_q(ugen);
         update_run_channel();
     }
@@ -226,7 +238,7 @@ public:
             float fTemp2 = 1.0f / std::max<float>(float(input2[i0]), 0.1f);
             float fTemp3 = (fTemp2 + fTemp1) / fTemp0 + 1.0f;
             state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * ((fTemp1 - fTemp2) / fTemp0 + 1.0f) + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp3;
-            output0[i0] = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp3);
+            output0[i0] = FAUSTFLOAT((state->fRec0[2] + 2.0f * state->fRec0[1] + state->fRec0[0]) / fTemp3);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }
@@ -240,7 +252,7 @@ public:
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-        Reson_state *state = &states[0];
+        Reson_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             (this->*run_channel)(state);
             state++;

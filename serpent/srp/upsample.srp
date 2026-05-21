@@ -1,0 +1,13 @@
+# upsample.srp -- upsample unit generator
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+class Upsample(Ugen):
+    def init(chans, input):
+        super.init(create_ugen_id(), "Upsample", chans, 'a', "U",
+	           'input', input, "bc")
+
+def upsample(input, optional chans = 1):
+    Upsample(chans, input)  # dnsampleb as a function
+

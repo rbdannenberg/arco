@@ -11,6 +11,8 @@ class Implementation:
         self.param_interp = param_interp  # list of True (interpolated) and False
         self.beyond_process = beyond_process  # rest of line after "process(...)"
         self.after_lines = after_lines  # list of lines after line with "process"
+                # param_names, except any parameter declared as constant ('c')
+                # is removed.
 
     def __str__(self):
         return f"Implementation({self.before_lines}, " + \
@@ -64,6 +66,12 @@ def prepare_implementation(ugen_src):
     beyond_process = params[loc3 : ]
     param_names = params[loc + 1 : loc2].replace(",", " ").split()
     param_interp = [p in interpolated for p in param_names]
+    # now check if all variables declared as interpolated exist:
+    for p in interpolated:
+        if not p in param_names:
+            print(f'Error: interpolated parameter "{p}"',
+                  f"not found in parameter list {param_names}.")
+            exit(-1)
     return Implementation(ugen_src[0 : paramline], param_names, param_interp,
                           beyond_process, ugen_src[paramline + 1 : ])
 

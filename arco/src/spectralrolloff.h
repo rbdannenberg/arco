@@ -21,21 +21,17 @@ public:
     float threshold;  // Percentage of spectral energy contained below
                       // the result frequency
     
-    SpectralRolloff(int id, char *reply_addr,
+    SpectralRolloff(int id, Ugen_ptr input, char *reply_addr, 
                     float threshold = 0.85) :
             Ugen(id, 0, 0), fftcalc(BL, AR), threshold(threshold) {
-        printf("SpectralRolloff constructor id %d classname %s\n",
-               id, classname());
         cd_reply_addr = NULL;
-        input = NULL;
+        init_input(input);
         start(reply_addr);
     }
 
+
     ~SpectralRolloff() {
-        printf("~SpectralRolloff called. id %d input->id %d\n", id, input->id);
-        if (input) {
-            input->unref();
-        }
+        input->unref(&input);
         if (cd_reply_addr) {
             O2_FREE(cd_reply_addr);
         }
@@ -46,6 +42,16 @@ public:
     const char *classname() {
         return SpectralRolloff_name;
     }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
     
     void print_details(int indent) {
         arco_print("SpectralRolloff running with threshold %f\n", threshold);
@@ -57,16 +63,19 @@ public:
     }
 
 
-    void repl_input(Ugen_ptr ugen) {
-        if (input) {
-            input->unref();
-        }
+    void init_input(Ugen_ptr ugen) {
         assert(ugen->rate == 'a');
         init_param(ugen, input, &input_stride);
+    }
+
+
+    void repl_input(Ugen_ptr ugen) {
+        input->unref(&input);
         if (ugen->chans > 1) {
             printf("WARNING: Input has more than one channel, only the first "
                    "channel is used for spectral rolloff calculation.\n");
         }
+        init_input(ugen);
     }
 
     void start(const char *reply_addr);

@@ -1,0 +1,113 @@
+# densify.srp -- remember dense measures and insert them to get higher density
+#
+# Roger B. Dannenberg
+#
+# After some experiments, this is a separate module to simplify things
+
+class Measure
+    var pitches
+    var density
+
+    def init(plist):
+        pitches = plist
+        var n = plist.count(REST)
+        density = (16 - n) / 16
+
+
+class Measure_history:
+# remembers list of measures for future replay
+    var history  // list of up to 10 Measures
+    var max_density  // maximum density stored in history
+    
+    def init():
+        history = []
+        max_density = 0
+
+    def add_measure(m):
+    # analyze 1 measure and remember high-density ones
+    # also update max_density
+        m = Measure(m)
+        if m.density > max_density or m.density > 0.5:
+            if len(history) >= 10:
+                // print "Remembering measure with density", m.density
+                var i = pr_range(len(history))
+                if m.density < history[i].density:  // replacing higher density
+                    // recompute density
+                    max_density = 0
+                    for h in history:
+                        max_density = max(h.density, max_density)
+                else:  // save some work
+                    max_density = m.density
+                history[i] = m
+            else:
+                history.append(m)
+        return m
+
+
+    def pick_a_measure():
+    # return a random measure from history or nil if there are none
+        if len(history) == 0:
+            print "WARNING (pick_a_measure): history is empty"
+            return nil
+        pr_choice(history)
+
+
+    def add_phrase(plist):
+    # analyze 2 measures of phrase and remember high-density ones
+    # returns 2 measures extracted from plist
+        if len(plist) >= 32:
+            assert(len(plist) == 32)
+            return Pair(add_measure(subseq(plist, 0, 16)),
+                        add_measure(subseq(plist, 16)))
+        else:
+            assert(len(plist) == 16)
+            var m = add_measure(plist)
+            return Pair(m, m)
+
+
+class Densify:
+    var measure_history
+
+    def init():
+        measure_history = Measure_history()
+
+
+    def replace_measure(phrase, offset, measure, density):
+    # replace the measure in phrase at offset with measure
+        if not measure:  // no replacement was available, ignore call
+            return
+        if measure.density < density:
+            print "replacement skipped because new density", measure.density,
+            print     "< old density", density
+            return
+        for p at i in measure.pitches:
+            phrase[offset + i] = p
+
+
+    def densify(phrase, enabled):
+    # phrase is a list of 16 or 32 sixteenths pitches (-1 for rest)
+    # enabled false means update history but do not densify phrase
+    # enabled true means also densify phrase
+        // first pick dense measures and possibly add to history
+        var replaced = false
+        var original = phrase.copy()
+        assert(len(phrase) == 16 or len(phrase) == 32)
+        var short = (len(phrase) == 16)
+        var measure_pair = measure_history.add_phrase(phrase)
+        if not enabled:
+            return
+        if measure_pair.x.density < 0.3:
+            replace_measure(phrase, 0, measure_history.pick_a_measure(),
+                            measure_pair.x.density)
+            replaced = true
+        if (not short) and measure_pair.y.density < 0.3:
+            replace_measure(phrase, 16, measure_history.pick_a_measure(),
+                            measure_pair.y.density)
+            replaced = true
+        if replaced:
+            print "phrase_finish changed phrase for density:"
+            print "from:", phrase2str(original)
+            print "to:  ", phrase2str(phrase)
+//        else:
+//            display "fill_in?", measure_pair.x.density,
+//            display             measure_pair.y.density        

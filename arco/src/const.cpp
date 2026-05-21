@@ -60,7 +60,7 @@ void arco_const_newn(O2SM_HANDLER_ARGS)
         }
         if (index != argc - 1) {
             ugen_table[const_ugen->id] = NULL;
-            const_ugen->unref();
+            const_ugen->unref((Ugen **) &const_ugen);
             goto bad_args;
         }
         return;

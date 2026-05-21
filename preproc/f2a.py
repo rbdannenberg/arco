@@ -581,7 +581,8 @@ def find_b_rate_parameter_faust_names(classname, impl, src):
 
 def generate_channel_method(fhfile, classname, signature,
                             instvars, impl, src, rate):
-    """Generate and return one channel method. Return True on error
+    """Generate and return one channel method and its slow_vars as a tuple.
+    Return True on error.
     The method is returned in 5 parts:
         the declaration
         the body
@@ -746,6 +747,8 @@ def generate_channel_method(fhfile, classname, signature,
     print("add code for interpolation") # , params_info is", params_info)
     varlist = []
     for i, name in enumerate(impl.param_names):
+        print(f"    name {name}, rate {fhfile[1][1 + i]},",
+              f"interp {impl.param_interp[i]}")
         if impl.param_interp[i] and fhfile[1][1 + i] != 'a':  # interpolated flag and b-rate
             varlist.append(name)
 
@@ -927,7 +930,7 @@ def generate_state_init(classname, instvars, slow_vars):
     for p in slow_vars:
         state_init += f"            states[i].{p}_prev = 0.0f;\n"
     state_init += "        }\n    }\n\n"
-    print(f"** state_init\n{state_init}\n------")
+    print(f"** state_init slow_vars: {slow_vars}\n{state_init}\n------")
     return state_init
 
 
@@ -1107,9 +1110,16 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
     """
     Write the .h file which is most of the ugen dsp code to outf.
 
-    fhfiles is a list of fhfile of the form:
+
+    Parameters
+    ----------
+    classname: the full name of the class, e.g. Sineb
+    impl: an Implementation object (see implementation.py)
+    signature: constructor signature info (see get_signatures() ini params.py)
+    rate: one of 'a', 'b', or 'c'
+    fhfiles: a list of fhfile of the form:
         [filename, signature (ab_b), output (classname)]
-    impl is an Implementation object
+    outf: output file, e.g. for Sineb.h
     """
 
     global fsrc, fimpl  # faust .dsp file and faust-generated .fh file
@@ -1149,9 +1159,11 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
         print("**** signature.params[i]", signature.params[i], 
               signature.params[i].fixed)
         # if only 1 channel or not fixed, we need stride
-        if (signature.params[i].chans > 1 or \
-            not signature.params[i].fixed) and \
-           signature.params[i].abtype != 'c':
+# TODO: Try to understand this...
+#        if (signature.params[i].chans > 1 or \
+#            not signature.params[i].fixed) and \
+#           signature.params[i].abtype != 'c':
+        if signature.params[i].abtype != 'c':
             var_decls += f"    int {p}_stride;\n"
             var_decls += f"    Sample_ptr {p}_samps;\n\n"
 
@@ -1192,17 +1204,29 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
         constructor += f"        run_channel = (void ({classname}::*)("
         constructor +=                          f"{classname}_state *)) 0;\n"
         constructor += "        update_run_channel();\n"
+    else:
+        constructor += "        initialize_channel_states();\n"
     constructor += "    }\n\n"
 
     ## Generate the destructor
     constructor += f"    ~{classname}() {{\n"
     for p in ab_params:
-        constructor += f"        {p}->unref();\n"
+        constructor += f"        {p}->unref(&{p});\n"
     constructor += "    }\n\n"
 
-    ## Generate name() method
+    ## Generate classname() method
     constructor += f"    const char *classname() {{"
     constructor += f" return {classname}_name; }}\n\n"
+
+    ## Generate the ARCO_REF_DEBUG get_ref method
+    constructor += "#if ARCO_REF_DEBUG\n    // for tracing tree of Ugens\n"
+    constructor += "    bool get_ref(int i, Ugen **child) {\n"
+    for i, p in enumerate(sig_params):
+        if signature.params[i].abtype != 'c':
+            condition = "        " + ("if" if i == 0 else "} else if")
+            constructor += f"{condition} (i == {i}) {{ *child = {p};\n"
+    constructor += "        } else { return false;\n        }\n"
+    constructor += "        return true;\n    }\n#endif\n\n"
 
     ## Generate update_run_channel method to set the run_channel
     update_run_channel = ""
@@ -1222,7 +1246,7 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
     ## Generate repl_* methods to set inputs
     for p in ab_params:
         methods += f"    void repl_{p}(Ugen_ptr ugen) {{\n"
-        methods += f"        {p}->unref();\n"
+        methods += f"        {p}->unref(&{p});\n"
         methods += f"        init_{p}(ugen);\n"
         if rate == 'a':
             methods += "        update_run_channel();\n"
@@ -1293,7 +1317,7 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
                     "            terminate(ACTION_TERM);\n        }\n"
 
     # do the signal computation
-    real_run += f"        {classname}_state *state = &states[0];\n"
+    real_run += f"        {classname}_state *state = states.get_array();\n"
     if signature.output.fixed:   # just call run_channel once
         indent = ""
     else:  # create a loop to call run_channel for each channel
@@ -1317,7 +1341,7 @@ def generate_arco_h(classname, impl, signature, rate, fhfiles, outf):
         else:
             real_run += "\n            state++;\n"
             real_run += "            out_samps++;\n"
-        for p in impl.param_names:
+        for p in ab_params:
             real_run += f"            {p}_samps += {p}_stride;\n"
         real_run += "        }\n"
     real_run += "    }\n"

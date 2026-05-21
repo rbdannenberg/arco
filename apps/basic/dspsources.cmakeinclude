@@ -2,6 +2,16 @@ set(ARCO_SRC ${ARCO_SRC}
     src/pwl.cpp src/pwl.h
     src/pwlb.cpp src/pwlb.h
     src/mix.cpp src/mix.h
-    /Users/rbd/arco/ugens/sine/sine.cpp /Users/rbd/arco4/ugens/sine/sine.h
-    /Users/rbd/arco/ugens/mult/mult.cpp /Users/rbd/arco4/ugens/mult/mult.h
+    /Users/rbd/arco/ugens/sine/sine.cpp /Users/rbd/arco/ugens/sine/sine.h
+    /Users/rbd/arco/ugens/sine/sineb.cpp /Users/rbd/arco/ugens/sine/sineb.h
+    src/mathugen.cpp src/mathugen.h
+    src/mathugenb.cpp src/mathugenb.h
+    src/thru.cpp src/thru.h
+    src/zero.cpp src/zero.h
+    src/zerob.cpp src/zerob.h
+    src/fader.cpp src/fader.h
+    src/sum.cpp src/sum.h
+    src/nofileio.cpp src/nofileio.h
 )
+
+target_sources(arcolib PRIVATE ${ARCO_SRC})

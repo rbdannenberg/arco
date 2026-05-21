@@ -25,13 +25,13 @@ void arco_smoothb_new(O2SM_HANDLER_ARGS)
 
 
 /* /arco/smoothb/newn id, cutoff, x0, x1, x2, ... xn-1
- *   create a 1-channel smoothbant initialized to a value, 
+ *   create a multi-channel smoothb and initialize values
  *   this is equivalent to the sequence:
- *        /arco/smoothb/new id n-1 cutoff
- *        /arco/smoothb/set id 0 value
- *        /arco/smoothb/set id 1 value
+ *        /arco/smoothb/new id n cutoff
+ *        /arco/smoothb/set id 0 x0
+ *        /arco/smoothb/set id 1 x1
  *        ...
- *        /arco/smoothb/set id n-1 value
+ *        /arco/smoothb/set id n-1 xn-1
  */
 void arco_smoothb_newn(O2SM_HANDLER_ARGS)
 {
@@ -63,12 +63,12 @@ void arco_smoothb_newn(O2SM_HANDLER_ARGS)
 
 
 /* /arco/smoothb/setn id, x0, x1, x2 ... xn-1
- *   create an n-1-channel smoothbant initialized to the xi
+ *   set n channels of smoothb to values
  *   this is equivalent to the sequence:
- *        /arco/smoothb/set id 0 value
- *        /arco/smoothb/set id 1 value
+ *        /arco/smoothb/set id 0 x0
+ *        /arco/smoothb/set id 1 x1
  *        ...
- *        /arco/smoothb/set id n-1 value
+ *        /arco/smoothb/set id n-1 xn-1
  */
 void arco_smoothb_setn(O2SM_HANDLER_ARGS)
 {

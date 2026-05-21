@@ -9,8 +9,7 @@
 
 const char *Feedback_name = "Feedback";
 
-/* O2SM INTERFACE: /arco/feedback/new int32 id, int32 chans, 
-                          int32 input_id, int32 from_id, int32 gain_id;
+/* O2SM INTERFACE: /arco/feedback/new int32 id, int32 chans, int32 input_id;
  */
 void arco_feedback_new(O2SM_HANDLER_ARGS)
 {
@@ -18,14 +17,10 @@ void arco_feedback_new(O2SM_HANDLER_ARGS)
     int32_t id = argv[0]->i;
     int32_t chans = argv[1]->i;
     int32_t input_id = argv[2]->i;
-    int32_t from_id = argv[3]->i;
-    int32_t gain_id = argv[4]->i;
     // end unpack message
 
     ANY_UGEN_FROM_ID(input, input_id, "arco_feedback_new");
-    ANY_UGEN_FROM_ID(from, from_id, "arco_feedback_new");
-    ANY_UGEN_FROM_ID(gain, gain_id, "arco_feedback_new");
-    new Feedback(id, chans, input, from, gain);
+    new Feedback(id, chans, input);
 }
 
 
@@ -92,7 +87,7 @@ static void arco_feedback_set_gain(O2SM_HANDLER_ARGS)
 static void feedback_init()
 {
     // O2SM INTERFACE INITIALIZATION: (machine generated)
-    o2sm_method_new("/arco/feedback/new", "iiiii", arco_feedback_new, NULL,
+    o2sm_method_new("/arco/feedback/new", "iii", arco_feedback_new, NULL,
                     true, true);
     o2sm_method_new("/arco/feedback/repl_input", "ii",
                     arco_feedback_repl_input, NULL, true, true);

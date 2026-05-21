@@ -1,0 +1,641 @@
+;; makesamps.sal -- extract samples for pointillism
+;;
+;; Roger B. Dannenberg
+;; March 2026
+
+variable *fileio-verbose*
+set *fileio-verbose* = nil
+
+variable *filename* = nil,
+         *set-number* = "0",  ;; suffix for metadata and samples (string)
+         *exceptions* = {},    ;; candidates to omit from sample pool
+         *min-step* = 65,      ;; minimum for yin
+         *max-step* = 81,      ;; maximum for yin
+         *max-sample-dur* = 5, ;; cut all samples to this max duration
+         *yin-threshold* = 0.005,  ;; inharmonicity cutoff for good pitch
+         *pitch-version* = 2,  ;; which version of pitch processing to use
+         *did-plot-yet*
+
+set *did-plot-yet* = nil
+
+function read-inp-file(offset: 0, dur: 10000.0)
+  begin with s = s-read(*filename*, time-offset: offset, dur: dur)[0]
+    set file-srate = snd-srate(s)
+    return s
+  end
+
+
+variable *threshold* = 0.003
+
+
+function pre-process-file()
+  begin
+    with r = rms(read-inp-file(), 10)
+    display "pre-process-file", *filename*
+    set rms-array = snd-samples(r, ny:all)
+    set rms-rate = snd-srate(r)
+    set rms-period = 1.0 / rms-rate
+    set min-frames-for-sample = truncate(2 * rms-rate)
+    print "length", length(rms-array)
+  end
+
+
+function locate-threshold-crossing-after(time)
+  begin
+    display "locate-threshold-crossing-after", time
+    loop
+      for i from truncate(time * snd-srate(r)) below length(rms-array)
+      if rms-array[i] > *threshold* then
+        return i / snd-srate(r)
+    end
+  end
+
+; print "test find xing", locate-threshold-crossing-after(
+;                           read-inp-file("tpt1.wav"), 10)
+
+
+;; to locate a candidate: scan for crossing. Look for at least
+;; 2 seconds above threshold. Keep scanning until below threshold
+;;
+function find-sample(start)
+  ;; start is an rms-array index
+  begin
+    with start-index, end-index
+    ; display "find-sample", start
+    loop
+      for i from start below length(rms-array)
+      if rms-array[i] > *threshold* then
+        begin
+          set start-index = i
+          set end-index = test-for-run(i)
+          if end-index & check-for-silence-before(start-index) then
+            return list(start-index - 1, end-index + 1)
+        end
+    end
+    return nil
+  end
+
+
+;; test if there are at least min-frames-for-sample rms values
+;; above *threshold* and then 1 second of values below threshold.
+;; If not return nil; if so, return index
+;; where rms-array goes back below *threshold*
+function test-for-run(i)
+  begin
+    ; display "test-for-run", i, i * rms-period
+    if length(rms-array) - i <= min-frames-for-sample then
+      return nil
+    loop
+      for j from i below i + min-frames-for-sample
+      if rms-array[j] < *threshold* then
+        return nil
+    end
+    loop
+      with j = i + min-frames-for-sample
+      while j < length(rms-array) & rms-array[j] > *threshold*
+      set j += 1
+      finally return check-for-silence-at(j)
+    end
+  end
+
+
+;; check that at j, which is below threshold, there are rms-rate
+;; more frames below threshold (clean note termination)
+function check-for-silence-at(i)
+  begin
+    if length(rms-array) - i <= rms-rate - 1 then return nil
+    loop
+      for j from i below i + truncate(rms-rate)
+      if rms-array[j] > *threshold* then return nil
+    end
+    return i
+  end
+
+
+;; check for silence before frame i
+function check-for-silence-before(i)
+  begin
+    if i <= rms-rate - 1 then return nil
+    loop
+      for j from i - truncate(rms-rate) below i
+      if rms-array[j] > *threshold* then return nil
+    end
+    return t
+  end
+
+
+function rms-over-range(start, stop)
+  ;; start/stop are rms-array indexes
+  begin
+    print "RMS from", start, "to", stop
+    loop
+      for i from start below stop
+      if i < 0 | i >= length(rms-array) then return nil
+      print i * rms-period, ":", rms-array[i]
+    end
+  end
+
+
+;; compute the average over a range
+function average-rms(i, j)
+  begin with sum = 0
+    loop for f from i below j
+      set sum += rms-array[f]
+    end
+    return sum / (j - i)
+  end
+
+
+;; compute yin for a segment of the input file
+function compute-yin(start, stop)
+  begin
+    with s = read-inp-file(offset: start, dur: stop - start)
+    return yin(s, *min-step*, *max-step*, round(file-srate / 25))
+  end
+
+function lessthan(a, b) return a < b
+
+;; compute average of step values where confidence is above threshold
+function average-step(start, stop)
+  begin
+    with y = compute-yin(start, stop),
+         ysteps = snd-samples(y[0], ny:all),
+         yinh = snd-samples(y[1], ny:all),
+         sum = 0, n = 0, avg = 0, m = 0
+
+    if *pitch-version* = 1 then
+      begin
+        loop for i from 0 below length(ysteps)
+          if yinh[i] < 0.01 then
+            begin
+              ; if start > 1351 then display "small yinh", i, yinh[i]
+              set sum += ysteps[i]
+              set n += 1
+            end
+        end
+        if n > 0 then
+          set avg = sum / n
+      end
+    else if *pitch-version* = 2 then
+      begin with plen = length(ysteps), plist
+        loop for i from 0 below plen set plist @= ysteps[i] end
+        set plist = sort(plist, quote(lessthan))
+        set avg = nth(plen / 2, plist)
+        display "average-step", avg
+        ;; fix octave errors
+        set plist = nil
+        loop with diff for i from 0 below plen
+          set diff = abs(ysteps[i] - avg)
+          if abs(diff - 12) < 0.5 then  ;; octave error
+            set ysteps[i] = #if(ysteps[i] < avg, ysteps[i] + 12, ysteps[i] - 12)
+        end
+        ;; compute median again with corrected ysteps
+        loop for i from 0 below plen set plist @= ysteps[i] end
+        set plist = sort(plist, quote(lessthan))
+        set avg = nth(plen / 2, plist)
+        display "average-step after correction", avg
+
+        ;; count number of good pitch estimates
+        loop for i from 0 below length(ysteps)
+          if yinh[i] < 0.01 then set n += 1
+        end       
+
+      end        
+    else exec error("bad *pitch-version*")
+
+    ;; sanity check: make sure 90% of yin output is within 1 of average
+    loop for i from 0 below length(ysteps)
+      if yinh[i] < *yin-threshold* & abs(ysteps[i] - avg) < 1 then
+        set m += 1
+    end
+
+    if ! *did-plot-yet* & start > 1351 then
+      begin
+        plot clip(snd-from-array(0, 25, yinh), 0.05)
+        ; loop for i from 0 below length(yinh) print yinh[i] end
+        ; plot snd-from-array(0, 25, ysteps)
+        set *did-plot-yet* = t
+      end
+
+    if m < 0.9 * n then
+      begin
+        display "average-step - unsteady pitch", start, stop, m, 0.9 * n, avg, *yin-threshold*
+        return nil
+      end
+    
+    if n = 0 then
+      begin
+        display "average-step - no pitch", start, stop, m, 0.9 * n, avg, *yin-threshold*
+        return nil
+      end
+    return avg
+  end
+
+
+;; analyze a time range
+function analyze-seg(seg)
+  begin
+    with seg-start = round(first(seg) * rms-rate),
+         seg-stop = round(min(second(seg), first(seg) + *max-sample-dur*) * rms-rate),
+         avg-rms = average-rms(seg-start + 1, seg-stop - 1),
+         ;; clip 0.1 sec from beginning and end
+         avg-step = average-step(first(seg) + 0.1, second(seg) - 0.1)
+    return list(first(seg), (seg-stop + 1) * rms-period, avg-rms, avg-step)
+  end
+    
+
+;; for each segment, compute average pitch and rms
+function analyze-segments(segs)
+  loop with data, segdata
+    for seg in segs
+    set segdata = analyze-seg(seg)
+    if fourth(segdata) then
+      set data @= segdata
+    finally return reverse(data)
+  end
+
+
+;; adjust the pitch by ratio: >1 makes it sharper
+function fix-pitch(s, ratio)
+  begin
+    set s = abs-env(sound(s) ~~ ratio)  ;; stretch then resample
+    return resample(s, file-srate)
+  end
+
+
+;; decay to zero in case sample is clipped
+function smooth(s)
+  return s * pwlv(1, *max-sample-dur* - 0.3, 1, *max-sample-dur*, 0)
+
+
+function make-sample-file(start, stop, pitch, keynum, savename)
+  begin with ratio = step-to-hz(pitch) / step-to-hz(keynum)
+    if *fileio-verbose* then
+      print "writing sample file", savename, ratio, pitch, keynum
+    ;; resample to do pitch correction
+    exec s-save(smooth(fix-pitch(read-inp-file(offset: start,
+                                               dur: stop - start),
+                                 ratio)),
+                ny:all, savename)
+  end    
+
+
+function write-samples(dirname, cands)
+  begin with outf, labels, sname
+    ;; write metadata and create files
+    set outf = open(strcat(dirname, "/list.txt"),
+                    direction: :output)
+    loop for cand in cands for id from 1
+      set sname = format(nil, "/samp~A", id)
+      if ! member(id, *exceptions*) then
+        begin with p = round(fourth(cand))  ;; rounded pitch
+          exec #princ(id, outf)
+          exec #princ(" ", outf)
+          exec #princ(first(cand), outf)
+          exec #princ(" ", outf)
+          exec #princ(second(cand), outf)
+          exec #princ(" ", outf)
+          exec #princ(third(cand), outf)
+          exec #princ(" ", outf)
+          exec #princ(p, outf)
+          exec #princ("\n", outf)
+          ; create the file
+          exec make-sample-file(first(cand), second(cand), fourth(cand), p,
+                                strcat(dirname, sname, ".wav"))
+          ;; write labels
+          set labels @= list(first(cand), second(cand), sname)
+        end
+      else
+        print "not writing sample file", sname
+    end
+    exec write-labels(strcat(dirname, "/labels.txt"), labels)
+    exec close(outf)
+  end
+
+
+;; pick the candidates to turn into samples
+;; -------------------------------------------
+;; cands are (start stop rms step number db) but db is added
+;;   by this function
+;; let's go for a 33dB range from softest to loudest, so
+;; if the loudest is 0dB, the softest is -33dB, and the
+;; difference in each step is 3dB
+;; first, number the candidates by appending 1 through N
+;; for each pitch, put the candidates into a list
+;; sort the list by RMS
+;; scale the RMS values and convert into dB with the range -33 to 0
+;; appending the dB value to each candidate
+;; place the samples into 12 bins centered from -33 to 0
+;; for each empty bin, see if a neighbor has 2 samples. If so, move
+;; the closest one to the empty bin. If both neighbors have 2 or more
+;; samples, move the one closest to the empty bin's center.
+;; Scan bins again. If there is an empty bin, find the closest bin with
+;; 2 or more samples and "slide" samples toward the empty bin. If bins
+;; above and below are equidistant, move the sample closest to the
+;; empty bin center.
+;; Scan bins again. If there is an empty bin, *duplicate* the closest.
+;; Now all bins are populated with at least one sample.
+;; Scan bins again. If there are multiple samples in a bin, keep the
+;; one closest to the bin center and remove the others.  Append the
+;; removed samples to the *exceptions* list so they are not written.
+;; Now write to map.txt file with format:
+;;    <keynum> <bin> "samp<N>.wav" <rms>
+;; where <keynum> is the MIDI pitch, <bin> is the bin number (0 - 11),
+;; <N> is the candidate number and <rms> is the actual rms of the sample.
+;;
+function cand-rms(cand) return third(cand)
+function cand-num(cand) return first(cddddr(cand))  ;; 5th element
+function cand-db(cand) return second(cddddr(cand))  ;; 6th element
+function lessrms(a, b) return third(a) < third(b)
+;; cands is a list of candidates, all for keynum, and mapf is open file
+;; for writing to map.txt:
+function candidate-selection(cands, keynum, mapf)
+  begin
+    with minrms, maxrms, bins
+
+    display "begin candidate-selection", length(cands)
+
+    ;; sort by RMS
+    set cands = append(cands, nil)  ;; make a copy before destructive sort
+    set cands = sort(cands, quote(lessrms))
+    set minrms = third(first(cands))
+    set maxrms = third(first(last(cands)))
+    set dbscale = 33.0 / (linear-to-db(maxrms) - linear-to-db(minrms))
+    ;; append expanded dB values to each candidate:
+    loop for cand in cands 
+         ;; last cand (maxrms) is 0dB and remains at 0dB
+         ;; first cand (minrms) is -XdB and is scaled to -33 by dbscale
+         set cand &= linear-to-db(third(cand) / maxrms) * dbscale end
+    ;; place candidates into 12 bins    
+    set bins = make-array(12)
+    loop with binno for cand in cands
+         set binno = round((cand-db(cand) + 33) / 3)
+         if binno < 0 | binno > 11 then
+           begin
+             print "WARNING: unexpected cand-db", cand
+             set binno = max(min(binno, 11), 0)
+           end
+         set bins[binno] &= cand
+    end
+
+    print "begin candidate-selection"
+    loop for i from 0 below 12 print "  ", i, bins[i] end
+
+    ;; slide a candidate to occupy an empty bin
+    loop for i from 0 below 12
+      if ! bins[i] then exec fill-bin-from-neighbor(bins, i)
+    end
+
+    print "after fill-bin-from-neighbor candidate-selection"
+    loop for i from 0 below 12 print "  ", i, bins[i] end
+
+    ;; slide from crowded to to empty bins
+    loop while spread-out-to-fill-bins(bins) end
+
+    print "after spread-out-to-fill-bins candidate-selection"
+    loop for i from 0 below 12 print "  ", i, bins[i] end
+
+    ;;  now we've spread out candidates but may still have empty bins
+    loop while fill-gaps-with-duplicates(bins) end
+
+    print "after fill-gaps-with-duplicates candidate-selection"
+    loop for i from 0 below 12 print "  ", i, bins[i] end
+
+    ;; remove extras
+    loop for i from 0 below 12
+      if length(bins[i]) > 1 then
+        exec bin-prune(bins, i)
+    end
+    ;; write to mapf
+    loop with cand for i from 0 below 12
+      set cand = first(bins[i])
+      exec #princ(format(nil, "~A ~A samp~A.wav ~A\n",
+                    keynum, i, cand-num(cand), cand-rms(cand)), mapf)
+    end
+
+    print "exit candidate-selection"
+    loop for i from 0 below 12 print "  ", i, bins[i] end
+
+    return bins
+  end
+    
+
+function fill-bin-from-neighbor(bins, i)
+  begin
+    with lower = max(0, i - 1), upper = min(11, i + 1),
+         lower-db, upper-db, steal-from,
+         bin-db = -33 + i * 3
+    if length(bins[lower]) > 1 then
+      set lower-db = cand-db(first(last(bins[lower])))
+    if length(bins[upper]) > 1 then
+      set upper-db = cand-db(first(bins[upper]))
+    if lower-db & upper-db then
+      begin
+        if bin-db - lower-db < upper-db - bin-db then
+          set steal-from = lower
+        else set steal-from = upper
+      end
+    else if lower-db then set steal-from = lower
+    else if upper-db then set steal-from = upper
+    if steal-from then ;; move last to this bin
+      exec steal-from-list(bins, steal-from, i)
+  end
+      
+
+;; move a candidate from bins[src] to bins[dst]
+;;
+;; moves either first or last depending on direction
+;;
+function steal-from-list(bins, src, dst)
+  begin
+    if src < dst then  ;; move forward
+      begin
+        with src-rev = reverse(bins[src]),
+             stolen = first(src-rev)
+        set bins[src] = reverse(rest(src-rev)),
+            bins[dst] = list(stolen)
+      end
+    else  ;; move backward
+      set bins[dst] = list(first(bins[src])),
+          bins[src] = rest(bins[src])
+  end
+
+
+;; slide from crowded toward empty bins. Find an
+;; empty bin and fill it by sliding from the closest supply
+;; Return true if an empty bin was filled. False if no
+;; progress was made.
+;;
+function spread-out-to-fill-bins(bins)
+  begin
+    ;; first find an empty bin
+    with i = 0, j, k, supply, ii, dir
+    loop while i < 12 & bins[i] set i += 1 end
+    if i = 12 then return nil
+    ;; now i is the empty bin to fill
+    ;; find supply below
+    set j = i - 1
+    loop while j >= 0 & length(bins[j]) < 2 set j -= 1 end
+    ;; find supply above
+    set k = i + 1
+    loop while k < 12 & length(bins[k]) < 2 set k += 1 end
+    ;; now if j >= 0, j is a supply, if k < 12, k is a supply
+    if j >= 0 & k < 12 then
+      set supply = #if(k - i < i - j, k, j) ;; closest
+    else if j >= 0 then set supply = j
+    else if k < 12 then set supply = k
+    else return nil
+    ;; now slide from supply toward i, sort of a bubble algorithm
+    ;; from i toward supply, moving by steps of dir (+1 or -1)
+    set ii = i, dir = #if(supply > i, 1, -1)
+    loop repeat abs(supply - i) - 1
+      set bins[ii] = bins[ii + dir], ii += dir
+    end
+    exec steal-from-list(bins, supply, supply - dir)
+    return t
+  end
+    
+
+;; copy nearest bin to fill empty bins
+;;
+function fill-gaps-with-duplicates(bins)
+  begin with i, j, k, lower-db, upper-db, bin-db
+    loop for i from 0 below 12
+      if length(bins[i]) = 0 then
+        begin
+          ;; find supply below
+          set j = i - 1
+          loop while j >= 0 & length(bins[j]) < 1 set j -= 1 end
+          ;; find supply above
+          set k = i + 1
+          loop while k < 12 & length(bins[k]) < 1 set k += 1 end
+          ;; now if j >= 0, j is a supply, if k < 12, k is a supply
+          if j >= 0 then ;; duplicate the closest one to bin center
+            set lower-db = cand-db(first(bins[j]))
+          if k < 12 then
+            set upper-db = cand-db(first(bins[k]))
+          set bin-db = -33 + i * 3
+          if lower-db & upper-db then
+            set copy-from = #if(bin-db - lower-db < upper-db - bin-db, j, k)
+          else if lower-db then set copy-from = j
+          else if upper-db then set copy-from = k
+          else
+            begin
+              display "error", lower-db, upper-db, j, k, i, bins
+              exec error("expected a bin to copy from")
+            end
+          ;; make the copy
+          set bins[i] = bins[copy-from]
+        end
+    end
+  end    
+
+
+;; bin-prune -- remove extras. The algorithm searches for the closest
+;;   option in dB to the mid-point between the bin below and the first
+;;   candidate in the bin above. This was intended to spread out the
+;;   dB levels going from one bin to the next. It is no optimal because
+;;   when we look to the bin above, we take the first dB level there,
+;;   but if there are many candidates there, this might not be the final
+;;   candidate in that bin, which means it might be higher and that we
+;;   should have chosen a higher dB level for this bin.
+;;
+function bin-prune(bins, i)
+  begin
+    if i = 0 then set bins[i] = list(first(bins[i]))
+    else if i = 11 then set bins[i] = last(bins[i])
+    else
+      begin
+        with prev-db = cand-db(first(last(bins[i - 1]))),
+             next-db = cand-db(first(bins[i + 1])),
+             mean-db = (prev-db + next-db) * 0.5,
+             closest = first(bins[i]), best = 999
+        loop for cand in bins[i]
+          if abs(cand-db(cand) - mean-db) < best then
+            set closest = cand, best = abs(cand-db(cand) - mean-db)
+        end
+        ;; replace bins[i] with the closest to the mean
+        set bins[i] = list(closest)
+      end
+  end
+            
+
+function main()
+  begin
+    with start = 0, cands, cand-array, mapf, dirname
+
+    ;; info about file to analyze
+    if #t then
+      set *filename* = "./samples/tpt1.wav",
+          *set-number* = "1",
+          *exceptions* = {27 55 88 91 126 144 147},  ;; samples to omit
+          *yin-threshold* = 0.005,
+          *pitch-version* = 1
+    
+    else if #f then
+      set *filename* = "./samples/tpt2.wav",
+          *set-number* = "2",
+          *exceptions* = {1 4 27 38 47 48},  ;; samples to omit
+          *yin-threshold* = 0.025,
+          *pitch-version* = 2
+    
+
+    exec pre-process-file()
+    ; exec rms-over-range(35, 42)
+    print "after preprocess: length(rms)", length(rms-array),
+          "dur", length(rms-array) * rms-period
+    loop
+      with cand = t
+      repeat 1000
+      while cand
+      set cand = find-sample(start)
+      display "after find-sample", start, cand
+      if cand then
+        begin
+          ; print "candidate", first(cand) * rms-period, "to",
+          ;       second(cand) * rms-period, cand
+          set cands @= list(first(cand) * rms-period,
+                            second(cand) * rms-period)
+          set start = second(cand)
+        end
+    end
+    set cands = reverse(cands)
+    print cands
+
+    ;; once we have candidates, get their pitch and average rms
+    set cands = analyze-segments(cands)
+    loop for cand in cands
+      print first(cand), second(cand), third(cand), fourth(cand)
+    end
+
+    ;; number the candidates
+    loop for cand in cands for i from 1 set cand &= i end
+
+    ;; collect candidates into 12 pitches
+    set cand-array = make-array(12)
+    loop with p for cand in cands for i from 1
+      set p = round(fourth(cand))
+      if p >= 69 & p <= 80 & ! member(i, *exceptions*) then ;; from A4 to G#5
+        set cand-array[p - 69] @= cand
+      else
+        set *exceptions* @= i
+    end
+
+    ;; make directory for samples and data if needed
+    set dirname = strcat("./samples/set", *set-number*)
+    exec system(strcat("mkdir -p ", dirname))
+
+    ;; select samples we really want and build maps
+    set mapf = open(strcat(dirname, "/map.txt"),
+                    direction: :output)
+    loop for i from 0 below 12
+      if length(cand-array[i]) > 0 then
+        exec candidate-selection(cand-array[i], 69 + i, mapf)
+      else
+        print "No candidates for", i, 69 + i
+    end
+    exec close(mapf)
+    exec write-samples(dirname, cands)
+  end
+
+exec main()

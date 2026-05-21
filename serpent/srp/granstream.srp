@@ -6,8 +6,8 @@
 class Granstream (Ugen):
     def init(chans, input, polyphony, dur, enable):
         super.init(create_ugen_id(), "Granstream", chans, 'a', "UifB",
-	           'input', input, 'polyphony', polyphony, 'dur', dur,
-                   'enable', enable)
+	           'input', input, "a", 'polyphony', polyphony, "f",
+                   'dur', dur, "f", 'enable', enable, "f")
 
     def set_gain(gain)
         o2_send_cmd("/arco/granstream/gain", 0, "Uf", id, gain)

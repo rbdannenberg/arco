@@ -177,6 +177,14 @@ class Ugen : public O2obj {
     
     virtual void real_run() = 0;
 
+#define RUN(samps, ugen, bc) { if (bc > ugen->current_block) {   \
+            Sample_ptr save_out_samps = ugen->out_samps; \
+            ugen->current_block = bc; \
+            ugen->real_run(); \
+            ugen->out_samps = save_out_samps; } \
+        samps = ugen->out_samps; }
+
+
     virtual Sample_ptr run(int block_count) {
         Sample_ptr save_out_samps = out_samps;
         if (block_count > current_block) {

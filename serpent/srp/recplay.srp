@@ -12,8 +12,8 @@ class Recplay (Ugen):
 
     def init(chans, input, gain, fade_time, loop):
         super.init(create_ugen_id(), "Recplay", chans, 'a', "UUfB",
-                   'input', input, 'gain', gain, 'fade_time', fade_time,
-                   'loop', loop)
+                   'input', input, "a", 'gain', gain, "bc",
+                   'fade_time', fade_time, "f", 'loop', loop, "f")
 
     def record(record_flag):
         o2_send_cmd("/arco/recplay/rec", 0, "UB", id, record_flag)

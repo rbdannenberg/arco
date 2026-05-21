@@ -6,7 +6,7 @@
 class Onset(Ugen):
     def init(input, reply_addr):
         super.init(create_ugen_id(), "Onset", 0, 'a', "Usiff", omit_chans = t,
-                   'input', input, 'reply_addr', reply_addr)
+                   'input', input, "a", 'reply_addr', reply_addr, "f")
 
 
 def onset(input, reply_addr):

@@ -13,6 +13,7 @@ fileplay
 filerec
 recplay
 delay
+delayvi
 allpass
 olapitchshift
 feedback

@@ -12,7 +12,7 @@ class Shift_delay_bank:
         delay_objs = array(length)
         for i = 0 to length:
             delay_objs[i] = delay(input_ugen, 1.0, 0.0, 2.0)
-            shift_objs[i] = ola_pitch_shift(delay_objs[i], 1, 0.01, 0.05)
+            shift_objs[i] = olapitchshift(delay_objs[i], 1, 0.01, 0.05)
 
     def set_delay(i, delay_value):
     # Sets the delay of the ith delay objects

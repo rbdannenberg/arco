@@ -1,0 +1,88 @@
+# phraserecorder.srp -- optional file to record transcriptions
+#
+# Roger B. Dannenberg
+# Sep 2025
+
+TRANSCRIPTIONS_ENABLED = false
+
+recphr_file = nil
+
+def need_new_file(basename, ext):
+# open a unique new file based on basename and ext
+# ext should include "."
+    var datafile_id = 1
+    var data_file_name = basename + leftpad(data_file_id, 3, "0") + ext
+    var data_file = open(data_file_name, "r")
+    while data_file:
+        data_file.close()
+        data_file_id = data_file_id + 1
+        data_file_name = basename + leftpad(data_file_id, 3, "0") + ext
+        data_file = open(data_file_name, "r")
+    # now, data_file_name does not already exist, so safe to write
+    return open(data_file_name, "w")
+
+
+def maybe_record_phrase(phrase, short):
+    if not TRANSCRIPTIONS_ENABLED:
+        return
+    if not recphr_file:
+        recphr_file = need_new_file("transcriptions", ".dat")
+    if short:
+        phrase = subseq(phrase, 0, 16)
+    recphr_file.write(str(phrase))
+    recphr_file.write("\n")
+    recphr_file.flush()
+
+
+def read_int_array(inf):
+    var token = inf.readvalue()
+    if not token:
+        return nil
+    if issymbol(token) and find(str(token), "[") != 0:
+        print "read_array did not find array"
+        return nil
+    var astr = [subseq(str(token), 1)]
+    var rslt = []
+    var done = false
+    while not done:
+        token = str(inf.readvalue())
+        astr.append(token)
+        if token.last() == "]":
+            astr[len(astr) - 1] = subseq(astr.last(), 0, -1)
+            done = true
+    astr = flatten(astr)
+    // now array is one long string
+    loc = 0
+    while loc < len(astr):
+        var loc2 = find(astr, ",", loc)
+        if loc2 <= 0:
+            loc2 = len(astr)
+        rslt.append(int(subseq(astr, loc, loc2)))
+        loc = loc2 + 1
+    return rslt
+
+
+def phrase_reader(filename):
+# read all phrases from transcription file. Each phrase
+# is a list of 16 or 32 pitch/rest values.
+# Returns a list of lists.
+    var inf = open(filename, "r")
+    if not inf:
+        print "ERROR: could not open", filename
+        return
+    var phrases = []
+    while true:
+        var result = read_value(inf)  // from prefs
+        if isstring(rslt):
+            print "phrase_reader returning partial list because of"
+            print "    error parsing file"
+            return phrases
+        if not result:
+            inf.close()
+            // print "phrase_reader got ["
+            // for p in phrases: print p; ","
+            // print "]"
+            return phrases
+        assert(len(result) == 16 or len(result) == 32)
+        phrases.append(result)
+        

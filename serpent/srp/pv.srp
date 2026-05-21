@@ -6,8 +6,9 @@
 class Pv(Ugen):
     def init(chans, input, ratio, fftsize, hopsize, points, mode):
         super.init(create_ugen_id(), "pv", chans, 'a', "Ufiiii",
-	           'input', input, 'ratio', ratio, 'fftsize', fftsize,
-                   'hopsize', hopsize, 'points', points, 'mode', mode)
+	           'input', input, "a",     'ratio', ratio, "f",
+                   'fftsize', fftsize, "f", 'hopsize', hopsize, "f",
+                   'points', points, "f",   'mode', mode, "f")
     
     def set_ratio(value):
         o2_send_cmd("/arco/pv/ratio", 0, "Uf", id, value)

@@ -5,16 +5,12 @@
 def sine(freq, amp, optional chans):
     if not chans:
         chans = max_chans(max_chans(1, freq), amp)
-    Ugen(create_ugen_id(), "sine", chans, 'a', "UU", 'freq', freq, 'amp', amp)
+    Ugen(create_ugen_id(), "sine", chans, 'a', "UU", 'freq', freq, "abc",
+         'amp', amp, "abc")
 
 def sineb(freq, amp, optional chans):
-    if not isnumber(freq) and freq.rate == 'a':
-        print "ERROR: 'freq' input to Ugen 'sineb' must be block rate"
-        return nil
-    if not isnumber(amp) and amp.rate == 'a':
-        print "ERROR: 'amp' input to Ugen 'sineb' must be block rate"
-        return nil
     if not chans:
         chans = max_chans(max_chans(1, freq), amp)
-    Ugen(create_ugen_id(), "sineb", chans, 'b', "UU", 'freq', freq, 'amp', amp)
+    Ugen(create_ugen_id(), "sineb", chans, 'b', "UU", 'freq', freq, "bc",
+         'amp', amp, "bc")
 

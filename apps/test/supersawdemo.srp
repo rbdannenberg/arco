@@ -23,12 +23,14 @@ BEGINNING_NOTES = true
 SUPERSAW1 = {'synth': 'Supersaw_synth', 'rolloff': 0.5, 'animate': SSEANI,
              'n': SSEN}
 
+SSVEL = 60
+
 def supersaw_example_chord(chd, score_dur, note_dur, antialias, 
                            animate, cutoff):
     var chord = Score()
     for p at i in chd:
         if not SELECT or SELECT == i:
-            var note = Note(0, p, 60, note_dur, decay = 2,
+            var note = Note(0, p, SSVEL, note_dur, decay = 2,
                             chans = 2, detune = 0.3, width = 1,
                             animate = animate,
                             antialias = antialias, attack = 0.02)
@@ -76,16 +78,16 @@ def supersaw_example_seq(antialias, animate, optional cutoff):
 def supersaw_example()
     var score = Score()
     if BEGINNING_NOTES:
-        score.append(Note(0, pC3, 80, 3, n = SSEN, detune = 0.3,
+        score.append(Note(0, pC3, SSVEL, 3, n = SSEN, detune = 0.3,
                       attack = 0.4, decay = 0.5))
         score.append_rest(1)
-        score.append(Note(0, pD3, 80, 3, n = SSEN, detune = 0.3,
+        score.append(Note(0, pD3, SSVEL, 3, n = SSEN, detune = 0.3,
                       attack = 0.4, decay = 0.5, lfofreq = 5, lfodepth = 0.25))
         score.append_rest(1)
-        score.append(Note(0, pE3, 80, 3, n = SSEN, detune = 1.0, 
+        score.append(Note(0, pE3, SSVEL, 3, n = SSEN, detune = 1.0, 
                       width = 0.2, chans = 2, attack = 0.4, decay = 0.5))
         score.append_rest(1)
-        score.append(Note(0, pF3, 80, 3, n = SSEN, detune = 1.0,
+        score.append(Note(0, pF3, SSVEL, 3, n = SSEN, detune = 1.0,
                       attack = 0.4, decay = 0.5, chans = 2))
     score.append_rest(1)
     score.append(supersaw_example_seq(SSEANI, 1, 12))

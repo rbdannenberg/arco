@@ -13,6 +13,14 @@ public:
 
     const char *classname() { return Testtone_name; }
 
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        return false;  // Testtone has no Ugen children
+    }
+#endif
+
     void real_run() {
         Sample_ptr dst = &output[0];
         for (int i = 0; i < BL; i++) {

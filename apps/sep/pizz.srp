@@ -53,7 +53,7 @@ class Pizz (Instrument):
         if off:
             print "Pizz.echo: off is set; removing recplay", name, "from mixer"
             count = count - 1
-            mix.rem(name)
+            mix.rem(name, 0.1, FADE_LINEAR)
         else:
             print "Pizz.echo: (re)starting playback from", name
             rp.start(0)

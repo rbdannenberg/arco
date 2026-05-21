@@ -1,0 +1,128 @@
+# init.srp -- Serpent library for controlling Arco
+#
+# Roger B. Dannenberg
+# Jan 2022
+
+# call arco_init(ensemble) to start
+# call arco_run() after setting up UI and or scheduling things
+# arco_ready is set to true when arco is ready for action
+
+print "apps/test/init.srp is loading, getcwd() ->", getcwd()
+
+require "debug"
+require "wxserpent"
+require "arco"
+require "allugens"
+require "mididevice"
+require "launchpadx"
+require "sched"
+require "samps"
+require "velocity"
+require "prob"
+
+ui_initialized = false
+ready_count = 0
+
+def arco_ready():
+# called when arco is intialized and ready to make sound or when
+# arco audio stream has been reopened
+    display "**** arco audio is running! ****", ready_count
+    
+    ready_count = ready_count + 1
+    if ready_count > 1:
+        display "arco_ready called again", ready_count
+        breakpoint()
+    var win = default_window
+    if ui_initialized:
+        return
+
+    display "arco_ready called in init.srp"
+    midi_devices = Midi_devices(prefs, latency = 0)
+
+    // display WXS_DEFAULT_HEIGHT, WXS_DEFAULT_SPACE
+    var WIDTH = 170
+    var COLUMN_X = 5  // changes to 200 for Column 2
+
+    wxs_x = COLUMN_X
+    Button(win, "Load", 'S', 20, WIDTH, 25, 'loadbutton')
+    loadbutton.add_callback('load_samples', 'x')
+
+    Checkbox(win, "Run", 'S', 'D', WIDTH, 'S', 'runcheckbox')
+    runcheckbox.add_callback('run_dsp', 'x')
+
+    Spinctrl(win, 10, 40, 33, 'S', 'D', WIDTH, 'S', 'dynrangespin')
+    dynrangespin.add_callback('dynrange_handler', 'x')
+
+    // Checkbox(win, "Test", 'S', 'D', WIDTH, 'S', 'testcheckbox')
+    // testcheckbox.add_callback('test_note', 'x')
+
+    ui_initialized = true
+    // default_window.fit_to_children()
+    default_window.set_size(250, 100)
+
+
+
+######### Interface Callbacks ##############
+
+// handler for loadbutton: load samples
+def load_samples(x):
+    display "loadbutton", x
+    load_sample_data()
+
+
+// handler for runcheckbox: play/stop sampler
+def run_dsp(x):
+    if not sample_data_loaded:
+        print "WARNING: sample data not loaded, loading now..."
+        load_sample_data()
+    midi_enabled = true
+    midi_init()
+    display "running application", x
+
+
+def dynrange_handler(x):
+    dynamic_range = x
+    display "dynrange_handler", dynamic_range
+    
+
+def test_note(x):
+    print "no test yet"
+
+
+########## MidiIn Initialization ##############
+
+def midi_init():
+    // MIDI output must be scheduled, so use cause here:
+    sched_cause(0.1, nil, 'Launchpad_x')
+    // midi_trace = true
+
+
+########## Main Initialization ###############
+
+def main():
+    // o2_debug_flags("aA") // ("SsBl")
+    // arco_set_input_files([sound_file_path])
+    arco_init(latency = 60, network = false, title = "Pointillism")
+    o2lite_initialize()
+    arco_run()
+    sched_select(rtsched)
+    var file_menu = default_window.get_menu("File")
+    file_menu.item("Print Ugen Info", "print Ugen tree and table",
+                   nil, nil, 'arco_prugens_handler')
+    file_menu.item("Arco Ugen GC Info", "print info about Ugen IDs",
+                   nil, nil, 'arco_ugen_gc_info_handler')
+
+
+######## Synthesis ###########
+
+def sequence(pitch, vel):
+    display "sequence", pitch, vel
+    if vel > 0:
+        samps_note_on(pitch, vel)
+    else:
+        samps_note_off(pitch, vel)
+
+
+
+main()
+

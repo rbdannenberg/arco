@@ -23,15 +23,15 @@ class The_side_band (Movement):
     # Setting up Movement1's UI
         Checkbox(win, "V. The Side Band", x + 5, y + 5, 
                  300, 'H', 'mod_check') // checkbox doubling as title
-        mod_check.add_target_method(this, 'mod_handler')
+        mod_check.add_target_method(this, 'mod_handler', 'x')
 
         // Sliders
         Labeled_slider(win, "hz", 'S', 'D', 250, 30, 25, 20, 1000, 
                        392.0, 'linear', 'freq_slide', prefs = prefs)
-        freq_slide.add_target_method(this, 'freq_handler')
+        freq_slide.add_target_method(this, 'freq_handler', 'x')
 
 
-    def mod_handler(obj, event, x, y)
+    def mod_handler(x)
         if x:
             // signatures: mult(x, y, [chans]); sine(freq, amp, [chans])
             // we want only the left channel (trumpet) input, so use 1 chan:
@@ -47,7 +47,7 @@ class The_side_band (Movement):
             sin1 = nil
 
 
-    def freq_handler(obj, x)
+    def freq_handler(x)
         mod_freq = x
         if sin1:
             sin1.set('freq', x)

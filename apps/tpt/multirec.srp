@@ -1,0 +1,121 @@
+# multirec.srp -- record multiple streams to multiple files
+#
+# Roger B. Dannenberg
+# March 2028
+
+
+class Multirec:
+# An object to make synchronized recordings of multiple sources
+# in multiple output files. You could simply output one source
+# to a multichannel file, but this object allows you to output
+# to multiple mono or stereo files.
+# 
+# Create with:
+#     mr = Multirec()
+#
+# Define each output file like this:
+#     filenum = mr.new_file(name, number_of_channels, overwrite = false)
+# where filenum is a small integer representing the file and
+# if overwrite is true, the file can be overwritten. If false,
+# an integer is appended before any extension to create a unique
+# file name.
+#
+# Assign inputs to files like this:
+#     mr.set_input(filenum, output_channel, src, [channel])
+# where filenum represents one of the output files, output_channel
+# represents the channel to write in the output file (0 or 1)
+# src is the sound source, and channel is which channel of src
+# to write. If channel is omitted or nil, src is multi-channel,
+# and the file is stereo, and output_channel is 0 (many conditions!)
+# then *the first two (both)* channels are written to the stereo
+# file. In all other cases, channel defaults to 0 and only
+# channel 0 is written to the file.
+#
+# Start recording like this:
+#     mr.go()
+# this will start recording all the streams until mr.close() is called.
+
+# Free the sources and save the files like this:
+#     mr.close()
+#
+    var started  // boolean
+    var mrecfiles  // array of Mrecfile objects
+
+    def init():
+        mrecfiles = []
+        started = nil  // used by close()
+
+
+    def new_file(name, chans, overwrite):
+        if chan < 1 or chans > 2:
+            print "WARNING: Multirec.new_file(" + name + ",...) called";
+            print     " with "; chans; " channels. Call is ignored."
+            return nil
+        if not overwrite:
+            name = file_get_temp_name(name)
+        var fr = filerec(name, zero_ugen, chans)
+        var mrf = Mrecfile(fr, chans)
+        mrecfiles.append(mrf)
+        return len(files) - 1
+
+
+    def set_input(n, output_chan, src, optional input_chan):
+        var mrf = mrecfiles[n]
+        if output_chan < 0 or output_chan >= mrf.file_chans:
+            print "WARNING: Multirec.set_input called with output_chan ";
+            print    output_chan; " but file has "; mrf.file_chans; " channels."
+            return
+        var resolved_input = input_chan if input_chan else 0
+        if not input_chan and src.chans > 1 and
+           mrf.chans > 1 and output_chan == 0:
+            if mrf.used > 0:
+                print "WARNING: Multirec.set_input called but mrf already ";
+                print     "has a connected source."
+                return
+            mrf.filerec.repl_input(src)
+            mrf.used = 3
+        elif mrf.chans == 1 and (resolved_input == 0):
+            if used:
+                print "WARNING: Multirec.set_input called but mrf already ";
+                print     "has a connected source."
+                return
+            mrf.repl_input(src)
+            mrf.used = 1
+        elif mrf.route:
+            mrf.route.ins(src, resolved_input, output_chan)
+            mrf.used = mrf.used + (1 << resolved_input)
+        else:
+            mrf.route = route(mrf.chans)
+            mrf.route.ins(src, resolved_input, output_chan)
+
+
+    def go():
+        if started:
+            print "WARNING: Multirec.start() called, but already started."
+            return
+        for mrf in mrecfiles:
+            mrf.filerec.go()
+
+
+    def close():
+        if started:
+            for mrf in mrecfiles:
+                mrf.filerec.stop()
+        else:
+            print "WARNING: Multirec.close() called, but never started."
+        init()  // clear all references to objects
+
+
+class Mrecfile:
+    var filerec  // the filerec object
+    var route    // the route object if any
+    var file_chans  // number of channels in the file (1 or 2)
+    var used     // used channels as bit map: 0, 1, 2, or 3
+
+    def init(fr, fc):
+        filerec = fr
+        // route = nil
+        file_chans = fc
+        used = 0
+
+

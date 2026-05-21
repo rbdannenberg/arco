@@ -25,7 +25,8 @@ class Math (Ugen):
         if not chans:
             chans = max_chans(max_chans(1, x1), x2)
         super.init(create_ugen_id(), "math", chans, 'a', "iUU",
-                   'op', op, 'x1', x1, 'x2', x2)
+                   'op', op, "f", 'x1', x1, "abc", 'x2', x2, "abc")
+
     def rliset(x):
     # randomize initial values (only for op == MATH_OP_RLI)
         o2_send_cmd("/arco/math/rliset", 0, "Uf", id, x)
@@ -35,16 +36,10 @@ class Mathb (Ugen):
     # NOTE: initialization may fail if x1 or x2 are incompatible
     # An object is created and returned but its id will be nil
     def init(op, x1, x2, optional chans):
-        if not isnumber(x1) and x1.rate == 'a':
-            display "ERROR: 'x1' input to Ugen 'mathb' must be block rate",
-            display op, x1
-        elif not isnumber(x2) and x2.rate == 'a':
-            display "ERROR: 'x2' input to Ugen 'mathb' must be block rate",
-            display op, x2
-        else:
+        if not chans:
             chans = chans or max_chans(max_chans(1, x1), x2)
-            super.init(create_ugen_id(), "mathb", chans, 'b', "iUU",
-                       'op', op, 'x1', x1, 'x2', x2)
+        super.init(create_ugen_id(), "mathb", chans, 'b', "iUU",
+                   'op', op, "f", 'x1', x1, "bc", 'x2', x2, "bc")
 
     def rliset(x):
         o2_send_cmd("/arco/mathb/rliset", 0, "Uf", id, x)

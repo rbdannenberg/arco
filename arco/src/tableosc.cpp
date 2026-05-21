@@ -89,6 +89,21 @@ void arco_tableosc_set_amp(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/tableosc/set_phase int32 id, int32 chan, float phase;
+ */
+void arco_tableosc_set_phase(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t chan = argv[1]->i;
+    float phase = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Tableosc, tableosc, id, "arco_tableosc_set_phase");
+    tableosc->set_phase(chan, phase);
+}
+
+
 /* O2SM INTERFACE: /arco/tableosc/sel int32 id, int32 index;
  */
 void arco_tableosc_sel(O2SM_HANDLER_ARGS)
@@ -180,6 +195,8 @@ static void tableosc_init()
                     NULL, true, true);
     o2sm_method_new("/arco/tableosc/set_amp", "iif", arco_tableosc_set_amp,
                     NULL, true, true);
+    o2sm_method_new("/arco/tableosc/set_phase", "iif",
+                    arco_tableosc_set_phase, NULL, true, true);
     o2sm_method_new("/arco/tableosc/sel", "ii", arco_tableosc_sel, NULL,
                     true, true);
     o2sm_method_new("/arco/tableosc/borrow", "ii", arco_tableosc_borrow,

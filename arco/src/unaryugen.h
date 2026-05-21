@@ -49,10 +49,20 @@ public:
     }
 
     ~Unary() {
-        x1->unref();
+        x1->unref(&x1);
     }
 
     const char *classname() { return Unary_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = x1; return true; }
+        return false;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -83,7 +93,7 @@ public:
     }
 
     void repl_x1(Ugen_ptr ugen) {
-        x1->unref();
+        x1->unref(&x1);
         init_x1(ugen);
         update_run_channel();
     }

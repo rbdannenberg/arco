@@ -10,7 +10,8 @@ class Wavetables (Ugen):
         if not chans:
             chans = max_chans(max_chans(1, freq), amp)
         super.init(create_ugen_id(), classname, chans, rate,
-                   "UUf", 'freq', freq, 'amp', amp, 'phase', phase)
+                   "UUf", 'freq', freq, "abc", 'amp', amp, "abc",
+                   'phase', phase, "f")
         address_prefix = "/arco/" + tolower(classname) + "/"
 
 
@@ -22,6 +23,13 @@ class Wavetables (Ugen):
             o2_add_int32(tlen)
         o2_add_vector(data, "f")
         o2_send_finish(0, address_prefix + method_name, true)
+
+    def set_phase(chan, phase):
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_int32(chan)
+        o2_add_float(phase)
+        o2_send_finish(0, address_prefix + "set_phase", true)
 
     def create_tas(index, tlen, ampspec):
     # table from amplitude spectrum
@@ -58,17 +66,21 @@ class Tableoscb (Wavetables):
         super.init(freq, amp, phase, chans, "Tableoscb", B_RATE)
 
 
-def tableosc(freq, amp, optional chans, keyword phase = 0):
-    Tableosc(freq, amp, phase, chans)
+def tableosc(freq, amp, optional chans, keyword phase):
+    var p = 0
+    if isnumber(phase):
+        p = phase
+    elif phase:
+        print "ERROR 'phase' input to Ugen 'tableosc' must be a number"
+    Tableosc(freq, amp, p, chans)
 
 
-def tableoscb(freq, amp, optional chans, keyword phase = 0):
-    if not isnumber(freq) and freq.rate != 'b':
-        print "ERROR: 'freq' input to Ugen 'tableoscb' must be block rate"
-        return nil
-    if not isnumber(amp) and amp.rate != 'b':
-        print "ERROR: 'amp' input to Ugen 'tableoscb' must be block rate"
-        return nil
+def tableoscb(freq, amp, optional chans, keyword phase):
     if not chans:
         chans = max_chans(max_chans(1, freq), amp)
-    Tableoscb(freq, amp, phase, chans)
+    var p = 0
+    if isnumber(phase):
+        p = phase
+    elif phase:
+        print "ERROR 'phase' input to Ugen 'tableoscb' must be a number"
+    Tableoscb(freq, amp, p, chans)

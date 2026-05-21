@@ -14,6 +14,8 @@ class Smoothb (Const_like):
     # channels from len(x) are initialized to zero
         var chans_default = max(len(x), 1) if isarray(x) else 1
         chans = chans if chans else chans_default
+        // create with default values of 0, set below
+        values_array = array(chans, 0)
         super.init(create_ugen_id(), "Smoothb", chans, C_RATE, "",
                    no_msg = true)
         o2_send_start()
@@ -29,7 +31,9 @@ class Smoothb (Const_like):
 
 
     def set_chan(chan, x):
-        o2_send_cmd("/arco/smoothb/set", 0, "Uif", id, chan, x)
+        if chan < chans:
+            values_array[chan] = x
+            o2_send_cmd("/arco/smoothb/set", 0, "Uif", id, chan, x)
 
 
     def set_cutoff(cutoff):

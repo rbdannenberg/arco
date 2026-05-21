@@ -4,6 +4,12 @@ import os
 import sys
 from pathlib import Path
 
+order = ["arco2", "arco4", "arco8", "arco16",
+         "arco32", "arco64", "arco128", "arco256",
+         "block2", "block4", "block8", "block16",
+         "block32", "block64", "block128", "block256"]
+
+
 def analyze_file(filepath):
     """Read and analyze a single file."""
     try:
@@ -20,7 +26,7 @@ def analyze_file(filepath):
 
 def main():
     # Get all data files in current directory
-    data_files = sorted(Path('data').glob('*.txt'))  # Adjust pattern as needed
+    data_files = Path('data').glob('*.txt')  # Adjust pattern as needed
     
     if not data_files:
         print("No data files found!")
@@ -33,10 +39,24 @@ def main():
     print("\nAnalyzing files:")
     print("-" * 50)
     
-    for file_path in data_files:
+    data_files = list(data_files)  # from generator to list
+    sorted_paths = []
+    for filename in order:
+        for i in range(len(data_files)):
+            if data_files[i].stem == filename:
+                sorted_paths.append(data_files[i])
+                del data_files[i]
+                break
+    if len(data_files) > 0:
+        print("Unordered files:", data_files)
+        sorted_paths += data_files
+
+    headers = []
+    for file_path in sorted_paths:
         result = analyze_file(file_path)
         if result:
             filename = file_path.stem  # Get filename without extension
+            headers.append(filename)
             results[filename] = result
             max_length = max(max_length, len(result['data']))
             print(f"{filename}:")
@@ -50,7 +70,6 @@ def main():
     
     with open(csv_filename, 'w') as f:
         # Write header
-        headers = list(results.keys())
         f.write(','.join(headers) + '\n')
         
         # Write data rows

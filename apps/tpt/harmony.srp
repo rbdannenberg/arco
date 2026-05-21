@@ -1,0 +1,240 @@
+# harmony.srp - play some chords
+#
+# Roger B. Dannenberg
+# Sep 2025
+
+require "read_value"
+
+ROOT_TO_INT = {"C": 48, "C#": 49, "Db": 49, "D": 50, "D#": 51, "Eb": 51,
+               "E": 52, "E#": 53, "Fb": 52, "F": 53, "F#": 54, "Gb": 54,
+               "G": 55, "G#": 56, "Ab": 56, "A": 57, "A#": 58, "Bb": 58,
+               "B": 59, "B#": 48, "Cb": 59}
+
+
+inf = open("harmony/transitions.dat", "r")
+transitions = read_value(inf)
+print "READ transitions" 
+inf.close()
+
+
+def transpose(chord, amount):
+    [p + amount for p in chord]
+
+
+def distance(prev, next):
+# compute a distance from previous chord to next in terms of voice
+# leading: bass stepwise or unison or down 5th is 0 cost,
+# fourth up: 1, else 2
+# other notes: stepwise or unison is 0 cost, else 1
+# anything over a 5th: +1
+    var cost = 0
+    var bass_delta = abs(prev[0] - next[0])
+    if next[0] == prev[0] + 5:
+        cost = cost + 1
+    if bass_delta > 2 and (next[0] != prev[0] - 7):
+        cost = cost + 2
+    for p = 1 to 4:  // for each prev note
+        var pp = prev[p]
+        var best = 10
+        for n = 1 to 4:
+            var nn = next[n]
+            if abs(pp - nn) <= 2:
+                best = 0
+            else:
+                best = min(best, 1)
+        cost = cost + best
+    return cost
+
+
+def voice_chord(prev_notes, chord, optional optimize = true):
+    var root = chord[0]
+    if len(chord) > 1 and (chord[1] == "b" or chord[1] == "#"):
+        root = subseq(chord, 0, 2)
+        chord = subseq(chord, 2)
+    else:
+        chord = subseq(chord, 1)
+    root = ROOT_TO_INT[root]
+    var notes = [root]
+    if chord == "7":
+        notes.append(root + 4).append(root + 7).append(root + 10)
+    elif chord == "%" or chord == "%7":
+        notes.append(root + 3).append(root + 6).append(root + 10)
+    elif chord == "o" or chord == "o7" or chord == "%6":
+        notes.append(root + 3).append(root + 6).append(root + 9)
+    elif chord == "" or chord == "^" or chord == "^7":
+        notes.append(root + 4).append(root + 7).append(root + 11)
+    elif chord == "m7" or chord == "m":
+        notes.append(root + 3).append(root + 7).append(root + 10)
+    elif chord == "m6":
+        notes.append(root + 3).append(root + 7).append(root + 9)
+    elif chord == "6":
+        notes.append(root + 4).append(root + 7).append(root + 9)
+    elif chord == "sus":
+        notes.append(root + 5).append(root + 7).append(root + 10)
+    elif chord == "m^7":
+        notes.append(root + 3).append(root + 7).append(root + 11)
+    elif chord == "+" or chord == "+":
+        notes.append(root + 4).append(root + 8).append(root + 12)
+    else:
+        error("unknown chord type")
+    if not optimize:
+        return notes
+
+    // try two different voicings: root fifth third seventh
+    // or third root fifth seventh
+    // pick one that is "closest" to prev_notes, considering octave shifts
+    // that place roots between C2 and C4
+    var c1 = [notes[0], notes[2], notes[1] + 12, notes[3] + 12]
+    var c2 = [notes[1], notes[0] + 12, notes[1] + 12, notes[3] + 12]
+    var c3 = transpose(c1, -12)
+    var c4 = transpose(c2, -12)
+    notes = c1
+    var dnotes = distance(prev_notes, notes)
+    var d2 = distance(prev_notes, c2)
+    var d3 = distance(prev_notes, c3)
+    var d4 = distance(prev_notes, c4)
+    if d2 < dnotes:
+        notes = c2
+        dnotes = d2
+    if d3 < dnotes:
+        notes = c3
+        dnotes = d3
+    if d4 < dnotes:
+        notes = c4
+        // dnotes = d4
+    display "voice_chord returns", notes
+    return notes
+
+
+
+def circular_distance(x, y):
+    x = x % 12 - y % 12
+    if abs(x) > 6:
+        x = 12 - abs(x)
+    return x
+
+
+def dissonance(chd, mel):
+# chords are always 4 pitches.  For each pitch in mel, find the smallest
+# distance from mel to a chd pitch class. Distance is always 0, 1 or 2.
+# Distance 2 cost is 1. Distance 1 cost is 4.
+    var diss = 0
+    for p in mel:
+        if p != REST:
+            dist = min(min(min(circular_distance(p, chd[0]),
+                               circular_distance(p, chd[1])),
+                           circular_distance(p, chd[2])),
+                       circular_distance(p, chd[3]))
+            if dist == 1:
+                diss = diss + 4
+            elif dist == 2:
+                diss = diss + 1
+            elif dist > 2:
+                display "WARNING: Unexpected distance in dissonance",
+                display     chd, p, dist
+    return diss
+
+
+best_chord = Argmin()  // used to minimize dissonance
+
+
+def pick_chord(current_chord, melody):
+# favor chords consistent with melody we're about to play
+# represented as array of pitches
+# We'll pick 4 chords based on weights. Then we'll pick
+# the chord most consistent with melody
+    var trans = transitions.get(current_chord)
+    if not trans:  # just in case
+        print "WARNING: did not find transitions for", current_chord
+        trans = transitions["C7"]
+    var keys = trans.keys()
+    var weights = [trans[key] for key in keys]
+    best_chord.reset()  # argmin initialization
+    for i = 0 to 4:
+        var index = pr_weighted_choice(weights)
+        chord = keys[index]
+        var candidate = voice_chord(harmony_prev_pitches,
+                                    chord, false)
+        best_chord.item(chord, dissonance(candidate, melody))
+    return best_chord.result
+    
+
+
+harmony_prev_pitches = [48, 55, 64, 70]
+harmony_chord_is_sounding = false
+harmony_chord_id = 0
+harmony_program_selection = []
+harmony_chord_count = 0
+
+// chdvol slider depends on program
+LOUD_PROG_TO_VEL = {18: -80, 18: -60, 19: -80, 45: -80, 90: -70, 
+              91: -60, 93: -80, 97: -60}
+
+// volume control: nominal vol will be 100. cresc will go up to 127
+VOL_NORMAL = 50
+
+
+def chord_vol_gesture(start, delta, dur, maxvol, id):
+// produce a rise and fall volume shape over dur. To get simple crescendo,
+// set dur to double the duration since the shape quits when the chord ends.
+    if id != harmony_chord_id:
+        return
+    var now = sched_current.time - start
+    if now > dur:
+        flsyn_vol(CHORD_CHAN, VOL_NORMAL)
+    else
+        if now > dur * 0.5:
+            now = dur - now
+        var vol = VOL_NORMAL + now / (dur * 0.5) * (maxvol - VOL_NORMAL)
+        flsyn_vol(CHORD_CHAN, round(vol))
+        // display "chord_vol_gesture", vol
+        sched_cause(delta, nil, 'chord_vol_gesture',
+                    start, delta, dur, maxvol, id)
+
+
+def play_chord(chord, duration):
+    if harmony_chord_is_sounding:
+        end_chord()
+
+    harmony_chord_count = harmony_chord_count + 1
+    if harmony_chord_count >= 10:
+        harmony_chord_count = 0
+        var prog = pr_choice(harmony_program_selection, PADS)
+        labellog_label("chord prog " + str(prog))
+        program_spinctrls[CHORD_CHAN].set_and_act(prog)
+        chordvol_slider.set_and_act(
+                LOUD_PROG_TO_VEL.get(prog, DEFAULT_CHORDVOL_OFFSET))
+
+    var pitches = voice_chord(harmony_prev_pitches, chord)
+    harmony_prev_pitches = pitches
+    for p in pitches:
+        flsyn_note_on(CHORD_CHAN, p, max(1, 100 + chordvol_offset))
+        // display "CHORD NOTE ON", p
+    harmony_chord_id = harmony_chord_id + 1
+    harmony_chord_is_sounding = true
+    if style != 'descend':  // go for continuous sound in other styles
+        duration = duration * 2
+    if pr_coin(0.4):
+        chord_vol_gesture(sched_vtime, 0.125, duration, pr_range(100, 128),
+                          harmony_chord_id)
+        labellog_label("hairpin")
+    elif pr_coin(0.25):
+        chord_vol_gesture(sched_vtime, 0.125, duration * 2, pr_range(100, 128),
+                          harmony_chord_id)
+        labellog_label("cresc")
+    else:  // set volume a higher than VOL_NORMAL because there is no crescendo
+        flsyn_vol(CHORD_CHAN,  pr_range(80, 100))
+    sched_cause(duration, nil, 'end_chord', harmony_chord_id)
+    labellog_label("chord vel " + str(100 + chordvol_offset), duration)
+
+
+def end_chord(optional id):
+# if scheduled, id must be provided and match harmony_chord_id
+    if id and id != harmony_chord_id:
+        return
+    for p in harmony_prev_pitches:
+        flsyn_note_on(CHORD_CHAN, p, 0)
+        // display "CHORD NOTE OFF", p
+    flsyn_vol(CHORD_CHAN, VOL_NORMAL)
+    harmony_chord_is_sounding = false
+

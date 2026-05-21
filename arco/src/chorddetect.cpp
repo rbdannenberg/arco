@@ -39,7 +39,7 @@ void Chorddetect::real_run()
         o2sm_add_float(chord_detector.confidence);
         o2sm_add_int32(chord_detector.rootNote);
         o2sm_add_int32(chord_detector.pitches);
-        
+
         o2sm_send_finish(0, cd_reply_addr, false);
     }
     
@@ -100,16 +100,18 @@ static void arco_chorddetect_repl_input(O2SM_HANDLER_ARGS)
 
 
 
-/* O2SM INTERFACE: /arco/chorddetect/new int32 id, string reply_addr;
+/* O2SM INTERFACE: /arco/chorddetect/new int32 id, input_id, string reply_addr;
  */
 static void arco_chorddetect_new(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
-    char *reply_addr = argv[1]->s;
+    int32_t input_id = argv[1]->i;
+    char *reply_addr = argv[2]->s;
     // end unpack message
 
-    new Chorddetect(id, reply_addr);
+    ANY_UGEN_FROM_ID(input, input_id, "arco_chorddetect_new");
+    new Chorddetect(id, input, reply_addr);
 }
 
 
@@ -120,7 +122,7 @@ static void chorddetect_init()
                     NULL, true, true);
     o2sm_method_new("/arco/chorddetect/repl_input", "ii",
                     arco_chorddetect_repl_input, NULL, true, true);
-    o2sm_method_new("/arco/chorddetect/new", "is", arco_chorddetect_new,
+    o2sm_method_new("/arco/chorddetect/new", "iis", arco_chorddetect_new,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
 }

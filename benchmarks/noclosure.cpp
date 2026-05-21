@@ -1002,8 +1002,8 @@ public:
 
 
     void real_run() {
-        freq_samps = freq->run(current_block); // update input
-        amp_samps = amp->run(current_block); // update input
+        freq_samps = freq->out_samps; // update input
+        amp_samps = amp->out_samps; // update input
         Tableosc_state *state = &states[0];
         if (which_table >= num_tables()) {
             return;
@@ -1065,6 +1065,8 @@ Compilation options: -lang cpp -os -light -ct 1 -cn Sineb -es 1 -mcd 16 -mdd 102
 #define RESTRICT __restrict__
 #endif
 
+#define SINESIZE 4096
+
 class SinebSIG0 {
     
   private:
@@ -1093,7 +1095,7 @@ class SinebSIG0 {
     void fillSinebSIG0(int count, float* table) {
         for (int i1 = 0; i1 < count; i1 = i1 + 1) {
             iVec0[0] = 1;
-            iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
+            iRec0[0] = (iVec0[1] + iRec0[1]) % SINESIZE;
             table[i1] = std::sin(9.58738e-05f * float(iRec0[0]));
             iVec0[1] = iVec0[0];
             iRec0[1] = iRec0[0];
@@ -1105,7 +1107,7 @@ class SinebSIG0 {
 static SinebSIG0* newSinebSIG0() { return (SinebSIG0*)new SinebSIG0(); }
 static void deleteSinebSIG0(SinebSIG0* dsp) { delete dsp; }
 
-static float ftbl0SinebSIG0[65536];
+static float ftbl0SinebSIG0[SINESIZE];
 /*-------------- END FAUST PREAMBLE --------------*/
 
 const char *Sineb_name = "Sineb";
@@ -1188,8 +1190,8 @@ public:
     void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, &amp_stride); }
 
     void real_run() {
-        freq_samps = freq->run(current_block);  // update input
-        amp_samps = amp->run(current_block);  // update input
+        freq_samps = freq->out_samps;  // update input
+        amp_samps = amp->out_samps;  // update input
         Sineb_state *state = &states[0];
         for (int i = 0; i < chans; i++) {
             float fSlow0 = float(amp_samps[0]);
@@ -1197,7 +1199,7 @@ public:
             state->iVec1[0] = 1;
             float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            out_samps[0] = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            out_samps[0] = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(SINESIZE * state->fRec1[0]), (SINESIZE - 1)))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
     
@@ -1424,9 +1426,9 @@ public:
 
 
     void real_run() {
-        x1_samps = x1->run(current_block); // update input
-        x2_samps = x2->run(current_block); // update input
-        b_samps = b->run(current_block);  // update input
+        x1_samps = x1->out_samps;  // update input
+        x2_samps = x2->out_samps; // update input
+        b_samps = b->out_samps;  // update input
         if ((x1->flags & x2->flags & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
@@ -1510,8 +1512,8 @@ public:
 
 
     void real_run() {
-        x_samps = x->run(current_block);
-        pan_samps = pan->run(current_block);
+        x_samps = x->out_samps;
+        pan_samps = pan->out_samps;
         if ((x->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
@@ -1529,7 +1531,8 @@ public:
         // but we want 0 to 1 as in cosine, so fix it
         left += left - 1;
         float left_incr = (left - state->left) * BL_RECIP;
-        left = state->left;
+        // left now represents the target value
+        left = state->left;  // replace it with the current left value
         
         // pan 0 to 1 maps to COS_TABLE_SIZE / 2 + 2 to COS_TABLE_SIZE + 2
         angle = (COS_TABLE_SIZE * 3 / 2.0f) - angle;
@@ -1540,7 +1543,8 @@ public:
         // but we want 0 to 1 as in cosine, so fix it
         right += right - 1;
         float right_incr = (right - state->right) * BL_RECIP;
-        right = state->right;
+        // right now represents the target value
+        right = state->right;  // replace it with the current right value
 
         for (int i = 0; i < BL; i++) {
             left += left_incr;
@@ -1548,7 +1552,7 @@ public:
             out_samps[i] = *x_samps * left;
             out_samps[i + BL] = *x_samps++ * right;
         }
-        state->left = left;
+        state->left = left;  // save final left and right for next block
         state->right = right;
 
         state++;
@@ -1674,7 +1678,7 @@ public:
         bool copy_first_input = true;
         while (i < inputs.size()) {
             Ugen_ptr input = inputs[i];
-            Sample_ptr input_ptr = input->run(current_block);
+            Sample_ptr input_ptr = input->out_samps;
             if (input->flags & TERMINATED) {
                 send_action_id(ACTION_REM, input->id);
                 input->unref();
@@ -1854,8 +1858,8 @@ public:
     void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, &x2_stride); }
 
     void real_run() {
-        x1_samps = x1->run(current_block); // update input
-        x2_samps = x2->run(current_block); // update input
+        x1_samps = x1->out_samps;
+        x2_samps = x2->out_samps;
         if (((x1->flags | x2->flags) & TERMINATED) && (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
@@ -2045,6 +2049,13 @@ int main()
     o2_internet_enable(false);
     o2_initialize("arcobenchmark");
     o2_clock_set(NULL, NULL);
+
+    // class initialization code from faust:
+    SinebSIG0* sig0 = newSinebSIG0();
+    sig0->instanceInitSinebSIG0(AR);
+    sig0->fillSinebSIG0(SINESIZE, ftbl0SinebSIG0);
+    deleteSinebSIG0(sig0);
+
     ugen_initialize();
     build_graph();
     printf("Initialization complete\n");
@@ -2123,6 +2134,6 @@ int main()
     printf("Completed %d samples, %g seconds, wall time %g s.\n",
            duration_blocks * BL, duration_blocks * BP,
            finish_time - start_time);
-#define RESULTS "noclosure.txt"
+#define RESULTS "data/noclosure.txt"
 #include "report.cpp"
 }

@@ -81,15 +81,28 @@ public:
         init_input(input);
         init_center(center);
         init_q(q);
+        initialize_channel_states();
     }
 
     ~Resonb() {
-        input->unref();
-        center->unref();
-        q->unref();
+        input->unref(&input);
+        center->unref(&center);
+        q->unref(&q);
     }
 
     const char *classname() { return Resonb_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = center;
+        } else if (i == 2) { *child = q;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -106,17 +119,17 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
     void repl_center(Ugen_ptr ugen) {
-        center->unref();
+        center->unref(&center);
         init_center(ugen);
     }
 
     void repl_q(Ugen_ptr ugen) {
-        q->unref();
+        q->unref(&q);
         init_q(ugen);
     }
 
@@ -142,10 +155,11 @@ public:
         input_samps = input->run(current_block);  // update input
         center_samps = center->run(current_block);  // update input
         q_samps = q->run(current_block);  // update input
-        if (((input->flags) & TERMINATED) && (flags & CAN_TERMINATE)) {
+        if (((input->flags) & TERMINATED) &&
+            (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-        Resonb_state *state = &states[0];
+        Resonb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
             float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));

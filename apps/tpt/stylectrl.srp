@@ -1,0 +1,138 @@
+# stylectrl.srp - use style classification to control styles
+#
+# Roger B. Dannenberg
+
+// global style will be computed every second.
+// values are 'descend', 'fast', 'slow'
+// new value is set based on the last 5 seconds. We store
+// all values as probabilities and take the product of 5 to
+// get an overall probability, then take the max.
+// so a single anomaly will not cause a brief style change
+//
+// Mappings
+//
+// Descend: no drums, poly, dense
+// Slow: drums, short, 60 or 90 BPM
+// Fast: drums, chords, dense, 90 or 120 BPM
+
+require "utils"
+
+STYLE_NAMES = ["Descend", "Fast", "Slow"]
+num_style_classes = len(STYLE_NAMES)
+
+style_history = []
+
+style = 'slow'  // initial value
+descend_rt60 = 6  // special case overrides rt60 in autofx states
+
+def actl_style(timestamp, address, types, descend, fast, slow):
+# handler for style classifier
+    style_guages[0].set_value(round(descend * 1000))
+    style_guages[1].set_value(round(fast * 1000))
+    style_guages[2].set_value(round(slow * 1000))
+    style_history.append(descend).append(fast).append(slow)
+    display "actl_style", descend, fast, slow
+    return
+
+
+def style_start_poll():
+    sched_select(rtsched)
+    print "starting style_poll"
+    style_poll()
+
+
+style_argmax = Argmax()
+style_count = 0
+
+def style_no_change():
+    style_count = style_count + 1
+    // when style stays 'fast' for many times, turn on poly, but only after 60"
+    // and not if lay_out
+    if style == 'fast' and sched_rtime > 60 and not lay_out and auto_cb.value():
+        polycheckbox.set_and_act(style_count > 5 and style_count < 20)
+        // after 5 minutes turn on boost half the time
+        if sched_rtime > 300 and pr_coin(0.5):
+            boostcheckbox.set_and_act(style_count > 7 and style_count < 20)
+            if pr_coin(0.5):
+                dbltimcheckbox.set_and_act(true)
+        else:
+            dbltimcheckbox.set_and_act(false)
+        
+
+def style_change(new_style):
+    style_count = 0
+    programs_new_style()
+
+    if style == 'descend':
+        style_labels[0].set_string("Descend")
+    elif style == 'fast':
+        style_labels[1].set_string("Fast")
+    elif style == 'slow':
+        style_labels[2].set_string("Slow")
+
+    if new_style == 'descend':
+        style_labels[0].set_string("*Descend")
+        if auto_cb.value():
+            drumscheckbox.set_and_act(false)
+            shortcheckbox.set_and_act(false)
+            polycheckbox.set_and_act(false)
+            densecheckbox.set_and_act(true)
+            chordcheckbox.set_and_act(true)
+            rt60_slider.set_and_act(descend_rt60)
+    elif new_style == 'fast':
+        style_labels[1].set_string("*Fast")
+        if auto_cb.value():
+            drumscheckbox.set_and_act(true)
+            shortcheckbox.set_and_act(false)
+            polycheckbox.set_and_act(false)
+            densecheckbox.set_and_act(true)
+            chordcheckbox.set_and_act(false)
+            rt60_slider.set_and_act(DEFAULT_SYNTH_RT60)
+    elif new_style == 'slow':
+        style_labels[2].set_string("*Slow")
+        if auto_cb.value():
+            drumscheckbox.set_and_act(true)
+            shortcheckbox.set_and_act(true)
+            polycheckbox.set_and_act(false)
+            densecheckbox.set_and_act(false)
+            chordcheckbox.set_and_act(true)
+            rt60_slider.set_and_act(DEFAULT_SYNTH_RT60)
+    if auto_cb.value():
+        labellog_label("style " + str(new_style))
+    else:
+        labellog_label("style (auto off)" + str(new_style))
+
+
+
+def style_poll():
+    sched_cause(1.0, nil, 'style_poll')
+    var n = num_style_classes * 5
+    var hlen = len(style_history)
+    if hlen < n:
+        // display "style_poll unfull history", sched_rtime, hlen
+        return
+    // remove pre-history if any
+    if hlen > n:
+        style_history.uninsert(0, hlen - n)
+    assert(len(style_history) == n)
+
+    // now we have n history entries
+    var probs = array(num_style_classes, 1)
+    for i = 0 to n by 3:
+        for p at j in probs:
+            probs[j] = p * style_history[i + j]
+    // now find maximum value in probs
+    style_argmax.reset()
+    for p at i in probs:
+        style_argmax.item(STYLE_NAMES[i], p)
+    var new_style = intern(tolower(style_argmax.result))
+    // normalize probs for display
+    if style_argmax.y > 0:
+        for p at i in probs:
+            probs[i] = p / style_argmax.y
+    // display "style_poll new style", sched_rtime, new_style, probs
+    if new_style != style:
+        style_change(new_style)
+    else:
+        style_no_change()
+    style = new_style

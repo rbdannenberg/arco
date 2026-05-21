@@ -51,7 +51,7 @@ SERPENTSOURCES = [
     ARCO + "steps.srp",
     ARCO + "constraint.srp",
     ARCO + "pan.srp",
-    ARCO + "o2util.srp",
+    ARCO + "o2msgutil.srp",
     LIB + "strparse.srp",
     LIB + "termcolor.srp",
     LIB + "precision.srp",

@@ -5,8 +5,9 @@
 
 class Flsyn (Ugen):
     def init(path):
-        super.init(create_ugen_id(), "Flsyn", nil, 'a', "s", 'path', path,
+        super.init(create_ugen_id(), "Flsyn", nil, 'a', "s", 'path', path, "f",
                    omit_chans = t) // always created with 2 channel output
+        chans = 2
 
     def alloff(chan):
         o2_send_cmd("/arco/flsyn/off", 0, "Ui", id, chan)

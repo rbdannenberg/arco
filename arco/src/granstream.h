@@ -148,7 +148,7 @@ public:
 
 
 class Granstream : public Ugen {
-    friend Gran_gen;
+    friend class Gran_gen;
 public:
     int polyphony;  // how many grains can we have at once per channel
     float dur;      // how far we can reach back in time to find a grain
@@ -225,10 +225,21 @@ public:
             states[i].finish();
         }
         states.finish();
+        input->unref(&input);
     }
     
     
     const char *classname() { return Granstream_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // 1 input
+        if (i == 0) { *child = input; return true; }
+        return false;
+    }
+#endif
     
 
     void print_details(int indent) {
@@ -256,11 +267,14 @@ public:
     }
     
     
-    void init_input(Ugen_ptr ugen) { init_param(ugen, input, &input_stride); }
+    void init_input(Ugen_ptr ugen) {
+        assert(ugen->rate == 'a');
+        init_param(ugen, input, &input_stride);
+    }
 
     
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 

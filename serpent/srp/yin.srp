@@ -5,9 +5,10 @@
 
 class Yin(Ugen):
     def init(chans, input, minstep, maxstep, hopsize, address):
-        super.init(create_ugen_id(), "Yin", chans, 'a', "Uiiis", 'inpur', input,
-                   'minstep', minstep, 'maxstep', maxstep, 'hopsize', hopsize,
-                   'address', address)
+        super.init(create_ugen_id(), "Yin", chans, 'a', "Uiiis",
+                   'input', input, "a", 'minstep', minstep, "f",
+                   'maxstep', maxstep, "f", 'hopsize', hopsize, "f",
+                   'address', address, "f")
 
 
 def yin(input, minstep, maxstep, hopsize, address, optional chans = 1):

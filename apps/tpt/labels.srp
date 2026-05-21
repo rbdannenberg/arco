@@ -1,0 +1,22 @@
+# labellog.srp -- record labels to display along with output recordings
+#
+# Roger B. Dannenberg
+
+
+def labellog_init():
+    labellogf = open("labellog.txt", "w")
+
+
+def labellog_finish():
+    labellogf.close()
+    labellogf = nil
+
+
+def labellog_label(txt, optional dur):
+    var timestr = str(sched_rtime - audio_logout_start_time )
+    var endstr = timestr
+    if dur:
+        endstr = str(sched_rtime + dur - audio_logout_start_time)
+    labellogf.write(timestr + "\t" + endstr + "\t" + txt + "\n")
+    labellogf.flush()
+

@@ -14,8 +14,9 @@ class Fileplay (Ugen):
     def init(chans, filename, start, end, cycle, mix, expand):
         // -chans cuts off standard creation:
         super.init(create_ugen_id(), "Fileplay", chans, 'a', "sffBBB",
-                   'filename', filename, 'start', start,'end', end,
-                   'cycle', cycle, 'mix', mix, 'expand', expand)
+                   'filename', filename, "f", 'start', start, "f",
+                   'end', end, "f", 'cycle', cycle, "f", 'mix', mix, "f",
+                   'expand', expand, "f")
 
     def go(optional play_flag = true):
         o2_send_cmd("/arco/fileplay/play", 0, "UB", id, play_flag)

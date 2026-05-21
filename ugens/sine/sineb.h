@@ -113,14 +113,26 @@ public:
         fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
         init_freq(freq);
         init_amp(amp);
+        initialize_channel_states();
     }
 
     ~Sineb() {
-        freq->unref();
-        amp->unref();
+        freq->unref(&freq);
+        amp->unref(&amp);
     }
 
     const char *classname() { return Sineb_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = freq;
+        } else if (i == 1) { *child = amp;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -139,12 +151,12 @@ public:
     }
 
     void repl_freq(Ugen_ptr ugen) {
-        freq->unref();
+        freq->unref(&freq);
         init_freq(ugen);
     }
 
     void repl_amp(Ugen_ptr ugen) {
-        amp->unref();
+        amp->unref(&amp);
         init_amp(ugen);
     }
 
@@ -163,7 +175,7 @@ public:
     void real_run() {
         freq_samps = freq->run(current_block);  // update input
         amp_samps = amp->run(current_block);  // update input
-        Sineb_state *state = &states[0];
+        Sineb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             float fSlow0 = float(amp_samps[0]);
             float fSlow1 = fConst0 * float(freq_samps[0]);

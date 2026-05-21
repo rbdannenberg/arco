@@ -1,0 +1,218 @@
+// An Interface to Launchpad X, Custom Mode 4
+//
+// Roger B. Dannenberg
+// March 2026
+
+// Assumes Launchpad X is connected to MIDI input and output
+// devices are midi_in and midi_out
+
+
+// Top 2 rows, Col 1-6: Dynamic (column) selection
+// Rows 2, 3, Col 1-6: Pitch (row) selection
+// 
+// Selecting any button in Rows 1-4, Cols 1-6 determines
+// a vertical or horizontal path. Then, Row 4-5, Col 1-6
+// play notes on that path. (You can play in any order).
+//
+// For diagonal paths: press Row 1, Col 7 for top-left to
+// bottom-right diagonal. press Row 1, Col 8 for top-right
+// to bottom-left diagonal. Clear the diagonal setting by
+// pressing any key in Row 4-5, Col 1-6.
+//
+// Reset display with lower left and lower right pads
+
+// colors:
+//   dynamics: orange (60)
+//   pitch: blue (37)
+//   diagonal 1: yellow (13)
+//   diagonal 2: purple (49)
+//   play background: gray (1)
+//   play foreground: green (21)
+
+LP_OFF = 0
+LP_ORANGE = 60
+LP_LITEORANGE = 61
+LP_BLUE = 37
+LP_LITEBLUE = 36
+LP_YELLOW = 13
+LP_PURPLE = 49
+LP_GRAY = 1
+LP_BRIGHT = 12
+
+LP_DIAG1 = 87
+LP_DIAG2 = 88
+
+EXCLUSIVE_MODES = ['dyn', 'pitch', 'diag1', 'diag2']
+
+class Launchpad_x (Midi_handler):
+    var mode   // 'dyn', 'pitch', 'diag1', or 'diag2'
+    // in 'dyn' mode, the dynamic level is in dyn and pitch is
+    // given by the user. In 'pitch' mode, the pitch level is
+    // pitch, and the dynamic level is given by the user.
+    var dyn    // stores dynamic if mode == 'dyn', (0-11)
+    var pitch  // stores pitch if mode == 'pitch', (0-11)
+    var seq    // stores pitch in sequence if mode == 'seq', (0-11)
+    var reset1  // 11 or 18 if one of the reset keys is pressed
+
+    def init():
+        mode = 'dyn'
+        dyn = 0
+        pitch = 0
+        seq = 0
+        reset1 = 0
+        activate()  // make this a handler
+        reset_colors()
+        display "Launchpad", midi_handler, this
+
+
+    def reset_colors(optional p = 11):
+    # initialize colors:
+        if p <= 88:
+            var color = LP_OFF
+            if (31 <= p and p <= 36) or (41 <= p and p <= 46):
+                color = LP_GRAY
+            // it seems that initially, launchpad thinks everything
+            // is off, so LP_OFF does nothing, so we set it to BRIGHT
+            // so that the 2nd message to set color will always work
+            midi_out.note_on(0, p, color)
+            if p % 10 == 8:
+                p = p + 2
+            sched_cause(0.001, this, 'reset_colors', p + 1)
+
+
+    def poly_touch(chan, data1, data2):
+        nil
+
+
+    def mode_to_lpkey(m, n):
+    # calculate key to address button representing mode m, row/col n
+        if m == 'dyn':
+            return (81 + n) if (n < 6) else (71 + n - 6)
+        elif m == 'pitch':
+            return (61 + n) if (n < 6) else (51 + n - 6)
+        elif m == 'diag1':
+            return 87
+        elif m == 'diag2':
+            return 88
+        elif m == 'seq':
+            return (41 + n) if (n < 6) else (31 + n - 6)
+        else:
+            nil
+
+
+    def choice(m, n):
+    # choose mode m with parameter (row or col) n
+        // turn off indicator for current mode:
+        if m in EXCLUSIVE_MODES:
+            if mode == 'dyn':
+                midi_out.note_on(0, mode_to_lpkey('dyn', dyn), LP_OFF)
+            elif mode == 'pitch':
+                midi_out.note_on(0, mode_to_lpkey('pitch', pitch), LP_OFF)
+            elif mode == 'diag1':
+                midi_out.note_on(0, LP_DIAG1, LP_OFF)
+            elif mode == 'diag2':
+                midi_out.note_on(0, LP_DIAG2, LP_OFF)
+            mode = m  // set the mode
+        elif m == 'seq':
+            midi_out.note_on(0, mode_to_lpkey('seq', seq), LP_GRAY)
+            
+        // turn on indicator for new mode
+        if m == 'dyn':
+            midi_out.note_on(0, mode_to_lpkey('dyn', n), LP_ORANGE)
+            dyn = n
+        elif m == 'pitch':
+            midi_out.note_on(0, mode_to_lpkey('pitch', n), LP_BLUE)
+            pitch = n
+        elif m == 'diag1':
+            midi_out.note_on(0, LP_DIAG1, LP_YELLOW)
+        elif m == 'diag2':
+            midi_out.note_on(0, LP_DIAG2, LP_PURPLE)
+        elif m == 'seq':
+            midi_out.note_on(0, mode_to_lpkey('seq', n), LP_BRIGHT)
+            seq = n
+
+
+    def noteon(chan, keynum, vel):
+        print
+        display "Launchpad_x noteon", chan, keynum, vel, mode, pitch, dyn
+        if 81 <= keynum and keynum <= 86:
+            choice('dyn', keynum - 81)
+        elif 71 <= keynum and keynum <= 76:
+            choice('dyn', keynum - 71 + 6)
+        elif 61 <= keynum and keynum <= 66:
+            choice('pitch', keynum - 61)
+        elif 51 <= keynum and keynum <= 56:
+            choice('pitch', keynum - 51 + 6)
+        elif 41 <= keynum and keynum <= 46:
+            var input = keynum - 41
+            choice('seq', input)
+            if mode == 'dyn':
+                samps_note_on(input, dyn)
+            elif mode == 'pitch':
+                samps_note_on(pitch, input)
+            elif mode == 'diag1':
+                samps_note_on(input, input)
+            elif mode == 'diag2':
+                samps_note_on(input, 11 - input)                
+            else:
+                print "No mode selected, noteon ignores input"
+        elif 31 <= keynum and keynum <= 36:
+            input = keynum - 31 + 6
+            choice('seq', input)
+            if mode == 'dyn':
+                samps_note_on(input, dyn)
+            elif mode == 'pitch':
+                samps_note_on(pitch, input)
+            elif mode == 'diag1':
+                samps_note_on(input, input)
+            elif mode == 'diag2':
+                samps_note_on(input, 11 - input)
+            else:
+                print "No mode selected, noteon ignores input"
+        elif keynum == LP_DIAG1:
+            choice('diag1', nil)
+        elif keynum == LP_DIAG2:
+            choice('diag2', nil)
+        elif keynum == 11:
+            if reset1 == 18:
+                reset_colors()
+            reset1 = 11
+        elif keynum == 18:
+            if reset1 == 11:
+                reset_colors()
+            reset1 = 18
+
+
+    def noteoff(chan, keynum, vel):
+        display "Launchpad_x noteoff", chan, keynum, vel, mode, pitch, dyn
+        if 41 <= keynum and keynum <= 46:
+            var input = keynum - 41
+            if mode == 'dyn':
+                samps_note_off(input, dyn)
+            elif mode == 'pitch':
+                samps_note_off(pitch, input)
+            elif mode == 'diag1':
+                samps_note_off(input, input)
+            elif mode == 'diag2':
+                samps_note_off(input, 11 - input)
+            else:
+                print "No mode selected, noteon ignores input"
+        elif 31 <= keynum and keynum <= 36:
+            input = keynum - 31 + 6
+            if mode == 'dyn':
+                samps_note_off(input, dyn)
+            elif mode == 'pitch':
+                samps_note_off(pitch, input)
+            elif mode == 'diag1':
+                samps_note_off(input, input)
+            elif mode == 'diag2':
+                samps_note_off(input, 11 - input)
+            else:
+                print "No mode selected, noteon ignores input"
+        elif keynum == 11 or keynum == 18:
+            reset1 = 0
+
+        
+    def poly_touch(chan, key, value):
+    # ignore poly_touch messages generated by launchpad
+        return

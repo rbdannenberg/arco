@@ -10,7 +10,7 @@ class Gated_foo (Instrument):
              psgain, delgain, attack, release):
         instr_begin()
         var faded = fader(input, 0, 0.1, 1)
-        var pshift = ola_pitch_shift(input, ratio, 0.01, 0.1)
+        var pshift = olapitchshift(input, ratio, 0.01, 0.1)
         // set max delay dur to 0.21 because application uses delays
         // of 0.15 and 0.2; 0.21 allows for rounding error
         var del = delay(input, delay, regen, 0.21)

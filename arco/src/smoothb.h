@@ -1,4 +1,4 @@
-/* smooth.h -- unit generator like const, but transitions are smoothed
+/* smoothb.h -- unit generator like const, but transitions are smoothed
  *
  * Roger B. Dannenberg
  * Oct 2023
@@ -29,6 +29,14 @@ public:
 
     
     const char *classname() { return Smoothb_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        return false;  // Smoothb has no Ugen children
+    }
+#endif
 
 
     void print_details(int indent) {

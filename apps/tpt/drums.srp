@@ -1,0 +1,80 @@
+# drums.srp -- drummer implemenetation
+#
+# Roger B. Dannenberg
+# Sep 2025
+
+
+class Drummer:
+    var drums_tacet
+    var drum_measure
+
+    def init():
+        drums_tacet = true
+        drum_measure = array(16)
+
+
+    def begin_two_bar_phrase():
+    # called every 2-measures under vtsched
+        var mean_dens = tempo_control.mean_dens
+        if lay_out:
+            return
+        if drums_tacet:  // even with low mean_dens, we turn on some
+                         // drums sometimes for a phrase:
+            drums_tacet = pr_coin(0.5)
+            display "begin_two_bar_phrase, after coin flip", drums_tacet
+        if run_length_process.rest_dur > 2 or mean_dens < 2:
+            drums_tacet = true
+            display "begin_two_bar_phrase", drums_tacet
+        if drums_tacet and mean_dens > 5:
+            drums_tacet = false
+        else:
+            display "begin_two_bar_phrase", drums_tacet, mean_dens
+//        if drums_tacet:
+//            display "drums_tacet with", mean_dens, run_length_process.rest_dur
+//        display "begin_two_bar_phrase", mean_dens, run_length_process.rest_dur,
+//        display     drums_tacet
+
+
+    def pick_drum(): pr_range(61, 64)
+
+
+    def play_drums(phase):
+    # create a measure of drums as they are played; record the sequence
+    # if record; otherwise, play back recorded measure.
+        // no drums before 30" have elapsed
+        if sched_rtime < run_length_process.start_time + 30:
+            return
+        if phase == 0:
+            begin_two_bar_phrase()
+        if drums_tacet or not drums_enabled:
+            return
+        var d = pick_drum()
+        if phase < 16:  // make a drum pattern
+            if phase == 0:
+                d = 63
+                play_drum(d, 127)
+            elif phase % 4 == 0 and pr_coin(0.9):
+                play_drum(d, 110)
+            if phase == 14 and pr_coin(0.8):
+                d = 63
+                play_drum(d, 127)
+            elif phase % 2 == 0 and pr_coin(0.4):
+                play_drum(d, 100)
+            elif pr_coin(0.2):
+                play_drum(d, 90)
+            else:
+                d = nil
+            drum_measure[phase] = d
+        else:  // replay drum pattern
+            d = drum_measure[phase - 16]
+            if d:
+                if phase == 16 or phase == 30:
+                    play_drum(d, 127)
+                elif phase % 4 == 0:
+                    play_drum(d, 110)
+                elif phase % 2 == 0:
+                    play_drum(d, 100)
+                else:
+                    play_drum(d, 90)
+
+

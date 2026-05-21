@@ -35,6 +35,8 @@ sum: Sum
 #include <climits>
 #include "o2internal.h"
 
+// int64_t gcount = 0; /*C*/
+
 /* arcotypes.h -- audio dsp process for Arco
  *
  * Roger B. Dannenberg
@@ -427,6 +429,7 @@ public:
             }
         }
         *out_samps = current;
+//         gcount++; /*C*/
         current += seg_incr;
         seg_togo--;
     }
@@ -855,9 +858,8 @@ public:
     Tableosc(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_, float phase) :
             Wavetables(id, nchans) {
         which_table = 0;
-        for (int i = 0; i < chans; i++) {
-            states.phase = fmodf(phase / 360.0f, 1.0f);
-        }
+        states.phase = fmodf(phase / 360.0f, 1.0f);
+        states.prev_amp = 0;
         init_freq(freq_);
         init_amp(amp_);
         update_run_channel();
@@ -932,6 +934,7 @@ public:
             float frac = x - ix;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_samps[i];
+//             gcount++; /*C*/
             phase += freq_samps[i] * AP;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -949,6 +952,7 @@ public:
             float frac = x - ix;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_samps[i];
+//             gcount++; /*C*/
             phase += phase_incr;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -970,6 +974,7 @@ public:
             amp_sig_fast += amp_sig_incr;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_sig_fast;
+//             gcount++; /*C*/
             phase += freq_samps[i] * AP;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -992,6 +997,7 @@ public:
             amp_sig_fast += amp_sig_incr;
             *out_samps++ = (table[ix] * (1 - frac) + 
                             table[ix + 1] * frac) * amp_sig_fast;
+//             gcount++; /*C*/
             phase += phase_incr;
             while (phase > 1) phase--;
             while (phase < 0) phase++;
@@ -1001,8 +1007,8 @@ public:
 
 
     void real_run() {
-        freq_samps = freq->run(current_block); // update input
-        amp_samps = amp->run(current_block); // update input
+        RUN(freq_samps, freq, current_block); // update input
+        RUN(amp_samps, amp, current_block); // update input
         if (which_table >= num_tables()) {
             return;
         }
@@ -1058,6 +1064,8 @@ Compilation options: -lang cpp -os -light -ct 1 -cn Sineb -es 1 -mcd 16 -mdd 102
 #define RESTRICT __restrict__
 #endif
 
+#define SINESIZE 4096
+
 class SinebSIG0 {
     
   private:
@@ -1086,7 +1094,7 @@ class SinebSIG0 {
     void fillSinebSIG0(int count, float* table) {
         for (int i1 = 0; i1 < count; i1 = i1 + 1) {
             iVec0[0] = 1;
-            iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
+            iRec0[0] = (iVec0[1] + iRec0[1]) % SINESIZE;
             table[i1] = std::sin(9.58738e-05f * float(iRec0[0]));
             iVec0[1] = iVec0[0];
             iRec0[1] = iRec0[0];
@@ -1098,7 +1106,7 @@ class SinebSIG0 {
 static SinebSIG0* newSinebSIG0() { return (SinebSIG0*)new SinebSIG0(); }
 static void deleteSinebSIG0(SinebSIG0* dsp) { delete dsp; }
 
-static float ftbl0SinebSIG0[65536];
+static float ftbl0SinebSIG0[SINESIZE];
 /*-------------- END FAUST PREAMBLE --------------*/
 
 const char *Sineb_name = "Sineb";
@@ -1178,15 +1186,16 @@ public:
     void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, &amp_stride); }
 
     void real_run() {
-        freq_samps = freq->run(current_block);  // update input
-        amp_samps = amp->run(current_block);  // update input
+        RUN(freq_samps, freq, current_block);  // update input
+        RUN(amp_samps, amp, current_block);  // update input
 
             float fSlow0 = float(amp_samps[0]);
             float fSlow1 = fConst0 * float(freq_samps[0]);
             states.iVec1[0] = 1;
             float fTemp0 = ((1 - states.iVec1[1]) ? 0.0f : fSlow1 + states.fRec1[1]);
             states.fRec1[0] = fTemp0 - std::floor(fTemp0);
-            out_samps[0] = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * states.fRec1[0]), 65535))]);
+            out_samps[0] = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(SINESIZE * states.fRec1[0]), (SINESIZE - 1)))]);
+//             gcount++; /*C*/
             states.iVec1[1] = states.iVec1[0];
             states.fRec1[1] = states.fRec1[0];
     
@@ -1385,6 +1394,7 @@ public:
             b_fast += b_incr;
             *out_samps++ = gain * (x1_samps[i] * (1.0f - b_fast) +
                                    x2_samps[i] * b_fast);
+//             gcount++; /*C*/
         }
     }
 
@@ -1405,9 +1415,9 @@ public:
 
 
     void real_run() {
-        x1_samps = x1->run(current_block); // update input
-        x2_samps = x2->run(current_block); // update input
-        b_samps = b->run(current_block);  // update input
+        RUN(x1_samps, x1, current_block); // update input
+        RUN(x2_samps, x2, current_block); // update input
+        RUN(b_samps, b, current_block);  // update input
         if ((x1->flags & x2->flags & TERMINATED) &&
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
@@ -1446,12 +1456,16 @@ public:
     int pan_stride;
     Sample_ptr pan_samps;
 
+    Stpan_state state;
+
     Stpan(int id, int nchans, Ugen_ptr x_, Ugen_ptr pan_) :
         Ugen(id, 'a', 2 /* chans */) {
         x = x_;
         pan = pan_;
         init_x(x);
         init_pan(pan);
+        state.left = 0.5;
+        state.right = 0.5;
     }
 
     void repl_x(Ugen_ptr ugen) {
@@ -1483,13 +1497,12 @@ public:
 
 
     void real_run() {
-        x_samps = x->run(current_block);
-        pan_samps = pan->run(current_block);
+        RUN(x_samps, x, current_block);
+        RUN(pan_samps, pan, current_block);
         if ((x->flags & TERMINATED) && (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
         // first channel to write output
-        Stpan_state states;
         float pan_sig = *pan_samps;
         pan_sig = (pan_sig < 0 ? 0 : (pan_sig > 1 ? 1 : pan_sig));
         // pan 0 to 1 maps to COS_TABLE_SIZE + 2 to COS_TABLE_SIZE / 2 + 2
@@ -1501,8 +1514,8 @@ public:
         // now left is from 0.5 to 1 because we used raised_cosine,
         // but we want 0 to 1 as in cosine, so fix it
         left += left - 1;
-        float left_incr = (left - states.left) * BL_RECIP;
-        left = states.left;
+        float left_incr = (left - state.left) * BL_RECIP;
+        left = state.left;
         
         // pan 0 to 1 maps to COS_TABLE_SIZE / 2 + 2 to COS_TABLE_SIZE + 2
         angle = (COS_TABLE_SIZE * 3 / 2.0f) - angle;
@@ -1512,17 +1525,19 @@ public:
         // now right is from 0.5 to 1 because we used raised_cosine,
         // but we want 0 to 1 as in cosine, so fix it
         right += right - 1;
-        float right_incr = (right - states.right) * BL_RECIP;
-        right = states.right;
+        float right_incr = (right - state.right) * BL_RECIP;
+        right = state.right;
 
         for (int i = 0; i < BL; i++) {
             left += left_incr;
             right += right_incr;
             out_samps[i] = *x_samps * left;
+//             gcount++; /*C*/
             out_samps[i + BL] = *x_samps++ * right;
+//             gcount++; /*C*/
         }
-        states.left = left;
-        states.right = right;
+        state.left = left;
+        state.right = right;
     }
 };
 
@@ -1634,7 +1649,8 @@ public:
         bool copy_first_input = true;
         while (i < inputs.size()) {
             Ugen_ptr input = inputs[i];
-            Sample_ptr input_ptr = input->run(current_block);
+            Sample_ptr input_ptr;
+            RUN(input_ptr, input, current_block);
             if (input->flags & TERMINATED) {
                 send_action_id(ACTION_REM, input->id);
                 input->unref();
@@ -1645,6 +1661,7 @@ public:
             int ch = input->chans;
             if (copy_first_input) {
                 block_copy_n(out_samps, input_ptr, MIN(ch, chans));
+//                 gcount += MIN(ch, chans) * BL; /*C*/
                 if (ch < chans) {  // if more output channels than
                     // input channels, zero fill; but if there is only one
                     // input channel, copy it to all outputs
@@ -1654,11 +1671,13 @@ public:
                     //    }
                     //} else {
                     block_zero_n(out_samps + BL * ch, chans - ch);
+//                     gcount += (chans - ch) * BL; /*C*/
                     //}
                 }
                 copy_first_input = false;  // from now on, need to sum input
             } else {
                 block_add_n(out_samps, input_ptr, MIN(ch, chans));
+//                 gcount += MIN(ch, chans) * BL; /*C*/
             }
             // whether we copied or sumed the first chans channels of input,
             // there could be extra channels to "wrap" and now we have to sum
@@ -1666,11 +1685,13 @@ public:
                 for (int c = chans; c < ch; c += chans) {
                     block_add_n(out_samps, input_ptr + c * BL,
                                 MIN(ch - c, chans));
+//                     gcount += MIN(ch - c, chans) * BL; /*C*/
                 }
             }
         }
         if (copy_first_input) {  // did not find even first input to copy
             block_zero_n(out_samps, chans);  // zero the outputs
+//             gcount += chans * BL; /*C*/
             // Check starting_size so that if we entered real_run() with no
             // inputs, we will not terminate. Only terminate if there was at
             // least one input that terminated and now there are none:
@@ -1687,6 +1708,7 @@ public:
             if (gain != 1) {
                 for (int i = 0; i < chans * BL; i++) {
                     *out_samps++ *= gain;
+//                     gcount++; /*C*/
                 }
                 prev_gain = gain;
             }
@@ -1701,6 +1723,7 @@ public:
                     for (int i = 0; i < BL; i++) {
                         g += gincr;
                         *out_samps++ *= g;
+//                         gcount++; /*C*/
                     }
                 }
                 // due to rate limiting, the end of the ramp over BL
@@ -1813,11 +1836,12 @@ public:
     void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, &x2_stride); }
 
     void real_run() {
-        x1_samps = x1->run(current_block); // update input
-        x2_samps = x2->run(current_block); // update input
+        RUN(x1_samps, x1, current_block); // update input
+        RUN(x2_samps, x2, current_block); // update input
         if (((x1->flags | x2->flags) & TERMINATED) && (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
+//             gcount++; /*C*/
 
             switch (op) {
               case MATH_OP_MUL:
@@ -2000,6 +2024,13 @@ int main()
     o2_internet_enable(false);
     o2_initialize("arcobenchmark");
     o2_clock_set(NULL, NULL);
+
+    // class initialization code from faust:
+    SinebSIG0* sig0 = newSinebSIG0();
+    sig0->instanceInitSinebSIG0(AR);
+    sig0->fillSinebSIG0(SINESIZE, ftbl0SinebSIG0);
+    deleteSinebSIG0(sig0);
+
     ugen_initialize();
     build_graph();
     printf("Initialization complete\n");
@@ -2009,7 +2040,8 @@ int main()
     int duration_blocks = BR * SIMSECS;
     while (block_count < duration_blocks) {
         block_count += 1;
-        sum->run(block_count);
+        Sample_ptr sum_samps;
+        RUN(sum_samps, sum, block_count);
     }
 
     O2time finish_time = o2_local_time();
@@ -2017,6 +2049,8 @@ int main()
     printf("Completed %d samples, %g seconds, wall time %g s.\n",
            duration_blocks * BL, duration_blocks * BP,
            finish_time - start_time);
-#define RESULTS "singlechannel.txt"
+    // printf("full sample output gcount: %lld\n", gcount);
+
+#define RESULTS "data/singlechannel.txt"
 #include "report.cpp"
 }

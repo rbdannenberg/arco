@@ -89,6 +89,21 @@ void arco_tableoscb_set_amp(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/tableoscb/set_phase int32 id, int32 chan, float phase;
+ */
+void arco_tableoscb_set_phase(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t chan = argv[1]->i;
+    float phase = argv[2]->f;
+    // end unpack message
+
+    UGEN_FROM_ID(Tableoscb, tableoscb, id, "arco_tableoscb_set_phase");
+    tableoscb->set_phase(chan, phase);
+}
+
+
 /* O2SM INTERFACE: /arco/tableoscb/sel int32 id, int32 index;
  */
 void arco_tableoscb_sel(O2SM_HANDLER_ARGS)
@@ -100,6 +115,29 @@ void arco_tableoscb_sel(O2SM_HANDLER_ARGS)
 
     UGEN_FROM_ID(Tableoscb, tableoscb, id, "arco_tableoscb_sel");
     tableoscb->select(index);
+}
+
+
+/* O2SM INTERFACE: /arco/tableoscb/borrow int32 id, int32 lender;
+ */
+void arco_tableoscb_borrow(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int32_t id = argv[0]->i;
+    int32_t lender = argv[1]->i;
+    // end unpack message
+
+    UGEN_FROM_ID(Tableoscb, tableoscb, id, "arco_tableoscb_borrow");
+    UGEN_FROM_ID(Tableoscb, wtugen, lender, "arco_tableoscb_borrow");
+    Wavetables *lender_ugen = (Wavetables *) wtugen;
+    
+
+    if (lender_ugen && streql(lender_ugen->classname(), "Tableoscb")) {
+        tableoscb->borrow(lender_ugen);
+    } else {
+        arco_warn("Tableoscb borrow ignored: lender %d is not a Tableoscb",
+                  lender);
+    }
 }
 
 
@@ -160,7 +198,11 @@ static void tableoscb_init()
                     arco_tableoscb_repl_amp, NULL, true, true);
     o2sm_method_new("/arco/tableoscb/set_amp", "iif",
                     arco_tableoscb_set_amp, NULL, true, true);
+    o2sm_method_new("/arco/tableoscb/set_phase", "iif",
+                    arco_tableoscb_set_phase, NULL, true, true);
     o2sm_method_new("/arco/tableoscb/sel", "ii", arco_tableoscb_sel,
+                    NULL, true, true);
+    o2sm_method_new("/arco/tableoscb/borrow", "ii", arco_tableoscb_borrow,
                     NULL, true, true);
     // END INTERFACE INITIALIZATION
     o2sm_method_new("/arco/tableoscb/createtas", "iiivf",

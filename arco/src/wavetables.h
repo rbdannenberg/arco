@@ -8,6 +8,8 @@
  * w[0] repeats at w[n-2] and w[1] repeats at w[n-1] to simplify
  * interpolation.
  */
+#include "ffts_compat.h"  // for ilog2()
+
 typedef Vec<float> Wavetable;
 
 const int sine_table_len = 1024;
@@ -19,7 +21,7 @@ public:
     Wavetables *lender;  // when non-null, wavetables are fetched from lender,
                          // allowing wavetables to be shared by many oscillators
 
-    Wavetables(int id, int nchans) : Ugen(id, 'a', nchans), wavetables(0) {
+    Wavetables(int id, char rate, int nchans) : Ugen(id, rate, nchans), wavetables(0) {
         lender = nullptr;
     }
 
@@ -29,9 +31,23 @@ public:
             wavetables[i].finish();
         }
         if (lender) {
-            lender->unref();
+            lender->unref((Ugen **) &lender);
         }
     }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        // lender is the only Ugen child
+        *child = NULL;
+        if (i == 0) {
+            *child = lender;
+            return true;
+        }
+        return false;
+    }
+#endif
 
 
     void borrow(Wavetables *wt) {
@@ -46,30 +62,24 @@ public:
 
 
     Wavetable *get_table(int i) {
-        if (lender) {
-            if (i >= lender->wavetables.size()) {
-                if (lender->wavetables.size() > 0) {
-                    i = 0;
-                } else {
-                    return nullptr;
-                }
+        Vec<Wavetable> &w = (lender ? lender->wavetables : wavetables);
+        if (i < 0 || i >= w.size()) {  // convert invalid index to index 0
+            if (w.size() > 0) {
+                i = 0;
+            } else {
+                return nullptr;
             }
-            return &lender->wavetables[0];
-        } else {
-            if (i >= wavetables.size()) {
-                if (wavetables.size() > 0) {
-                    i = 0;
-                } else {
-                    return nullptr;
-                }
-            }
-            return &wavetables[0];
         }
+        return &w[i];
     }
 
 
     void create_table_at(int i, int tlen) {
         // if i > size, extend wavetables and initialize to empty wavetables
+        // round tlen up to the next power of 2 if needed
+        if ((tlen & (tlen - 1)) != 0) {
+            tlen = 1 << ilog2(tlen);
+        }
         int n = wavetables.size();
         if (n <= i) {
             wavetables.set_size(i + 1, false);
@@ -91,6 +101,7 @@ public:
         create_table_at(i, tlen);
         // now wavetables[i] exists and is initialized but may be wrong size
         Wavetable &table = wavetables[i];
+        tlen = table.size() - 2;  // length is rounded up to power of 2 + 2
         table.zero();
         int harm = 1;  // harmonic number
         for (int h = 0; h < slen - hasphase; h += 1 + hasphase) {

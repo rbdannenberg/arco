@@ -1,0 +1,654 @@
+# notes.srp -- transcribe analysis data into note sequence
+#
+# Roger B. Dannenberg
+# Aug 2025
+#
+# Try with just YIN data to start with
+
+# Algorithm:
+#
+# Each sample goes into a selection filter that replaces
+# high inharmonicity or low rms with nil.
+#
+# Next, a 3-neighbor median filter where nil in the center
+# is replaced by the average of the other two if they are 
+# within 1 semitone, and a number is replaced by nil if
+# the neighbors are nil or the median otherwise.
+#
+# Next, we scan for the longest run before the pitch
+# range exceeds a semitone. When the run is exceeded,
+# we output a note from the time of the first pitch to
+# the time of the pitch outside the range (nil counts
+# as outside the range).
+#
+# Time and Meter:
+#
+# Time is quantized to 16ths, but tempo can change
+# at multiples of 16 16ths.
+# 
+# Tempo can change during capture and synthesis.
+#
+# Phrase capture and phrase synthesis can only start
+# at multiples of 4 16ths (beats). However, during
+# capture, the tempo (sixteenth_dur) is fixed to
+# avoid changing the "sample rate" during transcription
+#
+# To implement this, a "process" runs every 16 16ths
+# It sets the tempo of vtsched which counts beats
+# and where integer vtimes are beat numbers.
+#
+# EXPERIMENT:
+# 
+# Keep 10 measures with highest density.
+# When there is a measure with low density or nothing
+# to play, and the trumpet has not played for 2 previous
+# beats, find a measure that has high density and play
+# it instead.
+
+
+require "debug"
+REST = -1
+
+class Timed_pitch:
+    var time
+    var pitch
+    var rest
+
+    def init(time_, pitch_):
+        time = time_
+        pitch = pitch_
+        rest = false
+
+class Measure
+    var pitches
+    var density
+
+    def init(plist):
+        pitches = plist
+        var n = plist.count(REST)
+        density = (16 - n) / 16
+
+
+class Measure_history:
+# remembers list of measures for future replay
+    var history  // list of up to 10 Measures
+    var max_density  // maximum density stored in history
+    
+    def init():
+        history = []
+
+    def add_measure(m):
+    # analyze 1 measure and remember high-density ones
+    # also update max_density
+        m = Measure(m)
+        if m.density > max_density or m.density > 0.5:
+            if len(history) >= 10:
+                print "Remembering measure with density", m.density
+                var i = pr_range(len(history))
+                if m.density < history[i].density:  // replacing higher density
+                    // recompute density
+                    max_density = 0
+                    for h in history:
+                        max_density = max(h.density, max_density)
+                else:  // save some work
+                    max_density = m.density
+                history[i] = m
+
+
+    def add_phrase(plist):
+    # analyze 2 measures of phrase and remember high-density ones
+        add_measure(subseq(plist, 0, 16))
+        add_measure(subseq(plist, 16))
+
+# TODO: 
+#    add all phrases played to Measure_history
+#    detect when to insert random measures from Measure_history and do it   
+
+class Note_info:
+    var time
+    var pitch
+    var dur
+
+    def init(time_, pitch_, dur_):
+        time = time_
+        pitch = pitch_
+        dur = dur_
+
+    def to_str():
+        return "<Note_info time: " + str(time) + " pitch: " + str(pitch) +
+               " dur: " + str(dur) + ">"
+
+
+class Median3:
+    var prev
+    var current
+    var next
+    var next_time
+
+    def init():
+        prev = nil
+        current = nil
+        next = nil
+        next_time = 0
+
+
+    def median3(x, y, z):
+        if x > y:
+            var temp = x
+            x = y
+            y = temp
+        // now x and y are sorted
+        if z < x:   x
+        elif z < y: z
+        else:       y
+
+
+    def process(tp):
+    # returns tp with data representing the median
+        prev = current
+        var current_time = next_time
+        current = next
+        next_time = tp.time
+        next = tp.pitch
+        tp.time = current_time
+        if not current:
+            if prev and next and abs(prev - next) < 1:
+                // both neighbors nearby floats: nil -> average
+                tp.pitch = (prev + next) * 0.5
+        elif prev and next:  // all float: float -> median
+            tp.pitch = median3(prev, current, next)
+        elif prev and abs(prev - current) < 1:  // one nearby float:
+            tp.pitch = (prev + current) * 0.5    // float -> average
+        elif next and abs(next - current) < 1:  // one nearby float:
+            tp.pitch = (next + current) * 0.5    // float -> average
+        else:
+            tp.pitch = nil       // both neighbors nil: float -> nil
+        return tp
+
+
+class Run_length_process:
+# assemble incoming (time, pitch) pairs into notes by detecting runs of
+# steady pitch (within 1 semitone)
+# also detect silence. Record length of silence as rest_dur
+    var started
+    var lowest
+    var highest
+    var pitch_sum
+    var pitch_n
+    var note_info  // a Note_info used to return results
+    var rest_start  // start time of rest
+    var rest_dur    // duration of rest so far
+
+
+    def init():
+        set_range()
+        note_info = Note_info(0, 60, 1)
+        rest_dur = 0
+
+
+    def set_range():
+        lowest = 100
+        highest = 0
+        started = false
+
+
+    def process(tp):
+    # process one incoming (time, pitch) pair (a Time_pitch object).
+    # if a new note is starting or continuing, report the time and best
+    # estimate of pitch and set dur to nil (indicating unknown). When
+    # the note ends, report the final duration. Returns nil if no note
+    # is starting, continuing, or ending.
+    # Updates rest_start and rest_dur
+        // display "process", started, tp.pitch, lowest, highest
+        if started:
+            if tp.pitch:
+                lowest = min(lowest, tp.pitch)
+                highest = max(highest, tp.pitch)
+                if highest - lowest < 1:  // not end of note
+                    pitch_sum = pitch_sum + tp.pitch
+                    pitch_n = pitch_n + 1
+                    note_info.pitch = round(pitch_sum / pitch_n)
+                    // note_info.dur = nil  (set when note starts)
+                    return note_info  // continuing
+            // else note ends with nil (no) pitch
+            // end of note processing
+            note_info.dur = tp.time - note_info.time
+            note_info.pitch = round(pitch_sum / pitch_n)  // average pitch
+            // display "got note", note_info.time, note_info.pitch, 
+            // display         note_info.dur
+            started = false
+            return note_info
+        // first sample of new note?
+        if tp.pitch:
+            lowest = tp.pitch
+            highest = lowest
+            started = true
+            note_info.time = tp.time
+            note_info.pitch = lowest
+            note_info.dur = nil
+            pitch_sum = lowest
+            pitch_n = 1
+            rest_start = tp.time + yin_period  // if rest does not actually
+                    // start next yin_period, we'll set it again right here
+            return note_info  // first note
+        elif tp.rest:  // we have a rest
+            rest_dur = tp.time - rest_start  // initially 0 after first low rms
+        return nil
+
+
+class Notes:
+    var prev_time
+    var yin_period
+    var harmonicity_threshold  # upper bound
+    var rms_threshold  # lower bound
+    var m3
+    var tp
+    var gap_minimum
+    var start_silence
+    var gap_reported
+
+
+    def init(keyword ht = 0.1, rt = 0.1, rl = 3):
+        prev_time = 0
+        yin_period = 1.0 / YIN_SAMPLE_RATE
+        harmonicity_threshold = ht
+        rms_threshold = rt
+        min_run_len = rl
+        m3 = Median3()
+        run_length_process = Run_length_process()
+        tp = Timed_pitch(0, 60)
+        gap_minimum = 1.2  // seconds
+        start_silence = 100000.0
+        gap_reported = false
+
+        
+    def yin_input(pitch, harmonicity, rms):
+    # receives yin analysis messages. 
+    # TIMING: a message should arrive at YIN_SAMPLE_RATE but messages are
+    # bursty when audio block size is large, so estimate the time as follows:
+    #     Compute a time estimate as prev_time + yin_period. 
+        var actual_time = sched_time_get()
+        prev_time = prev_time + yin_period
+        if actual_time > prev_time + 0.1:  // estimate is way behind
+            prev_time = actual_time
+        tp.rest = rms < rms_threshold
+        if harmonicity > harmonicity_threshold or tp.rest:
+            pitch = nil
+        plot_notes.add_yin_point(prev_time, pitch, rms)
+        tp.time = prev_time
+        tp.pitch = pitch
+        tp = m3.process(tp)
+        var ni = run_length_process.process(tp)
+        if ni:  // new, continuing, or ending note
+            if ni.dur:  // if it has ended, plot it:
+                // display "yin_input got note", ni
+                plot_notes.add_note(ni.time, ni.pitch, ni.dur)
+                tempo_control.add_onset(prev_time, ni.dur)
+            phrase_maker.add_note(ni, prev_time)
+            // notes get counted in tempo estimator at their off time:
+        else:
+            phrase_maker.poll(prev_time)
+
+        # silence detection
+        if rms > rms_threshold:
+            // maybe silence will start next time
+            if prev_time - start_silence > 0.2:
+                print "gap time", prev_time - start_silence,
+                print     "at", sched_time_get()
+            start_silence = prev_time + yin_period
+            gap_reported = false
+        // else silence happening since start_silence
+        if prev_time > start_silence + gap_minimum and not gap_reported:
+            gap_reported = true
+            print "gap detected"
+            gap_detected()
+            // note: gap_reported is true until end of gap
+
+
+
+class Pair:
+    var first
+    var second
+
+    def init(f, s):
+        first = f
+        second = s
+
+    def show():
+        print "Pair: first "; first; " second "; second
+
+    def to_str():
+        "<Pair " + str(first) + ", " + str(second) + ">"
+
+
+
+class Tempo_control:
+# Controls tempo based on note density. Uses a 5 second window
+# and updates every second. Because the player may take some
+# long rests even though playing "fast", we want to divide the
+# density by the duty factor, equivalent to divide note count by
+# the "on time" or sum of note durations. This will over-estimate
+# density when articulation is stacatto, but tempo is only used
+# for note subdivisions (sixteenths), so output will still reflect
+# the density of input.
+#
+# Three tempi are used: 60, 90, 120 bpm, or 1, 1.5, 2 bps.
+#
+# Outside of this singleton object, tempo is observed through the
+# vtsched object.
+
+    var history  // [Pair(count, dur), ...]  5 pairs of (count, dur)
+    var current_bps  // bps from the most recent update
+    var bps_change_time
+    var bps  // final decision based on current_bps, but can only change
+             // after 5 sec
+    var measure_number
+    var drum_measure
+    var drums_tacet
+    var mean_dens  // mean density - affects tempo and drum_tacet
+
+    def init():
+        history = [Pair(0, 0)]
+        current_bps = 1.5  // default
+        sched_select(rtsched)
+        sched_cause(2.0, this, 'start_scheduling')
+        bps_change_time = sched_rtime
+        bps = current_bps
+        measure_number = 0
+        drum_measure = array(16)  // transcription of drums:
+        // elements are nil (rest), or drum id
+
+
+    def start_scheduling():
+    # called ONCE at rtime = 2 after initialization settles
+        sched_select(vtsched)
+        sched_set_time(0)
+        // update vtsched tempo every measure
+        sched_cause(0, this, 'begin_measure')
+        sched_select(rtsched)
+        sched_cause(0, this, 'compute_tempo')
+
+
+    def begin_measure():
+    # called every measure under vtsched
+        if not within(bps, vtsched.bps, 0.000001):
+            display "Tempo_control.begin_measure new bps", bps
+            show_tempo(bps)
+        sched_set_bps(bps)
+        if run_length_process.rest_dur > 4:
+            drums_tacet = true
+        if drums_tacet and mean_dens > 6:
+            drums_tacet = true
+        else:
+            display "drums_tacet with", mean_dens
+        if drums_enabled and not drums_tacet:
+            play_drums(0, measure_number % 4 == 0)
+        measure_number = measure_number + 1
+        sched_cause(4, this, 'begin_measure')
+
+
+    def pick_drum(): pr_range(61, 64)
+
+
+    def play_drums(sixteenth, record):
+    # create a measure of drums as they are played; record the sequence
+    # if record; otherwise, play back recorded measure.
+        var d = pick_drum()
+        if record:
+            if sixteenth == 0:
+                d = 63
+                play_drum(d, 127)
+            elif sixteenth % 4 == 0 and pr_coin(0.9):
+                play_drum(d, 110)
+            if sixteenth == 14 and pr_coin(0.8):
+                d = 63
+                play_drum(d, 127)
+            elif sixteenth % 2 == 0 and pr_coin(0.4):
+                play_drum(d, 100)
+            elif pr_coin(0.2):
+                play_drum(d, 90)
+            else:
+                d = nil
+            drum_measure[sixteenth] = d
+        else:
+            d = drum_measure[sixteenth]
+            if d:
+                if sixteenth == 0 or sixteenth == 14:
+                    play_drum(d, 127)
+                elif sixteenth % 4 == 0:
+                    play_drum(d, 110)
+                elif sixteenth % 2 == 0:
+                    play_drum(d, 100)
+                else:
+                    play_drum(d, 90)
+        if sixteenth < 15:
+            sched_cause(0.25, this, 'play_drums', sixteenth + 1, record)
+
+
+    def next_measure_boundary_vt(rtime):
+    # When is the virtual time of the next measure on or after rtime? 
+    # This is tricky because rtime may not be sched_rtime, so we have to 
+    # use timemap directly.
+        var vt = vtsched.map_from_parent(rtime)
+        // Multiply by 4 for measure number. Take
+        // approximate ceiling by truncating and adding 1, then * 4 to get beat
+        return (int(vt * 0.25) + 1) * 4
+
+    def next_measure_boundary_rt(rtime):
+    # When is the real time of the next measure on or after rtime?
+        return vtsched.map_to_parent(next_measure_boundary_vt(rtime))
+
+
+    def compute_tempo():
+    # returns estimated mean duration (equiv.: density / duty_factor)
+    # for last 5 frames, then shifts to start a new frame.
+    # Updates every second of real time.
+        // compute
+        var total_count = 0
+        var total_dur = 0
+        for p in history:
+            total_count = total_count + p.first
+            total_dur = total_dur + p.second
+        mean_dens = 3
+        if total_dur > 0:
+            mean_dens = total_count / total_dur
+
+        // change current_tempo using hysteresis
+        // we support 1, 1.5, 2 bps, which if we multiply by 2 gives 2, 3, 4
+        // so we'll use rounding to get to one of these numbers after adding
+        // some offset for hysteresis: Midpoints are 1.25 and 1.75. Let's use
+        // +-0.1, e.g., switch from 1 to 1.5 above 1.35 and back below 1.15.
+        // The tempo should be 1/2 * mean_dens, which means since mean
+        // duration is 1 / mean_dens, and beat duration is 2 / mean_dens, so
+        // sixteenth duration = 0.5 / mean_dens, then the sixteenth duration
+        // is 1/2 the mean duration.
+
+        var ideal_bps = 0.5 * mean_dens
+        if ideal_bps > current_bps:
+            ideal_bps = ideal_bps - 0.1  // bias towards current for hysteresis
+        else:
+            ideal_bps = ideal_bps + 0.1  // bias towards current for hysteresis
+        ideal_bps = round(ideal_bps * 2) / 2.0  // round to nearest 0.5 multiple
+        current_bps = max(1, min(2, ideal_bps))
+
+        if current_bps != bps and sched_rtime > bps_change_time + 5:
+            bps = current_bps
+            bps_change_time = sched_rtime
+
+        display "COMPUTED BPS", ideal_bps, current_bps, mean_dens
+
+        // shift:
+        history.set_len(min(len(history), 4))
+        history.insert(0, Pair(0, 0))
+
+        // schedule next computation
+        sched_cause(1, this, 'compute_tempo')
+
+
+    def add_onset(time, dur):
+        if dur:
+            history[0].first = history[0].first + 1
+            history[0].second = history[0].second + dur
+
+
+class Phrase_maker:
+# assemble notes into 2-bar phrases
+# start the clock at a measure boundary
+# constructs an array of pitch numbers representing 16th notes
+# with -1 for rest (inference will translate this to a class
+# vector and then to a one-hot matrix)
+    var phrase_start
+    var phrase
+    var sixteenth_dur
+    var note_start_time  // time or nil if not started yet
+
+    def init():
+        phrase_start = nil  // nil means not started yet
+        phrase = nil
+        sixteenth_dur = 0.25 / 1.5  // default is 90 bpm = 1.5 bps
+        note_start_time = nil
+
+
+    def add_note(note_info, current_time):
+    # note_info will have null dur if a note is starting or continuing
+    # only note_info with a float for dur is a completed note
+    # current_time is the time corresponding to the latest yin data
+    # (and corresponds to poll(time), except add_note() was called
+    # instead of poll() this time because there is note data).
+        var time = note_info.time
+        var dur
+        // this could be a note continuation message, in which case the
+        // note started before the phrase. Change the start time to
+        // match the phrase start time:
+        if phrase_start:
+            dur = note_info.dur
+            if dur and time < phrase_start:  // remove note before phrase_start
+                time = phrase_start
+                dur = dur - (phrase_start - note_info.time)
+                if dur < 0:
+                    return  // because note ends before beginning of phrase
+        var pitch = round(note_info.pitch)
+
+        // now, (time, pitch, dur) represents the note; null dur means
+        // note has not ended yet.
+
+        // if this is a new note starting and no phrase has started,
+        if not note_start_time and not phrase_start:  // start the phrase:
+            phrase_start = tempo_control.next_measure_boundary_rt(time)
+            phrase = array(32, REST)
+            plot_notes.phrase_start(phrase_start)
+            sixteenth_dur = 0.25 / vtsched.bps
+
+        // if this is a note ending or if the phrase end has been reached:
+        if dur or current_time > phrase_start + sixteenth_dur * 32:
+            if not dur:
+                dur = current_time - time  // pretend note has ended
+            // round start time and end time to nearest sixteenth:
+            var start = round((time - phrase_start) / sixteenth_dur)
+            var stop = round((time + dur - phrase_start) / sixteenth_dur)
+            if stop < 0:
+                return  // because note ends before phrase has started
+            for i = start to stop:
+                if i < len(phrase):
+                    phrase[i] = pitch
+            if stop >= 32:
+                phrase_finish()
+
+
+    def poll(time):
+    # if no new note is revealed by a yin input, poll is called with
+    # the time that would be associated with a new note if the data
+    # had called for it. Basically, poll() means there is no note, but
+    # time has passed, so check if the phrase is complete.
+        if phrase_start and time > phrase_start + sixteenth_dur * 32:
+            phrase_finish()
+
+
+    def phrase_finish():
+    # handler to be called when phrase is valid and complete
+    # state is reset to start a phrase with the next note onset
+        if hold_enabled:  // ignore new phrase, replaying old one
+            return
+        print "phrase is", phrase
+        phrase_start = nil
+        note_start_time = nil  // now, next add_note will start phrase
+        // even if it is for a note that is continuing
+        application_phrase_process(phrase)
+
+
+def application_phrase_process(phrase)
+# application handling here:
+    if hold_enabled and held_phrase:
+        phrase = held_phrase
+    held_phrase = phrase
+    if replay_transcription:
+        phrase_player.phrase_start(phrase)
+    else:
+        vae_process(phrase)
+
+
+class Phrase_player:
+# play a phrase
+    var pitch  // state of play for phrase_player
+    var transposition
+    var noteon_time
+
+    def init():
+        pitch = nil  // state of play for phrase_player
+        transposition = 0
+
+
+    def phrase_start(phrase):
+    # a phrase is a 2-bar array of 1/16th note pitches (nil or -1 for rest)
+        sched_select(vtsched)
+        // when is the next measure? Multiply by 4 for measure number. Take
+        // approximate ceiling by truncating and adding 1, then * 4 to get beat
+        var m = tempo_control.next_measure_boundary_vt(sched_rtime)
+        sched_cause(absolute(m), this, 'phrase_player_step', phrase, 0)
+
+
+    def phrase_player_step(phrase, i):
+    # pitch changes -> note off, note on
+    # pitch steady -> nil
+    # rest steady -> nil
+    # rest to pitch -> note_on
+    # pitch to rest -> note_off
+    # pitch to end -> note_off
+    # rest  to end -> nil
+        // simplify end-of-phrase by using next_pitch instead of phrase[i]
+        var next_pitch = phrase[i] if i < len(phrase) else nil
+        if next_pitch == -1 or not next_pitch:
+            next_pitch = -999  // use very negative number instead of -1 for
+                               // rests so that transposed notes are negative
+        // display "ppstep", pitch, next_pitch
+        // now we have 5 cases
+        next_pitch = next_pitch + transposition
+        if pitch and 
+           pitch != next_pitch:
+            phrase_note_off()  // pitch changes step 1 or pitch to rest
+        if next_pitch > 0 and pitch != next_pitch:
+            pitch = next_pitch
+            phrase_note_on()  // pitch changes step 2 or rest to pitch
+        // otherwise, do nothing for pitch or rest steady
+        if i < len(phrase):
+            sched_cause(0.25, this, 'phrase_player_step', phrase, i + 1)
+        elif hold_enabled:
+            application_phrase_process(held_phrase)
+
+
+    def phrase_note_on():
+        // display "noteon", pitch
+        noteon_time = sched_vtime
+        flsyn_ugen.noteon(0, pitch, 100)
+
+
+    def phrase_note_off()
+        // display "noteoff", pitch
+        var dur = (sched_vtime - noteon_time) * sustain_factor
+        if noteon_time + dur > sched_vtime + 0.02:
+            sched_cause(absolute(noteon_time + dur),
+                        flsyn_ugen, 'noteoff', 0, pitch)
+        else:
+            flsyn_ugen.noteoff(0, pitch)
+        pitch = nil  // does not match, so we get a note-on
+

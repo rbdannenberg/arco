@@ -6,10 +6,14 @@
 
 extern const char *Tableosc_name;
 
+const int64_t float_to_fix = (int64_t) 1 << 32;
+const float fix_to_float = 1.0f / float_to_fix;
+const float freq_to_phase_incr = AP * float_to_fix;
+
 class Tableosc : public Wavetables {
 public:
     struct Tableosc_state {
-        double phase;  // from 0 to 1 (1 represents 2PI or 360 degrees)
+        int64_t phase;  // fixed point from 0 to 1 with 32 fractional bits
         Sample prev_amp;
     };
     int which_table;
@@ -28,11 +32,22 @@ public:
 
 
     Tableosc(int id, int nchans, Ugen_ptr freq_, Ugen_ptr amp_, float phase) :
-            Wavetables(id, nchans) {
+            Wavetables(id, 'a', nchans) {
         which_table = 0;
         states.set_size(chans);
+        Wavetable *table = get_table(which_table);
+        int tlen = 0;
+        if (table) {
+            tlen = table->size() - 2;
+        }
+        // if there is no table yet, phase will be initialized to zero.
+        // otherwise, we initialize phase according to the phase parameter,
+        // and ASSUMING that table[0] has the right table length, even if
+        // a different table is selected before playing starts.
+        int64_t phase64 = fmodf(phase / 360.0f, 1.0f) * float_to_fix * tlen;
         for (int i = 0; i < chans; i++) {
-            states[i].phase = fmodf(phase / 360.0f, 1.0f);
+            states[i].phase = phase64;
+            states[i].prev_amp = 0.0f;
         }
         init_freq(freq_);
         init_amp(amp_);
@@ -40,7 +55,8 @@ public:
     }
 
     ~Tableosc() {
-        freq->unref();
+        freq->unref(&freq);
+        amp->unref(&amp);
     }
 
     const char *classname() { return Tableosc_name; }
@@ -67,7 +83,7 @@ public:
     }
 
     void repl_freq(Ugen_ptr ugen) {
-        freq->unref();
+        freq->unref(&freq);
         init_freq(ugen);
         update_run_channel();
     }
@@ -79,7 +95,7 @@ public:
     void init_freq(Ugen_ptr ugen) { init_param(ugen, freq, &freq_stride); }
 
     void repl_amp(Ugen_ptr ugen) {
-        amp->unref();
+        amp->unref(&amp);
         init_amp(ugen);
         update_run_channel();
     }
@@ -88,89 +104,108 @@ public:
         amp->const_set(chan, f, "Tableosc::set_amp");
     }
 
+    void set_phase(int chan, float f) {
+        Wavetable *table = get_table(which_table);
+        int tlen = 0;
+        if (table) {
+            tlen = table->size() - 2;
+        }
+        int64_t phase64 = fmodf(f / 360.0f, 1.0f) * float_to_fix * tlen;
+        states[chan].phase = phase64;
+    }
+
     void init_amp(Ugen_ptr ugen) { init_param(ugen, amp, &amp_stride); }
 
 
+    // Note: selecting a new table will maintain the phase ONLY if the
+    // selected table has the same size as the current table since phase
+    // is maintained as a fractional table INDEX.  If the new table is
+    // shorter than the current table, the phase (index) will be wrapped
+    // into a valid index if necessary (see the inner loops).
     void select(int i) {  // select table
         if (i < 0 || i >= num_tables()) {
             i = 0;
         }
         which_table = i;
-        Wavetable *table = get_table(i);
     }
 
 
     void chan_aa_a(Tableosc_state *state, Sample *table, int tlen) {
-        double phase = state->phase;
+        int64_t phase = state->phase;
+        int64_t tlen_mask = ((int64_t) tlen << 32) - 1;
+        float freq_scale = freq_to_phase_incr * tlen;
         for (int i = 0; i < BL; i++) {
-            float x = phase * tlen;
-            int ix = x;
-            float frac = x - ix;
-            *out_samps++ = (table[ix] * (1 - frac) + 
-                            table[ix + 1] * frac) * amp_samps[i];
-            phase += freq_samps[i] * AP;
-            while (phase > 1) phase--;
-            while (phase < 0) phase++;
+            // doing this first allows us to change tables, possibly changing
+            // table size, without worrying about phase overflow:
+            phase &= tlen_mask;
+            int ix = phase >> 32;
+            float frac = phase & 0xFFFFFFFF;
+            *out_samps++ = (table[ix] * (0x100000000 - frac) + 
+                            table[ix + 1] * frac) * amp_samps[i] * fix_to_float;
+            phase += freq_samps[i] * freq_scale;
         }
         state->phase = phase;
     }
 
 
     void chan_ba_a(Tableosc_state *state, Sample *table, int tlen) {
-        double phase = state->phase;
-        double phase_incr = *freq_samps * AP;
+        int64_t phase = state->phase;
+        int64_t tlen_mask = ((int64_t) tlen << 32) - 1;
+        double phase_incr = *freq_samps * freq_to_phase_incr * tlen;
         for (int i = 0; i < BL; i++) {
-            float x = phase * tlen;
-            int ix = x;
-            float frac = x - ix;
-            *out_samps++ = (table[ix] * (1 - frac) + 
-                            table[ix + 1] * frac) * amp_samps[i];
+            // doing this first allows us to change tables, possibly changing
+            // table size, without worrying about phase overflow:
+            phase &= tlen_mask;
+            int ix = phase >> 32;
+            float frac = phase & 0xFFFFFFFF;
+            *out_samps++ = (table[ix] * (0x100000000 - frac) + 
+                            table[ix + 1] * frac) * amp_samps[i] * fix_to_float;
             phase += phase_incr;
-            while (phase > 1) phase--;
-            while (phase < 0) phase++;
         }
         state->phase = phase;
     }
 
-
     void chan_ab_a(Tableosc_state *state, Sample *table, int tlen) {
-        double phase = state->phase;
-        Sample amp_sig = *amp_samps;
+        int64_t phase = state->phase;
+        int64_t tlen_mask = ((int64_t) tlen << 32) - 1;
+        float freq_scale = freq_to_phase_incr * tlen;
+        Sample amp_sig = *amp_samps * fix_to_float;
         Sample amp_sig_fast = state->prev_amp;
         state->prev_amp = amp_sig;
         Sample amp_sig_incr = (amp_sig - amp_sig_fast) * BL_RECIP;
         for (int i = 0; i < BL; i++) {
-            float x = phase * tlen;
-            int ix = x;
-            float frac = x - ix;
+            // doing this first allows us to change tables, possibly changing
+            // table size, without worrying about phase overflow:
+            phase &= tlen_mask;
+            int ix = phase >> 32;
+            float frac = phase & 0xFFFFFFFF;
             amp_sig_fast += amp_sig_incr;
-            *out_samps++ = (table[ix] * (1 - frac) + 
+            *out_samps++ = (table[ix] * (0x100000000 - frac) + 
                             table[ix + 1] * frac) * amp_sig_fast;
-            phase += freq_samps[i] * AP;
-            while (phase > 1) phase--;
-            while (phase < 0) phase++;
+            phase += freq_samps[i] * freq_scale;
         }
         state->phase = phase;
     }
 
 
     void chan_bb_a(Tableosc_state *state, Sample *table, int tlen) {
-        double phase = state->phase;
-        double phase_incr = *freq_samps * AP;
-        Sample amp_sig = *amp_samps;
+        int64_t phase = state->phase;
+        int64_t tlen_mask = ((int64_t) tlen << 32) - 1;
+        double phase_incr = *freq_samps * freq_to_phase_incr * tlen;
+        Sample amp_sig = *amp_samps * fix_to_float;
         Sample amp_sig_fast = state->prev_amp;
         state->prev_amp = amp_sig;
         Sample amp_sig_incr = (amp_sig - amp_sig_fast) * BL_RECIP;
         for (int i = 0; i < BL; i++) {
-            float x = phase * tlen;
-            int ix = x;
-            float frac = x - ix;
+            // doing this first allows us to change tables, possibly changing
+            // table size, without worrying about phase overflow:
+            phase &= tlen_mask;
+            int ix = phase >> 32;
+            float frac = phase & 0xFFFFFFFF;
             amp_sig_fast += amp_sig_incr;
-            *out_samps++ = (table[ix] * (1 - frac) + 
+            *out_samps++ = (table[ix] * (0x100000000 - frac) + 
                             table[ix + 1] * frac) * amp_sig_fast;
             phase += phase_incr;
-            while (phase > 1) phase--;
-            while (phase < 0) phase++;
         }
         state->phase = phase;
     }
@@ -180,19 +215,17 @@ public:
         freq_samps = freq->run(current_block); // update input
         amp_samps = amp->run(current_block); // update input
         Tableosc_state *state = &states[0];
-        if (which_table >= num_tables()) {
-            return;
-        }
         Wavetable *table = get_table(which_table);
         if (!table) {
             return;
         }
         int tlen = table->size() - 2;
+        assert(((tlen - 1) & tlen) == 0);
         if (tlen < 2) {
             return;
         }
         for (int i = 0; i < chans; i++) {
-            (this->*run_channel)(state, &((*table)[0]), tlen);
+            (this->*run_channel)(state, table->get_array(), tlen);
             state++;
             freq_samps += freq_stride;
             amp_samps += amp_stride;

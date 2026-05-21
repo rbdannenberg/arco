@@ -1,0 +1,563 @@
+# notes.srp -- transcribe analysis data into note sequence
+#
+# Roger B. Dannenberg
+# Aug 2025
+#
+# Try with just YIN data to start with
+
+# Algorithm for Transcription
+# ---------------------------
+# Each sample goes into a selection filter that replaces
+# high inharmonicity or low rms with nil.
+#
+# Next, a 3-neighbor median filter where nil in the center
+# is replaced by the average of the other two if they are 
+# within 1 semitone, and a number is replaced by nil if
+# the neighbors are nil or the median otherwise.
+#
+# Next, we scan for the longest run before the pitch
+# range exceeds a semitone. When the run is exceeded,
+# we output a note from the time of the first pitch to
+# the time of the pitch outside the range (nil counts
+# as outside the range).
+#
+# Time and Meter
+# --------------
+# Time is quantized to 16ths, but tempo can change
+# at multiples of 32 16ths.
+# 
+# Phrase capture and playback occurs withing phrases
+# where tempo is constant.
+#
+# EXPERIMENT
+# ----------
+# Keep 10 measures with highest density.
+# When there is a measure with low density or nothing
+# to play, [and the trumpet has not played for 2 previous
+# beats?], find a measure that has high density and play
+# it instead.
+#
+# PHRASES
+# -------
+# Tempo 60 to 120 gives beat dur of 0.5 to 1s so a 1.5 sec
+# delay at the end of a phrase is 1.5 to 3 beats or 6 to 12
+# 16ths. Start phrase at first pitch. End phrase after 31.5
+# 16ths or 1.5 sec of silence.
+
+require "debug"
+require "densify"
+require "flsynctrl"
+require "phraserecorder"
+
+REST = -1
+
+class Timed_pitch:
+    var time
+    var pitch
+    var rest
+
+    def init(time_, pitch_):
+        time = time_
+        pitch = pitch_
+        rest = false
+
+pitchclass2char = "ctdiefsgjahb"
+
+def phrase2str(s):
+# convert list of pitches and rests to more compact and readable string
+    var maxp = 0
+    for p in s:
+        maxp = max(p, maxp)
+    var high = maxp - 12  // use upper case at or below high
+    var rslt = ""
+    var c
+    for p in s:
+        if p == REST:
+            c = "_"
+        else:
+            c = pitchclass2char[p % 12]
+            if p <= high:
+                c = toupper(c)
+        rslt = rslt + c
+    return rslt
+
+
+class Note_info:
+    var time
+    var pitch
+    var dur
+
+    def init(time_, pitch_, dur_):
+        time = time_
+        pitch = pitch_
+        dur = dur_
+
+    def to_str():
+        return "<Note_info time: " + str(time) + " pitch: " + str(pitch) +
+               " dur: " + str(dur) + ">"
+
+
+class Median3:
+    var prev
+    var current
+    var next
+    var next_time
+
+    def init():
+        prev = nil
+        current = nil
+        next = nil
+        next_time = 0
+
+
+    def median3(x, y, z):
+        if x > y:
+            var temp = x
+            x = y
+            y = temp
+        // now x and y are sorted
+        if z < x:   x
+        elif z < y: z
+        else:       y
+
+
+    def process(tp):
+    # returns tp with data representing the median
+        prev = current
+        var current_time = next_time
+        current = next
+        next_time = tp.time
+        next = tp.pitch
+        tp.time = current_time
+        if not current:
+            if prev and next and abs(prev - next) < 1:
+                // both neighbors nearby floats: nil -> average
+                tp.pitch = (prev + next) * 0.5
+        elif prev and next:  // all float: float -> median
+            tp.pitch = median3(prev, current, next)
+        elif prev and abs(prev - current) < 1:  // one nearby float:
+            tp.pitch = (prev + current) * 0.5    // float -> average
+        elif next and abs(next - current) < 1:  // one nearby float:
+            tp.pitch = (next + current) * 0.5    // float -> average
+        else:
+            tp.pitch = nil       // both neighbors nil: float -> nil
+        return tp
+
+
+class Run_length_process:
+# assemble incoming (time, pitch) pairs into notes by detecting runs of
+# steady pitch (within 1 semitone)
+# also detect silence. Record length of silence as rest_dur
+    var started
+    var start_time  // when is first note?
+    var lowest
+    var highest
+    var pitch_sum
+    var pitch_n
+    // var note_info  // a Note_info used to return results
+    var rest_start  // start time of rest in real time
+    var rest_dur    // duration of rest so far in real time
+    var pitch       // estimated current pitch or REST (our output)
+    var is_active  // set when trumpet plays, cleared after 1 sec rest
+    var active_since  // most recent time that is_active became true when
+                      // active is true, basically NOW if active is false
+
+    def init():
+        set_range()
+        // note_info = Note_info(0, 60, 1)
+        pitch = REST
+        rest_dur = 0
+        is_active = false
+        active_since = 0
+        start_time = 999999.0
+
+
+    def set_range():
+        lowest = 100
+        highest = 0
+        started = false
+
+
+    def process(tp):
+    # process one incoming (time, pitch) pair (a Time_pitch object).
+    # records current pitch or REST into pitch instance variable so
+    # it can be sampled.
+    # Also updates rest_start and rest_dur with real times.
+        // display "process", started, tp.pitch, lowest, highest
+        if started:
+            if tp.pitch:
+                lowest = min(lowest, tp.pitch)
+                highest = max(highest, tp.pitch)
+                if highest - lowest < 1:  // not end of note
+                    pitch_sum = pitch_sum + tp.pitch
+                    pitch_n = pitch_n + 1
+                    pitch = round(pitch_sum / pitch_n)
+                    return
+            // else note ends with nil (no) pitch
+            // end of note processing
+            // display "got note", note_info.time, note_info.pitch, 
+            // display         note_info.dur
+            started = false
+            pitch = REST
+        elif tp.pitch:  // no pitch yet, first sample of new note?
+            lowest = tp.pitch
+            highest = lowest
+            pitch = lowest
+            started = true
+            start_time = min(start_time, tp.time)
+            pitch_sum = lowest
+            pitch_n = 1
+            rest_start = tp.time + YIN_PERIOD  // if rest does not actually
+                    // start next YIN_PERIOD, we'll set it again right here
+            if not is_active:
+                is_active = true
+                active_since = tp.time
+        elif tp.rest:  // we have a rest
+            pitch = REST
+            rest_start = rest_start or tp.time  // need to initialize rest_start
+            rest_dur = tp.time - rest_start  // initially 0 after first low rms
+            if rest_dur > 1:
+                is_active = false
+                active_since = tp.time
+
+
+
+class Notes:
+    var est_time // estimated actual time of yin_input (with some latency added)
+    // yin_input should occur every YIN_PERIOD. We delay time stamps so they are
+    // always in the future, and ideally separated by YIN_PERIOD, so ...
+    // set est_time to est_time + YIN_PERIOD * 0.95. This will caused
+    // currected time to run too slow. If est_time < real time, bump it up to
+    // real time. If it is greater than real time + 0.1s, assume something is
+    // way off and set it to real time + 0.1.
+    var harmonicity_threshold  # upper bound
+    var rms_threshold  # lower bound
+    var m3
+    var tp
+    var gap_minimum
+    var start_silence
+    var gap_reported  // if trumpet silent for gap_minimum (1.2 sec), this is
+                      // set to true
+    // transcription
+    var pitch      // pitch number or rest for current 16th
+    var dur_16ths  // duration (integer 16ths)
+    var dur_real   // duration (seconds of real time)
+    var is_onset   // if current 16th is a note onset (and not REST)
+    var frame_prev   // previous value of frame_start (used internally)
+    var frame_rtime  // real-time at which this pitch was sampled
+    var frame_dur  // real-time duration of this 16th note
+                   // (time since last frame_rtime)
+
+    def init(keyword ht = 0.1, rt = 0.05, rl = 3):
+        est_time = 0
+        harmonicity_threshold = ht
+        rms_threshold = rt
+        min_run_len = rl
+        m3 = Median3()
+        run_length_process = Run_length_process()
+        tp = Timed_pitch(0, 60)
+        gap_minimum = 1.2  // seconds
+        start_silence = 100000.0
+        gap_reported = false
+
+        
+    def yin_input(pitch, harmonicity, rms):
+    # receives yin analysis messages. 
+    # TIMING: a message should arrive at YIN_SAMPLE_RATE but messages are
+    # bursty when audio block size is large, so estimate the time (see above).
+        // display "yin_input", pitch, harmonicity, rms
+        var actual_time = sched_time_get()
+        est_time = min(max(est_time + YIN_PERIOD_INCR, actual_time),
+                       actual_time + 0.1)
+        tp.rest = rms < rms_threshold
+        if harmonicity > harmonicity_threshold or tp.rest:
+            pitch = nil
+        plot_notes.add_yin_point(est_time, pitch, rms)
+        tp.time = est_time
+        tp.pitch = pitch
+        tp = m3.process(tp)
+        run_length_process.process(tp)
+
+        # silence detection
+        if rms > rms_threshold:
+            // maybe silence will start next time
+            // if est_time - start_silence > 0.2:
+            //     print "gap time", est_time - start_silence,
+            //     print     "at", sched_time_get()
+            start_silence = est_time + YIN_PERIOD
+            gap_reported = false
+        // else silence happening since start_silence
+        if est_time > start_silence + gap_minimum and not gap_reported:
+            gap_reported = true
+            print "gap detected"
+            gap_detected()
+            // note: gap_reported is true until end of gap
+
+
+    def poll():
+    # wake up every 16th note and update transcription state
+        frame_rtime = frame_prev
+        frame_prev = sched_rtime
+        // if this is the first 16th, assume 1 bps just so we can have a dur:
+        frame_dur = sched_rtime - frame_rtime if frame_rtime else 0.25
+
+        var new_pitch = round(run_length_process.pitch)
+        if new_pitch == pitch:
+            dur_16ths = dur_16ths + 1
+            dur_real = dur_real + frame_dur
+            is_onset = false
+        else:
+            pitch = new_pitch
+            dur_16ths = 1
+            dur_real = frame_dur
+            is_onset = (pitch != REST)
+
+
+
+class Style_estimation:
+    var prev_vtime  // beats
+    var window
+    var index
+
+    def init():
+        sched_select(vtsched)
+        prev_vtime = sched_vtime
+        window = array(64)
+        index = 0
+
+
+    def send_window():
+    # send a window to style estimation, then 
+    # shift window by one measure. If shifted window
+    # starts with rests, remove them
+        o2_send_start()
+        var shift = 16
+        assert(len(window) == 64)
+        for p at i in window:
+            o2_add_int32(round(p))
+            // while we're looping, shift the data
+            if i == shift:
+                if p == -1:  // skip over rests
+                    shift = shift + 1
+                else:
+                    window[i - shift] = p
+            elif i > shift:
+                window[i - shift] = p
+        o2_send_finish(0.0, "/vae/window", true)
+        index = index - shift
+        // now window has the first non-rest and beyond after index 16
+        // shifted to index 0, and index is the location to put the next
+        // input (or 0 if the window was all rests after 16)
+
+
+    def poll():
+        var p = note_transcriber.pitch
+        // must begin window with a pitch; to classify silence, just
+        // look at run_length_process.rest_dur
+        if index == 0 and p == REST:
+            return
+        window[index] = p
+        index = index + 1
+        if index == 64:
+            send_window()
+        assert(index < 64)
+
+
+
+class Phrase_maker:
+# assemble notes into 2-bar phrases or less
+# start looking every 2 measures or after 1.5 sec of rest
+# start on first non-rest (2 bars is 4 to 8 sec in comparison)
+# constructs an array of pitch numbers representing 16th notes
+# with -1 for rest (inference will translate this to a class
+# vector and then to a one-hot matrix)
+# 
+# Algorithm
+# ---------
+# The phrase is filled in as information becomes available.
+# index is the location of the next 16th to be filled in.
+#
+# start() is called at zero beats and runs every 8 beats. It
+#    remembers the sched_rtime because note timing is in terms
+#    of real time.  The phrase is initialized to all REST.
+# poll() is called every 16th note to get info from note_transcriber
+#    is waits for a non-rest and starts collecting 16th note frames.
+#
+    var running
+    var phrase_start
+    var phrase
+    var index  // next unfilled phrase location (16th)
+
+    def init():
+        running = true
+        phrase = array(32)
+        phrase.clear()
+
+
+    def process_phrase():
+        if short_enable and len(phrase) <= 16:
+            // fill in rest of phrase by reversing first half
+            // assert(len(phrase) <= 16) -- actually, if short_enable is set
+            // after we accumulate more than 16 16ths, phrase can have length 32
+            while len(phrase) < 16:
+                phrase.append(REST)
+            for i = 0 to 16:
+                phrase.append(phrase[15 - i])
+        else:  // either phrase len should be 32 or we already have len > 16:
+            while len(phrase) < 32:
+                phrase.append(REST)
+
+        assert(len(phrase) == 32)  // required for VAE
+        phrase_finish(phrase.copy(), short_enable)
+
+
+    def poll(phase):
+    # Accumulate phrase into phrase[]
+        var phrlen = len(phrase)
+        var pitch = note_transcriber.pitch
+        assert(pitch)
+        if not running:
+            return
+        if phrlen == 0 and pitch == REST:
+            return  // need non-rest for first 16th
+        phrase.append(pitch)
+        phrlen = phrlen + 1
+        phrasetext.set_string(phrase2str(phrase) + " " + str(phrlen))
+        if (phrlen > 0 and
+            ((pitch == REST and note_transcriber.dur_real > 1.5) or
+             phrlen == 32 or (short_enable and phrlen == 16))):
+            process_phrase()
+            phrase.clear()  // start over
+
+
+held_phrase = nil
+
+// for 4, 5: 80 too loud, for 75, default 100 too loud for lead but ok for lead2
+// must map to int > 30. 'L80/100' is a hack, interpreted as lead gets 80 and 
+// lead2 gets 100:
+LEAD_PROG_TO_VEL = {4: 50, 5: 60, 6: 80, 75: 'L80/100'}
+
+def phrase_finish(phrase, short)
+# application handling here. short means the phrase was constructed from
+# one measure of input as opposed to two
+    maybe_record_phrase(phrase, short)
+    if hold_enabled and held_phrase:
+        phrase = held_phrase
+        print "phrase_finish reusing held_phrase:", phrase2str(phrase)
+    held_phrase = phrase
+    print "phrase_finish", phrase2str(phrase)
+    if replay_transcription:
+        print "phrase_finish starting a direct replay"
+        if short:
+            phrase = phrase.copy()
+            phrase.set_len(16)
+        phrase_player.start(phrase)
+        return
+    vae_process(phrase, short)
+
+
+previous_chord = "C7"
+
+
+class Phrase_player:
+# play a phrase
+    var transposition
+    var densify
+    var phrase_count
+
+    def init():
+        transposition = 0
+        densify = Densify()
+        phrase_count = 0
+
+
+    def start(phrase, optional chan = LEAD_CHAN, transpose, 
+              stretch = 1, is_poly):
+    # a phrase is a 2-bar array of 1/16th note pitches (nil or -1 for rest)
+    # is_poly means this is started in parallel with many other phrases. We
+    #    use phrase_count to keep track of how many "is_poly" phrases are in
+    #    progress and set phrases_playing to false when they finish.
+        if is_poly:  // never lay out during poly sequence
+            phrase_count = phrase_count + 1
+        elif lay_out:
+            return
+        if not transpose:
+            transpose = transposition  // from GUI
+        densify.densify(phrase, fill_in_for_density)
+        // start playback in the nearest measure. If the measure has already
+        // started, play what remains of the measure
+        // compute start_time of phrase and the index of the first note to play
+        sched_select(vtsched)  // may have been called via O2 message handler
+        var phrase_start_time = int(sched_vtime + 1)  // next beat
+        print "PLAY", phrase2str(phrase), sched_vtime, phrase_start_time
+        sched_cause(absolute(phrase_start_time),
+                    this, 'step', phrase, 0, chan, transpose, stretch, is_poly)
+        if chan == 0 and chord_enable:
+            previous_chord = pick_chord(previous_chord, phrase)
+            // display "picked new", previous_chord
+            // end just before next beat
+            play_chord(previous_chord, len(phrase) / 4 - 0.01)
+
+
+    def get_vel(chan, pitch):
+    # pick a randomized velocity based on current program
+        var vel = 100
+        if chan == LEAD_CHAN or chan
+            vel = LEAD_PROG_TO_VEL.get(lead_program, 100)
+            if vel == 'L80/100': vel = 80  // special hack
+        elif chan == LEAD2_CHAN:
+            vel = LEAD_PROG_TO_VEL.get(lead2_program, 100)
+            if vel == 'L80/100': vel = 100  // special hack
+        // lower register should be less loud
+        var pitch_offset = min(5, max(-20, int(pitch - 60)))
+        return vel + pr_range(-10, 10) + pitch_offset
+        
+
+    def step(phrase, i, chan, transpose, stretch, is_poly):
+    # if phrase[i] == REST, find index of next note and schedule it then
+    # otherwise, find time of note off and schedule note-on, note-off
+    # note length is scaled by sustain_factor and stretch. note starting
+    # times (relative to phrase start times) ar scaled by stretch.
+        var pitch = phrase[i] if i < len(phrase) else REST
+        if pitch == REST:
+            // find next note:
+            for s = i + 1 to len(phrase):
+                if phrase[s]:
+                    sched_cause((s - i) * 0.25 * stretch, this, 'step', 
+                                phrase, s, chan, transpose, stretch, is_poly)
+                    return
+            // no more notes found; we're done
+            if is_poly:
+                phrase_count = phrase_count - 1
+                if phrase_count == 0 and phrases_playing:
+                    print "phrases_playing -> false"
+                    phrases_playing = false  // no longer waiting for phrases
+            return
+        // we have a pitch to play starting at i
+        // when does the note end?
+        var end_i = i + 1
+        while end_i < len(phrase) and phrase[end_i] == pitch:
+            end_i = end_i + 1
+        // now end_i is the first position where pitch changes (or it's 32)
+        pitch = pitch + transpose
+        var dur = (end_i - i) * 0.25 * stretch * sustain_factor
+        var onset_delay = 0
+        if quant_enable:  // quantize note timing
+            // Quantize to "tatem inverse" per quarter for 32nds or 16ths:
+            var tinv = 8 if dbltim_enable else 4
+            onset_delay = round(sched_vtime * tinv) / tinv - sched_vtime
+            if onset_delay < 0:
+                onset_delay = onset_delay + 1.0 / tinv
+        var vel = get_vel(chan, pitch)
+        if is_poly:
+            vel = min(127, vel + 30)  # poly is much louder
+        sched_cause(onset_delay, nil, 'flsyn_note_on', chan, pitch, vel)
+        sched_cause(onset_delay + dur - 0.01, this, 'end_note', pitch,
+                    phrase, end_i, chan, transpose, stretch, is_poly)
+
+        
+    def end_note(pitch, phrase, i, chan, transpose, stretch, is_poly):
+    # scheduled call for when note ends; next note or rest starts at i
+        flsyn_note_on(chan, pitch, 0)  // note off
+        step(phrase, i, chan, transpose, stretch, is_poly)
+        

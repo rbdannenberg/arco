@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # Aug 2024
 
-from o2lite import O2lite
+from o2litepy import O2lite
 import time
 ENSEMBLE = "arco"
 OUTPUT_ID = 3  # ugen for audio output (see arco.srp)

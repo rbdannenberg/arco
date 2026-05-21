@@ -147,7 +147,7 @@ input unit generator, stride for that unit generator (described
 below), and pointer to input samples.
 
 Ugen objects have a method `run` that is called on each input before
-accessing input. The causes each input unit generator to compute its
+accessing input. This causes each input unit generator to compute its
 output and may result in `run` calls to inputs of the inputs, etc.
 The `run` method is inherited from `Ugen` and checks to see if output
 is already up-to-date, which happens if the same output fans out to
@@ -247,14 +247,46 @@ uses reference counting to free unused unit generators.
 Clients (applications) name unit generators with small
 integers. Normally, the integer will index arrays on both the client
 and Arco sides. The Arco side has an array of pointers to unit
-generators, the `ugen_table`. Unit generators are referenced by this
-table as well as by any unit generator that they are connected
-to. Reference counts are decremented when a unit generator is
-disconnected from an input. The reference from the `ugen_table` also
-counts as one reference. You can free the integer index, which clears
-the pointer from the `ugen_table` to the unit generator and decrements
-the reference count. When the last reference is removed, the reference
-count becomes zero and the unit generator is deleted.
+generators, the `ugen_table`. Unit generators (Ugens) are referenced
+by this table and the id is considered part of the Ugen. (The id is
+also an instance variable in the abstract Ugen class.) An invariant
+holds: If ugen_table[i] is not NULL, then ugen_table[i] points to a
+Ugen ugen and ugen->id == i and ugen->refcount > 0. In addition, if
+ugen->reference becomes zero, there are no more references, so the 
+ugen should be freed and ugen_table[i] should be freed.
+
+The `ugen_table` is not the only reference to a Ugen. Ugens are
+referenced directly by any unit generator that they are connected
+to. Reference counts are incremented when they are connected to an
+input and decremented when a unit generator is disconnected from an
+input. Normally, the client has references to some or all Ugens.
+For convenience, the refcount is initialized to 1 representing the
+reference from the client. The client must send a "free" message when
+it can no longer use the id to reference the ugen. For this to be
+practical, the client should represent Ugen IDs in *only one place*.
+This can be done at least 2 ways:
+
+  1. The client can "shadow" each actual Ugen with a local instance
+     of a client-oriented Ugen superclass (subclassed for each actual
+     Ugen class). The Ugen superclass holds the ID privately, and all
+     references to the Ugen on the client side are actually to the
+     shadow object. When the Ugen is freed, a "free" message must be
+     sent to the Arco server.
+     
+  2. In Serpent, we add an external type called Ugen_id that
+     encapsulates the ID. The Ugen_id is referenced from the Ugen
+     superclass, and other references can be to either the Ugen
+     shadow or more directly to the Ugen_id. The use of a special
+     Ugen_id object is motivated by the need to detect when the
+     object is freed through garbage collection. (Discussed later).
+
+Sending a "free" object does *not* necessarily free the Ugen, since
+other Ugens may use it as their input. Therefore, the client is not
+immediately free to reuse an id. The id becomes reusable only after
+the Ugen is freed. (This is why we said "the id is considered to be
+part of the Ugen.") To reclaim and reuse ids, the Arco server will
+send messages containing freed ids to the client, which can then put
+the ids back on a free list.
 
 In the simplest case, a tree of unit generators is created by the
 client, which frees all but its reference ID to the output (Ugen at
@@ -264,10 +296,27 @@ of ID's of unit generators whose outputs should be mixed to form the
 audio output.
 
 Eventually, the client can remove the ugen from the `output_set` using
-`/arco/mute` and free the ID using the message address
-`/arco/free`. If the object is not connected to any inputs, it will be
-freed. The reference counts will propagate up the tree, freeing all
-the unit generators in the tree.
+`/arco/mute` and delete its reference to the corresponding Ugen_id.
+When the Ugen_id object is freed, it will free the ID using the
+message address `/arco/free`. If the object is not connected to any
+other inputs, it will be freed. The reference counts will propagate up
+the tree, freeing all the unit generators in the tree. All of the
+freed IDs will then be sent back to the client, and the client will
+then be able to reuse them for new Ugens.
+
+The structures are drawn here:
+```
+Client                             . Arco Server
+                                   .    ugen_table
+                                   .      +----+
++-----------------+  +---------+   .   0  |    |     +---------------+
+| Client Shadow   -->| Ugen_id |   .  ... |    |     | Ugen          |
+| Object for Ugen |  |  id=15 - - -.-> 15 |  ----->  |  id=15        |
++-----------------+  +---------+   .  ... |    |     |  refcount > 0 |
+                        ^          .      +----+     +---------------+
+  Other reference       |          .
+  to the Ugen ----------+          .
+```
 
 You can also use `/arco/run` to insert a ugen ID into `run_set`, which
 is a list of unit generators to "run" before computing each block of
@@ -292,33 +341,31 @@ In Serpent, I have created shadow classes and objects for unit
 generators, so the entire unit generator graph in Arco is mirrored in
 the client side control program.  These objects encapsulate and manage
 reference counts so that the client code is written in terms of
-methods on the mirror objects. The client works as this level of
+methods on the mirror objects. The client works at this level of
 abstraction and there are no direct messages to Arco. Languages with
 garbage collectors that call "cleanup code" when objects are freed
-could use this to free Arco IDs.
+could store Arco IDs directly in the shadow object and free the ID
+when the shadow object is freed.
 
-In this more elaborate scheme, the ID on the client side is actually
-an object, not a simple integer. When all references to the object
-(and thus all ability to referene the acutal Arco ugen) are deleted
-and the object is garbage colleted, we can `/arco/free` the ID, which
-decrements the reference count and possibly deletes the ugen. (It could
-still have other references within Arco and survive longer.)
-
-Arco does not count `output_set` items as references, so reference
-counts cna go to zero even while an object is being output. This
-allows for implicit disconnection from output when an object no
-longer has an id. Similarly, in Serpent, we do not keep a list of
-playing objects, so object IDs are garbage collected and the
-corresponding Arco object is deleted when there are no more
-references to the shadow object in Serpent.
-
+In the more elaborate Serpent scheme, the ID on the client side is
+actually an object, not a simple integer. When all references to the
+object (and thus all ability to referene the actual Arco ugen) are
+deleted and the object is garbage collected, we can `/arco/free` the
+ID, which decrements the reference count and possibly deletes the
+ugen. (It could still have other references within Arco and survive
+longer.)
 
 ### Output and Run Sets
 
-The `output_set` and `run_set` are lists of ugens and affect
-reference counts. Every ugen also has flag bits `IN_OUTPUT_SET`
-and `IN_RUN_SET` indicating membership. A ugen can only be in
-either set once.
+The `output_set` and `run_set` are lists of ugens and affect reference
+counts. Every ugen also has flag bits `IN_OUTPUT_SET` and `IN_RUN_SET`
+indicating membership. A ugen can only be in either set once.  If the
+object is freed, it is removed from the `output_set` or `run_set`
+which reduces the reference count once more. Thus, if an object only
+has a reference from the client and is also in the `output_set`, then
+an `/arco/free` message will remove it from the `output_set`
+(immediately) and free it. It follows that one should not free a unit
+generator while it is producing sound, as this can cause a click.
 
 
 ## Unit Generator References in Serpent
@@ -358,29 +405,37 @@ Currently, users normally send O2 messages from Serpent using
 `o2_send_cmd` with a type string to specify types in the message.  We
 will add a special type character code "U" for Ugen that expects a
 Ugen_id object, checks the epoch number to make sure it is valid,
-extracts the Ugen_id, and adds it to the message using `o2_add_int32`.
+extracts the id from the Ugen_id, and adds it to the message using
+`o2_add_int32`.
 
-Ugen_id objects are created by consulting an array of integers. The
-array is initialized as a linked list, where each array element
-contains the index of the next array element. To create a Ugen_id, pop
-an entry off the linked list to get an integer. Mark the array element
-at that index with its own index to mean *allocated*. Set the current
-epoch number in the Ugen_id.
+Ugen_id objects are created in Serpent by calling `arco_ugen_new()` to
+return a new ID, or `arco_ugen_new_id(id)` to make a Ugen_id for a
+known ID such as Zero (ID=0). This is implemented by consulting an
+array of integers. The array is initialized as a linked list, where
+each array element contains the index of the next array element. To
+create a Ugen_id, pop an entry off the linked list to get an
+integer. Mark the array element at that index with its own index to
+mean *allocated*. Set the current epoch number in the Ugen_id.
 
 Note that Serpent can have any number of references to a Ugen_id and
 it can be freely copied (because assignment of an object assigns the
 object address). When a Ugen_id is freed by GC, we will send an
-`/arco/free` message and return the id to the free list.
+`/arco/free` message, but locally, the ID is not put back on the
+free list for reuse because `/arco/free` merely decrements the
+reference count, and the object may persist due to other references,
+which means it keeps the ID and the ID cannot be reused yet.
 
 If we construct messages in the normal way, the message construction
 primitives beginning with `o2_msg_start` and ending with
 `o2_msg_finish` are *not* reentrant, which means we cannot send a
 message from within the garbage collector, which can be invoked
 between Serpent instructions. To solve this, we'll have the GC keep
-another list of freed id's and provide a C++-level function that once
-called runs without invoking GC and sends `/arco/free` messages for
-all freed ids. We might optimize `/arco/free` by allowing it to carry
-an arbitrary number of id's so we can free them in a batch.
+another list of freed id's (`to_be_freed_list`) threaded through the
+same table, and provide a C++-level function (`arco_ugen_gc` in both
+Serpent and C++) that once called runs without invoking GC and sends
+`/arco/free` messages for all freed ids. We might optimize
+`/arco/free` by allowing it to carry an arbitrary number of id's so we
+can free them in a batch.
 
 Since Serpent will have to periodically call a function to check for
 freed id's and send `/arco/free` there will be some delay between
@@ -388,35 +443,91 @@ freeing a Ugen on the Serpent (client) side and actually releasing the
 id and Ugen on the Arco (server) side. There might be cases where we
 want to release a Ugen immediately. We can add a `delete` method to
 the Serpent Ugen class that makes the Ugen invalid. The method will
-call a function that immediately sends `/arco/free` and marks the ugen
-array entry with -id. Later, GC will actually free the reference, and
-the -id will indicate that the `/arco/free` message has been sent and
-the id can be moved to the free list (not the to-be-freed list). (If
-the array entry is id, it means the id is allocated. We put the array
-entry in the to-be-freed list which will give the array entry the
-value to another index or -1 (end of list). We want to delay moving
-the id to the free list for two reasons: (1) we need to keep the array
-entry -1 to tell GC that the id is already free, and (2) if we
-immediately put the id back on the free list, another object could be
-created for the id, so a second object would then have the
-same id number.
+call a function (`arco_ugen_free_now`) that immediately sends
+`/arco/free`. Details will follow, but it is important to notice two
+sources of asynchronous behavior:
+  1. When you send `/arco/free` to the server, the ID is in limbo:
+     There is no reference to ID at the Serpent level, but we cannot
+     put it on the free list for reuse because ID is in use on the
+     server until notified by `/actl/free`.
+  2. If `arco_ugen_free_now` is called, we will eventually receive
+     an `/actl/free` message when the Ugen is freed on the server
+     side, and we will eventually garbage collect the Ugen_id
+     object. The order is unknown.
+ 
+### States
 
-Functions available to Serpent are:
+To handle the multiple orderings of events, we encode some state
+information into the low 2 bits of `ugen_id_table` entries:
+  1. ON_LIST means `id` is on a list. The entry is the index of the
+     next list element. The lists are:
+       - free list: a list of ready-to-be-used ids
+       - to-be-freed list: a list of ids that have been garbage
+         collected. When `arco_ugen_gc()` is called, the id's on this
+         list are sent to the server via an `/arco/free` message, and
+         the list is emptied.
+  2. ON_LIST and `UGEN_IDX2ID(index) == -1` means `id` indexes the last
+     element of a list.
+  3. FREE_SENT means the id was used, but now its Ugen_id object has been
+     garbage collected and `/arco/free` was sent to decrement the
+     reference count on the Ugen on the server.
+  4. FREE_SENT_NO_GC means the id is in some Ugen_id object, but the
+     client has called `arco_free_ugen_id_now`, which asserts that the
+     client has or will free all references to the Ugen_id object. An
+     `/arco/free` message has been sent.
+  5. FREE_IN_ARCO means `id` is in some Ugen_id object, or at least it
+     has not been GC'd, but as a result of the client calling
+     `arco_ugen_free_now`, we have now received `/actl/free` and
+     the Ugen and `id` have been freed on the server. We are still
+     waiting for GC to collect the Ugen_id object.
+
+### The state transitions
+
+  1. Initially, `id` is on the free list. (Some small values of id's
+     including 0 are not dynamically allocated and are not on any
+     list.)
+  2. When index `id` is allocated, we make `UGEN_IDX2ID(id) == id` and
+     `UGEN_IDX2STATE(id) == ON_LIST`. (Even though this is literally a
+     circular list of one element, `id`.)
+  3. The "allocated" state can go to:
+     1. "on the to-be-freed list" if GC frees the Ugen_id object. 
+     2. FREE_SENT_NO_GC if `arco_ugen_free_now` is called.
+  4. The only next state after "on the to-be-freed list" is FREE_SENT
+     when `arco_ugen_gc` is called and `/arco/free` message is sent.
+  4. The only next state after FREE_SENT is ON_LIST and on the free
+     list when `/actl/free` is received.
+  5. The FREE_SENT_NO_GC can go to:
+     1. the ON_LIST and "on the to-be-freed list" state if GC frees the 
+        Ugen_id object, followed by FREE_SENT when `/arco/free`
+        message is sent (see above).
+     2. the FREE_IN_ARCO state if `/actl/free` is received.
+  6. the FREE_IN_ARCO state can only await GC and then become ON_LIST
+     and on the free list".
+
+
+### Functions available to Serpent
+
 - `arco_ugen_new()` -- allocate an id and construct a new Ugen_id
 
 - `arco_ugen_new_id(id)` -- construct a new Ugen_id from known id
 
 - `arco_ugen_id(ugen_id)` -- extract the Arco id from the Ugen_id
-  object. Returns -1 if the epoch is not current or ugen_id was freed
-  using `arco_ugen_free`.
+  object. Returns the ID (integer) or -1 if the epoch is not current
+  or ugen_id was freed using `arco_ugen_free_now`.
 
 - `arco_ugen_epoch(ugen_id)` -- extract the epoch number from the Ugen_id
   object.
 
-- `arco_ugen_free(ugen_id)` -- explicitly free the associated
+- `arco_ugen_free_now(ugen_id)` -- explicitly free the associated
   Ugen. The `arco_ugen_id` will become -1 for the remaining lifetime
   of this object, thus any references to the object will also lose
   their ability to reference the Ugen.
+  
+- `arco_ugen_is_free` -- called by the handler of `/actl/free` to put
+  the id back on the free list (or in the state where GC has not freed
+  the Ugen_id object, the state is changed to `== -3 * id` (see
+  above). This is not a built-in function, but called by a message
+  handler and is implemented in Serpent within the arco library.
 
 - `arco_ugen_gc()` -- when ugen_id objects are garbage collected,
   their id's are collected in a list, but the associated Ugens in Arco
@@ -445,6 +556,39 @@ Functions available to Serpent are:
 - `arco_ugen_reset()` -- increment the epoch, invalidating all current
   Ugen_id objects. Returns the new epoch number.
 
+### Life Cycle
+
+There are multiple paths from "birth" to "death" of a Ugen ID. Here,
+we trace through some paths. These descriptions have been used to also
+trace through and check the actual code:
+
+1. A Serpent Ugen subclass initialization calls` Ugen.init()` which
+   calls `create_ugen_id` which calls extern function `arco_ugen_new`.
+   `arco_ugen_new` (Serpent extern function) calls `new(m) Ugen_id`
+   which pops an integer id from the static list `Ugen_id::free_list`
+   and returns the allocated Ugen_id. We assume the created Ugen is
+   saved in some reachable variable until some time in the future.
+2. `Ugen.init()` continues by getting the integer id by calling extern
+   function `arco_ugen_id(id)` and sending it and other parameters to
+   `/arco/*ugclass*/new`, where *ugclass* is the class of ugen.
+3. The C++ Ugen's constructor assigns `ugen_table[id] = id` and
+   remembers the id with `this->id = id`. The reference count is set
+   to 1.
+4. The variable referencing the Serpent Ugen is cleared so the Ugen
+   becomes "garbage". It references the Ugen_id object, so that
+   becomes garbage too.
+5. Garbage collection (GC) eventually discovers and frees the
+   Ugen_id by calling Ugen_id_descriptor::free(obj). The Ugen_id
+   is put on the to-be-freed list.
+6. Serpent calls `arco_ugen_gc` which sends `/arco/free` for each
+   to-be-freed id, and sets the id state to FREE_SENT.
+7. In the server, the unit generator ugen->unref() is called.
+8. In the server, when the reference count is zero,
+   `on_terminate(ACTION_FREE)` is called followed by
+   `send_arco_ugen_free(id)`, which sets ugen_table[id] to NULL and
+   sends `/actl/free` back to Serpent.
+9. `actl_free(id)` is called, which calls `arco_ugen_is_free` which
+   puts id back on the free list.
 
 ## Instruments in Serpent
 
@@ -468,60 +612,172 @@ a designated output unit generator that represents the output of the
 generators in the `Instrument`.
 
 To define an `Instrument`, the `init` method of a subclass calls
-`instr_begin` which initializes a container for components of the
-instrument. As each component is created, you call `member` to say
-that the created Ugen is a member of the instrument, e.g.,
+`instr_begin()` which initializes a container for
+components of the instrument. Let's create an instrument `Twoharm`
+that simply adds two sinusoids to create two harmonics:
+<!--
+### *member() is obsolete*
+*As each component is created, you call*
+*`member` to say that the created Ugen is a member of the instrument,*
+*e.g.,*
 ```
     var env = member(pwlb(dur * 0.2, 0.01, dur * 0.8), 'env')
 ```
-This example creates a piece-wise linear envelope generator (`pwlb`),
-adds it as a member to the instrument, and gives it the name
-`'env'`. It also keeps a reference to the `Pwlb` in the local variable
-`env`. Later, you can use `instrument.get('env')` to retrieve the
-`pwlb` component, e.g. to start the envelope:
+*This example creates a piece-wise linear envelope generator (`pwlb`),*
+*adds it as a member to the instrument, and gives it the name*
+*`'env'`. It also keeps a reference to the `Pwlb` in the local variable*
+*`env`. Later, you can use `instrument.get('env')` to retrieve the*
+*`pwlb` component, e.g. to start the envelope:*
 ```
     instrument.get('env').start()
 ```
-Alternatively, you could also store it
-as an instance variable and write a `start` method for the instrument,
-e.g.:
+-->
 ```
-    def start(): env.start()  // new method in instrument
-...
-    instrument.start()  // called to start the instrument's envelope
+class Twoharm (Instrument): 
+    def init(): 
+        instr_begin() 
+        var twoharm = add(sine(220.0, 0.1), sine(440.0, 0.1)) 
+        super.init("Twoharm", twoharm) 
 ```
-You can also create named, setable parameters. The problem here is
-that you might want your instrument to have parameters `freq` or
-`amp`, but the instrument is not a real unit generator and has no
-inherent parameters. You could write a method for each parameter, but
-that is a little awkward. Consider implementing a settable frequency:
-```
-    var mysine  // this is in the class declaration
+Here, `"Twoharm"` is the instrument name (used for text descriptions
+in console output) and `twoharm` is passed to `super.init` to indicate
+the output. For example, you can now write `Twoharm().play()` to play
+the instrument and the Ugen represented in `init` by `twoharm` will be
+the one connected to the output mixer.
 
-    def init():
-        ...
-        mysine = member(sine(220.0, 0.5), 'sine')
-        ...
+## Parameters
 
-    def set_freq(f): mysine.set('freq', 440.0)
-```
-Then, you can change frequency by calling: `instrument.set_freq(440.0)`.
+### Simple Methods 
 
-Alternatively, there is a special `set` method in Instrument that
-avoids defining a method for every parameter.  To make this work, call
-`param` in `init`. For example, consider this from the instrument
-`init` function:
+You can implement methods to update parameters. For example, here is
+a simple way to change the frequency of a `Twotone`:
 ```
-    def init():
-        ...
-        var mysine = sine(220.0, 0.5)`, you can call:
-        param(mysine, 'freq', 'myfreq')
-        ...
-```
-This creates a Sine Ugen in the instrument and says that `'myfreq'`
-will name the sine's `'freq'` parameter. Then, you can call
-`instrument.set('myfreq', 440.0)`.
+class Twoharm (Instrument): 
+    var h1, h2
 
+    def init(freq): 
+        instr_begin() 
+        h1 = sine(freq, 0.1)
+        h2 = sine(freq * 2, 0.1)) 
+        var twoharm = add(h1, h2)
+        super.init("Twoharm", twoharm) 
+
+    def set_freq(x):
+        h1.set('freq', x)
+        h2.set('freq', x * 2)
+```
+Now you can write `var twoharm = Twoharm(220.0)` to play a 220 Hz tone
+and then `twoharm.set_freq(330.0)` to change the frequency to 330 Hz.
+
+You could almost pass in a signal to the `Twoharm` constructor to get
+continuous frequency control, but to make this work, you would need to
+change `freq * 2` to `mult(freq, 2)` since the `*` operator only works
+on numbers.
+
+### Implementing `set()` Style Updates
+
+The "standard" way to update Ugens is to call `ugen.set('attr',
+value), where `'attr'` is some attribute name like `'freq'` or
+`'amp'`. This interface is recommended for Instruments as well, and is
+supported by some special functions. To change our `Twoharm` example
+to accept `.set('freq', x)`, we rewrite it as follows:
+```
+class Twoharm (Instrument): 
+
+    def init(freq): 
+        instr_begin()
+        freq = param('freq', freq)
+        var twoharm = add(sine(freq, 0.1), sine(multb(freq, 2), 0.1))
+        super.init("Twoharm", twoharm) 
+```
+A bit of "magic" here is that `param` returns a `Param_descr` that you
+can (mostly) treat as a signal that you can pass as a parameter to any
+Ugen. Note how we can write `sine(freq, 0.1)` and `multb(freq,
+2)`. However, now when you write `twoharm.set('freq', x)` the value of
+`x` (either a signal or a float or an array of floats) will be
+propagated to every Ugen the previously received the `Param_descr`.
+
+For example, if you write `twoharm.set('freq', 330.0)`, it will update
+the frequency of an instance of `Twoharm`, changing both harmonics.
+
+Note that we no longer need explicit instance variables `h1` and
+`h2` to remember the `Sine` ugens, and `def set_freq ...` is no longer
+needed. The `param` function works with `instr_begin()`,
+`Instrument.init()`, and `Ugen.init()` (called by `Sine.init()`) to
+create a mapping from the attribute `'freq'` to the inputs of the
+`Sine` and `Mathb` (implementing `multb`) Ugens.
+
+### The param Function and Options
+The `param` function has some optional parameters that allow the
+incoming parameter to the Instrument to be linearly mapped from a
+range of [0, 1] to any range [low, high]. You can also clip the input
+values to the range [low, high] (with or without initial mapping).
+
+You can also apply smoothing to float updates with a setable time
+constant. For example, if you connect a slider control to an
+amplitude, smoothing the signal will avoid "zipper" noise due to small
+but sudden changes in amplitude. See `param`'s implementation in
+`instr.srp`.
+
+Because of the mapping and clipping feature, it is convenient to
+"convert" an incoming parameter like `freq` into a `Param_descr` as
+shown in the previous example. If `myparm` is a parameter to an
+Instrument subclass, then `myparm = param('myparm', myparm, 'clip', 0,
+1)` converts `myparm` to a `Param_descr`. However, if `myparm` was
+passed in as a float, you could write `myparm * 2` or any other float
+operation. Now you cannot do that. If `param` does any mapping But
+instead, you can write `myparm.value() * 2`. This is probably better
+than saving and using the original float parameter because
+`myparm.value()` has clipping applied. Note that if the original
+parameter was an array of floats (representing a multi-channel
+"float") or a non-Const-like Ugen, then `myparm.value()` will
+return either the array of floats or the Ugen.
+
+A "Const-like" Ugen is either a Const or Smoothb. Both of these are
+Ugens with block-rate outputs that essentially output constant values
+as opposed to time-varying signals. The can be set with a `.set(x)`
+method, and they can have multiple channels. The roll of Const-like
+Ugens is to allow floats to be used as Ugen inputs without
+implementing a special case within every Ugen. Instead, the floats are
+coerced to either a Const or Smoothb. A float is coerced to a
+Const-like when `Param_descr` is provided as a Ugen signal input.
+Smoothb Ugens differ from Const mainly by applying smoothing so their
+outputs do not change instantly.
+
+### Implementing Updates with Methods
+
+Sometimes, the functional style of `param` is not enough and you need
+to invoke a method to implement an operation like `.set('freq',
+x)`. Modifying our example again, here is how to do it:
+
+```
+class Twoharm (Instrument): 
+    var h1, m2
+
+    def init(freq): 
+        instr_begin()
+        freq_param = param('freq', freq)
+        param.add_method(this, 'set_freq')
+        h1 = sine(freq, 0.1)
+        m2 = multb(freq, 2)
+        var twoharm = add(h1, sine(m2, 0.1))
+        super.init("Twoharm", twoharm) 
+
+    def set_freq(x):
+        h1.set('freq', x)
+        m2.set('x1', x)
+```
+Here, we revert back to saving some Ugens as instance variables so we
+ can reference them in the `set_freq` method. This version uses `m2`
+ for the 2nd harmonic's multiplier Ugen (`multb`) rather than the
+ `Sine` so that  `set_freq` will work with signals as well as
+ floats. (This comes at the small cost of running the multiply for
+ *every* block of 32 samples rather than doing it once at update
+ time. You could optimize this with some careful coding in `set_freq`
+ but the savings would be minimal.)
+
+See also [Instrument Parameters](./instruments.md) and the `param()`
+function described there.
 
 ## End-of-Sound Actions
 

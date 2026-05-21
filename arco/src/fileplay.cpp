@@ -21,7 +21,7 @@ void send_fileplay_play(int64_t addr, bool play_flag)
     o2_add_bool(play_flag);
     O2message_ptr msg =
             o2_message_finish(0.0, "/fileio/fileplay/play", true);
-    fileio_bridge->outgoing.push((O2list_elem *) msg);
+    o2_shmem_inst_outgoing_push(fileio_bridge, (O2list_elem *) msg);
 }
     
 

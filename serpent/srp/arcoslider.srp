@@ -37,12 +37,12 @@ class Arco_slider (Labeled_slider):
                                 initial, style, varname)
         ugen_id = id
         address = addr
-        add_target_method(this, 'on_slider')
+        add_target_method(this, 'on_slider', 'x')
         if send_initial:
             on_slider(this, initial)
 
 
-    def on_slider(obj, x):
+    def on_slider(x):
         // display "Arco_slider:on_slider", x, message, arco_id.to_string()
         if address:
             if ugen_id:

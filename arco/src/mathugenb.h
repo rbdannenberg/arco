@@ -41,27 +41,48 @@ public:
     }
 
     ~Mathb() {
-        x1->unref();
-        x2->unref();
+        x1->unref(&x1);
+        x2->unref(&x2);
     }
 
     const char *classname() { return Mathb_name; }
 
+  #if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+      // 2 inputs
+      if (i == 0) {
+        *child = x1;
+      } else if (i == 1) {
+        *child = x2;
+      } else {
+        return false;
+      }
+      return true;
+    }
+  #endif
+
+    void print_details(int indent) {
+        arco_print("op %s ", OP_TO_STRING[op]);
+    }
+    
     void print_sources(int indent, bool print_flag) {
         x1->print_tree(indent, print_flag, "x1");
         x2->print_tree(indent, print_flag, "x2");
     }
 
     void clear_counts() {
-        // since we have a new parameter, we clear the count so that we will
-        // immediately start ramping to a value between -x2 and x2 rather than
-        // possibly wait for a long ramp to finish. A potential problem is that
-        // if x1 is now low, creating long ramp times, and our current ramp value
-        // (state->hold) is much larger than a new x2, it could take a long time
-        // for the output to get within the desired range -x2 to x2.  It takes
-        // a little work to determine what is affected by a change since an input
-        // could have fanout to multiple output channels, so we just restart ramps
-        // on all channels.
+    // since we have a new parameter, we clear the count so that we will
+    // immediately start ramping to a value between -x2 and x2 rather than
+    // possibly wait for a long ramp to finish. A potential problem is that
+    // if x1 is now low, creating long ramp times, and our current ramp value
+    // (state->hold) is much larger than a new x2, it could take a long time
+    // for the output to get within the desired range -x2 to x2.  It takes
+    // a little work to determine what is affected by a change since an input
+    // could have fanout to multiple output channels, so we just restart ramps
+    // on all channels.
+
         if (op == MATH_OP_RLI) {
             for (int i = 0; i < chans; i++) {
                 states[i].count = 0;
@@ -71,13 +92,13 @@ public:
 
 
     void repl_x1(Ugen_ptr ugen) {
-        x1->unref();
+        x1->unref(&x1);
         init_x1(ugen);
         clear_counts();
     }
 
     void repl_x2(Ugen_ptr ugen) {
-        x2->unref();
+        x2->unref(&x2);
         init_x2(ugen);
         clear_counts();
     }
@@ -100,9 +121,15 @@ public:
         }
     }
 
-    void init_x1(Ugen_ptr ugen) { init_param(ugen, x1, &x1_stride); }
+    void init_x1(Ugen_ptr ugen) {
+        assert(ugen->rate != 'a');
+        init_param(ugen, x1, &x1_stride);
+    }
 
-    void init_x2(Ugen_ptr ugen) { init_param(ugen, x2, &x2_stride); }
+    void init_x2(Ugen_ptr ugen) {
+        assert(ugen->rate != 'a');
+        init_param(ugen, x2, &x2_stride);
+    }
 
     void real_run() {
         x1_samps = x1->run(current_block); // update input
@@ -166,7 +193,7 @@ public:
                     Mathb_state *state = &states[i];
                     Sample h = state->hold;
                     Sample p = state->prev;
-                    Sample x2 = x2_samps[i];
+                    Sample x2 = *x2_samps;
                     if (p <= 0 && x2 > 0) {
                         h = *x1_samps;
                         state->hold = h;
@@ -177,21 +204,21 @@ public:
                 break;
 
               case MATH_OP_QNT: {
-                    Sample x2 = x2_samps[i];
+                    Sample x2 = *x2_samps;
                     Sample q = x2 * 0x8000;
                     *out_samps++ = x2 <= 0 ? 0 : 
-                            round((x1_samps[i] + 1) * q) / q - 1;
+                            round((*x1_samps + 1) * q) / q - 1;
                 }
                 break;
 
               case MATH_OP_RLI: {
                     Mathb_state *state = &states[i];
                     if (state->count == 0) {
-                        state->count = (int) (BR / x1_samps[i]);
+                        state->count = (int) (BR / *x1_samps);
                         if (state->count == 0) {
                             state->count = 1;
                         }
-                        Sample x2 = x2_samps[i];
+                        Sample x2 = *x2_samps;
                         Sample target = unifrand_range(-x2, x2);
                         state->hold = (target - state->prev) / state->count;
                     }
@@ -201,26 +228,26 @@ public:
                 break;
 
               case MATH_OP_HZDIFF:
-                *out_samps = (float) steps_to_hzdiff(x1_samps[i], x2_samps[i]);
+                *out_samps = (float) steps_to_hzdiff(*x1_samps, *x2_samps);
                 break;
 
               case MATH_OP_TAN: {
-                    *out_samps++ = tanf(x1_samps[i] * x2_samps[i]);
+                    *out_samps++ = tanf(*x1_samps * *x2_samps);
                 }
                 break;
 
               case MATH_OP_ATAN2: {
-                    *out_samps++ = atan2f(x1_samps[i], x2_samps[i]);
+                    *out_samps++ = atan2f(*x1_samps, *x2_samps);
                 }
                 break;
 
               case MATH_OP_SIN: {
-                    *out_samps++ = sinf(x1_samps[i] * x2_samps[i]);
+                    *out_samps++ = sinf(*x1_samps * *x2_samps);
                 }
                 break;
 
               case MATH_OP_COS: {
-                    *out_samps++ = cosf(x1_samps[i] * x2_samps[i]);
+                    *out_samps++ = cosf(*x1_samps * *x2_samps);
                 }
                 break;
 

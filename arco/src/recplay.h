@@ -146,13 +146,13 @@ public:
 
     ~Recplay() {
         int i;
-        input->unref();
-        gain->unref();
+        input->unref(&input);
+        gain->unref(&gain);
         if (loan_count) {
             arco_error("Recplay::~Recplay -- loan_count non-zero!");
             return;
         } else if (lender_ptr) {
-            lender_ptr->unref();
+            lender_ptr->unref((Ugen **) &lender_ptr);
             return;  // don't free buffers, they belong to lender
         }
         for (int chan = 0; chan < chans; chan++) {
@@ -166,6 +166,22 @@ public:
     }
 
     const char *classname() { return Recplay_name; }
+    
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = gain;
+        } else if (i == 2) { *child = lender_ptr;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
+
+
 
     void print_details(int indent) {
         arco_print("rec %s, play %s speed %g",
@@ -180,12 +196,12 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
     void repl_gain(Ugen_ptr ugen) {
-        gain->unref();
+        gain->unref(&gain);
         init_gain(ugen);
     }
 

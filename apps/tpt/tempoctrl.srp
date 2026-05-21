@@ -1,0 +1,167 @@
+# tempoctrl - Tempo_control object that delineates measures and tempo change
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+# vtsched is used to represent beats. 2-bar phrases start on multiples of 8
+# units of virtual time.
+
+class Tempo_data:
+    var onsets
+    var dur_on
+    var dur
+
+    def init():
+        onsets = 0
+        dur_on = 0
+        dur = 0
+
+
+    def update(is_onset, frame_dur, pitch):
+        if pitch != REST:
+            dur_on = dur_on + frame_dur
+            if is_onset:
+                onsets = onsets + 1
+        dur = dur + frame_dur
+
+
+
+class Tempo_control (Periodic):
+# Controls tempo based on note density. Uses a 5 second window
+# and updates every second. Because the player may take some
+# long rests even though playing "fast", we want to divide the
+# density by the duty factor, equivalent to divide note count by
+# the "on time" or sum of note durations. This will over-estimate
+# density when articulation is stacatto, but tempo is only used
+# for note subdivisions (sixteenths), so output will still reflect
+# the density of input.
+#
+# Three tempi are used: 60, 90, 120 bpm, or 1, 1.5, 2 bps.
+#
+# init.srp's every_16th() calls our compute_tempo() method
+# every 1/16th note. compute_tempo() uses update() to count
+# onsets and other data.
+#
+# In addition to tempo estimates, we observe many onsets in 1 sec
+# windows and use them to quickly suppress long reverb when player
+# transitions from slow playing to fast playing.
+#
+# Tempo (estimated every 1.0 sec) looks at history to get some
+# averages, computes tempo, and transfers tempo to vtsched.
+# This used to change tempo on phrase boundaries of 8 beats,
+# but due to latency issues, now it changes on beat boundary.
+#
+# Outside of this singleton object, tempo is observed through the
+# vtsched object.
+
+    var history  // [Tempo_data, ...]  5 pairs of (onsets, dur_on, dur)
+    // representing count of onsets and duty factor every second of real time
+    var current_bps  // bps from the most recent update
+    var bps_change_time
+    var bps  // final decision based on current_bps, but can only change
+             // after 5 sec
+    var measure_number
+    var drum_measure
+    var mean_dens  // mean density - affects tempo and drum_tacet
+    var last_tempo_compute_time
+
+    def init():
+        super.init(0.25, nil, 'every_16th', unique = 'tempo_control')
+        history = [Tempo_data()]
+        current_bps = 1.5  // default
+        sched_select(rtsched)
+        sched_cause(2.0, this, 'start')
+        bps_change_time = sched_rtime
+        bps = current_bps
+        drum_measure = array(16)  // transcription of drums:
+        // elements are nil (rest), or drum id
+        last_compute_tempo_time = -99  // force immediate compute_tempo
+        mean_dens = 3  // unimportant initial value to avoid nil
+
+
+    def start():
+    # called ONCE at rtime = 2 after initialization settles
+        sched_select(vtsched)
+        sched_set_time(0)
+        // update vtsched tempo every measure
+        super.start()
+
+
+    def compute_tempo(phase):
+    # returns estimated mean duration (equiv.: density / duty_factor)
+    # for last 5 frames, then shifts to start a new frame.
+    # Updates every approximately 1 second of real time:
+        update()
+        if sched_rtime < last_compute_tempo_time + 1:
+            return  // if we don't return, update is still called below
+        # EVERY SECOND
+        compute_activity()
+        last_compute_tempo_time = sched_rtime
+        // display "### computing tempo", history[0].onsets
+
+        // allows rapid suppression of long reverb in style transitions:
+        effects_ctrl.style_rapid_notes(history[0].onsets >= 3)
+
+        // compute
+        var total_count = 0
+        var total_dur_on = 0
+        var total_dur = 0
+        for td in history:
+            total_count = total_count + td.onsets
+            total_dur_on = total_dur_on + td.dur_on
+            total_dur = total_dur + td.dur
+        mean_dens = 3
+        if total_dur_on > 0:
+            mean_dens = total_count / total_dur_on
+        // display "    ", mean_dens, total_dur_on
+
+        // change current_tempo using hysteresis
+        // we support 1, 1.5, 2 bps, which if we multiply by 2 gives 2, 3, 4
+        // so we'll use rounding to get to one of these numbers after adding
+        // some offset for hysteresis: Midpoints are 1.25 and 1.75. Let's use
+        // +-0.1, e.g., switch from 1 to 1.5 above 1.35 and back below 1.15.
+        // The tempo should be 1/2 * mean_dens, which means since mean
+        // duration is 1 / mean_dens, and beat duration is 2 / mean_dens, so
+        // sixteenth duration = 0.5 / mean_dens, then the sixteenth duration
+        // is 1/2 the mean duration.
+
+        var ideal_bps = 0.5 * mean_dens
+        if ideal_bps > current_bps:
+            ideal_bps = ideal_bps - 0.1  // bias towards current for hysteresis
+        else:
+            ideal_bps = ideal_bps + 0.1  // bias towards current for hysteresis
+        ideal_bps = round(ideal_bps * 2) / 2.0  // round to nearest 0.5 multiple
+        current_bps = max(1, min(2, ideal_bps))
+        // display "    before style limitation", current_bps, style
+        // style influences allowable bps:
+        if style == 'slow' and current_bps > 1.6:
+            current_bps = 1.5
+        elif style == 'fast' and current_bps < 1.4:
+            current_bps = 1.5
+        // display "    after style limitation", current_bps, bps
+        // display "                          ", sched_rtime, bps_change_time + 5
+            
+        if current_bps != bps and sched_rtime > bps_change_time + 5:
+            bps = current_bps
+            bps_change_time = sched_rtime
+
+        // display "COMPUTED BPS", ideal_bps, current_bps, mean_dens
+
+        // shift and insert Pair recording this 1-second time window
+        history.set_len(min(len(history), 4))
+        history.insert(0, Tempo_data());
+        // if phase == 0 and not within(bps, vtsched.bps, 0.000001):
+        if not within(bps, vtsched.bps, 0.000001):
+            labellog_label("tempo " + str(bps))
+            display "Tempo_control at begin_phrase new bps", bps
+            sched_select(vtsched)
+            sched_set_bps(bps)  // not on a measure or phrase boundary
+            show_tempo(bps)
+        // else:
+        //     display "Tempo_control maintain bps", vtsched.bps, bps, phase
+        
+
+    def update()
+        history[0].update(note_transcriber.is_onset,
+                          note_transcriber.frame_dur,
+                          note_transcriber.pitch)

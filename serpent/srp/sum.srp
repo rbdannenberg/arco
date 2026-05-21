@@ -6,7 +6,7 @@
 class Sum(Ugen):
     def init(chans, wrap, optional id_num):
         super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
-                   "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0)
+                   "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0, "f")
         register_action(this, ACTION_REM, this, 'action_rem')
 
     def action_rem(status, uid, parameters):

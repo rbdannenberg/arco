@@ -11,9 +11,20 @@
 # normally be the previous 32 samples, creating feedback with a 32-sample delay.
 
 class Feedback (Ugen):
-    def init(chans, input, from, gain):
-        super.init(create_ugen_id(), "feedback", chans, 'a', "UUU",
-	           'input', input, 'from', from, 'gain', gain)
+    def init(chans, input):
+        super.init(create_ugen_id(), "feedback", chans, 'a', "U",
+                   'input', input, "a")
+        inputs['from'] = zero_ugen  // enables .set('from', x)
+        inputs['gain'] = zero_ugen  // enables .set('gain', x)
 
-def feedback(input, from, gain, optional chans = 1):
-    Feedback(chans, input, from, gain)
+    def fb(from, gain):
+        if isinstance(from, Param_descr):
+            from = from.get_ugen_value("Feeback", 'from')
+        if isinstance(gain, Param_descr):
+            gain = gain.get_ugen_value("Feeback", 'gain')
+        set('from', from)
+        set('gain', gain)
+        
+
+def feedback(input, optional chans = 1):
+    Feedback(chans, input)

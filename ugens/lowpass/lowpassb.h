@@ -71,14 +71,26 @@ public:
         fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
         init_input(input);
         init_cutoff(cutoff);
+        initialize_channel_states();
     }
 
     ~Lowpassb() {
-        input->unref();
-        cutoff->unref();
+        input->unref(&input);
+        cutoff->unref(&cutoff);
     }
 
     const char *classname() { return Lowpassb_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens
+    bool get_ref(int i, Ugen **child) {
+        if (i == 0) { *child = input;
+        } else if (i == 1) { *child = cutoff;
+        } else { return false;
+        }
+        return true;
+    }
+#endif
 
     void initialize_channel_states() {
         for (int i = 0; i < chans; i++) {
@@ -97,12 +109,12 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
     void repl_cutoff(Ugen_ptr ugen) {
-        cutoff->unref();
+        cutoff->unref(&cutoff);
         init_cutoff(ugen);
     }
 
@@ -125,7 +137,7 @@ public:
             (flags & CAN_TERMINATE)) {
             terminate(ACTION_TERM);
         }
-        Lowpassb_state *state = &states[0];
+        Lowpassb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
             float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
             float fSlow1 = 1.0f / (fSlow0 + 1.0f);

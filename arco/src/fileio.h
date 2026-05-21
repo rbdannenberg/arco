@@ -147,6 +147,11 @@ there is /arco/filerec/samps with the last flag set.
 
 int fileio_initialize();
 
+// when audio shuts down, it sends a /fileio/quit message, but to avoid race
+// conditions, it waits for fileio_finished to become true before it shuts
+// itself down.
+extern bool fileio_finished;
+
 class Fileio_obj;
 
 extern Vec<Fileio_obj *> fileio_objs;

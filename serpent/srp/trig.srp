@@ -6,8 +6,9 @@
 class Trig(Ugen):
     def init(input, reply_addr, window, threshold, pause):
         super.init(create_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
-                   'input', input, 'reply_addr', reply_addr, 'window', window,
-                   'threshold', threshold, 'pause', pause)
+                   'input', input, "a",   'reply_addr', reply_addr, "f",
+                   'window', window, "f", 'threshold', threshold, "f",
+                   'pause', pause, "f")
 
     def set_window(window):
         o2_send_cmd("/arco/trig/window", 0, "Ui", id, window)

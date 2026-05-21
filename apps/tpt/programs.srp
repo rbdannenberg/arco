@@ -1,0 +1,60 @@
+# programs.srp - manage MIDI program numbers
+#
+# Roger B. Dannenberg
+# Aug 2025
+
+program_spinctrls = []
+programs = array(16, 0)
+
+def programs_init(win, x, y):
+# create 4x4 array of spinners, omit ch 10 (internal 9)
+    var left = x
+    // programs = prefs.get('programs', programs)
+    programs = [0, 2, 7, 8, 12, 28, 37, 45, 106, nil, 0, 0, 0, 0, 0, 0] // 107, 108, 112]
+    programs[CHORD_CHAN] = pr_choice(PADS)
+    display "programs_init", programs, prefs.prefs
+    for ch = 0 to 16:
+        if ch == 9:
+            program_spinctrls.append(nil)  // so index matches channel
+        else:
+            var sc = Spinctrl(win, 0, 127, 0, x, y, 60, 20)
+            sc.add_callback('program_change', 'objx')
+            program_spinctrls.append(sc)
+            if programs:
+                sc.set_and_act(programs[ch])
+        x = x + 60
+        if ch % 4 == 3:  // just did last in row
+            x = left
+            y = y + 20
+    programs_new_style()  // sets programs on LEAD_CHAN and LEAD2_CHAN
+    // on return, we want wxs_x, wxs_y to be at left and below controls
+    wxs_x = left  // and wxs_y is set by Spinctrl
+
+
+def program_change(obj, x):
+# handle program changes
+    var ch = program_spinctrls.index(obj)
+    // display "program_change", obj, x, ch, flsyn_ugen
+    flsyn_program_change(ch, x)
+    programs[ch] = x
+    // prefs.set('programs', programs, true)
+
+
+def programs_new_style():
+# called when there is a style change
+    lead_program = pr_choice(LEAD)
+    lead2_program = pr_choice(LEAD)
+    while lead2_program == lead_program:
+        lead2_program = pr_choice(LEAD)
+    labellog_label("lead progs " + str(lead_program) + " " + str(lead2_program))
+    program_spinctrls[0].set_and_act(lead_program)
+    program_spinctrls[11].set_and_act(lead2_program)
+
+
+LEAD = [4, 5, 6, 75]
+TINNY = [6, 7, 44, 107]
+BELLS = [10, 12, 32, 45, 46, 76, 98]
+PADS = [16, 17, 18, 34, 39, 90, 91, 93, 97]
+SHARP = [2, 7, 8, 12, 28, 37, 45, 106, 107, 108, 112]
+
+

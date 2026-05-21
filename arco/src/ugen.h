@@ -13,8 +13,14 @@
 #endif
 
 #define INT16_TO_FLOAT(x) ((x) * 3.0518509476e-5)
+#define FLOAT_CLIP(x) fmaxf(-1.0f, fminf(1.0f, x))
 // This maps to range -32767 to 32767:
 #define FLOAT_TO_INT16(x) ((int) ((32767 * (x) + 32768.5)) - 32768)
+
+#define ARCO_REF_DEBUG 0
+#ifndef ARCO_REF_DEBUG
+#define ARCO_REF_DEBUG 0
+#endif
 
 // flags for Unit generators to cooperate with audioio, etc.
 const int IN_RUN_SET = 1;
@@ -80,18 +86,22 @@ class Ugen : public O2obj {
     int current_block;
     int action_id;
     int action_mask;
+#if ARCO_REF_DEBUG
+    bool ref_debug_mark;  // needed to cut off cycles in graph traversal
+#endif
 
     // to initialize a Ugen without installing in table, pass id = -1
     Ugen(int id, char ab, int nchans) {
         refcount = 1;
         if (id >= 0) {
             if (ugen_table.bounds_check(id)) {
-                if (ugen_table[id]) {
+                Ugen **ptr = &ugen_table[id];
+                if (*ptr) {
                     arco_warn("Ugen ID %d is already taken. Freeing the ID",
                               id);
-                    ugen_table[id]->unref();
+                    (*ptr)->unref(ptr);
                 }
-                ugen_table[id] = this;  // install Ugen in the table
+                *ptr = this;  // install Ugen in the table
                 refcount = 1;
             } else {
                 arco_error("New Ugen ID %d is out of bounds.", id);
@@ -120,13 +130,21 @@ class Ugen : public O2obj {
         }
         current_block = 0;
         action_id = 0;
-        // printf("created ugen@%p\n", this);
+#if ARCO_REF_DEBUG
+        ref_debug_mark = false;
+#endif
     }
 
     // subclasses should override to unref inputs
     virtual ~Ugen();
 
     virtual const char *classname() = 0;
+
+#if ARCO_REF_DEBUG
+    virtual bool get_ref(int i, Ugen **ptr) = 0;
+
+    bool find_reference_to(Ugen *ugen);
+#endif
     
     void indent_spaces(int indent);
 
@@ -174,7 +192,7 @@ class Ugen : public O2obj {
     Sample_ptr outblock(int ch) { return &output[ch * BL]; }
     
     void ref() { refcount++; }
-    virtual void unref();
+    virtual void unref(Ugen **ptr);
     
     virtual void real_run() = 0;
 
@@ -235,6 +253,17 @@ class Ugen : public O2obj {
         printf("send_action_id sent to address %s id %d status %d uid %d "
                "o2_status(actl) %d\n",
                ctrl_service_addr, action_id, status, uid, o2_status("actl"));
+    }
+
+    void send_arco_ugen_free(int id) {
+        // Temporary/internal ugens use id < 0 and are not in ugen_table.
+        if (id < 0 || !ugen_table.bounds_check(id)) {
+            return;
+        }
+        ugen_table[id] = NULL;
+        o2sm_send_start();
+        o2sm_add_int32(id);
+        o2sm_send_finish(0.0, ctrl_complete_addr("free"), true);
     }
 };
 

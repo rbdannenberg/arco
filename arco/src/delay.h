@@ -69,15 +69,29 @@ public:
     }
 
     ~Delay() {
-        input->unref();
-        dur->unref();
-        fb->unref();
+        input->unref(&input);
+        dur->unref(&dur);
+        fb->unref(&fb);
         for (int i = 0; i < chans; i++) {
             states[i].samps.finish();
         }
     }
 
     const char *classname() { return Delay_name; }
+
+#if ARCO_REF_DEBUG
+    // for tracing tree of Ugens. Returns true with the ith child in *child
+    // or false if i is too high.
+    bool get_ref(int  i, Ugen **child) {
+        // 3 inputs
+        *child = NULL;
+        if (i == 0) {         *child = input;
+        } else if (i == 1) {  *child = dur;
+        } else if (i == 2) {  *child = fb;
+        } else return false;
+        return true;
+    }
+#endif
 
     void set_state_max(Delay_state *state, int len) {
         // tail indexes the oldest sample
@@ -111,19 +125,19 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
         update_run_channel();
     }
 
     void repl_dur(Ugen_ptr ugen) {
-        dur->unref();
+        dur->unref(&dur);
         init_dur(ugen);
         update_run_channel();
     }
 
     void repl_fb(Ugen_ptr ugen) {
-        fb->unref();
+        fb->unref(&fb);
         init_fb(ugen);
         update_run_channel();
     }
