@@ -628,27 +628,6 @@ period cosine shape.
 `chan` to `goal`. This has no effect on the current fade if
 any, and takes effect when `/arco/fader/mode` is sent.
 
-### multisend
-```
-multisend(id)
-.ins(target, addr, p1, p2, ..., pn)
-.send()
-```
-Send a message "simultaneously" to multiple objects.
-
-
-`/arco/multisend/new id - Create a multisend object
-with the given id.
-
-`/arco/multisend/ins id addr target p1 p2 ... pn` - Add a target and
-message to send. The addr parameter is the address string to be sent
-to the target. The target parameter is the Arco id of target ugen.
-Remaining parameters are arbitrary in type and number and given 
-by p1 through pn.  Currently, only int32 and float types are
-supported.
-
-`/arco/multisend/send` - Send the saved message to all objects now.
-
 
 ### feedback
 ```
@@ -773,7 +752,7 @@ channel (`chan`) to a the float value `gain`. This is also sent by the
 ### fileplay
 ```
 fileplay(filename, [chans], [start], [end], [cycle], [mix], [expand])
-.go([playflag])
+.start([playflag])
 .stop()
 ```
 
@@ -782,7 +761,7 @@ running in another thread to prefetch audio data into buffers. If
 prefetching cannot keep up, output is filled with zeros until the
 next buffer is available. There is currently no notification when
 the first buffer is ready, but the playback does not start until
-a `/arco/fileplay/play` message is sent. To detect when playback
+a `/arco/fileplay/start` message is sent. To detect when playback
 is finished, a message is sent to `/actl/act` with the action id
 provided earlier in `/arco/act`. The action status values are:
  - ACTION_END (playback finished normally), 
@@ -805,15 +784,15 @@ above `chans` if
 file has fewer than `chans` channels. If `end` is zero, reading will
 end at the end of the file.
 
-`/arco/fileplay/play id play_flag` - Starts or stops playback
+`/arco/fileplay/start id play_flag` - Starts or stops playback
 according to `playflag` (Boolean). Play will pause if necessary to
 wait for a block of samples to be read from the file.
 
 
-##filerec
+### filerec
 ```
 filerec(filename, input [, chans])
-.go(rec_flag)
+.start(rec_flag)
 .stop()
 ```
 
@@ -831,12 +810,12 @@ that writes `chans` channels to `filename`. The source of audio is
 `/arco/filerec/repl_input id input_id` - Set the input to the object
 with id `input_id`.
 
-`/arco/filerec/rec id record` - Start recording (when `record`, a
+`/arco/filerec/start id record` - Start recording (when `record`, a
 Boolean) is true. Stop recording when `record` is false. Recording can
 only be started and then stopped, in that order. To record again,
 create a new unit generator.
 
-##flsyn
+###  flsyn
 ```
 flsyn(path)
 .alloff(chan)
@@ -1245,6 +1224,54 @@ channel `chan` to the float value `gain`.
 to the a-rate Ugen `input`.
 
 
+### monodistortion
+
+This unit generator is used in the overdrive effect.
+See overdrive.
+
+### multisend 
+```
+multisend() 
+.ins(addr, target, p1, p2, ..., pn) 
+.send() 
+```
+Send a message "simultaneously" to multiple objects. This can be used 
+to guarantee synchronous actions such as recording multiple streams of 
+audio or starting multiple envelopes. 
+
+The object does not produce any sound, so there are no input Ugens or 
+output Ugens. However, the object does maintain references to the 
+target Ugens, so the lifetime of the targets is *at least* the 
+lifetime of this object even if the targets are not connected to any 
+inputs or outputs. You *must* free this object to free the target 
+objects. 
+
+Targets can only be Ugens in the same process and messages always 
+insert a Ugen id as a first parameter (before p1), consistent with 
+all messages to Ugens. Since the target may no longer have an id, 
+id 9 is used temporarily just to deliver the message. ID 9 is 
+reserved for this purpose. 
+
+The target restriction allows message sends to be direct and 
+synchronous. Note that ordinary message sends from the Arco 
+audio process are routed through the host, allowing complete 
+message service routing, taps, and other features. 
+
+`/arco/multisend/new id` - Create a multisend object 
+with the given id. 
+
+`/arco/multisend/ins id addr target p1 p2 ... pn` - Add a target and 
+message to send. The addr parameter is the address string of the 
+message to be sent. It must match the class of the target. E.g., if 
+the message is "/arco/pwlb/start", then target must be an instance 
+of `Pwlb`. The target parameter is the Arco id of this target ugen. 
+Remaining parameters are arbitrary in type and number and given 
+by p1 through pn.  Currently, only int32 and float types are 
+supported. Each target can have an entirely unique message. 
+
+`/arco/multisend/send` - Send the saved messages to all objects now. 
+
+
 ### multx
 ```
 mult(x1, x2, init = x2_init [, chans])
@@ -1481,6 +1508,56 @@ ratio. Greater than 1 means raise the pitch.
 `arco/pv/repl_input id input_id` - Set the input to the object with id
 `input_id`.
 
+
+### overdrive 
+```
+overdrive(input, gain, tone, volume)
+.set_input(input)
+.set_gain(gain)
+.set_tone(freq)
+.set_volume(volume)
+```
+
+Input channels are first summed and then multiplied by gain.
+
+The processing chain contains a first-order high-pass filter set at 720 Hz, 
+which removes low-frequency components. The filtered signal is then passed 
+through a cubic nonlinear distortion function, which shapes the 
+signal by introducing harmonic content and saturation. After 
+distortion, the signal is passed through a low-pass filter with a cutoff 
+frequency determined by the `tone` parameter (in Hz), allowing for control 
+over the brightness or warmth of the effect. Finally, the signal is 
+multiplied by the `volume` parameter divided by the square root of the
+number of channels (implementing the equal power law). The output is
+then added to each input channel to form the output.
+
+<!-- The monodistortion ugen is accessed via the Overdrive class.
+
+`/arco/monodistortion/new id chans gain tone volume` - Create a new 
+monodistortion unit generator with `gain`, `tone`, and `volume` control 
+inputs, along with an audio input and output. 
+
+`/arco/monodistortion/repl_gain id gain_id` - Set gain to object with id 
+`gain_id`. 
+
+`/arco/monodistortion/set_gain id chan gain` - Set gain of channel `chan` to 
+float value `gain`. 
+
+`/arco/monodistortion/repl_tone id tone_id` - Set tone to object with id 
+`tone_id`. 
+
+`/arco/monodistortion/set_tone id chan tone` - Set tone of channel `chan` to 
+float value `tone`. 
+
+`/arco/monodistortion/repl_volume id volume_id` - Set volume to object with 
+id `volume_id`. 
+
+`/arco/monodistortion/set_volume id chan volume` - Set volume of channel 
+`chan` to float value `volume`. 
+
+-->
+
+
 ### pwe, pweb
 ```
 pwe(d0, y0, d1, y1, ..., [init=0], [start=true] [lin=false])
@@ -1631,7 +1708,7 @@ except the address begins with `/arco/pwlb/`.
 ```
 recplay(input, [chans], [gain], [fade_time], [loop])
 .record(record_flag)
-.start(start_time)
+.play(start_time)
 .stop()
 .set_speed(ratio)
 .borrow(lender)
@@ -1677,11 +1754,11 @@ to `gain` (a float). The gain input must be a `const` ugen.
 `speed`. The same speed applies to all channels. Samples are linearly
 interpolated, and `speed` is a relative value, nominally 1.0.
 
-`/arco/recplay/rec id record` - Start or stop recording. `record` is a
+`/arco/recplay/record id record` - Start or stop recording. `record` is a
 boolean value (true to start). When you start to record, any previous
 samples recorded are deleted.
 
-`/arco/recplay/start id start_time` - Start playback from time offset
+`/arco/recplay/play id start_time` - Start playback from time offset
 `start_time` (a float), which is relative to the start of recording.
 
 `/arco/recplay/stop id` - Stop playback. Playback continues until the
@@ -2245,52 +2322,7 @@ zero()
 
 `/arco/zero/new id` - Create a signal consisting of all-zeros.
 
-### monodistortion 
-'''
-monodistortion(input, gain, tone, volume)
-'''
-The input signal can have multiple channels, which are first summed into 
-a mono signal and scaled by `gain`. After processing in mono, the signal 
-is fanned out and blended with the original input signal using `wetdry` 
-to control the balance from pure input (`wetdry` = 0) to pure effect 
-(`wetdry` = 1).
 
-The processing chain contains a first-order high-pass filter set at 720 Hz,
-which removes low-frequency components. The filtered signal is then passed
-through a cubic nonlinear distortion function, which shapes the
-signal by introducing harmonic content and saturation. After
-distortion, the signal is passed through a low-pass filter with a cutoff
-frequency determined by the `tone` parameter (in Hz), allowing for control
-over the brightness or warmth of the effect. Finally, the signal is
-multiplied by the `volume` parameter, controlling the output gain.
-
-After the signal is processed, the `wetdry` parameter is used to blend the
-distorted signal with the original input. When `wetdry` is set to 0, the
-output consists entirely of the original input signal. When set to 1, the
-output consists only of the distorted signal. Values in between allow for a
-balance between the dry and processed signals
-
-`/arco/monodistortion/new id chans gain tone volume` - Create a new 
-monodistortion unit generator with `gain`, `tone`, and `volume` control 
-inputs, along with an audio input and output.
-
-`/arco/monodistortion/repl_gain id gain_id` - Set gain to object with id 
-`gain_id`.
-
-`/arco/monodistortion/set_gain id chan gain` - Set gain of channel `chan` to
-float value `gain`.
-
-`/arco/monodistortion/repl_tone id tone_id` - Set tone to object with id 
-`tone_id`.
-
-`/arco/monodistortion/set_tone id chan tone` - Set tone of channel `chan` to 
-float value `tone`.
-
-`/arco/monodistortion/repl_volume id volume_id` - Set volume to object with 
-id `volume_id`.
-
-`/arco/monodistortion/set_volume id chan volume` - Set volume of channel 
-`chan` to float value `volume`.
 ### zitarev
 
 ```

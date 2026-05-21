@@ -23,6 +23,7 @@ require "programs"
 require "chorusrbd"
 require "stylectrl"
 require "labellog"
+require "multirec"
 
 SAVE_DATA = false
 display "CONFIGURATION NOTICE", SAVE_DATA
@@ -80,9 +81,12 @@ def arco_ready():
     phrase_player = Phrase_player()
     drummer = Drummer()
 
-    var flsyn_gain = 20.0
-    var flchdsyn_gain = 24.0 // 16.0 was ok, trying louder still
-                // 10 was low, 16 is based on how low 10 sounded
+    var flsyn_gain = 40.0  // was 20, mixing +6dB in Audacity was good
+    // still too soft though, so adding another +6dB
+    var flchdsyn_gain = 11.0  // after going to streo granstream, 24 was too hot
+                             // 16 too hot, trying 8
+                             // maybe too soft. Since I just changed flsyn_gain
+                             // from 40 to 80, I'm boosting chords from 8 to 11
     flsyn_ugen = Flsyn(SOUNDFONT)
     display "in arco_ready", flsyn_ugen
     // flsyn_chorus_ugen = chorusrbd(flsyn_ugen, 0.02, 0.04,
@@ -93,7 +97,7 @@ def arco_ready():
     flsyn_mix.ins("nonchd", flsyn_chorus_ugen, [flsyn_gain, flsyn_gain])
     
     flchdsyn_ugen = Flsyn(SOUNDFONT)
-    gran_ugen = granstream(flchdsyn_ugen, 20, 0.3, true)
+    gran_ugen = granstream(flchdsyn_ugen, 20, 0.3, true, 2)
 
     flsyn_mix.ins("chord", gran_ugen, [flchdsyn_gain, flchdsyn_gain])
 
@@ -167,7 +171,7 @@ def arco_ready():
                    -24, 12, 0, 'integer', 'transpose_slider')
     transpose_slider.add_callback('transpose_handler', 'x')
 
-    drumvol_offset = -30
+    drumvol_offset = -20  // -30 was too low
     Labeled_slider(win, "Drumvol", 'S', 'D', 'S', 'S', lab_w,
                    -80, 0, drumvol_offset, 'integer', 'drumvol_slider')
     drumvol_slider.add_callback('drumvol_handler', 'x')
@@ -180,6 +184,7 @@ def arco_ready():
     wxs_space = WXS_DEFAULT_SPACE // restore spacing
 
     effects = Autofx(input_ugen)
+    display "init", effects.chans
     effects_ctrl = Autofx_ctrl(win, 425, 10, 340, effects)
     effects.play()
 
@@ -193,6 +198,11 @@ def arco_ready():
     style_init()
 
     solo_boxes_init()
+
+    Checkbox(win, "multitrack record", 'S', 'D', 150, 'S', 'rec_all_checkbox')
+    rec_all_checkbox.add_callback('rec_all_handler', 'x')
+    Checkbox(win, "no thru for multitrack", 'S', 'D', 150, 'S', 'no_thru_checkbox')
+    no_thru_checkbox.add_callback('no_thru_handler', 'x')
 
     win.fit_to_children()
 
@@ -341,6 +351,37 @@ def onset_start(x):
     else:
         onset.unrun()
         onset = nil
+
+
+// handler for rec all (record all) checkbox
+def rec_all_handler(x):
+    display "rec_all_handler", x
+    if x:
+        rec_all_multirec = multirec("record/input.wav",  1, input_ugen,
+                                    "record/flsyn.wav",  2, flsyn_chorus_ugen,
+                                    "record/chords.wav", 2, gran_ugen,
+                                    "record/autofx.wav", 2, effects)
+
+//        rec_all_multirec.set_input(rec_all_multirec.new_file(
+//                                       "record/input.wav", 1), 0, input_ugen)
+//        rec_all_multirec.set_input(rec_all_multirec.new_file(
+//                                "record/flsyn.wav", 2), 0, flsyn_chorus_ugen)
+//        display "rec_all_handler", gran_ugen, gran_ugen.chans
+//        rec_all_multirec.set_input(rec_all_multirec.new_file(
+//                                       "record/chords.wav", 2), 0, gran_ugen)
+//        rec_all_multirec.set_input(rec_all_multirec.new_file(
+//                                         "record/autofx.wav", 2), 0, effects)
+
+        // give time to allocate Ugens and buffers and open files before start:
+        sched_select(rtsched)
+        sched_cause(0.1, rec_all_multirec, 'start')
+    else:
+        rec_all_multirec.close()
+
+
+def no_thru_handler(x):
+    display "no_thru_handler -- disable direct path through drygain to output"
+    effects.drygain_thru_enable(not x)  // parameter is "enable", not disable
 
 
 spectralcentroid_handler_installed = false
@@ -687,7 +728,7 @@ def tptsolo_handler(x):
 
 
 def main():
-    o2_debug_flags("") // ("SsBl")
+    o2_debug_flags("d") // ("SsBl")
     var files = ["trumpet.wav", "descend.wav", "fast.wav", "slow.wav"]
     arco_set_input_files(["/Users/rbd/algocomp/rbd25/audio/" + file
                           for file in files])

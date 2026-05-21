@@ -115,7 +115,7 @@ def file_play_with_env(file, gain)
 def file_play_start(mul, fply, env):
 # scheduled to start after preload (we hope)
     mul.play()
-    fply.go()
+    fply.start()
     env.start()  // no effect if start was 0 (start at beginning)
 
 

@@ -49,6 +49,8 @@ require "densify"
 require "flsynctrl"
 require "phraserecorder"
 
+NOTE_DYN_RANGE = 0.5  // original range is 1, <1 reduces velocity offset
+
 REST = -1
 
 class Timed_pitch:
@@ -248,10 +250,10 @@ class Notes:
     var frame_dur  // real-time duration of this 16th note
                    // (time since last frame_rtime)
 
-    def init(keyword ht = 0.1, rt = 0.05, rl = 3):
+    def init(keyword ht = 0.1, rt = 0.03, rl = 3):
         est_time = 0
         harmonicity_threshold = ht
-        rms_threshold = rt
+        rms_threshold = rt  // was 0.05, but soft notes not above threshold
         min_run_len = rl
         m3 = Median3()
         run_length_process = Run_length_process()
@@ -550,7 +552,8 @@ class Phrase_player:
                 onset_delay = onset_delay + 1.0 / tinv
         var vel = get_vel(chan, pitch)
         if is_poly:
-            vel = min(127, vel + 30)  # poly is much louder
+            vel = min(127, vel + 30 * NOTE_DYN_RANGE)  # poly is much louder
+        vel = round(vel)
         sched_cause(onset_delay, nil, 'flsyn_note_on', chan, pitch, vel)
         sched_cause(onset_delay + dur - 0.01, this, 'end_note', pitch,
                     phrase, end_i, chan, transpose, stretch, is_poly)

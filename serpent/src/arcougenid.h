@@ -18,10 +18,17 @@
    Then, in the ugen_id_table, we can store the mutable state and use the
    remaining bits for links to form the linked free and to-be-freed lists.
  
+   There are only two state, so we will use the sign bit. The remainder is
+   used for links.  This is tricky in that we need an end-of-list marker.
+   This could be -1, but the sign bit is taken for state, or it could be
+   0, but 0 is an ID. However, 0 is a "special" ID for the Zero Ugen,
+   which is never freed, so we use 0 for end-of-list AND for the Zero Ugen
+   ID, and we just have to be careful.  (Note: a previous implementation
+   used the lower-order 2 bits for state and ignored the sign bit, but had
+   to shift IDs by 2 bits to extract the link or index field, so that is
+   an alternate implementation option.)
+
    We need some macros to retrieve epoch, id, and state.
- 
-   We'll store state as lower 2 bits in ugen_id_table, so to get the id,
-   you shift right 2 bits.
  
  */
 
@@ -31,21 +38,18 @@ typedef Ugen_id *Ugen_id_ptr;  // just a generic pointer. We never dereference
 
 enum Ugen_id_state {
     ON_LIST = 0,
-    FREE_SENT = 1,
-    FREE_SENT_NO_GC = 2,
-    FREE_IN_ARCO = 3};
+    FREE_SENT_NO_GC = 1 };
+
+#define UGEN_END_OF_LIST 0
 
 #define UGEN_IN_RANGE(i) ((i >= 0) && (i < UGEN_TABLE_SIZE))
-#define UGEN_IDX2ID(i) (ugen_id_table[i] >> 2)
-#define UGEN_IDX2STATE(i) (ugen_id_table[i] & 3)
-#define UGEN_EPOCH(p) (((int64_t) p) >> 32)
+#define UGEN_IDX2ID(i) (ugen_id_table[i] & 0x7fffffff)  // clear sign bit
+#define UGEN_IDX2STATE(i) (((uint32_t) ugen_id_table[i]) >> 31)  // sign bit
+#define UGEN_EPOCH(p) (((uint64_t) p) >> 32)
 #define UGEN_ID(p) (((int64_t) p) & 0xffffffff)
 #define UGEN_STATE(p) UGEN_IDX2STATE(UGEN_IDX(p))
-#define UGEN_LINK(i) ((i << 2) | ON_LIST)
-#define UGEN_FREE_SENT(i) ((i << 2) | FREE_SENT)
-#define UGEN_FREE_SENT_NO_GC(i) ((i << 2) | FREE_SENT_NO_GC)
-#define UGEN_FREE_IN_ARCO(i) ((i << 2) | FREE_IN_ARCO)
-
+#define UGEN_LINK(i) (i)
+#define UGEN_FREE_SENT_NO_GC(i) (-(i))
 
 class Ugen_id_descriptor : public Descriptor {
 public:
@@ -69,9 +73,6 @@ int64_t make_ugen_id();
 int64_t make_ugen_id_from(int id);
 /*SER extern Ugen_id arco_ugen_new_id(int) PENT*/
 #define arco_ugen_new_id(id) ((Ugen_id *) make_ugen_id_from(id))
-
-/*SER void arco_ugen_is_free(int) PENT*/
-void arco_ugen_is_free(int);
 
 /*SER int arco_ugen_id(extern Ugen_id) PENT*/
 int arco_ugen_id(Ugen_id_ptr ugen_id);

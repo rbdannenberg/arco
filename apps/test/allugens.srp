@@ -193,7 +193,7 @@ class Mix (Ugen):
         return this
     
 
-    def rem(name, dur, mode):
+    def rem(name, optional dur, mode):
         if inputs.has_key(name):
             if not dur:
                 dur = 0
@@ -517,8 +517,8 @@ class Fileplay (Ugen):
                    'end', end, "f", 'cycle', cycle, "f", 'mix', mix, "f",
                    'expand', expand, "f")
 
-    def go(optional play_flag = true):
-        o2_send_cmd("/arco/fileplay/play", 0, "UB", id, play_flag)
+    def start(optional play_flag = true):
+        o2_send_cmd("/arco/fileplay/start", 0, "UB", id, play_flag)
         this
     
     def stop():
@@ -543,12 +543,12 @@ class Filerec (Ugen):
         super.init(create_ugen_id(), "Filerec", chans, '', "sU",
                    'filename', filename, "f", 'input', input, "a")
 
-    def go(optional rec_flag = true):
-        o2_send_cmd("/arco/filerec/rec", 0, "UB", id, rec_flag)
+    def start(optional rec_flag = true):
+        o2_send_cmd("/arco/filerec/start", 0, "UB", id, rec_flag)
         this
     
     def stop():
-        go(false)
+        start(false)
         this
  
  
@@ -571,7 +571,7 @@ class Recplay (Ugen):
                    'fade_time', fade_time, "f", 'loop', loop, "f")
 
     def record(record_flag):
-        o2_send_cmd("/arco/recplay/rec", 0, "UB", id, record_flag)
+        o2_send_cmd("/arco/recplay/record", 0, "UB", id, record_flag)
         this
 
     def start(start_time):
@@ -1272,3 +1272,43 @@ def overdrive(snd, gain, tone, volume):
 
 def sumb(optional chans = 1, keyword wrap = true): Sumb(chans, wrap)
  
+# ---- included from /Users/rbd/arco/serpent/srp/multisend.srp ----
+
+# multisend.srp -- multisend Ugen to dispatch messages synchronously
+#
+# Roger B. Dannenberg
+# Mar 2026
+
+class Multisend(Ugen):
+    def init()
+        super.init(create_ugen_id(), "Multisend", chans, A_RATE, "i",
+                   omit_chans = true)
+
+    def ins(addr, target, rest params)
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_string(addr)
+        display "Multisend.ins", id, target, params
+        if isinstance(target, Ugen):
+            target = target.id
+        o2_add_int32(arco_ugen_id(target))
+        for p in params:
+            if isreal(p):
+                o2_add_float(p)
+            elif isinteger(p):
+                o2_add_int32(p)
+            elif p == nil or p == true:
+                o2_add_bool(p)
+            else:
+                error("Multisend.ins - parameter must be int32 or float, got " +
+                      str(p) + " (" + str(type(p)) + ")")
+        o2_send_finish(0, "/arco/multisend/ins", true)
+        this
+
+    def send():
+        o2_send_cmd("/arco/multisend/send", 0, "U", id)
+        this
+
+
+def multisend(): Multisend()
+

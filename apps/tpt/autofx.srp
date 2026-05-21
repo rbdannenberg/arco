@@ -75,6 +75,7 @@ class Autofx (Instrument):
     var dly2_fade
     var warblerevb_fade
     var mix_ugen
+    var drygain_thru_enabled
     
 
     def init(input):
@@ -82,6 +83,7 @@ class Autofx (Instrument):
         noisegate_ugen = noisegate(input, 0.001, 0.001, 0.1, 0.02)
         input_fade = fader(noisegate_ugen, 0, 0.5)  // current, dur
         drygain_fade = fader(input_fade, 0, 0.5)
+        display "init", drygain_fade.chans
 
         // before independent effects, a pitch shift effect
         olaps = olapitchshift(input_fade, 1.25, 0.01, 0.05)
@@ -132,12 +134,14 @@ class Autofx (Instrument):
         revb_in_sum.ins(revbolaps_fade)
         
         revb_ugen = zitarev(revb_in_sum, 1.0, 1.0, 2.0)
+        display "init", revb_ugen.chans
         var warblerevb_osc = addb(sineb(16, 0.005), 0.0055)
         var delayvi2_ugen = delayvi(revb_ugen, warblerevb_osc, 0.011)
         warblerevb_fade = fader(delayvi2_ugen, 0, 0.5)
 
         mix_ugen = mix(2)
         mix_ugen.ins("dry", drygain_fade, [1.0, 1.0])  # pan to center
+        drygain_thru_enabled = true
         mix_ugen.ins("olaps", olaps_fade, [1.0, 1.0])
         mix_ugen.ins("ringmod", ringmod_fade, [1.0, 1.0])  # pan to center
         mix_ugen.ins("delay", delay_fade, [1.0, 1.0])  # pan to center
@@ -148,8 +152,18 @@ class Autofx (Instrument):
         mix_ugen.ins("delay_right", delay_right, [0.1, 1.0])  # pan right
 
         master_fx_ugen = fader(mix_ugen, 1)
+        display "init", master_fx_ugen.chans
 
         super.init("Autofx", master_fx_ugen)
+
+
+    def drygain_thru_enable(enable):
+        if drygain_thru_enabled and not enable:
+            print "removing \"dry\" input to mix"
+            mix_ugen.rem("dry", 0.1)
+        elif enable and not drygain_thru_enabled:
+            mix_ugen.ins("dry", drygain_fade, [1.0, 1.0], 0.1)  # pan to center
+        drygain_thru_enabled = enable
 
 
     def set_noisethreshold(x): noisegate_ugen.set('threshold', x)

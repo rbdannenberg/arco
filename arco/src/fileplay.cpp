@@ -13,14 +13,14 @@
 
 const char *Fileplay_name = "Fileplay";
 
-void send_fileplay_play(int64_t addr, bool play_flag)
+void send_fileplay_start(int64_t addr, bool play_flag)
 {
-    // o2sm_send_cmd("/fileio/fileplay/play", 0, "hB", addr, play_flag);
+    // o2sm_send_cmd("/fileio/fileplay/start", 0, "hB", addr, play_flag);
     o2_send_start();
     o2_add_int64(addr);
     o2_add_bool(play_flag);
     O2message_ptr msg =
-            o2_message_finish(0.0, "/fileio/fileplay/play", true);
+            o2_message_finish(0.0, "/fileio/fileplay/start", true);
     o2_shmem_inst_outgoing_push(fileio_bridge, (O2list_elem *) msg);
 }
     
@@ -28,7 +28,7 @@ void send_fileplay_play(int64_t addr, bool play_flag)
 Fileplay::~Fileplay()
 {
     if (!stopped) {
-        send_fileplay_play((int64_t) this, false);
+        send_fileplay_start((int64_t) this, false);
     }
 }
 
@@ -89,17 +89,17 @@ void arco_fileplay_ready(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/fileplay/play int32 id, bool play;
+/* O2SM INTERFACE: /arco/fileplay/start int32 id, bool play;
  */
-void arco_fileplay_play(O2SM_HANDLER_ARGS)
+void arco_fileplay_start(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     bool play = argv[1]->B;
     // end unpack message
 
-    UGEN_FROM_ID(Fileplay, fileplay, id, "arco_fileplay_play");
-    fileplay->play(play);
+    UGEN_FROM_ID(Fileplay, fileplay, id, "arco_fileplay_start");
+    fileplay->start(play);
 }
 
 
@@ -109,7 +109,7 @@ static void fileplay_init()
     o2sm_method_new("/arco/fileplay/new", "iisffBBB", arco_fileplay_new, NULL, true, true);
     o2sm_method_new("/arco/fileplay/samps", "hh", arco_fileplay_samps, NULL, true, true);
     o2sm_method_new("/arco/fileplay/ready", "hiB", arco_fileplay_ready, NULL, true, true);
-    o2sm_method_new("/arco/fileplay/play", "iB", arco_fileplay_play, NULL, true, true);
+    o2sm_method_new("/arco/fileplay/start", "iB", arco_fileplay_start, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
 

@@ -60,6 +60,8 @@ public:
         O2message_ptr msg = o2_message_finish(0.0, "/fileio/filerec/new",
                                               true);
         fileio_bridge->outgoing.push((O2list_elem *) msg);
+        printf("Filerec sending:\n");
+        o2_message_print(msg);
     };
 
     ~Filerec();
@@ -68,7 +70,7 @@ public:
         refcount--;
         if (refcount == 0) {
             if (!finished) {
-                record(false);
+                start(false);
             } else {
                 if (flags & UGENTRACE) {
                     printf("Filerec::unref deleting traced ugen: ");
@@ -115,7 +117,7 @@ public:
     }
 
 
-    void record(bool record) {
+    void start(bool record) {
         // You can only record once, no recording after stopped:
         if (record && !stopped) {
             recording = true;
@@ -169,7 +171,7 @@ public:
     void samps() {
         num_free++;
         if (blocks[next_block]->last) {
-            printf("filerec samps got last block %d\n", next_block);
+            // printf("filerec samps got last block %d\n", next_block);
             finished = true;
             if (refcount == 0) {
                 delete this;

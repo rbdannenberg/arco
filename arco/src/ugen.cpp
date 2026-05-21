@@ -71,6 +71,10 @@ Ugen::~Ugen() {
     // send_action_id(ACTION_FREE);
     // special case: check for run set or output set references
     assert((flags & IN_RUN_SET) == 0);
+    if (id >= 0) {  // we are still in the ugen table, which now has an
+                    // invalid pointer: remove the reference from the table
+        ugen_table[id] = NULL;
+    }
     // printf("Ugen delete %d\n", id);
 }
 
@@ -104,7 +108,10 @@ bool Ugen::find_reference_to(Ugen *ugen) {
 //     redundant if the referencer itself is in the process of being freed, but
 //     this is a "safe programming feature" to help make sure the reference is
 //     not used again. It is easy to circumvent, e.g. by passing the address of
-//     a copy of the reference, but at least it serves as a strong reminder.
+//     a copy of the reference, but at least it serves as a strong reminder that
+//     the pointer should become NULL to aid in debugging and avoid accidental
+//     access through an invalid pointer because some other code did not properly
+//     maintain the reference count.
 void Ugen::unref(Ugen **ptr) {
 #if ARCO_REF_DEBUG
     *ptr = NULL;  // remove the pointer pointing to this Ugen so that the graph will
@@ -131,7 +138,6 @@ void Ugen::unref(Ugen **ptr) {
         }
 #endif
         on_terminate(ACTION_FREE);  // notify `atend` mechanism if it is
-        send_arco_ugen_free(id);
         // pending this should be in destructor, but destructors cannot
         // call inherited methods in c++.
         if (flags & UGENTRACE) {
@@ -171,9 +177,14 @@ void Ugen::print(int indent, const char *param, bool revisiting) {
     if (!*param) {
         openp = closep = "";
     }
-    const char *was = (this == ugen_table[id] ? "" : "(was) ");
+    const char *was = "";
+    int posid = id;
+    if (id < 0) {
+        was = "(was) ";
+        posid = -id;
+    }
     arco_print("%s %s%s%sid %s%d refs %d chans %d ",
-               classname(), openp, param, closep, was, id, refcount, chans);
+               classname(), openp, param, closep, was, posid, refcount, chans);
     if (flags & TERMINATED) {
         arco_print("TERMINATED ");
     } else if (flags & TERMINATING) {
@@ -267,9 +278,19 @@ void arco_free(O2SM_HANDLER_ARGS)
         int id = ap->i;
         ANY_UGEN_FROM_ID(ugen, id, "arco_free");
         if (ugen) {
-            // printf("arco_free handler freeing %d #%d\n", id, ugen->refcount);
-            // printf("arco_free %d (%s)\n", id, ugen->classname());
+            // printf("*** arco_free: %d #%d (%s)\n", id, ugen->refcount,
+            //       ugen->classname());
             ugen->unref(&ugen);
+            if (ugen_table[id]) {  // id is no longer valid; Ugen still exists
+                // printf("*** arco_free: %d #%d (%s) becomes %d\n", id,
+                //       ugen->refcount, ugen->classname(), -id);
+                ugen->id = -id;  // remember Ugen's original id to aid
+                ugen_table[id] = NULL;
+                // in debugging (but be aware that when negative, the id may not
+                // be unique. Also, 0 (the zero Ugen) is a special case, but
+                // ugen_table[0] should never be freed or replaced unless Arco is
+                // reset.
+            }  // else the Ugen is freed, and it set ugen_table[id] to NULL
         }
     }
 }

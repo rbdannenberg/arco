@@ -7,7 +7,9 @@
 /* References and reference counting:
 
 A Fileplay unit generator uses a Fileio_obj in another thread to read
-the file. There can be multiple Fileplay and Fileio_obj objects, so we need a way for Fileplay and Fileio_obj objects to reference each other.
+the file. There can be multiple Fileplay and Fileio_obj objects, so we
+need a way for Fileplay and Fileio_obj objects to reference each
+other.
 
 Imagine that we use ordinary Arco reference counting. Fileplay sends
 its id to Fileio, which uses a mapping from id to Fileio_obj to locate
@@ -38,10 +40,12 @@ confirmation message is /arco/fileplay/ready (ready = false).
 
 */
 
+#define FILEPLAY_DEBUG 0
+
 extern const char *Fileplay_name;
 extern void *fileio_bridge;
 
-void send_fileplay_play(int64_t addr, bool play_flag);
+void send_fileplay_start(int64_t addr, bool play_flag);
 
 class Fileplay : public Ugen {
 public:
@@ -54,6 +58,10 @@ public:
     bool mix;
     bool expand;
     int action_id;  // send this when playback is stopped or finished
+#if FILEPLAY_DEBUG
+    int blocks_requested;
+    int blocks_received;
+#endif
 
     Fileplay(int id, const char *filename, int nchans, float start, float end,
              bool cycle, bool mix_, bool expand_) : Ugen(id, 'a', nchans) {
@@ -67,6 +75,10 @@ public:
         blocks[1] = NULL;
         frame_in_block = 0;
         action_id = 0;
+#if FILEPLAY_DEBUG
+        blocks_requested = 1;
+        blocks_received = 0;
+#endif
 
         // o2sm_send_cmd("/fileio/fileplay/new", 0, "hsffB", addr, filename,
         //               start, end, cycle);
@@ -87,7 +99,7 @@ public:
         refcount--;
         if (refcount == 0) {
             if (!stopped) {
-                play(false);
+                start(false);
             } else {
                 if (flags & UGENTRACE) {
                     printf("Fileplay::unref deleting traced ugen: ");
@@ -116,7 +128,7 @@ public:
     }
 
 
-    void play(bool play) {
+    void start(bool play) {
         // You can only play once, no play after stopped:
         if (play && !stopped) {
             started = true;
@@ -127,8 +139,8 @@ public:
             return;
         }
 
-        // o2sm_send_cmd("/fileio/fileplay/play", 0, "hB", addr, play);
-        send_fileplay_play((int64_t) this, play);
+        // o2sm_send_cmd("/fileio/fileplay/start", 0, "hB", addr, play);
+        send_fileplay_start((int64_t) this, play);
     }
 
 
@@ -160,12 +172,17 @@ public:
         assert(blocks[next_block] == NULL);
         blocks[next_block] = block;
         next_block ^= 1;  // swap 0 <-> 1
+#if FILEPLAY_DEBUG
+        blocks_received++;
+        printf("fileplay @ %g: got block #%d from fileio\n", o2sm_time_get(),
+               blocks_received);
+#endif
     }
 
 
     Audioblock *advance_to_next_block() {
         if (blocks[block_on_deck]->last) {  // not end of file
-            play(false);
+            start(false);
         } else if (!stopped) {
             // o2sm_send_cmd("/fileio/fileplay/read", 0, "h", addr);
             o2_send_start();
@@ -173,12 +190,23 @@ public:
             O2message_ptr msg = 
                     o2_message_finish(0.0, "/fileio/fileplay/read", true);
             o2_shmem_inst_outgoing_push(fileio_bridge, (O2list_elem *) msg);
+#if FILEPLAY_DEBUG
+            blocks_requested++;
+            printf("fileplay @ %g: requested block #%d\n", o2sm_time_get(),
+                   blocks_requested);
+#endif
         }
         blocks[block_on_deck] = NULL;
         block_on_deck ^= 1;  // swap 0 <-> 1
         Audioblock *block = blocks[block_on_deck];
         if (!block && !stopped) {
-            arco_warn("fileplay underflow\n");
+            arco_warn("fileplay underflow");
+#if FILEPLAY_DEBUG
+            printf("    fileplay @ %g: requested %d received %d blocks[0] %p"
+                   " blocks[1] %p\n", o2sm_time_get(),
+                   blocks_requested, blocks_received, blocks[0], blocks[1]);
+#endif
+
         }
         frame_in_block = 0;
         return block;
@@ -194,7 +222,7 @@ public:
         int i = 0;  // how many frames we have computed so far
         // how many channels to copy from input to output:
         int nchans = MIN(chans, block->channels);
-        
+
         while (i < BL) {  // may execute 2x to read from next block
             if (!block) {  // zero the remaining output frames
                 for (int ch = 0; ch < nchans; ch++) {

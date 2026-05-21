@@ -32,6 +32,7 @@ def flsyn_note_on(ch, pitch, vel):
     var fl_ugen = flchdsyn_ugen if ch == CHORD_CHAN else flsyn_ugen
     // display "### flsyn_note_on", ch, pitch, vel, count
     if vel > 0:
+        vel = min(127, ceiling(vel))  // don't ever round to 0
         if count == 0:
             // respect solo boxes:
             var mute = (ch == LEAD_CHAN and not leadsolocheckbox.value()) or

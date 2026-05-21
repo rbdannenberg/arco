@@ -74,7 +74,7 @@ class Mix (Ugen):
         return this
     
 
-    def rem(name, dur, mode):
+    def rem(name, optional dur, mode):
         if inputs.has_key(name):
             if not dur:
                 dur = 0

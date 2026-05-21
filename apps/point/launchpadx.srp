@@ -33,7 +33,7 @@ LP_OFF = 0
 LP_ORANGE = 60
 LP_LITEORANGE = 61
 LP_BLUE = 37
-LP_LITEBLUE = 36
+LP_LITEBLUE = 39
 LP_YELLOW = 13
 LP_PURPLE = 49
 LP_GRAY = 1
@@ -55,7 +55,7 @@ class Launchpad_x (Midi_handler):
     var reset1  // 11 or 18 if one of the reset keys is pressed
 
     def init():
-        mode = 'dyn'
+        mode = 'none'
         dyn = 0
         pitch = 0
         seq = 0
@@ -74,10 +74,18 @@ class Launchpad_x (Midi_handler):
             // it seems that initially, launchpad thinks everything
             // is off, so LP_OFF does nothing, so we set it to BRIGHT
             // so that the 2nd message to set color will always work
+            display "reset_colors - midi_out.note", p, LP_BRIGHT
+            midi_out.note_on(0, p, LP_BRIGHT)
+            time_sleep(0.01)
+            display "reset_colors - midi_out.note", p, LP_OFF
+            midi_out.note_on(0, p, LP_OFF)
+            time_sleep(0.01)
+            display "reset_colors - midi_out.note", p, color
             midi_out.note_on(0, p, color)
             if p % 10 == 8:
                 p = p + 2
-            sched_cause(0.001, this, 'reset_colors', p + 1)
+            sched_cause(0.01, this, 'reset_colors', p + 1)
+        mode = 'none'
 
 
     def poly_touch(chan, data1, data2):
@@ -103,32 +111,49 @@ class Launchpad_x (Midi_handler):
     def choice(m, n):
     # choose mode m with parameter (row or col) n
         // turn off indicator for current mode:
+        display "choice", m, n, mode
         if m in EXCLUSIVE_MODES:
             if mode == 'dyn':
-                midi_out.note_on(0, mode_to_lpkey('dyn', dyn), LP_OFF)
+                var keynum = mode_to_lpkey('dyn', dyn)
+                display "midi_out.note_on", keynum, LP_LITEORANGE
+                midi_out.note_on(0, keynum, LP_LITEORANGE)
             elif mode == 'pitch':
-                midi_out.note_on(0, mode_to_lpkey('pitch', pitch), LP_OFF)
+                keynum = mode_to_lpkey('pitch', pitch)
+                display "midi_out.note_on", keynum, LP_LITEBLUE
+                midi_out.note_on(0, keynum, LP_LITEBLUE)
             elif mode == 'diag1':
-                midi_out.note_on(0, LP_DIAG1, LP_OFF)
+                display "midi_out.note_on", LP_DIAG1, LP_GRAY
+                midi_out.note_on(0, LP_DIAG1, LP_GRAY)
             elif mode == 'diag2':
-                midi_out.note_on(0, LP_DIAG2, LP_OFF)
+                display "midi_out.note_on", LP_DIAG2, LP_GRAY
+                midi_out.note_on(0, LP_DIAG2, LP_GRAY)
             mode = m  // set the mode
         elif m == 'seq':
-            midi_out.note_on(0, mode_to_lpkey('seq', seq), LP_GRAY)
+            keynum = mode_to_lpkey('seq', seq)
+            display "midi_out.note_on", keynum, LP_GRAY
+            midi_out.note_on(0, keynum, LP_GRAY)
             
         // turn on indicator for new mode
         if m == 'dyn':
-            midi_out.note_on(0, mode_to_lpkey('dyn', n), LP_ORANGE)
+            keynum = mode_to_lpkey('dyn', n)
+            display "midi_out.note_on", keynum, LP_ORANGE
+            midi_out.note_on(0, keynum, LP_ORANGE)
             dyn = n
         elif m == 'pitch':
-            midi_out.note_on(0, mode_to_lpkey('pitch', n), LP_BLUE)
+            keynum = mode_to_lpkey('pitch', n)
+            display "midi_out.note_on", keynum, LP_BLUE
+            midi_out.note_on(0, keynum, LP_BLUE)
             pitch = n
         elif m == 'diag1':
+            display "midi_out.note_on", LP_DIAG1, LP_YELLOW
             midi_out.note_on(0, LP_DIAG1, LP_YELLOW)
         elif m == 'diag2':
+            display "midi_out.note_on", LP_DIAG2, LP_PURPLE
             midi_out.note_on(0, LP_DIAG2, LP_PURPLE)
         elif m == 'seq':
-            midi_out.note_on(0, mode_to_lpkey('seq', n), LP_BRIGHT)
+            keynum = mode_to_lpkey('seq', n)
+            display "midi_out.note_on", keynum, LP_BRIGHT
+            midi_out.note_on(0, keynum, LP_BRIGHT)
             seq = n
 
 

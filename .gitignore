@@ -99,6 +99,7 @@ srp.log
 /apps/tpt/*.wav
 /apps/tpt/*.csv
 /apps/tpt/video/
+/apps/tpt/record/
 
 /apps/tpt/Debug7mar26/
 
@@ -115,3 +116,7 @@ srp.log
 /ugens/highpass/highpass_ab_a.dsp
 
 /apps/point/samples/tpt*.wav
+
+/arcopython25.zip
+
+/python25/

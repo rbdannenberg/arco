@@ -248,12 +248,31 @@ Clients (applications) name unit generators with small
 integers. Normally, the integer will index arrays on both the client
 and Arco sides. The Arco side has an array of pointers to unit
 generators, the `ugen_table`. Unit generators (Ugens) are referenced
-by this table and the id is considered part of the Ugen. (The id is
-also an instance variable in the abstract Ugen class.) An invariant
-holds: If ugen_table[i] is not NULL, then ugen_table[i] points to a
-Ugen ugen and ugen->id == i and ugen->refcount > 0. In addition, if
-ugen->reference becomes zero, there are no more references, so the 
-ugen should be freed and ugen_table[i] should be freed.
+by this table as well as by other unit generators. The id instance
+variable in the abstract Ugen class is the index in the `ugen_table`,
+and id servse as a "back-pointer" to the table. Reference counting is
+used and the table entry counts as one reference. Initially, the
+table entry points to the Ugen, and the reference count is 1, so it
+is up to the client to free the table entry in order to free the Ugen.
+An invariant holds: If ugen_table[i] is not NULL, then ugen_table[i]
+points to a Ugen ugen and ugen->id == i and ugen->refcount > 0. In
+addition, if ugen->reference becomes zero, there are no more
+references, so the ugen should be freed and ugen_table[i] becomes
+NULL.
+
+The client may free the id at any time, leaving the Ugen to continue
+generating samples as long as some Ugen has a reference to it. (These
+"anonymous" Ugens are considered a feature, e.g., many Arco Ugens
+allow parameter values that are constant until updated, as opposed to
+being time-varying functions that need to be updated every sample.
+These "constant" parameters are represented by Ugens of class Const,
+so typically there are many Const Ugens that the client never needs to
+access again. Their id's can be freed and reused for other Ugens.)
+When an id is freed and the `ugen_table` entry is set to NULL, the
+Ugen's id is set to -id. (It could be set to a unique value like -1,
+but by using -id, the Ugen, if not deleted, might be inspected and the
+-id value tells us the original "name" of the Ugen, which might be
+helpful in debugging.)
 
 The `ugen_table` is not the only reference to a Ugen. Ugens are
 referenced directly by any unit generator that they are connected
@@ -281,12 +300,8 @@ This can be done at least 2 ways:
      object is freed through garbage collection. (Discussed later).
 
 Sending a "free" object does *not* necessarily free the Ugen, since
-other Ugens may use it as their input. Therefore, the client is not
-immediately free to reuse an id. The id becomes reusable only after
-the Ugen is freed. (This is why we said "the id is considered to be
-part of the Ugen.") To reclaim and reuse ids, the Arco server will
-send messages containing freed ids to the client, which can then put
-the ids back on a free list.
+other Ugens may use it as their input. However, the client is then
+immediately free to reuse an id.
 
 In the simplest case, a tree of unit generators is created by the
 client, which frees all but its reference ID to the output (Ugen at
@@ -297,25 +312,24 @@ audio output.
 
 Eventually, the client can remove the ugen from the `output_set` using
 `/arco/mute` and delete its reference to the corresponding Ugen_id.
-When the Ugen_id object is freed, it will free the ID using the
-message address `/arco/free`. If the object is not connected to any
-other inputs, it will be freed. The reference counts will propagate up
-the tree, freeing all the unit generators in the tree. All of the
-freed IDs will then be sent back to the client, and the client will
-then be able to reuse them for new Ugens.
+The client should also free the ID, which might take place
+automatically through the client's garbage collector.  If the object
+is not connected to any other inputs, it will be freed. The reference
+counts will propagate up the tree, freeing all the unit generators in
+the tree.
 
 The structures are drawn here:
 ```
-Client                             . Arco Server
-                                   .    ugen_table
-                                   .      +----+
-+-----------------+  +---------+   .   0  |    |     +---------------+
-| Client Shadow   -->| Ugen_id |   .  ... |    |     | Ugen          |
-| Object for Ugen |  |  id=15 - - -.-> 15 |  ----->  |  id=15        |
-+-----------------+  +---------+   .  ... |    |     |  refcount > 0 |
-                        ^          .      +----+     +---------------+
-  Other reference       |          .
-  to the Ugen ----------+          .
+Client                             │  Arco Server
+                                   │     ugen_table
+                                   │      ┌──────┐
+┌─────────────────┐  ┌──────────┐  │    0 │      │
+│ Client shadow   ├─>│ Ugen_id  │  │    … │      │   ┌───────────────┐
+│ object for Ugen │  │  id = 15 ├──├──>15 │      ├──>│  Ugen  id=15  │
+└─────────────────┘  └──────────┘  │    … │      │   │  refcount > 0 │
+                          ▲        │      └──────┘   └───────────────┘
+  Other client reference  │        │
+  to the Ugen ────────────┘        │
 ```
 
 You can also use `/arco/run` to insert a ugen ID into `run_set`, which
@@ -359,13 +373,15 @@ longer.)
 
 The `output_set` and `run_set` are lists of ugens and affect reference
 counts. Every ugen also has flag bits `IN_OUTPUT_SET` and `IN_RUN_SET`
-indicating membership. A ugen can only be in either set once.  If the
-object is freed, it is removed from the `output_set` or `run_set`
-which reduces the reference count once more. Thus, if an object only
-has a reference from the client and is also in the `output_set`, then
-an `/arco/free` message will remove it from the `output_set`
-(immediately) and free it. It follows that one should not free a unit
-generator while it is producing sound, as this can cause a click.
+indicating membership. A ugen can only be in either set once.  An
+object will not be freed if it is in either set. *An alternate policy
+is possible, but not implemented: If the object is freed, it is
+removed from the `output_set` or `run_set` which reduces the reference
+count once more. Thus, if an object only has a reference from the
+client and is also in the `output_set`, then an `/arco/free` message
+will remove it from the `output_set` (immediately) and free it. If
+this policy is implemented, one should not free a unit generator while
+it is producing sound, as this could cause a click.*
 
 
 ## Unit Generator References in Serpent
@@ -420,10 +436,9 @@ mean *allocated*. Set the current epoch number in the Ugen_id.
 Note that Serpent can have any number of references to a Ugen_id and
 it can be freely copied (because assignment of an object assigns the
 object address). When a Ugen_id is freed by GC, we will send an
-`/arco/free` message, but locally, the ID is not put back on the
-free list for reuse because `/arco/free` merely decrements the
-reference count, and the object may persist due to other references,
-which means it keeps the ID and the ID cannot be reused yet.
+`/arco/free` message, and locally, the ID is put back on the
+free list for reuse because `/arco/free` will at least release the
+ID if not the Ugen as well.
 
 If we construct messages in the normal way, the message construction
 primitives beginning with `o2_msg_start` and ending with
@@ -444,16 +459,14 @@ id and Ugen on the Arco (server) side. There might be cases where we
 want to release a Ugen immediately. We can add a `delete` method to
 the Serpent Ugen class that makes the Ugen invalid. The method will
 call a function (`arco_ugen_free_now`) that immediately sends
-`/arco/free`. Details will follow, but it is important to notice two
-sources of asynchronous behavior:
-  1. When you send `/arco/free` to the server, the ID is in limbo:
-     There is no reference to ID at the Serpent level, but we cannot
-     put it on the free list for reuse because ID is in use on the
-     server until notified by `/actl/free`.
-  2. If `arco_ugen_free_now` is called, we will eventually receive
-     an `/actl/free` message when the Ugen is freed on the server
-     side, and we will eventually garbage collect the Ugen_id
-     object. The order is unknown.
+`/arco/free`. Details will follow, but it is important to notice an
+important asynchronous behavior:
+  1. If `arco_ugen_free_now` is called, we free the Ugen ID at the
+  server, but we still have a Ugen_id locally (otherwise, how would
+  we say which Ugen_id to free? If we put the ID on a client free
+  list and it gets allocated again, we could have two Ugen_id objects
+  with the same ID and if either is GD'd, it could free an ID that is
+  still active.
  
 ### States
 
@@ -468,18 +481,10 @@ information into the low 2 bits of `ugen_id_table` entries:
          the list is emptied.
   2. ON_LIST and `UGEN_IDX2ID(index) == -1` means `id` indexes the last
      element of a list.
-  3. FREE_SENT means the id was used, but now its Ugen_id object has been
-     garbage collected and `/arco/free` was sent to decrement the
-     reference count on the Ugen on the server.
-  4. FREE_SENT_NO_GC means the id is in some Ugen_id object, but the
+  3. FREE_SENT_NO_GC means the id is in some Ugen_id object, but the
      client has called `arco_free_ugen_id_now`, which asserts that the
      client has or will free all references to the Ugen_id object. An
      `/arco/free` message has been sent.
-  5. FREE_IN_ARCO means `id` is in some Ugen_id object, or at least it
-     has not been GC'd, but as a result of the client calling
-     `arco_ugen_free_now`, we have now received `/actl/free` and
-     the Ugen and `id` have been freed on the server. We are still
-     waiting for GC to collect the Ugen_id object.
 
 ### The state transitions
 
@@ -492,17 +497,12 @@ information into the low 2 bits of `ugen_id_table` entries:
   3. The "allocated" state can go to:
      1. "on the to-be-freed list" if GC frees the Ugen_id object. 
      2. FREE_SENT_NO_GC if `arco_ugen_free_now` is called.
-  4. The only next state after "on the to-be-freed list" is FREE_SENT
-     when `arco_ugen_gc` is called and `/arco/free` message is sent.
-  4. The only next state after FREE_SENT is ON_LIST and on the free
-     list when `/actl/free` is received.
+  4. The only next state after "on the to-be-freed list" is ON_LIST
+     and "on the free list" when `arco_ugen_gc` is called and 
+     `/arco/free` message is sent. 
   5. The FREE_SENT_NO_GC can go to:
-     1. the ON_LIST and "on the to-be-freed list" state if GC frees the 
-        Ugen_id object, followed by FREE_SENT when `/arco/free`
-        message is sent (see above).
-     2. the FREE_IN_ARCO state if `/actl/free` is received.
-  6. the FREE_IN_ARCO state can only await GC and then become ON_LIST
-     and on the free list".
+     1. the ON_LIST and and "on the free list" when `arco_ugen_gc` is
+     called and `/arco/free` message is sent.
 
 
 ### Functions available to Serpent
@@ -523,12 +523,6 @@ information into the low 2 bits of `ugen_id_table` entries:
   of this object, thus any references to the object will also lose
   their ability to reference the Ugen.
   
-- `arco_ugen_is_free` -- called by the handler of `/actl/free` to put
-  the id back on the free list (or in the state where GC has not freed
-  the Ugen_id object, the state is changed to `== -3 * id` (see
-  above). This is not a built-in function, but called by a message
-  handler and is implemented in Serpent within the arco library.
-
 - `arco_ugen_gc()` -- when ugen_id objects are garbage collected,
   their id's are collected in a list, but the associated Ugens in Arco
   are not immediately freed. Calling `arco_ugen_gc` will free the
@@ -581,14 +575,11 @@ trace through and check the actual code:
    Ugen_id by calling Ugen_id_descriptor::free(obj). The Ugen_id
    is put on the to-be-freed list.
 6. Serpent calls `arco_ugen_gc` which sends `/arco/free` for each
-   to-be-freed id, and sets the id state to FREE_SENT.
-7. In the server, the unit generator ugen->unref() is called.
+   to-be-freed id, and puts the id back on `Ugen_id::free_list`.
+7. In the server, the unit generator ugen->unref() is called and
+   the table entry is set to NULL.
 8. In the server, when the reference count is zero,
-   `on_terminate(ACTION_FREE)` is called followed by
-   `send_arco_ugen_free(id)`, which sets ugen_table[id] to NULL and
-   sends `/actl/free` back to Serpent.
-9. `actl_free(id)` is called, which calls `arco_ugen_is_free` which
-   puts id back on the free list.
+   `on_terminate(ACTION_FREE)` and the Ugen is freed.
 
 ## Instruments in Serpent
 

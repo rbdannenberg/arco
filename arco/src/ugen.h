@@ -250,20 +250,9 @@ class Ugen : public O2obj {
         o2sm_add_int32(status);
         o2sm_add_int32(uid);
         o2sm_send_finish(0.0, ctrl_complete_addr("act"), true);
-        printf("send_action_id sent to address %s id %d status %d uid %d "
-               "o2_status(actl) %d\n",
-               ctrl_service_addr, action_id, status, uid, o2_status("actl"));
-    }
-
-    void send_arco_ugen_free(int id) {
-        // Temporary/internal ugens use id < 0 and are not in ugen_table.
-        if (id < 0 || !ugen_table.bounds_check(id)) {
-            return;
-        }
-        ugen_table[id] = NULL;
-        o2sm_send_start();
-        o2sm_add_int32(id);
-        o2sm_send_finish(0.0, ctrl_complete_addr("free"), true);
+        // printf("send_action_id sent to address %s id %d status %d uid %d "
+        //        "o2_status(actl) %d\n",
+        //        ctrl_service_addr, action_id, status, uid, o2_status("actl"));
     }
 };
 

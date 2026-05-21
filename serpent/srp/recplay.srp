@@ -16,7 +16,7 @@ class Recplay (Ugen):
                    'fade_time', fade_time, "f", 'loop', loop, "f")
 
     def record(record_flag):
-        o2_send_cmd("/arco/recplay/rec", 0, "UB", id, record_flag)
+        o2_send_cmd("/arco/recplay/record", 0, "UB", id, record_flag)
         this
 
     def start(start_time):

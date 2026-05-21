@@ -207,7 +207,7 @@ ugens_created = 0
 
 def create_ugen_id():
     var uid = arco_ugen_new()
-    display "create_ugen_id", uid
+    // display "create_ugen_id", uid
     // Debug: track who makes an Ugen:
     // if arco_ugen_id(uid) == 54:
     //      breakpoint()
@@ -572,7 +572,6 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
     o2_method_new("/actl/stopped", "i", 'actl_stopped', t)
     o2_method_new("/actl/reset", "i", 'actl_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
-    o2_method_new("/actl/free", "i", 'actl_free', t)
     sched_select(rtsched)
     sched_cause(0.1, nil, 'poll_for_arco')
     if IS_WXSERPENT:
@@ -687,7 +686,7 @@ def arco_poll_to_free_ugens(id):
         // that the Serpent garbage collector has collected
         sched_cause(0.1, nil, 'arco_poll_to_free_ugens',
                     arco_poll_to_free_ugens_id)
-    // return
+    return
     // debugging information tells when GC happens (disabled)
     if last_gc_cycles != gc_cycles():
         print "******************************************",
@@ -695,12 +694,6 @@ def arco_poll_to_free_ugens(id):
         print "more GC cycles. Cycle count", gc_cycles()
         arco_ugen_gc_info()
         last_gc_cycles = gc_cycles()
-
-
-def actl_free(timestamp, address, types, id):
-# called when "/actl/free" received signaling the freeing of a
-# unit generator and its Arco id.
-    arco_ugen_is_free(id)
 
 
 def actl_reset(timestamp, address, types, status):
@@ -868,7 +861,7 @@ class Ugen:
         o2_add_int32(id if isinteger(id) else arco_ugen_id(id))
         if not omit_chans: // some Ugens, (Probe), do not have chans parameter
             o2_add_int32(chans)
-        print "sent", "/arco/" + tolower(classname) + "/new, id", id,
+        // print "sent", "/arco/" + tolower(classname) + "/new, id", id,
 
         // send the "new" message with parameters to create the Ugen:
         for i = 0 to len(inputs_) by 3:
@@ -876,12 +869,12 @@ class Ugen:
             if types_[idiv(i, 3)] == "U":  // it's a Ugen
                 o2_add_int32(arco_ugen_id(inp.id))
                 inputs[inputs_[i]] = inp  // build dictionary of inputs
-                print inputs_[i], inp.id,
+                // print inputs_[i], inp.id,
             else:  // add a normal value, use code from o2msgutil.srp:
                 funcall(TYPE_TO_ADD_TYPE[types_[idiv(i, 3)]], inp)
-                print inputs_[i], inp
+                // print inputs_[i], inp
         o2_send_finish(0, "/arco/" + tolower(classname) + "/new", true)
-        print
+//        print
 
 
     def to_str():

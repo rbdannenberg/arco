@@ -26,7 +26,7 @@ require "mididevice"
 require "chorusrbd"
 
 SIMPLE = false
-DEBUG_ACTIONS = true  // override default
+// DEBUG_ACTIONS = true  // override default
 
 class Atone (Instrument):
     var env, renv
@@ -86,6 +86,7 @@ def arco_ready():
     var WIDTH = 170
     var COLUMN_X = 5  // changes to 200 for Column 2
     var COLUMN_TWO = 200
+    var COLUMN_THREE = 400
 
     Checkbox(win, "Simple test", COLUMN_X, 5, WIDTH, 20, 'stcheckbox')
     stcheckbox.add_callback('play_simple_test', 'x')
@@ -314,6 +315,14 @@ def arco_ready():
 
     Checkbox(win, "Overdrive Test", 'S', 'D', WIDTH, 'S', 'overdrivecheckbox')
     overdrivecheckbox.add_target_method(nil, 'overdrivetest')
+
+    # start a 2nd column
+    COLUMN_X = COLUMN_THREE
+    wxs_x = COLUMN_X
+    wxs_y = 5 - wxs_h  // 'D' will get y = wxs_y + wxs_h = 5
+
+    Button(win, "Multisend", 'S', 'D', WIDTH, 'S', 'multisendbutton')
+    multisendbutton.add_callback('multisend_test', 'x')
 
     ui_initialized = true
     default_window.fit_to_children()
@@ -590,7 +599,7 @@ def play_sound_file(rest ignore):
     sp.atend(MUTE, m1)  // "when the sound file finishes, mute m1"
     // The mute method will delete m1. If it were not a local var,
     // we would call m1.ref() here.
-    sp.go()     // play the sound file
+    sp.start()     // play the sound file
 
 
 ########## DELAY TEST ################
@@ -649,7 +658,7 @@ def gstest(x):
         gs1.play()
         grfr = filerec("./groutput.wav", gs1, 2)
         grfr.run()
-        grfr.go()
+        grfr.start()
     else:
         gs1.mute()  // immediate stop
         gs1 = nil   // eventual cleanup
@@ -676,7 +685,7 @@ def gsfbtest(x):
         gs1.play()
         grffr = filerec("./grfoutput.wav", gs1, 2)
         grffr.run()
-        grffr.go()
+        grffr.start()
     else:
         gs1.mute()  // immediate stop
         gs1 = nil   // eventual cleanup
@@ -872,7 +881,7 @@ def pvtest(x):
         pv.play()
 //        pvfr = filerec("./pvoutput.wav", pv, 1)
 //        pvfr.run()
-//        pvfr.go()
+//        pvfr.start()
     else:
         pv.mute()
 //        pvfr.stop()
@@ -1049,9 +1058,9 @@ class File_play_record:
         fply = fileplay("./testinput.wav", 1)
         frec = filerec("./testoutput.wav", fply, 1)
         fply.atend(FINISH, this)
-        fply.go()
+        fply.start()
         frec.run()
-        frec.go()
+        frec.start()
 
     def finish(optional status, finisher, parameters):
     # stop recording and clean up
@@ -1453,7 +1462,7 @@ def overdrivetest(x):
                                  sineb(8, 1)), 0.3)
         // illustrate increasing distortion with amplitude:
         tones = mult(tones, pweb(4, 2))
-        ovd = overdrive(tones, 0.85, 0.85, 0.8)  // snd, gain, tone, volume
+        ovd = overdrive(tones, 0.85, 4000.0, 0.8)  // snd, gain, tone, volume
         ovd.play()
     else:
         // see if setting input works. Sound should stop even though
@@ -1585,6 +1594,37 @@ def do_all_checkboxes(n, on):
             sched_cause(0.1, nil, 'do_all_checkboxes', n + 1, true)
     else:
         print "**** DONE WITH ALL TESTS ****"
+
+
+######### Multisend Test #############
+
+def multisend_test(x):
+    print "multisend test"
+    // make 3 sine tones
+    mts1 = sine(440.0, 0.02).play()
+    mts2 = sine(660.0, 0.02).play()
+    mts3 = sine(770.0, 0.02).play()
+    // make multisend
+    mtms = multisend()
+    // parameters are id, channel, frequency
+    mtms.ins("/arco/sine/set_freq", mts1, 0, 484.0)
+    mtms.ins("/arco/sine/set_freq", mts2, 0, 726.0)
+    mtms.ins("/arco/sine/set_freq", mts3, 0, 847.0)
+    sched_select(rtsched)
+    sched_cause(0.5, mtms, 'send')
+    sched_cause(1.0, nil, 'multisend_cleanup')
+
+def multisend_cleanup():
+    display "multisend_cleanup", mts1.id, mts2.id
+    display "                 ", mts3.id, mtms.id
+    mts1.mute()
+    mts2.mute()
+    mts3.mute()
+    mts1 = nil
+    mts2 = nil
+    mts3 = nil
+    mtms = nil
+    // after GC, everything should be free
 
 
 ########## Main Initialization ################

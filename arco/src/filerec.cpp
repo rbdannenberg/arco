@@ -83,17 +83,17 @@ void arco_filerec_ready(O2SM_HANDLER_ARGS)
 }
 
 
-/* O2SM INTERFACE: /arco/filerec/rec int32 id, bool rec;
+/* O2SM INTERFACE: /arco/filerec/start int32 id, bool rec;
  */
-void arco_filerec_rec(O2SM_HANDLER_ARGS)
+void arco_filerec_start(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     bool rec = argv[1]->B;
     // end unpack message
 
-    UGEN_FROM_ID(Filerec, filerec, id, "arco_filerec_rec");
-    filerec->record(rec);
+    UGEN_FROM_ID(Filerec, filerec, id, "arco_filerec_start");
+    filerec->start(rec);
 }
 
 
@@ -108,7 +108,7 @@ static void filerec_init()
                     true, true);
     o2sm_method_new("/arco/filerec/ready", "hB", arco_filerec_ready, NULL,
                     true, true);
-    o2sm_method_new("/arco/filerec/rec", "iB", arco_filerec_rec, NULL, true,
+    o2sm_method_new("/arco/filerec/start", "iB", arco_filerec_start, NULL, true,
                     true);
     // END INTERFACE INITIALIZATION
 }

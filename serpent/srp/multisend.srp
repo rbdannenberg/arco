@@ -1,0 +1,37 @@
+# multisend.srp -- multisend Ugen to dispatch messages synchronously
+#
+# Roger B. Dannenberg
+# Mar 2026
+
+class Multisend(Ugen):
+    def init()
+        super.init(create_ugen_id(), "Multisend", chans, A_RATE, "i",
+                   omit_chans = true)
+
+    def ins(addr, target, rest params)
+        o2_send_start()
+        o2_add_int32(arco_ugen_id(id))
+        o2_add_string(addr)
+        display "Multisend.ins", id, target, params
+        if isinstance(target, Ugen):
+            target = target.id
+        o2_add_int32(arco_ugen_id(target))
+        for p in params:
+            if isreal(p):
+                o2_add_float(p)
+            elif isinteger(p):
+                o2_add_int32(p)
+            elif p == nil or p == true:
+                o2_add_bool(p)
+            else:
+                error("Multisend.ins - parameter must be int32 or float, got " +
+                      str(p) + " (" + str(type(p)) + ")")
+        o2_send_finish(0, "/arco/multisend/ins", true)
+        this
+
+    def send():
+        o2_send_cmd("/arco/multisend/send", 0, "U", id)
+        this
+
+
+def multisend(): Multisend()

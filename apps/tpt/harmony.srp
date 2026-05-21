@@ -173,6 +173,13 @@ LOUD_PROG_TO_VEL = {18: -80, 18: -60, 19: -80, 45: -80, 90: -70,
 // volume control: nominal vol will be 100. cresc will go up to 127
 VOL_NORMAL = 50
 
+// volume gestures boost vol up to some maximum, but the maximum seemed
+// to high, so use this to tweak it. DYN_RANGE=1 means "original" but
+// vol max is now VOL_NORMAL + (original_max - VOL_NORMAL) * DYN_RANGE,
+// so for values less than 1 you get less of a boost and less dynamic range
+// This is for chords only.
+DYN_RANGE = 0.5
+
 
 def chord_vol_gesture(start, delta, dur, maxvol, id):
 // produce a rise and fall volume shape over dur. To get simple crescendo,
@@ -215,7 +222,9 @@ def play_chord(chord, duration):
     if style != 'descend':  // go for continuous sound in other styles
         duration = duration * 2
     if pr_coin(0.4):
-        chord_vol_gesture(sched_vtime, 0.125, duration, pr_range(100, 128),
+        chord_vol_gesture(sched_vtime, 0.125, duration,
+                          VOL_NORMAL + (pr_range(100, 128) - VOL_NORMAL) *
+                                       DYN_RANGE,
                           harmony_chord_id)
         labellog_label("hairpin")
     elif pr_coin(0.25):

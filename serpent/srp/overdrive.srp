@@ -3,17 +3,79 @@
 # Vivek Mohan
 # February 2025
 
+OD_MSG = ") is not a number or single channel Ugen."
+
+
 class Overdrive(Instrument):
+    var scale_factor
+    var vol_scale_ugen
+    var processed  // the monodistortion ugen
+
+    // there are 4 volume possibilities:
+    // 1. multiple channel input (scale_factor != 1)
+    //    -> coerce volume to ugen, create
+    //       vol_scale_ugen = mult(volume, scale_factor). To
+    //       set volume, set x1 of vol_scale_ugen,
+    // 3. single channel input (scale_factor == 1)
+    //    -> coerce volume to ugen. To set volume, either set
+    //       volume (a const) or replace 'volume' of monodistortion.
+
+
     def init(input, gain, tone, volume, wetdry):
+        if isnumber(gain):
+            gain = const(gain)
+        if isnumber(tone):
+            tone = const(tone)
+        if isnumber(wetdry):
+            wetdry = const(wetdry)
+        if not isinstance(gain, Ugen) or gain.chans != 1:
+            print "WARNING: gain ("; gain; OD_MSG
+            gain = const(1.0)
+        if not isinstance(tone, Ugen) or tone.chans != 1:
+            print "WARNING: tone ("; tone; OD_MSG
+            tone = const(8000.0)
+        if not isinstance(wetdry, Ugen) or wetdry.chans != 1:
+            print "WARNING: wetdry ("; wetdry; OD_MSG
+            wetdry = const(1.0)
+        if not isinstance(volume, Ugen) or volume.chans != 1:
+            print "WARNING: volume ("; volume; OD_MSG
+            volume = const(1.0)
 
-        mono_input = route(1)
-        for i = 0 to input.chans:
-            mono_input.ins(input, i, 0)
+        if input.chans == 1:
+            mono_input = input
+            scale_factor = 1.0
+            processed = monodistortion(mono_input, gain, tone, volume)
+        else:
+            mono_input = route(1)
+            for i = 0 to input.chans:
+                mono_input.ins(input, i, 0)
+            scale_factor = 1.0 / sqrt(input.chans)
+            vol_scale_ugen = mult(scale_factor, volume)
+            processed = monodistortion(mono_input, gain, tone, vol_scale_ugen)
+                                       
 
-        scale_factor = 1.0 / sqrt(input.chans)
-
-        processed = monodistortion(mono_input, gain, tone, volume * scale_factor)
-
-        final_output = add(mult(input, mult(scale_factor,subb(1, wetdry))), mult(processed, mult(scale_factor,wetdry)))
+        final_output = add(mult(input, subb(1, wetdry)),
+                           mult(processed, wetdry))
 
         super.init("Overdrive", final_output)
+
+
+    def set_input(input):
+        processed.set('input', input)
+
+    def set_gain(gain):
+        processed.set('gain', gain)
+
+    def set_tone(tone):
+        processed.set('tone', tone)
+
+    def set_volume(volume):
+        if scale_factor == 1.0:  // no scaling, so direct set
+            processed.set('volume', volume)
+        else:
+            vol_scale_ugen.set('x1', volume)
+
+
+
+def overdrive(input, gain, tone, volume, wetdry):
+    Overdrive(input, gain, tone, volume, wetdry)

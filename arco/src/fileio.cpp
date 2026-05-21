@@ -77,7 +77,7 @@ public:
     Audioblock *blocks[2];  // pointers to buffers
     int64_t all_frames_count;  // how many frames to read from file
     int64_t frames_to_end;  // how many more frames to read until end time
-    int block_on_deck;  // which block do we send next?
+    int block_on_deck;  // which block do we read and send next?
     
 
     Fileio_reader(int64_t addr, char *fn, float st, float en, bool cy) :
@@ -130,6 +130,8 @@ public:
         o2_shmem_inst_outgoing_push(audio_bridge, (O2list_elem *) msg);
 
         load_block();  // even if error opening or seeking
+        // only prefetch the first block. When fileplay starts, it requests
+        // another block to achieve double-buffering
 
         arco_print("Opened %s, a %d channel audio file.\n", fn, chans);
     }
@@ -219,9 +221,9 @@ public:
         snd_out = sf_open(fn, SFM_WRITE, &snd_out_info);
         if (snd_out) {
             file_is_open = true;
+            arco_print("Fileio_writer: Opened %s (%p)\n", fn, snd_out);
             rslt = 0;
-        }
-        if (!file_is_open) {
+        } else {
             arco_print("Fileio_writer: Failed to open %s\n", fn);
         }
         sf_command(snd_out, SFC_SET_CLIPPING, NULL, SF_TRUE);
@@ -288,6 +290,7 @@ public:
     void makeclosed() {
         if (file_is_open) {
             sf_close(snd_out);
+            printf("Fileio_writer: Closed %p\n", snd_out);
             file_is_open = false;
         }
     }
@@ -341,8 +344,8 @@ void fileio_fileplay_read(O2SM_HANDLER_ARGS)
 }           
 
 
-/* O2SM INTERFACE: /fileio/fileplay/play int64 addr, bool play_flag; */
-void fileio_fileplay_play(O2SM_HANDLER_ARGS)
+/* O2SM INTERFACE: /fileio/fileplay/start int64 addr, bool play_flag; */
+void fileio_fileplay_start(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int64_t addr = argv[0]->h;
@@ -356,7 +359,7 @@ void fileio_fileplay_play(O2SM_HANDLER_ARGS)
             reader->load_block();
         } else {
             fileio_objs.remove(i);
-            printf("fileio_fileplay_play deleting reader @ %p addr %p\n",
+            printf("fileio_fileplay_start deleting reader @ %p addr %p\n",
                    reader, (void *) addr);
             delete reader;
         }
@@ -436,7 +439,7 @@ int fileio_initialize()
                     NULL, true, true);
     o2sm_method_new("/fileio/fileplay/read", "h", fileio_fileplay_read,
                     NULL, true, true);
-    o2sm_method_new("/fileio/fileplay/play", "hB", fileio_fileplay_play,
+    o2sm_method_new("/fileio/fileplay/start", "hB", fileio_fileplay_start,
                     NULL, true, true);
     o2sm_method_new("/fileio/quit", "", fileio_quit, NULL, true, true);
     o2sm_method_new("/fileio/filerec/new", "his", fileio_filerec_new,

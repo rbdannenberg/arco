@@ -541,36 +541,85 @@ rvb.set_rt60(rt60)
 ```
 Change the reverb time to `rt60`.
 
-# Fluidsynth
-Fluidsynth is a well-known library. The interface from Arco to
-Fluidsynth is described here.
 
-`/arco/flsyn/new id sfont` - create a Fluidsynth object. `id` is the
-(int32) object id, `sfont` is the (string) path to the soundfont file.
-Because a soundfont must be loaded, you should create the `flsyn`
-object when the program is initialized even if it will not be used
-until later.
+## Multirec
+Note: requires the dspmanifest to include `multisend` and `route`.
 
-`/arco/flsyn/off id chan` - perform an "all-off" action. All notes
-are ended.
+To record multiple synchronized audio files, you need to start
+recording all of them at the same audio block. This is not guaranteed
+if you simply send messages to multiple `filerec` objects at the same
+time. Multirec was created (along with Multisend) to enable starting
+synchronously.
 
-`/arco/flsyn/cc id chan num val` - perform a control change operation.
+To use Multirec, you first instantiate the Multirec class. Then, for
+each file you want to record, call `new_file`. An integern file
+designator is returned. You can use this to map Ugen outputs to
+selected channels of designated files using `set_input`. The `start`
+method will start all file recorders synchronously, and `close` will
+close the files and reinitialize the object. You can use it again, but
+you need to create new files and assign Ugen outputs to file channels.
 
-`/arco/flsyn/cp id chan val` - perform a channel pressure
-operation.
+```
+mr = multirec(rest config)
+```
+Creates a Multirec object. Optional `config` parameters can configure
+output files and connections between Ugens and these output files.
+To specify an output file, use a string file name, an optional true
+or false for overwrite and the number of channels for the file. (This
+is equivalent to calling the `new_file` method.) Then, immediately
+after the number of channels, you can list Ugens, and each Ugen can
+be immediately be followed by pairs of channel numbers denoting the
+source (Ugen) channel followed by the file channel to be written.
+(Each Ugen in `config` is equivalent to calling the `set_input`
+method once for each pair of channels, or once to map all channels
+if channel numberss are omitted.
 
-`/arco/flsyn/kp id chan key val` - perform a key pressure operation.
+Example:
+```
+mr = multrec("file1.wav", 1, input_ugen,
+             "file2.wav", 2, output1_ugen, 0, 0, output2_ugen, 0, 1)
+```
+Denotes a mono and stereo output file, where channel 0 of input_ugen
+(which might be mono) is written to file1.wav, output1_ugen
+(presumably mono) is written to file2.wav channel 0 (left) and
+output2_ugen (also presumably mono) is written to file2.wav
+channel 1 (right).
 
-`/arco/flsyn/noteoff id chan key` - perform a note off operation.
 
-`/arco/flsyn/noteon id chan key vel` - perform a note on operation.
+```
+n = mr.new_file(name, chans, optional overwrite)
 
-`/arco/flsyn/pbend id chan val` - perform a pitch bend operation.
-val is in the range -1 to 8192/8193 and will be clipped if out of
-range.
+```
+Opens a new file for recording using "name" as the base name or path
+for the file. If `overwrite` is omitted or false, digits are appended
+to `name` to make a unique new path. `chans` is the number of
+channels. Usually this is 1 or 2 because if you are happy to create
+multi-channel files, why not just write all your tracks into one file?
+Returns an integer file designator, used by `set_input`.
 
-`/arco/flsyn/psens id val` - set the pitch bend sensitivity to an
-(integer) range of semitones given by val.
+```
+mr.set_input(n, output_chan, src, optional input_chan)
+```
+Assigns output from Ugen `src` to file designated by
+`n`. `output_channel` represents the channel to write in the output
+file (e.g., 0 or 1), and `channel` is which channel of `src` to
+write. If `channel` is omitted or nil, `src` is multi-channel, and the
+file is stereo, and `output_channel` is 0 (many conditions!), then
+*the first two (both)* channels are written to the stereo file. In all
+other cases, channel defaults to 0 and only one channel is written to
+the file. You can call `set_input` to assign another Ugen to the
+unused channel of a stereo or multi-channel file.
 
-`/arco/flsyn/prog id chan program` - set the MIDI program number.
+```
+mr.start()
+```
+Start recording.
+
+```
+mr.close()
+```
+Stop recording and close the files. This is asynchronous, so it is
+possible that some files will be longer than others.
+
+
 

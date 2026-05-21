@@ -18,8 +18,8 @@ class Fileplay (Ugen):
                    'end', end, "f", 'cycle', cycle, "f", 'mix', mix, "f",
                    'expand', expand, "f")
 
-    def go(optional play_flag = true):
-        o2_send_cmd("/arco/fileplay/play", 0, "UB", id, play_flag)
+    def start(optional play_flag = true):
+        o2_send_cmd("/arco/fileplay/start", 0, "UB", id, play_flag)
         this
     
     def stop():

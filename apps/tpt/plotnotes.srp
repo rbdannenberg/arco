@@ -28,9 +28,9 @@ class Plot_notes (Canvas):
         super.init(parent, x, y, w, h, varname)
         plot_height = get_height() - 20  // margin for labels
         refresh_period = 1.0 / 15  // 15 fps
-        print "Plot_notes: calling refresh(true) from init()"
+        // print "Plot_notes: calling refresh(true) from init()"
         refresh(true)
-        print "Plot_notes: return from refresh(true) from init()"
+        // print "Plot_notes: return from refresh(true) from init()"
 
 
     def changed():
@@ -45,7 +45,7 @@ class Plot_notes (Canvas):
             refresh_state = 'pending'
             sched_select(sched)
             return
-        print "Plot_notes: calling refresh(true) from changed()"
+        // print "Plot_notes: calling refresh(true) from changed()"
         refresh(true)
 
 

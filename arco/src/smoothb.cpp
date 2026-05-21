@@ -52,7 +52,7 @@ void arco_smoothb_newn(O2SM_HANDLER_ARGS)
         }
         if (index != argc - 2) {
             ugen_table[smoothb->id] = NULL;
-            smoothb->unref();
+            smoothb->unref((Ugen **) &smoothb);
             goto bad_args;
         }
         return;

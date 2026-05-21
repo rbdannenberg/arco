@@ -37,17 +37,6 @@ void s2c_arco_ugen_new_id(Machine_ptr m)
 }
 
 
-void s2c_arco_ugen_is_free(Machine_ptr m)
-{
-    SVal local0 = LOCAL_TO_SVAL(m->frame->local(0));
-    int arg0 = (int) Node::must_get_long(local0, m);
-    if (!m->error_flag) {
-        arco_ugen_is_free((int) arg0);
-        m->push(NULL);
-    }
-}
-
-
 void s2c_arco_ugen_id(Machine_ptr m)
 {
     SExtern_ptr arg0 = Node::must_get_extern(LOCAL_TO_SVAL(m->frame->local(0)), ugen_id_name, m);
@@ -111,7 +100,6 @@ void sugenid_init_fn(Machine_ptr m)
     ugen_id_descriptor.name = ugen_id_name;
     m->create_builtin(Symbol::create("arco_ugen_new", m), 0, &s2c_arco_ugen_new);
     m->create_builtin(Symbol::create("arco_ugen_new_id", m), 1, &s2c_arco_ugen_new_id);
-    m->create_builtin(Symbol::create("arco_ugen_is_free", m), 1, &s2c_arco_ugen_is_free);
     m->create_builtin(Symbol::create("arco_ugen_id", m), 1, &s2c_arco_ugen_id);
     m->create_builtin(Symbol::create("arco_ugen_epoch", m), 1, &s2c_arco_ugen_epoch);
     m->create_builtin(Symbol::create("arco_ugen_free", m), 1, &s2c_arco_ugen_free);

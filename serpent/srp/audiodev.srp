@@ -53,7 +53,7 @@ def simulate_input_from_file(path):
         fileinput_player = fileplay(path, arco_input_chans,
                                     0, 0, false, true, true)
         input_ugen.set_alternate(fileinput_player)
-        fileinput_player.go()
+        fileinput_player.start()
     else:
         print "WARNING in simulate_input_from_file: file not found"
         input_ugen.set_alternate(zero_ugen)
@@ -616,10 +616,10 @@ class Monitor_audio (Arco_window):
             sched_select(rtsched)
             input_logger = filerec("input.wav", input_ugen, arco_input_chans)
             input_logger.run()
-            input_logger.go()
+            input_logger.start()
             audio_login_start_time = sched_rtime
         elif not x and input_logger:
-            input_logger.go(false)
+            input_logger.stop()
             input_logger.unrun()
             input_logger = false;
             audio_login_start_time = -99
@@ -640,10 +640,10 @@ class Monitor_audio (Arco_window):
             output_logger = filerec("output.wav", output_logger_fader,
                                     arco_output_chans)
             output_logger.run()
-            output_logger.go()
+            output_logger.start()
             audio_logout_start_time = sched_rtime
         elif not x and output_logger:
-            output_logger.go(false)
+            output_logger.stop()
             output_logger.unrun()
             output_logger = nil
             output_logger_fader = nil

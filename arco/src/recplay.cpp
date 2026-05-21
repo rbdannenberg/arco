@@ -585,14 +585,14 @@ static void arco_recplay_speed(O2SM_HANDLER_ARGS)
 
 /* O2SM INTERFACE: /arco/recplay/rec int32 id, bool record;
  */
-static void arco_recplay_rec(O2SM_HANDLER_ARGS)
+static void arco_recplay_record(O2SM_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
     int32_t id = argv[0]->i;
     bool record = argv[1]->B;
     // end unpack message
 
-    UGEN_FROM_ID(Recplay, recplay, id, "arco_recplay_rec");
+    UGEN_FROM_ID(Recplay, recplay, id, "arco_recplay_record");
     recplay->record(record);
 }
 
@@ -651,7 +651,7 @@ static void recplay_init()
                     NULL, true, true);
     o2sm_method_new("/arco/recplay/speed", "if", arco_recplay_speed, NULL,
                     true, true);
-    o2sm_method_new("/arco/recplay/rec", "iB", arco_recplay_rec, NULL, true,
+    o2sm_method_new("/arco/recplay/record", "iB", arco_recplay_record, NULL, true,
                     true);
     o2sm_method_new("/arco/recplay/start", "if", arco_recplay_start, NULL,
                     true, true);

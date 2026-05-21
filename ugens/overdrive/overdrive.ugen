@@ -1,9 +1,9 @@
 # overdrive.ugen -- Overdrive Unit Generator
 #
-# Vivek Mohan
+# Vivek Mohan, Roger B. Dannenberg
 # November 2024
 
-overdrive(snd: 2a, gain: b, tone: b, volume: b): 2a
+overdrive(input: a, gain: b, tone: b, volume: b): a
 
 FAUST
 
@@ -12,12 +12,11 @@ declare description "Overdrive Unit Generator for Arco";
 
 import("stdfaust.lib");
 
-overdrive = _,_:>_:input_filter : clipping : post_filter * volume_control<:_,_
+overdrive = _:input_filter : clipping : post_filter * volume
 with{
     input_filter = fi.highpass(1, 720);
     clipping = ef.cubicnl(gain, 0);
-    post_filter = fi.lowpass(1, 350 + (tone * (4500 - 350)));
-    volume_control = ba.db2linear((volume - 1) * 40);
+    post_filter = fi.lowpass(1, tone);
 };
 
-process(left, right, gain, tone, volume) = left,right:overdrive;
+process(input, gain, tone, volume) = input:overdrive;
