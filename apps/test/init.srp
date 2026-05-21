@@ -312,6 +312,9 @@ def arco_ready():
     Button(win, "All Fast", 'S', 'D', 'S', 'S', 'afbutton')
     afbutton.add_callback('allfast_test', 'x')
 
+    Checkbox(win, "Overdrive Test", 'S', 'D', WIDTH, 'S', 'overdrivecheckbox')
+    overdrivecheckbox.add_target_method(nil, 'overdrivetest')
+
     ui_initialized = true
     default_window.fit_to_children()
 

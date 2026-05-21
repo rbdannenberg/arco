@@ -1,0 +1,33 @@
+# monodistortion.ugen -- Overdrive Unit Generator
+#
+# Vivek Mohan
+# November 2024
+
+#Parameters
+
+#snd: N-channel input signal.
+#gain: Controls the intensity of distortion applied to the signal (Range: 0 to 1).
+#tone: Adjusts the post-filter low-pass cutoff frequency.
+#volume: Controls the output gain.
+
+monodistortion(snd: a, gain: b, tone: b, volume: b): a
+
+FAUST
+
+declare name "monodistortion";
+declare description "Overdrive Unit Generator for Arco";
+
+import("stdfaust.lib");
+
+monodistortion = _: input_filter : clipping : post_filter * volume
+
+with {
+    
+    input_filter = fi.highpass(1, 720); 
+
+    clipping = ef.cubicnl(gain, 0);
+
+    post_filter = fi.lowpass(1, tone);
+};
+
+process(audio, gain, tone, volume) = audio:monodistortion;

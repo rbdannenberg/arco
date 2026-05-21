@@ -1,508 +1,5 @@
-
-# ---- included from /Users/rbd/arco/serpent/srp/mathugen.srp ----
-
-# mathugen.srp - constructor implementation for mult, add, ugen_div, ugen_max,
-#           ugen_min, ugen_clip, ugen_less, ugen_greater, ugen_soft_clip.
-#           For completeness, you can create a Math as well with ugen_math.
-
-MATH_OP_MUL = 0
-MATH_OP_ADD = 1
-MATH_OP_SUB = 2
-MATH_OP_DIV = 3
-MATH_OP_MAX = 4
-MATH_OP_MIN = 5
-MATH_OP_CLP = 6  // min(max(x, -y), y) i.e. clip if |x| > y
-MATH_OP_POW = 7
-MATH_OP_LT = 8
-MATH_OP_GT = 9
-MATH_OP_SCP = 10
-MATH_OP_PWI = 11
-MATH_OP_RND = 12
-MATH_OP_SH = 13
-MATH_OP_QNT = 14
-MATH_OP_RLI = 15
-MATH_OP_HZDIFF = 16
-
-class Math (Ugen):
-    def init(op, x1, x2, optional chans):
-        if not chans:
-            chans = max_chans(max_chans(1, x1), x2)
-        super.init(create_ugen_id(), "math", chans, 'a', "iUU",
-                   'op', op, "f", 'x1', x1, "abc", 'x2', x2, "abc")
-
-    def rliset(x):
-    # randomize initial values (only for op == MATH_OP_RLI)
-        o2_send_cmd("/arco/math/rliset", 0, "Uf", id, x)
-
-
-class Mathb (Ugen):
-    # NOTE: initialization may fail if x1 or x2 are incompatible
-    # An object is created and returned but its id will be nil
-    def init(op, x1, x2, optional chans):
-        if not chans:
-            chans = chans or max_chans(max_chans(1, x1), x2)
-        super.init(create_ugen_id(), "mathb", chans, 'b', "iUU",
-                   'op', op, "f", 'x1', x1, "bc", 'x2', x2, "bc")
-
-    def rliset(x):
-        o2_send_cmd("/arco/mathb/rliset", 0, "Uf", id, x)
-
-
-def mult(x1, x2, optional chans, keyword x2_init):
-    if x2_init:
-        if not chans:
-            chans = max_chans(max_chans(1, x1), x2)
-        Ugen(create_ugen_id(), "multx", chans, 'a', "UUf", 'x1', x1, 'x2', x2,
-             'init', x2_init)
-    else:
-        Math(MATH_OP_MUL, x1, x2, chans)
-
-
-def multb(x1, x2, optional chans):
-    Mathb(MATH_OP_MUL, x1, x2, chans)
-
-
-def add(x1, x2, optional chans):
-    Math(MATH_OP_ADD, x1, x2, chans)
-def addb(x1, x2, optional chans):
-    Mathb(MATH_OP_ADD, x1, x2, chans)
-
-def sub(x1, x2, optional chans):
-    Math(MATH_OP_SUB, x1, x2, chans)
-def subb(x1, x2, optional chans):
-    Mathb(MATH_OP_SUB, x1, x2, chans)
-
-def ugen_div(x1, x2, optional chans):
-    Math(MATH_OP_DIV, x1, x2, chans)
-def ugen_divb(x1, x2, optional chans):
-    Mathb(MATH_OP_DIV, x1, x2, chans)
-
-def ugen_max(x1, x2, optional chans):
-    Math(MATH_OP_MAX, x1, x2, chans)
-def ugen_maxb(x1, x2, optional chans):
-    Mathb(MATH_OP_MAX, x1, x2, chans)
-
-def ugen_min(x1, x2, optional chans):
-    Math(MATH_OP_MIN, x1, x2, chans)
-def ugen_minb(x1, x2, optional chans):
-    Mathb(MATH_OP_MIN, x1, x2, chans)
-
-def ugen_clip(x1, x2, optional chans):
-    Math(MATH_OP_CLP, x1, x2, chans)
-def ugen_clipb(x1, x2, optional chans):
-    Mathb(MATH_OP_CLP, x1, x2, chans)
-
-def ugen_pow(x1, x2, optional chans):
-    Math(MATH_OP_POW, x1, x2, chans)
-def ugen_powb(x1, x2, optional chans):
-    Mathb(MATH_OP_POW, x1, x2, chans)
-
-def ugen_less(x1, x2, optional chans):
-    Math(MATH_OP_LT, x1, x2, chans)
-def ugen_lessb(x1, x2, optional chans):
-    Mathb(MATH_OP_LT, x1, x2, chans)
-
-def ugen_greater(x1, x2, optional chans):
-    Math(MATH_OP_GT, x1, x2, chans)
-def ugen_greaterb(x1, x2, optional chans):
-    Mathb(MATH_OP_GT, x1, x2, chans)
-
-def ugen_soft_clip(x1, x2, optional chans):
-    Math(MATH_OP_SCP, x1, x2, chans)
-def ugen_soft_clipb(x1, x2, optional chans):
-    Mathb(MATH_OP_SCP, x1, x2, chans)
-
-def ugen_powi(x1, x2, optional chans):
-    Math(MATH_OP_PWI, x1, x2, chans)
-def ugen_powib(x1, x2, optional chans):
-    Mathb(MATH_OP_PWI, x1, x2, chans)
-
-def ugen_rand(x1, x2, optional chans):
-    Math(MATH_OP_RND, x1, x2, chans)
-def ugen_randb(x1, x2, optional chans):
-    Mathb(MATH_OP_RND, x1, x2, chans)
-
-def sample_hold(x1, x2, optional chans):
-    Math(MATH_OP_SH, x1, x2, chans)
-def sample_holdb(x1, x2, optional chans):
-    Mathb(MATH_OP_SH, x1, x2, chans)
-
-def ugen_quantize(x1, x2, optional chans):
-    Math(MATH_OP_QNT, x1, x2, chans)
-def ugen_quantizeb(x1, x2, optional chans):
-    Mathb(MATH_OP_QNT, x1, x2, chans)
-
-def ugen_rli(x1, x2, optional chans):
-    Math(MATH_OP_RLI, x1, x2, chans)
-def ugen_rlib(x1, x2, optional chans):
-    Mathb(MATH_OP_RLI, x1, x2, chans)
-
-def ugen_hzdiff(x1, x2, optional chans):
-    Math(MATH_OP_HZDIFF, x1, x2, chans)
-def ugen_hzdiffb(x1, x2, optional chans):
-    Mathb(MATH_OP_HZDIFF, x1, x2, chans)
-
-def ugen_tan(x1, x2, optional chans):
-    Math(MATH_OP_TAN, x1, x2, chans)
-def ugen_tanb(x1, x2, optional chans):
-    Mathb(MATH_OP_TAN, x1, x2, chans)
-
-def ugen_atan2(x1, x2, optional chans):
-    Math(MATH_OP_ATAN2, x1, x2, chans)
-def ugen_atan2b(x1, x2, optional chans):
-    Mathb(MATH_OP_ATAN2, x1, x2, chans)
-
-def ugen_sin(x1, x2, optional chans):
-    Math(MATH_OP_SIN, x1, x2, chans)
-def ugen_sinb(x1, x2, optional chans):
-    Mathb(MATH_OP_SIN, x1, x2, chans)
-
-def ugen_cos(x1, x2, optional chans):
-    Math(MATH_OP_COS, x1, x2, chans)
-def ugen_cosb(x1, x2, optional chans):
-    Mathb(MATH_OP_COS, x1, x2, chans)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/unaryugen.srp ----
-
-# unaryugen.srp - constructor implementation for abs, neg, exp, log,
-#     log10, log2, sqrt, step_to_hz, hz_to_step, vel_to_lin, lin_to_vel.
-#     For completeness, you can create a Unary as well with ugen_unary.
-
-UNARY_OP_ABS = 0
-UNARY_OP_NEG = 1
-UNARY_OP_EXP = 2
-UNARY_OP_LOG = 3
-UNARY_OP_LOG10 = 4
-UNARY_OP_LOG2 = 5
-UNARY_OP_SQRT = 6
-UNARY_OP_STEP_TO_HZ = 7
-UNARY_OP_HZ_TO_STEP = 8
-UNARY_OP_VEL_TO_LINEAR = 9
-UNARY_OP_LINEAR_TO_VEL = 10
-UNARY_OP_DB_TO_LINEAR = 11
-UNARY_OP_LINEAR_TO_DB = 12
-
-def unary(op, x1, optional chans):
-    if not chans:
-        chans = max_chans(1, x1)
-    Ugen(create_ugen_id(), "unary", chans, 'a', "iU",
-         'op', op, 'x1', x1)
-
-
-def unaryb(op, x1, optional chans):
-    if not isnumber(x1) and x1.rate != 'b':
-        display "ERROR: 'x1' input to Ugen 'mathb' must be block rate", op
-        return nil
-    if not chans:
-        chans = max_chans(1, x1)
-    Ugen(create_ugen_id(), "unaryb", chans, 'b', "iU",
-         'op', op, 'x1', x1)
-
-
-def ugen_abs(x1, optional chans):
-    unary(UNARY_OP_ABS, x1, chans)
-def ugen_absb(x1, optional chans):
-    unaryb(UNARY_OP_ABS, x1, chans)
-
-def ugen_neg(x1, optional chans):
-    unary(UNARY_OP_NEG, x1, chans)
-def ugen_negb(x1, optional chans):
-    unaryb(UNARY_OP_NEG, x1, chans)
-
-def ugen_exp(x1, optional chans):
-    unary(UNARY_OP_EXP, x1, chans)
-def ugen_expb(x1, optional chans):
-    unaryb(UNARY_OP_EXP, x1, chans)
-
-def ugen_log(x1, optional chans):
-    unary(UNARY_OP_LOG, x1, chans)
-def ugen_logb(x1, optional chans):
-    unaryb(UNARY_OP_LOG, x1, chans)
-
-def ugen_log10(x1, optional chans):
-    unary(UNARY_OP_LOG10, x1, chans)
-def ugen_log10b(x1, optional chans):
-    unaryb(UNARY_OP_LOG10, x1, chans)
-
-def ugen_log2(x1, optional chans):
-    unary(UNARY_OP_LOG2, x1, chans)
-def ugen_log2b(x1, optional chans):
-    unaryb(UNARY_OP_LOG2, x1, chans)
-
-def ugen_sqrt(x1, optional chans):
-    unary(UNARY_OP_SQRT, x1, chans)
-def ugen_sqrtb(x1, optional chans):
-    unaryb(UNARY_OP_SQRT, x1, chans)
-
-def ugen_step_to_hz(x1, optional chans):
-    unary(UNARY_OP_STEP_TO_HZ, x1, chans)
-def ugen_step_to_hzb(x1, optional chans):
-    unaryb(UNARY_OP_STEP_TO_HZ, x1, chans)
-
-def ugen_hz_to_step(x1, optional chans):
-    unary(UNARY_OP_HZ_TO_STEP, x1, chans)
-def ugen_hz_to_stepb(x1, optional chans):
-    unaryb(UNARY_OP_HZ_TO_STEP, x1, chans)
-
-def ugen_vel_to_linear(x1, optional chans):
-    unary(UNARY_OP_VEL_TO_LINEAR, x1, chans)
-def ugen_vel_to_linearb(x1, optional chans):
-    unaryb(UNARY_OP_VEL_TO_LINEAR, x1, chans)
-
-def ugen_linear_to_vel(x1, optional chans):
-    unary(UNARY_OP_LINEAR_TO_VEL, x1, chans)
-def ugen_linear_to_velb(x1, optional chans):
-    unaryb(UNARY_OP_LINEAR_TO_VEL, x1, chans)
-
-def ugen_db_to_linear(x1, optional chans):
-    unary(UNARY_OP_DB_TO_LINEAR, x1, chans)
-def ugen_db_to_linearb(x1, optional chans):
-    unaryb(UNARY_OP_DB_TO_LINEAR, x1, chans)
-
-def ugen_linear_to_db(x1, optional chans):
-    unary(UNARY_OP_LINEAR_TO_DB, x1, chans)
-def ugen_linear_to_dbb(x1, optional chans):
-    unaryb(UNARY_OP_LINEAR_TO_DB, x1, chans)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/thru.srp ----
-
-# thru.srp -- audio pass-through
-#
-# Roger B. Dannenberg
-# May 2023
-
-class Thru (Ugen):
-
-    def init(input, optional chans = 1, id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Thru", chans, 'a', "U", 'input', input, "a")
-
-    def set_alternate(alt):
-        o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
-        this
-
-def thru(input, optional chans = 1):
-    Thru(input, chans)
-
-
-def fanout(input, chans)
-# When thru is used for fanout, the preferred constructor is "fanout",
-# which requires the number of channels you are expanding to. You should
-# only use this if input is mono.
-    Thru(input, chans)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/zero.srp ----
-
-# zero.srp -- audio zero
-#
-# Roger B. Dannenberg
-# May 2023
-
-class Zero (Ugen):
-
-    def init(optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Zero", 1, 'a', "", omit_chans = true)
-
-
-# DO NOT DEFINE zero() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN zero_ugen
-# def zero(): purposefully not defined here!
-
-
-class Zerob (Ugen)
-
-    def init(optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
-                   "Zerob", 1, 'b', "", omit_chans = true)
-
-# DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen
-# def zerob(): purposefully not defined here!
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/fader.srp ----
-
-# fader.srp - constructor implementation
-#
-# Roger B. Dannenberg
-# Nov 2023
-
-# Support for fade_in: In the simple case, where we faded in ugen,
-# we could just swap in the ugen and swap out the fader using a
-# scheduled call. But what if the user says to fade() before the
-# fade_in() is complete? What we need to do is cancel the pending
-# end-of-fade-in, and use the fader to fade to zero. We'll use a
-# dictionary for keeping track of everything fading in, mapping
-# the ugen being faded in to the fader. Either fade_in_complete
-# will remove the fader, or fade() will remove the fader from
-# the dictionary.
-
-// print "INCLUDING fader.srp"
-
-fade_in_lookup = {}  // maps ugen to its fader
-
-
-def fader(input, current, optional dur, goal, chans, keyword mode = nil):
-# Create a Fader, with optional intialization. Example:
-#     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
-#     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
-    var fader = Fader(input, current, chans, mode = mode)
-    if dur:
-        fader.set_dur(dur)
-    if goal:
-        fader.set_goal(goal)
-    fader
-
-
-class Fader (Ugen):
-    var mode
-
-    def init(input, current, chans, keyword mode = nil):
-        this.mode = mode
-        if not chans:
-            chans = max_chans(1, input)
-        super.init(create_ugen_id(), "fader", chans, 'a', "Uf",
-                   'input', input, "a", 'current', current, "f")
-
-
-    def set_current(current, optional chan):
-        if chan:
-            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, chan, current)
-        for i = 0 to chans:
-            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, i,
-                        current if isnumber(current) else current[i])
-        this
-
-
-    def set_dur(dur):
-        o2_send_cmd("/arco/fader/dur", 0, "Uf", id, dur)
-        this
-
-
-    def set_mode(mode_):
-        mode = mode_
-        o2_send_cmd("/arco/fader/mode", 0, "Ui", id, mode_)
-        this
-
-
-    def set_goal(goal, optional chan):
-        if chan:
-            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, chan, goal)
-        else:
-            for i = 0 to chans:
-                o2_send_cmd("/arco/fader/goal", 0, "Uif", id, i,
-                            goal if isnumber(goal) else goal[i])
-        this
-
-
-    def set(x, optional chan):
-        set_goal(x, chan)
-        set_mode(mode or FADE_SMOOTH)  // use SMOOTH if not set
-
-
-    def fade_in_complete(ugen):
-        var fader = fade_in_lookup.get(ugen)
-        if fader:  // fade in was not cancelled, so end it now
-            output_ugen.swap(this, ugen)  // remove fader from ugen
-            fade_in_lookup.remove(ugen)
-        // otherwise, fade_in was cancelled by a fade()
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/sum.srp ----
-
-# sum.srp -- sum and sumb unit generators
-#
-# Roger B. Dannenberg
-# June 2023
-
-class Sum(Ugen):
-    def init(chans, wrap, optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
-                   "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0, "f")
-        register_action(this, ACTION_REM, this, 'action_rem')
-
-    def action_rem(status, uid, parameters):
-        // find input with uid if any -- similar to mix but inputs
-        // directly map to ugens:
-        display "Sum.action_rem", status, uid, parameters
-        for ugen in inputs.values():
-            if arco_ugen_id(ugen.id) == uid:
-                inputs.remove(uid)
-
-    def ins(rest ugens):
-        for ugen in ugens:
-            // for sum, use integer Arco id as input name in dictionary:
-            inputs[arco_ugen_id(ugen.id)] = ugen
-            o2_send_cmd("/arco/sum/ins", 0, "UU", id, ugen.id)
-        this
-
-    def rem(rest ugens):
-        for ugen in ugens:
-            var name = arco_ugen_id(ugen.id)
-            if inputs.has_key(name):
-                inputs.remove(name)
-                o2_send_cmd("/arco/sum/rem", 0, "UU", id, ugen.id)
-        this
-
-    def swap(ugen, replacement):
-        var name = arco_ugen_id(ugen.id)
-        if inputs.has_key(name):
-            // locally, act as if ugen is removed and replacement is inserted
-            inputs.remove(name)
-            inputs[arco_ugen_id(replacement.id)] = replacement
-            o2_send_cmd("/arco/sum/swap", 0, "UUU", id, ugen.id, replacement.id)
-        this
-
-
-def sum(optional chans = 1, keyword wrap = true): Sum(chans, wrap)
-
-
-class Sumb(Ugen):
-    def init(chans, wrap, optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
-                   "Sumb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
-        register_action(this, ACTION_REM, this, 'action_rem')
-
-    def action_rem(status, uid, parameters):
-        // find input with uid if any -- similar to mix but inputs
-        // directly map to ugens:
-        display "Sum.action_rem", status, uid, parameters
-        for ugen in inputs.values():
-            if arco_ugen_id(ugen.id) == uid:
-                inputs.remove(uid)
-
-    def ins(rest ugens):
-        for ugen in ugens:
-            inputs[arco_ugen_id(ugen.id)] = ugen
-            o2_send_cmd("/arco/sumb/ins", 0, "UU", id, ugen.id)
-        this
-
-    def rem(rest ugens):
-        for ugen in ugens:
-            var name = arco_ugen_id(ugen.id)
-            if inputs.has_key(name):
-                inputs.remove(name)
-                o2_send_cmd("/arco/sumb/rem", 0, "UU", id, ugen.id)
-        this
-
-    def swap(ugen, replacement):
-        var name = arco_ugen_id(ugen.id)
-        if inputs.has_key(name):
-            // locally, act as if ugen is removed and replacement is inserted
-            inputs.remove(name)
-            inputs[arco_ugen_id(replacement.id)] = replacement
-            o2_send_cmd("/arco/sumb/swap", 0, "UUU",
-                        id, ugen.id, replacement.id)
-        this
-
-
-def sumb(optional chans = 1, keyword wrap = true): Sumb(chans, wrap)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/vu.srp ----
-
+ 
+ 
 # vu.srp -- record and play audio in memory
 #
 # Roger B. Dannenberg
@@ -528,10 +25,9 @@ class Vu (Ugen):
         // display "Vu set", id, value.id
         o2_send_cmd("/arco/vu/repl_input", 0, "UU", id, value.id)
         this
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/probe.srp ----
-
+ 
+ 
+ 
 # probe.srp -- stream audio from file
 #
 # Roger B. Dannenberg
@@ -570,10 +66,9 @@ class Probe (Ugen):
             running = false
         this
         
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/pwl.srp ----
-
+ 
+ 
+ 
 # pwl.srp -- piece-wise linear envelope
 #
 # Roger B. Dannenberg
@@ -595,10 +90,9 @@ class Pwlb (Envelope):
 
 def pwlb(keyword init, start = true, rest points):
     envelope(Pwlb(points), init, start)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/pwe.srp ----
-
+ 
+ 
+ 
 # pwe.srp -- piece-wise exponential envelope
 #
 # Roger B. Dannenberg
@@ -620,10 +114,9 @@ class Pweb (Envelope):
 
 def pweb(keyword init, start = true, lin = false, rest points):
     envelope(Pweb(points), init, start, lin)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/mix.srp ----
-
+ 
+ 
+ 
 # mix.srp -- audio mixer
 #
 # Roger B. Dannenberg
@@ -777,10 +270,9 @@ def mix_name(i):
 # handy function to convert index into a symbol to name an input when
 # inputs are originally created in a loop or come from an array
     intern("in" + str(i))
-
-
-# ---- included from /Users/rbd/arco/ugens/sine/sine.srp ----
-
+ 
+ 
+ 
 # sine.srp - constructor implementation
 #
 # (machine generated by u2f.py)
@@ -794,13 +286,179 @@ def sine(freq, amp, optional chans):
 def sineb(freq, amp, optional chans):
     if not chans:
         chans = max_chans(max_chans(1, freq), amp)
-    Ugen(create_ugen_id(), "sineb", chans, 'b', "UU", 'freq', freq, "bc",
-         'amp', amp, "bc")
+    Ugen(create_ugen_id(), "sineb", chans, 'b', "UU", 'freq', freq, 'amp', amp)
+
+ 
+ 
+ 
+# mathugen.srp - constructor implementation for mult, add, ugen_div, ugen_max,
+#           ugen_min, ugen_clip, ugen_less, ugen_greater, ugen_soft_clip.
+#           For completeness, you can create a Math as well with ugen_math.
+
+MATH_OP_MUL = 0
+MATH_OP_ADD = 1
+MATH_OP_SUB = 2
+MATH_OP_DIV = 3
+MATH_OP_MAX = 4
+MATH_OP_MIN = 5
+MATH_OP_CLP = 6  // min(max(x, -y), y) i.e. clip if |x| > y
+MATH_OP_POW = 7
+MATH_OP_LT = 8
+MATH_OP_GT = 9
+MATH_OP_SCP = 10
+MATH_OP_PWI = 11
+MATH_OP_RND = 12
+MATH_OP_SH = 13
+MATH_OP_QNT = 14
+MATH_OP_RLI = 15
+MATH_OP_HZDIFF = 16
+
+class Math (Ugen):
+    def init(op, x1, x2, optional chans):
+        if not chans:
+            chans = max_chans(max_chans(1, x1), x2)
+        super.init(create_ugen_id(), "math", chans, 'a', "iUU",
+                   'op', op, 'x1', x1, 'x2', x2)
+    def rliset(x):
+    # randomize initial values (only for op == MATH_OP_RLI)
+        o2_send_cmd("/arco/math/rliset", 0, "Uf", id, x)
 
 
+class Mathb (Ugen):
+    # NOTE: initialization may fail if x1 or x2 are incompatible
+    # An object is created and returned but its id will be nil
+    def init(op, x1, x2, optional chans):
+        if not isnumber(x1) and x1.rate == 'a':
+            display "ERROR: 'x1' input to Ugen 'mathb' must be block rate",
+            display op, x1
+        elif not isnumber(x2) and x2.rate == 'a':
+            display "ERROR: 'x2' input to Ugen 'mathb' must be block rate",
+            display op, x2
+        else:
+            chans = chans or max_chans(max_chans(1, x1), x2)
+            super.init(create_ugen_id(), "mathb", chans, 'b', "iUU",
+                       'op', op, 'x1', x1, 'x2', x2)
 
-# ---- included from /Users/rbd/arco/ugens/reson/reson.srp ----
+    def rliset(x):
+        o2_send_cmd("/arco/mathb/rliset", 0, "Uf", id, x)
 
+
+def mult(x1, x2, optional chans, keyword x2_init):
+    if x2_init:
+        if not chans:
+            chans = max_chans(max_chans(1, x1), x2)
+        Ugen(create_ugen_id(), "multx", chans, 'a', "UUf", 'x1', x1, 'x2', x2,
+             'init', x2_init)
+    else:
+        Math(MATH_OP_MUL, x1, x2, chans)
+
+
+def multb(x1, x2, optional chans):
+    Mathb(MATH_OP_MUL, x1, x2, chans)
+
+
+def add(x1, x2, optional chans):
+    Math(MATH_OP_ADD, x1, x2, chans)
+def addb(x1, x2, optional chans):
+    Mathb(MATH_OP_ADD, x1, x2, chans)
+
+def sub(x1, x2, optional chans):
+    Math(MATH_OP_SUB, x1, x2, chans)
+def subb(x1, x2, optional chans):
+    Mathb(MATH_OP_SUB, x1, x2, chans)
+
+def ugen_div(x1, x2, optional chans):
+    Math(MATH_OP_DIV, x1, x2, chans)
+def ugen_divb(x1, x2, optional chans):
+    Mathb(MATH_OP_DIV, x1, x2, chans)
+
+def ugen_max(x1, x2, optional chans):
+    Math(MATH_OP_MAX, x1, x2, chans)
+def ugen_maxb(x1, x2, optional chans):
+    Mathb(MATH_OP_MAX, x1, x2, chans)
+
+def ugen_min(x1, x2, optional chans):
+    Math(MATH_OP_MIN, x1, x2, chans)
+def ugen_minb(x1, x2, optional chans):
+    Mathb(MATH_OP_MIN, x1, x2, chans)
+
+def ugen_clip(x1, x2, optional chans):
+    Math(MATH_OP_CLP, x1, x2, chans)
+def ugen_clipb(x1, x2, optional chans):
+    Mathb(MATH_OP_CLP, x1, x2, chans)
+
+def ugen_pow(x1, x2, optional chans):
+    Math(MATH_OP_POW, x1, x2, chans)
+def ugen_powb(x1, x2, optional chans):
+    Mathb(MATH_OP_POW, x1, x2, chans)
+
+def ugen_less(x1, x2, optional chans):
+    Math(MATH_OP_LT, x1, x2, chans)
+def ugen_lessb(x1, x2, optional chans):
+    Mathb(MATH_OP_LT, x1, x2, chans)
+
+def ugen_greater(x1, x2, optional chans):
+    Math(MATH_OP_GT, x1, x2, chans)
+def ugen_greaterb(x1, x2, optional chans):
+    Mathb(MATH_OP_GT, x1, x2, chans)
+
+def ugen_soft_clip(x1, x2, optional chans):
+    Math(MATH_OP_SCP, x1, x2, chans)
+def ugen_soft_clipb(x1, x2, optional chans):
+    Mathb(MATH_OP_SCP, x1, x2, chans)
+
+def ugen_powi(x1, x2, optional chans):
+    Math(MATH_OP_PWI, x1, x2, chans)
+def ugen_powib(x1, x2, optional chans):
+    Mathb(MATH_OP_PWI, x1, x2, chans)
+
+def ugen_rand(x1, x2, optional chans):
+    Math(MATH_OP_RND, x1, x2, chans)
+def ugen_randb(x1, x2, optional chans):
+    Mathb(MATH_OP_RND, x1, x2, chans)
+
+def sample_hold(x1, x2, optional chans):
+    Math(MATH_OP_SH, x1, x2, chans)
+def sample_holdb(x1, x2, optional chans):
+    Mathb(MATH_OP_SH, x1, x2, chans)
+
+def ugen_quantize(x1, x2, optional chans):
+    Math(MATH_OP_QNT, x1, x2, chans)
+def ugen_quantizeb(x1, x2, optional chans):
+    Mathb(MATH_OP_QNT, x1, x2, chans)
+
+def ugen_rli(x1, x2, optional chans):
+    Math(MATH_OP_RLI, x1, x2, chans)
+def ugen_rlib(x1, x2, optional chans):
+    Mathb(MATH_OP_RLI, x1, x2, chans)
+
+def ugen_hzdiff(x1, x2, optional chans):
+    Math(MATH_OP_HZDIFF, x1, x2, chans)
+def ugen_hzdiffb(x1, x2, optional chans):
+    Mathb(MATH_OP_HZDIFF, x1, x2, chans)
+
+def ugen_tan(x1, x2, optional chans):
+    Math(MATH_OP_TAN, x1, x2, chans)
+def ugen_tanb(x1, x2, optional chans):
+    Mathb(MATH_OP_TAN, x1, x2, chans)
+
+def ugen_atan2(x1, x2, optional chans):
+    Math(MATH_OP_ATAN2, x1, x2, chans)
+def ugen_atan2b(x1, x2, optional chans):
+    Mathb(MATH_OP_ATAN2, x1, x2, chans)
+
+def ugen_sin(x1, x2, optional chans):
+    Math(MATH_OP_SIN, x1, x2, chans)
+def ugen_sinb(x1, x2, optional chans):
+    Mathb(MATH_OP_SIN, x1, x2, chans)
+
+def ugen_cos(x1, x2, optional chans):
+    Math(MATH_OP_COS, x1, x2, chans)
+def ugen_cosb(x1, x2, optional chans):
+    Mathb(MATH_OP_COS, x1, x2, chans)
+ 
+ 
+ 
 # reson.srp - constructor implementation
 #
 # (machine generated by u2f.py)
@@ -817,10 +475,9 @@ def resonb(input, center, q, optional chans):
     Ugen(create_ugen_id(), "resonb", chans, 'b', "UUU", 'input', input, "bc",
          'center', center, "bc", 'q', q, "bc")
 
-
-
-# ---- included from /Users/rbd/arco/ugens/lowpass/lowpass.srp ----
-
+ 
+ 
+ 
 # lowpass.srp - constructor implementation
 #
 # (machine generated by u2f.py)
@@ -837,10 +494,9 @@ def lowpassb(input, cutoff, optional chans):
     Ugen(create_ugen_id(), "lowpassb", chans, 'b', "UU", 'input', input, "bc",
          'cutoff', cutoff, "bc")
 
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/fileplay.srp ----
-
+ 
+ 
+ 
 # fileplay.srp -- stream audio from file
 #
 # Roger B. Dannenberg
@@ -868,10 +524,9 @@ class Fileplay (Ugen):
     def stop():
         go(false)
         this
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/filerec.srp ----
-
+ 
+ 
+ 
 # filerec.srp -- stream audio from file
 #
 # Roger B. Dannenberg
@@ -895,10 +550,9 @@ class Filerec (Ugen):
     def stop():
         go(false)
         this
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/recplay.srp ----
-
+ 
+ 
+ 
 # recplay.srp -- record and play audio in memory
 #
 # Roger B. Dannenberg
@@ -936,10 +590,9 @@ class Recplay (Ugen):
     def borrow(u):
         o2_send_cmd("/arco/recplay/borrow", 0, "UU", id, u.id)
         this
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/delay.srp ----
-
+ 
+ 
+ 
 # delay.srp -- feedback delay unit generator
 #
 # Roger B. Dannenberg
@@ -970,10 +623,9 @@ def delayvi(input, delay, maxdelay, optional chans):
     Ugen(create_ugen_id(), "delayvi", chans, 'a', "UUf", 'input', input, "a",
          'delay', delay, "abc", 'maxdelay', maxdelay, "f")
 
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/allpass.srp ----
-
+ 
+ 
+ 
 # allpass.srp -- feedback all-pass filter unit generator
 #
 # Roger B. Dannenberg
@@ -990,10 +642,9 @@ def allpass(input, dur, fb, maxdur, optional chans = 1):
     Allpass(chans, input, dur, fb, maxdur)  # allpass as a function
 
 
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/olapitchshift.srp ----
-
+ 
+ 
+ 
 # olapitchshift.srp -- overlap add pitch shift unit generator
 #
 # Roger B. Dannenberg
@@ -1010,12 +661,11 @@ class Olapitchshift (Ugen):
         this
         
 
-def olapitchshift(input, ratio, xfade, windur, optional chans = 1):
-    Olapitchshift(chans, input, ratio, xfade, windur)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/feedback.srp ----
-
+def ola_pitch_shift(input, ratio, xfade, windur, optional chans = 1):
+    Ola_pitch_shift(chans, input, ratio, xfade, windur)
+ 
+ 
+ 
 # feedback.srp -- mix input with most recent output of some Ugen
 #
 # Roger B. Dannenberg
@@ -1044,12 +694,11 @@ class Feedback (Ugen):
         set('gain', gain)
         
 
-def feedback(input, optional chans = 1):
-    Feedback(chans, input)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/granstream.srp ----
-
+def feedback(input, from, gain, optional chans = 1):
+    Feedback(chans, input, from, gain)
+ 
+ 
+ 
 # granstream.srp -- granular synthesis from input stream unit generator
 #
 # Roger B. Dannenberg
@@ -1106,10 +755,9 @@ def granstream(input, polyphony, dur, enable, optional chans = 1):
     Granstream(chans, input, polyphony, dur, enable)  # granstream as a function
 
 
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/flsyn.srp ----
-
+ 
+ 
+ 
 # flsyn.srp - fluid synth interface
 #
 # Roger B. Dannenberg
@@ -1160,10 +808,9 @@ class Flsyn (Ugen):
 
 
 def flsyn(path): Flsyn(path)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/pv.srp ----
-
+ 
+ 
+ 
 # pv.srp -- overlap add pitch shift unit generator
 #
 # Roger B. Dannenberg
@@ -1187,10 +834,9 @@ class Pv(Ugen):
 
 def pv(input, ratio, fftsize, hopsize, points, mode, optional chans = 1):
     Pv(chans, input, ratio, fftsize, hopsize, points, mode)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/yin.srp ----
-
+ 
+ 
+ 
 # yin.srp -- yin pitch estimation unit generator
 #
 # Roger B. Dannenberg
@@ -1206,10 +852,9 @@ class Yin(Ugen):
 
 def yin(input, minstep, maxstep, hopsize, address, optional chans = 1):
     Yin(chans, input, minstep, maxstep, hopsize, address)  # yin as a function
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/trig.srp ----
-
+ 
+ 
+ 
 # trig.srp -- sound event detection
 #
 # Roger B. Dannenberg
@@ -1242,10 +887,9 @@ class Trig(Ugen):
 
 def trig(input, reply_addr, window, threshold, pause):
     Trig(input, reply_addr, window, threshold, pause)  # trig as a function
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/route.srp ----
-
+ 
+ 
+ 
 # route.srp -- route input channels to output channels
 #
 # Roger B. Dannenberg
@@ -1280,12 +924,11 @@ class Route (Ugen):
 
 def route(chans):
     return Route(chans)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/chorddetect.srp ----
-
-def chorddetect(input, reply_addr):
-    return Chorddetect(input, reply_addr)
+ 
+ 
+ 
+def chorddetect(reply_addr):
+    return Chorddetect(reply_addr)
 
 
 class Chorddetect (Ugen):
@@ -1297,10 +940,16 @@ class Chorddetect (Ugen):
         o2_send_cmd("/arco/chorddetect/start", 0, "Us", id, reply_addr)
         this
 
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "Chorddetect set", id, value.id
+        o2_send_cmd("/arco/chorddetect/repl_input", 0, "UU", id, value.id)
+        this
 
-
-# ---- included from /Users/rbd/arco/serpent/srp/onset.srp ----
-
+ 
+ 
+ 
 # trig.srp -- sound event detection
 #
 # Roger B. Dannenberg
@@ -1314,12 +963,11 @@ class Onset(Ugen):
 
 def onset(input, reply_addr):
     Onset(input, reply_addr)  # onset as a function
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/spectralcentroid.srp ----
-
-def spectralcentroid(input, reply_addr):
-    return SpectralCentroid(input, reply_addr)
+ 
+ 
+ 
+def spectralcentroid(reply_addr):
+    return SpectralCentroid(reply_addr)
 
 
 class SpectralCentroid (Ugen):
@@ -1332,11 +980,19 @@ class SpectralCentroid (Ugen):
         o2_send_cmd("/arco/spectralcentroid/start", 0, "Us", id, reply_addr)
         this
 
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "SpectralCentroid set", id, value.id
+        o2_send_cmd("/arco/spectralcentroid/repl_input", 0, "UU", id, value.id)
+        this
 
-# ---- included from /Users/rbd/arco/serpent/srp/spectralrolloff.srp ----
 
-def spectralrolloff(input, reply_addr, threshold):
-    return SpectralRolloff(input, reply_addr, threshold)
+ 
+ 
+ 
+def spectralrolloff(reply_addr, threshold):
+    return SpectralRolloff(reply_addr, threshold)
 
 
 class SpectralRolloff (Ugen):
@@ -1349,9 +1005,18 @@ class SpectralRolloff (Ugen):
         o2_send_cmd("/arco/spectralrolloff/start", 0, "Us", id, reply_addr)
         this
 
+    def set(input, value):  // patterned after Ugen.set()
+        // Note that the only thing you can set is 'input'
+        inputs['input'] = value
+        display "SpectralRolloff set", id, value.id
+        o2_send_cmd("/arco/spectralrolloff/repl_input", 0, "UU", id, value.id)
+        this
 
-# ---- included from /Users/rbd/arco/serpent/srp/o2audioio.srp ----
 
+
+ 
+ 
+ 
 # o2audioio.srp -- overlap add pitch shift unit generator
 #
 # Roger B. Dannenberg
@@ -1378,241 +1043,213 @@ def o2audioio(input, destaddr, destchans, recvchans, buffsize,
               sampletype, msgsize)
     O2audioio(input, destaddr, destchans, recvchans, buffsize,
               sampletype, msgsize)
-
-
-# ---- included from /Users/rbd/arco/ugens/sttest/sttest.srp ----
-
-# sttest.srp - constructor implementation
-#
-# (machine generated by u2f.py)
-
-def sttest(input, hz1, hz2):
-    if input.chans != 1 and input.chans != 2:
-        print "ERROR: 'input' input to Ugen 'sttest' must have 1 or 2 channels"
-        return nil
-    if not isnumber(hz1) and hz1.chans != 1:
-        print "ERROR: 'hz1' input to Ugen '{c}' must be single channel"
-        return nil
-    if not isnumber(hz2) and hz2.chans != 1:
-        print "ERROR: 'hz2' input to Ugen '{c}' must be single channel"
-        return nil
-
-    Ugen(create_ugen_id(), "sttest", 2, 'a', "Uff", omit_chans = true, 'input',
-         input, "a", 'hz1', hz1, "c", 'hz2', hz2, "c")
-
-
-
-# ---- included from /Users/rbd/arco/ugens/zitarev/zitarev.srp ----
-
+ 
+ 
+ 
 # zitarev.srp - constructor implementation
 #
 # (machine generated by u2f.py)
 
-def zitarev(input, wet, gain, rt60):
-    if input.chans != 1 and input.chans != 2:
-        print "ERROR: 'input' input to Ugen 'zitarev' must have 1 or 2 channels"
+def zitarev(snd, wetdry, gain, t60m):
+    if snd.rate != 'a':
+        print "ERROR: 'snd' input to Ugen 'zitarev' must be audio rate"
         return nil
-    if not isnumber(wet) and wet.chans != 1:
-        print "ERROR: 'wet' input to Ugen '{c}' must be single channel"
+    if not isnumber(wetdry) and wetdry.rate == 'a':
+        print "ERROR: 'wetdry' input to Ugen 'zitarev' must be block rate"
+        return nil
+    if not isnumber(gain) and gain.rate == 'a':
+        print "ERROR: 'gain' input to Ugen 'zitarev' must be block rate"
+        return nil
+    if not isnumber(t60m) and t60m.rate == 'a':
+        print "ERROR: 't60m' input to Ugen 'zitarev' must be block rate"
+        return nil
+    if snd.chans != 1 and snd.chans != 2:
+        print "ERROR: 'snd' input to Ugen 'zitarev' must have 1 or 2 channels"
+        return nil
+    if not isnumber(wetdry) and wetdry.chans != 1:
+        print "ERROR: 'wetdry' input to Ugen '{c}' must be single channel"
         return nil
     if not isnumber(gain) and gain.chans != 1:
         print "ERROR: 'gain' input to Ugen '{c}' must be single channel"
         return nil
-    if not isnumber(rt60) and rt60.chans != 1:
-        print "ERROR: 'rt60' input to Ugen '{c}' must be single channel"
+    if not isnumber(t60m) and t60m.chans != 1:
+        print "ERROR: 't60m' input to Ugen '{c}' must be single channel"
         return nil
 
-    Ugen(create_ugen_id(), "zitarev", 2, 'a', "UUUU", omit_chans = true,
-         'input', input, "a", 'wet', wet, "bc", 'gain', gain, "bc", 'rt60', rt60, "bc")
+    Ugen(create_ugen_id(), "zitarev", 2, 'a', "UUUU", omit_chans = true, 'snd',
+         snd, 'wetdry', wetdry, 'gain', gain, 't60m', t60m)
 
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/tableosc.srp ----
-
-# tableosc.srp -- table-lookup oscillator with frequency control
-#
-# Roger B. Dannenberg
-# Oct 2024
-
-class Wavetables (Ugen):
-    var address_prefix  // e.g. "/arco/tableosc/"
-
-    def init(freq, amp, phase, chans, classname, rate):
-        if not chans:
-            chans = max_chans(max_chans(1, freq), amp)
-        super.init(create_ugen_id(), classname, chans, rate,
-                   "UUf", 'freq', freq, "abc", 'amp', amp, "abc",
-                   'phase', phase, "f")
-        address_prefix = "/arco/" + tolower(classname) + "/"
-
-
-    def create_table(index, tlen, data, method_name):
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        o2_add_int32(index)
-        if tlen:  // omit length in case of time-domain data
-            o2_add_int32(tlen)
-        o2_add_vector(data, "f")
-        o2_send_finish(0, address_prefix + method_name, true)
-
-    def set_phase(chan, phase):
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        o2_add_int32(chan)
-        o2_add_float(phase)
-        o2_send_finish(0, address_prefix + "set_phase", true)
-
-    def create_tas(index, tlen, ampspec):
-    # table from amplitude spectrum
-        create_table(index, tlen, ampspec, "createtas")
-
-    def create_tcs(index, tlen, spec):
-    # table from complex spectrum (amplitude and phase pairs)
-        create_table(index, tlen, spec, "createtcs")
-
-    def create_ttd(index, samps):
-    # table from time-domain data (table length is len(samps))
-        create_table(index, nil, samps, "createttd")
-
-    def borrow(lender):
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        o2_add_int32(arco_ugen_id(lender.id))
-        o2_send_finish(0, address_prefix + "borrow", true)
-
-    def select(index):
-        o2_send_start()
-        o2_add_int32(arco_ugen_id(id))
-        o2_add_int32(index)
-        o2_send_finish(0, address_prefix + "sel", true)
-
-
-class Tableosc (Wavetables):
-    def init(freq, amp, phase, chans):
-        super.init(freq, amp, phase, chans, "Tableosc", A_RATE)
-    
-
-class Tableoscb (Wavetables):
-    def init(freq, amp, phase, chans):
-        super.init(freq, amp, phase, chans, "Tableoscb", B_RATE)
-
-
-def tableosc(freq, amp, optional chans, keyword phase):
-    var p = 0
-    if isnumber(phase):
-        p = phase
-    elif phase:
-        print "ERROR 'phase' input to Ugen 'tableosc' must be a number"
-    Tableosc(freq, amp, p, chans)
-
-
-def tableoscb(freq, amp, optional chans, keyword phase):
-    if not chans:
-        chans = max_chans(max_chans(1, freq), amp)
-    var p = 0
-    if isnumber(phase):
-        p = phase
-    elif phase:
-        print "ERROR 'phase' input to Ugen 'tableoscb' must be a number"
-    Tableoscb(freq, amp, p, chans)
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/blend.srp ----
-
-# blend.srp -- fade between two inputs
-#
-# Roger B. Dannenberg
-# June 2023
-
-BLEND_LINEAR = 0
-BLEND_POWER = 1
-BLEND_45 = 2
-
-class Blend (Ugen):
-    def init(chans, x1, x2, b, init_b, mode):
-        super.init(create_ugen_id(), "Blend", chans, 'a', "UUUfi",
-	           'x1', x1, "abc", 'x2', x2, "abc", 'b', b, "abc",
-                   'init_b', init_b, "f", 'mode', mode)
-
-    def set_gain(gain)
-        o2_send_cmd("/arco/blend/gain", 0, "Uf", id, gain)
-        this
-
-    def set_mode(mode)
-        o2_send_cmd("/arco/blend/mode", 0, "Ui", id, mode)
-        this
-
-
-def blend(x1, x2, b, optional chans, mode, keyword gain = 1, init_b = 0.5):
-    chans = chans or max_chans(max_chans(max_chans(1, x1), x2), b)
-    mode = mode or BLEND_POWER
-    var ugen = Blend(chans, x1, x2, b, init_b, mode)  # blend as a function
-    if gain != 1:  // default for Arco
-        ugen.set_gain(gain)
-    return ugen
-
-
-class Blendb (Ugen):
-    def init(chans, x1, x2, b, mode):
-        super.init(create_ugen_id(), "Blendb", chans, 'b', "UUUi",
-	           'x1', x1, "bc", 'x2', x2, "bc", 'b', b, "bc",
-                   'mode', mode, "f")
-
-    def set_gain(gain)
-        o2_send_cmd("/arco/blendb/gain", 0, "Uf", id, gain)
-        this
-
-    def set_mode(mode)
-        o2_send_cmd("/arco/blendb/mode", 0, "Ui", id, mode)
-        this
-
-
-def blendb(x1, x2, b, optional chans, mode, keyword gain = 1):
-    chans = chans or max_chans(max_chans(max_chans(1, x1), x2), b)
-    mode = mode or BLEND_POWER
-    var ugen = Blendb(chans, x1, x2, b, mode)  # blend as a function
-    if gain != 1:  // default for Arco
-        ugen.set_gain(gain)
-    return ugen
-
-
-
-# ---- included from /Users/rbd/arco/serpent/srp/stdistr.srp ----
-
-# stdistr.srp -- stereo distribution
-#
-# Roger B. Dannenberg
-# June 2023
-
-class Stdistr (Ugen):
-    def init(n, width):
-        super.init(create_ugen_id(), "Stdistr", 2, 'a', "if",
-	           'n', n, "f", 'width', width, "f", omit_chans = true)
-
-    def set_gain(gain)
-        o2_send_cmd("/arco/stdistr/gain", 0, "Uf", id, gain)
-        this
-
-    def set_width(width)
-        o2_send_cmd("/arco/stdistr/width", 0, "Uf", id, width)
-        this
-
-    def ins(index, ugen):
-        o2_send_cmd("/arco/stdistr/ins", 0, "UiU", id, index, ugen)
-        this
-        
-    def rem(index):
-        o2_send_cmd("/arco/stdistr/rem", 0, "Ui", id, index)
-        this
-        
-
-def stdistr(n, width):
-    Stdistr(n, width)  # stdistr as a function
-
-
-# ---- included from /Users/rbd/arco/ugens/overdrive/overdrive.srp ----
-
+ 
+ 
+ 
 # overdrive.srp - constructor implementation
+#
+# (machine generated by u2f.py)
+
+def overdrive(snd, gain, tone, volume):
+    if snd.rate != 'a':
+        print "ERROR: 'snd' input to Ugen 'overdrive' must be audio rate"
+        return nil
+    if not isnumber(gain) and gain.rate == 'a':
+        print "ERROR: 'gain' input to Ugen 'overdrive' must be block rate"
+        return nil
+    if not isnumber(tone) and tone.rate == 'a':
+        print "ERROR: 'tone' input to Ugen 'overdrive' must be block rate"
+        return nil
+    if not isnumber(volume) and volume.rate == 'a':
+        print "ERROR: 'volume' input to Ugen 'overdrive' must be block rate"
+        return nil
+    if snd.chans != 1 and snd.chans != 2:
+        print "ERROR: 'snd' input to Ugen 'overdrive' must have 1 or 2 channels"
+        return nil
+    if not isnumber(gain) and gain.chans != 1:
+        print "ERROR: 'gain' input to Ugen '{c}' must be single channel"
+        return nil
+    if not isnumber(tone) and tone.chans != 1:
+        print "ERROR: 'tone' input to Ugen '{c}' must be single channel"
+        return nil
+    if not isnumber(volume) and volume.chans != 1:
+        print "ERROR: 'volume' input to Ugen '{c}' must be single channel"
+        return nil
+
+    Ugen(create_ugen_id(), "overdrive", 2, 'a', "UUUU", omit_chans = true,
+         'snd', snd, 'gain', gain, 'tone', tone, 'volume', volume)
+
+ 
+ 
+ 
+# thru.srp -- audio pass-through
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Thru (Ugen):
+
+    def init(input, optional chans = 1, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Thru", chans, 'a', "U", 'input', input)
+
+    def set_alternate(alt):
+        o2_send_cmd("/arco/thru/alt", 0, "UU", id, alt.id)
+        this
+
+def thru(input, optional chans = 1):
+    Thru(input, chans)
+
+
+def fanout(input, chans)
+# When thru is used for fanout, the preferred constructor is "fanout",
+# which requires the number of channels you are expanding to. You should
+# only use this if input is mono.
+    Thru(input, chans)
+ 
+ 
+ 
+# zero.srp -- audio zero
+#
+# Roger B. Dannenberg
+# May 2023
+
+class Zero (Ugen):
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zero", 1, 'a', "", omit_chans = true)
+
+
+# DO NOT DEFINE zero() -- SEE arco.srp, WHICH DEFINES zero() TO RETURN zero_ugen
+# def zero(): purposefully not defined here!
+
+
+class Zerob (Ugen)
+
+    def init(optional id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+                   "Zerob", 1, 'b', "", omit_chans = true)
+
+# DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen
+# def zerob(): purposefully not defined here!
+ 
+ 
+ 
+# fader.srp - constructor implementation
+#
+# Roger B. Dannenberg
+# Nov 2023
+
+# Support for fade_in: In the simple case, where we faded in ugen,
+# we could just swap in the ugen and swap out the fader using a
+# scheduled call. But what if the user says to fade() before the
+# fade_in() is complete? What we need to do is cancel the pending
+# end-of-fade-in, and use the fader to fade to zero. We'll use a
+# dictionary for keeping track of everything fading in, mapping
+# the ugen being faded in to the fader. Either fade_in_complete
+# will remove the fader, or fade() will remove the fader from
+# the dictionary.
+
+print "INCLUDING fader.srp"
+
+fade_in_lookup = {}  // maps ugen to its fader
+
+
+def fader(input, current, optional dur, goal, chans):
+# Create a Fader, with optional intialization. Example:
+#     fader(input, 0, 0.3, 1) -- fade input from 0 to 1 over 0.3 sec
+#     fader(input, 0, 0.3, 1, 0) -- same, but use linear fade
+    var fader = Fader(input, current, chans)
+    if dur:
+        fader.set_dur(dur)
+    if goal:
+        fader.set_goal(goal)
+    fader
+
+
+class Fader (Ugen):
+    def init(input, current, chans):
+        if not chans:
+            chans = max_chans(1, input)
+        super.init(create_ugen_id(), "fader", chans, 'a', "Ufi",
+                   'input', input, 'current', current)
+
+
+    def set_current(current, optional chan):
+        if chan:
+            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, chan, current)
+        for i = 0 to chans:
+            o2_send_cmd("/arco/fader/cur", 0, "Uif", id, i,
+                        current if isnumber(current) else current[i])
+        this
+
+
+    def set_dur(dur):
+        o2_send_cmd("/arco/fader/dur", 0, "Uf", id, dur)
+        this
+
+
+    def set_mode(mode):
+        o2_send_cmd("/arco/fader/mode", 0, "Ui", id, mode)
+        this
+
+
+    def set_goal(goal, optional chan):
+        if chan:
+            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, chan, goal)
+        for i = 0 to chans:
+            o2_send_cmd("/arco/fader/goal", 0, "Uif", id, i,
+                        goal if isnumber(goal) else goal[i])
+        this
+
+
+    def fade_in_complete(ugen):
+        var fader = fade_in_lookup.get(ugen)
+        if fader:  // fade in was not cancelled, so end it now
+            output_ugen.swap(this, ugen)  // remove fader from ugen
+            fade_in_lookup.remove(ugen)
+        // otherwise, fade_in was cancelled by a fade()
+ 
+ 
+ 
+# sum.srp -- sum and sumb unit generators
 #
 # (machine generated by u2f.py)
 
@@ -1633,4 +1270,5 @@ def overdrive(snd, gain, tone, volume):
     Ugen(create_ugen_id(), "overdrive", 2, 'a', "UUUU", omit_chans = true,
          'snd', snd, "a", 'gain', gain, "bc", 'tone', tone, "bc", 'volume', volume, "bc")
 
-
+def sumb(optional chans = 1, keyword wrap = true): Sumb(chans, wrap)
+ 
