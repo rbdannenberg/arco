@@ -11,7 +11,7 @@
 - Instruments in Serpent
 - End-of-Sound Actions
 - Phase Vocoder and Pitch Shifting
-- Audio Shutdown
+- Audio Shutdown and State Transitions
 
 ## External Control
 This section describes protocols and interaction between a client and
@@ -1080,7 +1080,7 @@ and the best approach is simply to transpose down, not up.
 
 Execution time with a window of 8 is about 2000 times real time.
 
-## Audio Shutdown
+## Audio Shutdown and State Transitions
 
 How does Arco shut down in a coordinated fashion?
 
@@ -1088,3 +1088,4 @@ How does Arco shut down in a coordinated fashion?
 
 See comments at the top of audioio.cpp with an analysis/description of
 aud_state transitions.
+

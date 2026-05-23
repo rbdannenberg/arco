@@ -125,53 +125,52 @@ states and flags to deal with the asynchrony.
 Since the Server shares memory with the Arco thread, we will call the
 server state server_aud_state.
 
-Initial state: IDLE, other states used are STARTING, RUNNING, STOPPING
+The basic idea is we have server_aud_state that tells us what state
+we are in, and server_goal_state that tells us what state we want to
+be in. The main polling loop figures out what to do from these two
+variables. The valid server_goal_states do not include "in-transition"
+states that are only used as server_aud_state values to remember that
+asynchronous actions are pending.
 
-To Start (Server's host_open_audio):
-    if state is STARTING or RUNNING, just return with 
-        "already starting"
-    if state is STOPPING, set open_requested and return
-    if basic ugens are not yet created, create the standard
-        zero, zerob, input and output ugens
-    send /arco/open, IDLE->STARTING
-    if /host/starting shows a failure, STARTING->IDLE
-    when /host/started is called, STARTING->RUNNING and 
-        if close_requested, clear it and call close
-        else for libraries implementing "To Start" for
-            applications, call back to application
+When server_aud_state is one of the "in-transition" states, no further
+actions can be taken. At least for debugging, we also introduce
+server_wait_since with a timestamp. We can report problems after a
+long wait if server_aud_state != server_goal_state.
 
-To Close:
-    if state is STOPPING or IDLE, just return with
-        "already stopping"
-    if state is STARTING, set close_requested and return
-    send /arco/close, RUNNING->STOPPING
-    when /host/stopped is called, check for failure (value 2):
-        if failure, then wait 2 msec and call /arco/close again
-            (the wait prevents a busy loop continuously sending
-            /arco/close and receiving another failure while arco
-            is trying to poll the audio thread and make progress)
-            return (/host/stopped will be called very soon and
-                we will re-enter this handler)
-        STOPPING->IDLE and
-        if quit requested, call quit and return
-        if reset_requested, clear it and call reset
-        if open_requested, clear it and call start
+To simplify transitions, once a goal is set, we disallow changing the
+goal until the goal is reached. Essentially we are saying that
+reaching the goal is treated as an atomic transaction that cannot be
+interrupted by a new goal. All transitions are quick (I'm guessing
+10 or 20 msec max, where the longest is probably starting up an audio
+stream.)
 
-To Reset:
-    if state is STARTING, set reset_requested and
-        close_requested and return
-    if state is RUNNING, set reset_requested and
-        send /arco/close and return
-    if state is STOPPING, set reset_requested and return
-    if state is IDLE,
-        send /arco/reset
+States are: IDLE, STARTING, RUNNING, STOPPING, FINISH1, FINISHED
 
-To quit:
-    if state is STARTING or RUNNING, set quit_requested
-        and call close and return
-    if state is STOPPING, set quit_requested and return
-    if state is IDLE, send /arco/quit
-    when service is no longer available and quit_requested, exit Server
+Initial state is IDLE
+IDLE->STARTING when /arco/open is sent to start audio processing
+STARTING->RUNNING when audio thread sends /host/started message
+RUNNING->STOPPING when /arco/close is sent to stop audio processing
+STOPPING->IDLE when audio thread sends /host/stopped message
+IDLE->FINISH1 when /arco/quit is sent to sht down audio thread
+FINISH1->FINISHED when all shared memory threads are gone
+Final state is FINISHED, and the program exits.
+
+Reset: More State
+-----------------
+More state relates to resetting the unit generators.
+
+Initially, server_aud_reset is false and we want the server to set up
+the initial unit generators (input, output, zero).
+
+When polling sees the goal of RUNNING and the state is IDLE, if
+not server_aud_reset, host_ugens_init() is called to create standard
+ugens. Then, server_aud_reset is set to true so this only happens
+the first time that audio is started.
+
+The application can do an /arco/reset, but it must handle the
+/actrl/reset response and recreate that unit generators. In the
+future, the server may provide some support for this.
+
 
 For the application developer
 -----------------------------
@@ -186,7 +185,7 @@ the following methods allow the application to customize behavior:
 The superclass also provides methods that the application can use:
     arco_reset() - runs the "To Reset" procedure shown above
     audio_open() - open and start audio io
-    arco_close() - shuts down audio
+    arco_close() - shuts down audio, completed when aud_state == FINISHED
     
 
 Typical pattern is:

@@ -55,7 +55,7 @@ const char *help_strings[] = {
     " P - Save latest selections to preferences",
     " p - Print audio ugen tree",
     " Q - Quit the program",
-    " R - Reset server: deletes all unit generators",
+//     " R - Reset server: deletes all unit generators",
     " S - Start or Stop",
     " t - ask audio thread to print a test message",
     " T - test tone",
@@ -68,14 +68,35 @@ bool arco_ready = false;
 bool has_curses = false;  // curses interface exists
 
 static void host_initialize();
-
+/*
 static bool open_requested = false;
 static bool close_requested = false;
 static bool reset_requested = false;
 static bool quit_requested = false;
+*/
 static int server_aud_state = IDLE;
+static int server_goal_state = IDLE;
+static double server_wait_since = -100.0;
+
 static bool server_aud_is_reset = false;
 #define aud_state THIS_IS_PRIVATE_TO_THE_AUDIO_SERVICE
+
+
+/* set goal if possible and return 0. return 1 if refused. */
+int set_server_goal_state(int state, const char *err_msg)
+{
+    if (server_goal_state == state) {
+        return 0;
+    }
+    if (server_goal_state != server_aud_state) {
+        printf("%s: A state transition is in progress, try again.\n", err_msg);
+        return 1;
+    }
+    server_goal_state = state;
+    server_wait_since = o2_local_time();
+    return 0;
+}
+    
 
 /* O2 INTERFACE: /host/openaggr string info;
     For rapid setup and debugging, this looks for the aggregate device
@@ -160,6 +181,27 @@ void automation()
 }
 #endif
 
+
+void host_ugens_init()
+{
+    // Note: channels here are based on preferences. We try to open 
+    // matching counts, but if devices cannot achieve the preferences,
+    // inputs are expanded to the preferred count and outputs are mixed
+    // down to the available output channels.
+    arco_print("**** host_ugens_init initializing %d ins %d outs ****\n",
+               prefs_in_chans(), prefs_out_chans());
+    assert(prefs_in_chans() >= 0);
+    assert(prefs_out_chans() >= 0);
+    o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID);
+    o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID);
+    o2_send_cmd("/arco/thru/new", 0, "iii", INPUT_ID,
+                prefs_in_chans(), ZERO_ID);
+    o2_send_cmd("/arco/thru/new", 0, "iii", OUTPUT_ID, 
+                prefs_out_chans(), INPUT_ID);
+    server_aud_is_reset = true;
+}
+
+
 int main(int argc, char *argv[])
 {
     prefs_read();
@@ -178,18 +220,45 @@ int main(int argc, char *argv[])
     }
 
     int running = true;
-    int shutting_down = false;
-    while (server_aud_state != FINISHED || shutting_down) {
+    int shared_mem_active = true;
+    while (server_aud_state != FINISHED) {
         ui_poll(2);  // 2 ms polling period
-        if (server_aud_state == FINISHED) {  // User entered the Quit command
-            if (!shutting_down) {
-                shutting_down = true;  // wait for O2sm_info to be deleted
-            } else {  // test for O2sm_info deleted before exiting loop
-                shutting_down = (o2_shmem_inst_count() > 0);
-                // when no more shared memory instances, shutting_down becomes
-                // false, and this will be the last time through the loop
+        if (server_goal_state != server_aud_state) {
+            // if goal is RUNNNING, either we're IDLE and need to
+            // start, or we've started, state is STARTING, and action pending
+            if (server_goal_state == RUNNING) {
+                if (server_aud_state == IDLE) {
+                    host_ugens_init();
+                    server_aud_state = STARTING;
+                    // expecting /host/starting:
+                    o2_send_cmd("/arco/open", 0, "iiiiii", p_in_id, p_out_id,
+                                prefs_in_chans(), prefs_out_chans(),
+                                prefs_latency_ms(), prefs_buffer_size());
+                }
+            } else if ((server_goal_state == IDLE ||
+                        server_goal_state == FINISHED) &&
+                       (server_aud_state == RUNNING)) {
+                server_aud_state = STOPPING;
+                // expecting /host/starting:
+                o2_send_cmd("/arco/ctrl", 0, "s", "host");
+                o2_send_cmd("/arco/close", 0, "");
+            } else if (server_aud_state == FINISH1) {
+                if (o2_shmem_inst_count() == 0) {
+                    server_aud_state = FINISHED;
+                }
+            } else if (server_goal_state == FINISHED &&
+                       server_aud_state == IDLE) {
+                server_aud_state = FINISH1;
+                o2_send_cmd("/arco/quit", 0, "");
+            }
+
+            double wait = o2_local_time() - server_wait_since;
+            if (wait > 5) {
+                arco_warn("current state: %d, goal state %d, elapsed time: %g",
+                          server_aud_state, server_goal_state, wait);
             }
         }
+
         o2_poll();
         arco_thread_poll();
         if (!arco_ready) {
@@ -234,52 +303,28 @@ static void host_devinfo(O2_HANDLER_ARGS)
 
 void host_close_audio()
 {
-    if (server_aud_state == STOPPING || server_aud_state == IDLE) {
-        return 1;  // already stopping or stopped
-    }
-    if (server_aud_state == STARTING) {
-        close_requested = true;
-        return 0;
-    }
-    assert(server_aud_state == RUNNING);
-    server_aud_state = STOPPING;
-    o2_send_cmd("/arco/ctrl", 0, "s", "host");
-    o2_send_cmd("/arco/close", 0, "");
+    return set_server_goal_state(IDLE, "Cannot Close now");
 }
 
 
+/* start audio processing */
 int host_open_audio()
 {
-    if (server_aud_state == STARTING || server_aud_state == RUNNING) {
-        return 1;  // already starting or running
-    }
-    if (server_aud_state == STOPPING) {
-        open_requested = true;
-        return 0;
-    }
-    assert(server_aud_state == IDLE);
-    server_aud_state = STARTING;
-    o2_send_cmd("/arco/open", 0, "iiiiii", p_in_id, p_out_id,
-                prefs_in_chans(), prefs_out_chans(),
-                prefs_latency_ms(), prefs_buffer_size());
+    return set_server_goal_state(RUNNING, "Cannot Open now");
 }
 
 
 void host_quit_audio()
 {
-    if (server_aud_state == STARTING || server_aud_state == RUNNING) {
-        quit_requested = true;
-        host_close_audio();
-        return;
-    }
-    if (server_aud_state == STOPPING) {
-        quit_requested = true;
-        return;
-    }
-    assert(server_aud_state == IDLE);
-    o2_send_cmd("/arco/quit", 0, "");
+    return set_server_goal_state(FINISHED, "Cannot Quit now");
 }
 
+
+/* reset command is questionable since it could pull the rug out
+from under a running application. On the other hand, maybe if an
+application crashes, we want to do a reset and restart the
+application. For now, we are removing reset support until we figure
+out what it should do to support rather than screw users.
 
 void host_reset_audio()
 {
@@ -301,10 +346,12 @@ void host_reset_audio()
     o2_send_cmd("/arco/ctrl", 0, "s", "host");
     o2_send_cmd("/arco/reset", 0, "");
 }
-
-
-/* O2 INTERFACE: /host/reset int32 status;
 */
+
+/* O2 not INTERFACE: /host/reset int32 status;
+(this is the old handler for Arco's /host/reset message; it is
+disabled until we figure out what's best to support applications. See
+audioio.cpp under "Reset: More State" and see host_ugens_init().)
 void host_reset(O2_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
@@ -341,6 +388,7 @@ void host_reset(O2_HANDLER_ARGS)
         host_open_audio();
     }
 }
+*/
 
 
 /* O2 INTERFACE: /host/starting
@@ -383,15 +431,9 @@ void host_starting(O2_HANDLER_ARGS)
 void host_started(O2_HANDLER_ARGS)
 {
     if (server_aud_state != STARTING) {
-        arco_warn("Server expected state to be STARTING but got %d\n",
-                  server_aud_state);
-        return;
+        arco_warn("Got /host/starting but state is %d\n", server_aud_state);
     }
     server_aud_state = RUNNING;
-    if (close_requested) {
-        close_requested = false;
-        host_close_audio();
-    }
 }
 
 
@@ -413,18 +455,6 @@ void host_stopped(O2_HANDLER_ARGS)
         arco_warn("Got /host/stopped but state is %d\n", server_aud_state);
     }
     server_aud_state = IDLE;
-    if (quit_requested) {
-        host_quit_audio();
-        return;
-    }
-    if (reset_requested) {
-        reset_requested = false;
-        host_reset_audio();
-    }
-    if (open_requested) {
-        open_requested = false;
-        host_open_audio();
-    }
 }
 
 
@@ -462,7 +492,7 @@ static void host_initialize()
     o2_method_new("/host/starting", "iiiiii", host_starting, NULL, true, true);
     o2_method_new("/host/started", "", host_started, NULL, true, true);
     o2_method_new("/host/stopped", "i", host_stopped, NULL, true, true);
-    o2_method_new("/host/reset", "i", host_reset, NULL, true, true);
+//    o2_method_new("/host/reset", "i", host_reset, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
 
@@ -552,25 +582,15 @@ int action(int ch)
       case 'Q':
         host_quit_audio();
         break;
-      case 'R':  // reset: remove all unit generators
-        host_reset_audio();
-        break;
+//      case 'R':  // reset: remove all unit generators
+//        host_reset_audio();
+//        break;
       case 'S':  // start/stop
         if (server_aud_state == RUNNING) {
             printf("Closing audio devices.\n");
             host_close_audio();
         } else if (server_aud_state == IDLE) {
-            if (server_aud_is_reset) {
-                /* printf("Open device %d (in, %d chans) and %d "
-                   "(out, %d chans), "
-                   "latency %d ms, buffer size %d\n", p_in_id,
-                   prefs_in_chans(), p_out_id, prefs_out_chans(),
-                   prefs_latency_ms(), prefs_buffer_size()); */
-                host_open_audio();
-            } else {  // first time we are starting
-                open_requested = true;
-                host_reset_audio();
-            }
+            host_open_audio();
         } else {
             printf("Start/stop ignored because state is not"
                    " IDLE or RUNNING.\n");
