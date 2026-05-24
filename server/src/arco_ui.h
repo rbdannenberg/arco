@@ -17,9 +17,7 @@ struct Dminfo {
     } varptr;
 };
 
-#ifndef _WIN32
 extern Vec<Dminfo> dminfo;
-#endif
 extern Vec<O2string> arco_device_info;
 
 int ui_init(int count);

@@ -23,10 +23,10 @@ void prefs_set_out_name(const char *name);
 void prefs_set_in_chans(int chans);
 void prefs_set_out_chans(int chans);
 void prefs_set_buffer_size(int size);
-bool prefs_set_network_enable(bool enable);
-bool prefs_set_o2lite_enable(bool enable);
-bool prefs_set_internet_enable(bool enable);
-bool prefs_set_mqtt_enable(bool enable);
+void prefs_set_network_enable(bool enable);
+void prefs_set_o2lite_enable(bool enable);
+void prefs_set_internet_enable(bool enable);
+void prefs_set_mqtt_enable(bool enable);
 
 /* these are derived from names outside of prefs.cpp. Maybe they
  * should not even be declared here, but I'm leaving them for now.

@@ -342,7 +342,7 @@ static void host_devinfo(O2_HANDLER_ARGS)
 
 void host_close_audio()
 {
-    return set_server_goal_state(IDLE, "Cannot Close now");
+    set_server_goal_state(IDLE, "Cannot Close now");
 }
 
 
@@ -355,7 +355,7 @@ int host_open_audio()
 
 void host_quit_audio()
 {
-    return set_server_goal_state(FINISHED, "Cannot Quit now");
+    set_server_goal_state(FINISHED, "Cannot Quit now");
 }
 
 

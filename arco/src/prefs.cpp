@@ -112,7 +112,7 @@ void prefs_set_in_chans(int chans) { p_in_chans = chans; }
 void prefs_set_out_chans(int chans) { p_out_chans = chans; }
 void prefs_set_buffer_size(int size) { p_buffer_size = size; }
 
-bool prefs_set_network_enable(bool enable) { p_network_enable = enable; }
-bool prefs_set_o2lite_enable(bool enable) { p_o2lite_enable = enable; }
-bool prefs_set_internet_enable(bool enable) { p_internet_enable = enable; }
-bool prefs_set_mqtt_enable(bool enable) { p_mqtt_enable = enable; }
+void prefs_set_network_enable(bool enable) { p_network_enable = enable; }
+void prefs_set_o2lite_enable(bool enable) { p_o2lite_enable = enable; }
+void prefs_set_internet_enable(bool enable) { p_internet_enable = enable; }
+void prefs_set_mqtt_enable(bool enable) { p_mqtt_enable = enable; }
