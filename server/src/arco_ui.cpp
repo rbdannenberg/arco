@@ -32,25 +32,14 @@
 #include <ctype.h>
 #include <assert.h>
 #include <curses.h>
-#include <form.h>
-#ifndef _WIN32
-#include <fcntl.h>
-#include <unistd.h>
-#else
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-// Stub types for form.h - curses UI is not available on Windows
-typedef void FIELD;
-typedef void FORM;
-#define REQ_NEXT_FIELD 0
-#define REQ_PREV_FIELD 0
-#define REQ_END_LINE 0
-#define REQ_NEXT_CHAR 0
-#define REQ_PREV_CHAR 0
-#define REQ_DEL_PREV 0
-#define REQ_DEL_CHAR 0
-#define REQ_VALIDATION 0
-#define REQ_BEG_FIELD 0
+#include "form.h"
+#else
+#include <form.h>
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 #include "cmtio.h"
 #include "o2internal.h"
