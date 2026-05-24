@@ -25,6 +25,7 @@
 #include "prefs.h"
 #include "arcotypes.h"
 
+/* these are the preferences */
 char p_in_name[80] = "";
 char p_out_name[80] = "";
 int p_in_id = -1;
@@ -33,7 +34,9 @@ int p_in_chans = -1;
 int p_out_chans = -1;
 int p_buffer_size = -1;
 int p_latency_ms = -1;
-
+bool p_network_enable = true;
+bool p_o2lite_enable = true;
+bool p_mqtt_enable = false;
 
 char *prefs_in_name()
 {
@@ -70,20 +73,21 @@ int prefs_out_lookup(const char *name, int id)
 
 int prefs_in_id() { return p_in_id; }
 
-
 int prefs_out_id() { return p_out_id; }
-
 
 int prefs_in_chans() { return p_in_chans != -1 ? p_in_chans : 2; }
 
-
 int prefs_out_chans() { return p_out_chans != -1 ? p_out_chans : 2; }
-
 
 int prefs_buffer_size() { return p_buffer_size != -1 ? p_buffer_size : BL; }
 
-
 int prefs_latency_ms() { return p_latency_ms != -1 ? p_latency_ms : 10; }
+
+bool prefs_network_enable() { return p_network_enable; }
+
+bool prefs_o2lite_enable() { return p_o2lite_enable; }
+
+bool prefs_mqtt_enable() { return p_mqtt_enable; }
 
 
 void prefs_set_in_name(const char *name) 
@@ -105,3 +109,6 @@ void prefs_set_in_chans(int chans) { p_in_chans = chans; }
 void prefs_set_out_chans(int chans) { p_out_chans = chans; }
 void prefs_set_buffer_size(int size) { p_buffer_size = size; }
 
+bool prefs_set_network_enable(bool enable) { p_network_enable = enable; }
+bool prefs_set_o2lite_enable(bool enable) { p_o2lite_enable = enable; }
+bool prefs_set_mqtt_enable(bool enable) { p_mqtt_enable = enable; }

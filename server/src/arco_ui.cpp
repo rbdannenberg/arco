@@ -30,11 +30,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
+#ifndef _WIN32
 #include <fcntl.h>
 #include <unistd.h>
-#include <assert.h>
 #include <curses.h>
 #include <form.h>
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+// Stub types for form.h - curses UI is not available on Windows
+typedef void FIELD;
+typedef void FORM;
+#define REQ_NEXT_FIELD 0
+#define REQ_PREV_FIELD 0
+#define REQ_END_LINE 0
+#define REQ_NEXT_CHAR 0
+#define REQ_PREV_CHAR 0
+#define REQ_DEL_PREV 0
+#define REQ_DEL_CHAR 0
+#define REQ_VALIDATION 0
+#define REQ_BEG_FIELD 0
+#endif
 #include "cmtio.h"
 #include "o2internal.h"
 #include "prefs.h"
@@ -82,7 +99,7 @@ static void print_extras()
 }
 
 
-const char *help_strings2[] = {   
+const char *help_strings2[] = {
     "p - scroll back one line",
     "b - scroll back one page",
     "n - scroll forward one line",

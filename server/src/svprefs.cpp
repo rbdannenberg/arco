@@ -79,7 +79,7 @@ void prefs_read()
     int n;
     char *line_ptr = line;
     size_t line_len = 80;
-    while (getline(&line_ptr, &line_len, pf) > 0) {
+    while (fgets(line_ptr, (int) line_len, pf) != NULL) {
         if (strstr(line_ptr, "audio_in_name:") != 0) {
             get_name(line_ptr + 14, device);
             prefs_set_in_name(device);
@@ -94,11 +94,16 @@ void prefs_read()
             prefs_set_buffer_size(n);
         } else if (get_number(line_ptr, "latency:", &n)) {
             prefs_set_latency(n);
+        } else if (get_number(line_ptr, "network_enable:", &n)) {
+            prefs_set_network_enable(n != 0);
+        } else if (get_number(line_ptr, "o2lite_enable:", &n)) {
+            prefs_set_o2lite_enable(n != 0);
+        } else if (get_number(line_ptr, "mqtt_enable:", &n)) {
+            prefs_set_mqtt_enable(n != 0);
         }
     }
-    if (line_ptr != line) {
-        free(line_ptr);
-    }
+    // Note: original used POSIX getline which could realloc line_ptr.
+    // fgets always uses the provided buffer, so no free needed.
 }
 
 
@@ -119,6 +124,9 @@ void prefs_write()
     printf("out_chans: %d\n", prefs_out_chans());
     printf("buffer_size: %d\n", prefs_buffer_size());
     printf("latency: %d\n", prefs_latency_ms());
+    printf("network_enable: %d\n", (int) prefs_network_enable());
+    printf("o2lite_enable: %d\n", (int) prefs_o2lite_enable());
+    printf("mqtt_enable: %d\n", (int) prefs_mqtt_enable());
 }
 
 

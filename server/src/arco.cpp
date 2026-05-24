@@ -5,12 +5,17 @@
  */
 
 #include "o2internal.h"  // need internal to offer bridge
+#ifndef _WIN32
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef __linux__
 #include "ncurses.h"
 #else
 #include "curses.h"
+#endif
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #endif
 #include "o2atomic.h"
 #include "sharedmem.h"   // o2_shmem_inst_new()
@@ -55,7 +60,7 @@ const char *help_strings[] = {
     " P - Save latest selections to preferences",
     " p - Print audio ugen tree",
     " Q - Quit the program",
-//     " R - Reset server: deletes all unit generators",
+    " R - Reset server: deletes all unit generators",
     " S - Start or Stop",
     " t - ask audio thread to print a test message",
     " T - test tone",
@@ -208,10 +213,17 @@ int main(int argc, char *argv[])
 
     printf("main: initial latency %d\n", prefs_latency_ms());
     has_curses = ui_init(200) >= 0;  // <0 means error, no curses interface
-    o2_network_enable(false);
+    // must be true for O2lite/Zeroconf discovery:
+    o2_network_enable(prefs_network_enable());
     o2_debug_flags("");
     o2_initialize("arco");
     o2_clock_set(NULL, NULL);  // we are the reference clock
+    if (prefs_mqtt_enable()) {
+        o2_mqtt_enable(NULL, 0);  // only default MQTT server supported now
+    }
+    if (prefs_o2lite_enable()) {
+        o2lite_initialize();  // enable O2lite client connections
+    }
     host_initialize();  // set up handlers
     int err;
     if ((err = arco_initialize())) {
@@ -531,8 +543,8 @@ void audio_dialog()
     arco_out_id = p_out_id;
     arco_in_chans = p_in_chans;
     arco_out_chans = p_out_chans;
-    arco_buffer_size = p_buffer_size;
-    arco_latency_ms = p_latency_ms;
+    arco_buffer_size = prefs_buffer_size();
+    arco_latency_ms = prefs_latency_ms();
 
     ui_start_dialog();
     // "Current" values are displayed as information to user from
@@ -590,7 +602,7 @@ int action(int ch)
             printf("Closing audio devices.\n");
             host_close_audio();
         } else if (server_aud_state == IDLE) {
-            host_open_audio();
+                host_open_audio();
         } else {
             printf("Start/stop ignored because state is not"
                    " IDLE or RUNNING.\n");
