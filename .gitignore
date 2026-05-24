@@ -72,14 +72,8 @@ srp.log
 
 /fluidsynth/
 
-/ugens/sttest/sttest_abb_a.dsp
-/ugens/sttest/sttest_abb_a.fh
-
-/ugens/zitarev/zitarev_abb_a.fh
-
 /apps/perfdata/perfdata*.csv
 /apps/perfdata/perfdata.zip
-/ugens/sttest/
 /ugens/zsine/
 
 /benchmarks/blocksize.xlsx
@@ -113,8 +107,6 @@ srp.log
 /benchmarks/Release/
 
 /benchmarks/build/
-
-/ugens/highpass/highpass_ab_a.dsp
 
 /apps/point/samples/tpt*.wav
 
