@@ -35,7 +35,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <curses.h>
-#include <form.h>
+// #include <form.h>
 #else
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
