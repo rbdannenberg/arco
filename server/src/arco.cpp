@@ -5,12 +5,17 @@
  */
 
 #include "o2internal.h"  // need internal to offer bridge
+#ifndef _WIN32
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef __linux__
 #include "ncurses.h"
 #else
 #include "curses.h"
+#endif
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #endif
 #include "o2atomic.h"
 #include "sharedmem.h"   // o2_shmem_inst_new()
@@ -208,10 +213,11 @@ int main(int argc, char *argv[])
 
     printf("main: initial latency %d\n", prefs_latency_ms());
     has_curses = ui_init(200) >= 0;  // <0 means error, no curses interface
-    o2_network_enable(false);
+    o2_network_enable(true);  // must be true for O2lite/Zeroconf discovery
     o2_debug_flags("");
     o2_initialize("arco");
     o2_clock_set(NULL, NULL);  // we are the reference clock
+    o2lite_initialize();  // enable O2lite client connections
     host_initialize();  // set up handlers
     int err;
     if ((err = arco_initialize())) {
@@ -282,7 +288,9 @@ int main(int argc, char *argv[])
         O2_FREE((void *) arco_device_info[i]);
     }
     arco_device_info.finish();
+#ifndef _WIN32
     dminfo.finish();
+#endif
     
     o2_finish();
 }
@@ -301,7 +309,7 @@ static void host_devinfo(O2_HANDLER_ARGS)
 }
 
 
-void host_close_audio()
+int host_close_audio()
 {
     return set_server_goal_state(IDLE, "Cannot Close now");
 }
@@ -617,6 +625,7 @@ int action(int ch)
 
 void dmaction()
 {
+#ifndef _WIN32
     // update preferences
     for (int i = 0; i < dminfo.size(); i++) {
         if (dminfo[i].changed) {
@@ -637,4 +646,5 @@ void dmaction()
             }
         }
     }
+#endif
 }

@@ -57,8 +57,9 @@ add_executable(${ARCO_SERVER_NAME} ${SOURCES})
 register_target(${ARCO_SERVER_NAME})
 
 
-if(APPLE) 
+if(APPLE)
   set(CURSES_LIB curses)
+  set(FORM_LIB form)
   find_library(COREAUDIO CoreAudio)
   find_library(COREFOUNDATION CoreFoundation)
   find_library(COREMIDI CoreMIDI)
@@ -70,8 +71,13 @@ if(APPLE)
       ${COREAUDIO} ${COREFOUNDATION} ${COREMIDI} ${CORESERVICES}
       ${AVFOUNDATION} ${AUDIOTOOLBOX} ${FOUNDATION})
   target_link_options(${ARCO_SERVER_NAME} PUBLIC "-ObjC")
+elseif(WIN32)
+  # Windows: no curses UI, plain console mode
+  set(CURSES_LIB "")
+  set(FORM_LIB "")
 else()
   set(CURSES_LIB ncurses)
+  set(FORM_LIB form)
 endif() 
 
 # O2 is not in arcolib because it is already in wxslib (if you link
@@ -97,7 +103,14 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)
 target_link_whole_library(${ARCO_SERVER_NAME} arcolib)
 target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
                       debug ${O2_DBG_LIB} optimized ${O2_OPT_LIB})
-target_link_libraries(${ARCO_SERVER_NAME} PRIVATE form ${CURSES_LIB})
+if(CURSES_LIB)
+  target_link_libraries(${ARCO_SERVER_NAME} PRIVATE ${FORM_LIB} ${CURSES_LIB})
+endif()
+if(WIN32)
+  target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
+      winmm ws2_32 Iphlpapi
+      "C:/Program Files/Bonjour SDK/Lib/x64/dnssd.lib")
+endif()
 
 if(UNIX AND NOT APPLE)  # linux
   target_link_libraries(arcolib PRIVATE avahi-client avahi-common atomic rt) 
