@@ -14,6 +14,7 @@ int prefs_buffer_size();
 int prefs_latency_ms();
 bool prefs_network_enable();
 bool prefs_o2lite_enable();
+bool prefs_internet_enable();
 bool prefs_mqtt_enable();
 
 void prefs_set_latency(int latency);
@@ -24,6 +25,7 @@ void prefs_set_out_chans(int chans);
 void prefs_set_buffer_size(int size);
 bool prefs_set_network_enable(bool enable);
 bool prefs_set_o2lite_enable(bool enable);
+bool prefs_set_internet_enable(bool enable);
 bool prefs_set_mqtt_enable(bool enable);
 
 /* these are derived from names outside of prefs.cpp. Maybe they
@@ -41,5 +43,6 @@ extern int p_buffer_size;
 extern int p_latency_ms;
 extern bool p_network_enable;
 extern bool p_o2lite_enable;
+extern bool p_internet_enable;
 extern bool p_mqtt_enable;
 */

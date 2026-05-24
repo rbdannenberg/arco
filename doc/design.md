@@ -71,8 +71,8 @@ will need this to understand the code:
 There are several sets of preference variables with different prefixes:
 - `p_*` -- private to prefs module; values correspond to .arco prefs file
 - `arco_*` -- Used for getting preferences from the user interactively.
-- `actual_*` -- Parameters determined after devices were actually opened.
-  These values are displayed in interfaces as the "Current value" of any
+- `host_*` -- Parameters determined after devices were actually opened.
+  These values are displayed in interfaces as the "Actual" value of any
   parameter.
 
 These prefixes are applied to each of the following suffixes. Here is
@@ -92,10 +92,25 @@ what they mean:
   this long. The input buffer should also be this long, but we assume
   it is empty when the output buffer is full, so input buffers do not
   contribute additional latency.)
+- `*_network_enable` -- is networking enabled? If not, only
+  connections within the local machine are possible.
+- `*_o2lite_enable` -- is o2lite enabled? Implies `network_enable`.
+- `*_internet_enable` -- is internet enabled? If not, O2 will not
+  wait to determine a public IP address, causing delays if there is
+  no internet access.
+- `*_mqtt_enable` -- is MQTT enabled? If not, O2 cannot establish
+  wide-area connections and only uses Bonjour.
+  
 
 **General information flow:**
-- `actual_*` values are provided by PortAudio when devices are opened.
-They are used by the audio callback to interpret the audio stream.
+- `host_*` values are provided by PortAudio when devices are opened.
+  The `host_network_enable`, `host_o2lite_enable`,
+  `host_internet_enable`, and `host_mqtt_enable` are not related to
+  PortAudio. Instead, they are set and applied at server startup and
+  cannot be changed without restarting.
+  
+The other `host_*` values are used by the audio callback to interpret
+the audio stream.
 - `p_*` values are initialized from the preferences file `.arco`
 - `arco_*` values are initialized from `p_*` values, and when the user
   sets valid `arco_*` values, they are used to update `p_*` values.
@@ -108,8 +123,10 @@ They are used by the audio callback to interpret the audio stream.
 Preferences are only written on request by writing the current `p_*`
 values, which can include -1 for "no preference".
 
-Initially, arco_* values are set to preferences. The can be changed.
-Changes are saved in preferences.
+Initially, arco_* values are set to preferences. They can be changed.
+Changes are *not* automatically saved back to the .arco preference file.
+You must use the 'P' command to save them.
+
 Default in and out channels is 2. 
 
 **Preferences inside/outside the server**
@@ -118,8 +135,8 @@ counts, buffer size and latency. -1 works to get default values.
 
 Preferences are on the "server side" and not visible to
 the "arco side". To allow inspection of actual values selected, the
-arco side sends actual values back to the control service, the name
-of which is provided in /arco/ctrl.
+arco side sends actual (`host_*`) values back to the control service,
+the name of which is provided in /arco/ctrl.
 
 On the "arco side", we have only defaults and whatever values are
 passed into the open operation.

@@ -98,6 +98,8 @@ void prefs_read()
             prefs_set_network_enable(n != 0);
         } else if (get_number(line_ptr, "o2lite_enable:", &n)) {
             prefs_set_o2lite_enable(n != 0);
+        } else if (get_number(line_ptr, "internet_enable:", &n)) {
+            prefs_set_internet_enable(n != 0);
         } else if (get_number(line_ptr, "mqtt_enable:", &n)) {
             prefs_set_mqtt_enable(n != 0);
         }
@@ -126,8 +128,6 @@ void prefs_write()
     printf("latency: %d\n", prefs_latency_ms());
     printf("network_enable: %d\n", (int) prefs_network_enable());
     printf("o2lite_enable: %d\n", (int) prefs_o2lite_enable());
+    printf("internet_enable: %d\n", (int) prefs_internet_enable());
     printf("mqtt_enable: %d\n", (int) prefs_mqtt_enable());
 }
-
-
-

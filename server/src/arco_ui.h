@@ -13,6 +13,7 @@ struct Dminfo {
         int *intptr;
         float *floatptr;
         char *charptr;
+        bool *boolptr;
     } varptr;
 };
 
@@ -30,6 +31,7 @@ void ui_get_string(const char *prompt, void (*callback)(const char *s));
 void ui_start_dialog();
 void ui_int_field(const char *prompt, int *value, int min, int max,
                   int actual, int dflt);
+void ui_bool_field(const char *prompt, bool *value, bool actual, bool dflt);
 void ui_run_dialog(const char *title);
 
 // to be provided by client:

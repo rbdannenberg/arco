@@ -600,7 +600,7 @@ void ui_start_dialog()
 // actual and pref are dsiplayed as actual and pref value information
 //
 void ui_int_field(const char *prompt, int *value, int min, int max,
-                 int actual, int pref)
+                  int actual, int pref)
 {
     FIELD *field = new_field(1, 6, field_top, 3 + strlen(prompt), 0, 0);
     set_field_back(field, A_UNDERLINE);
@@ -635,6 +635,30 @@ void ui_int_field(const char *prompt, int *value, int min, int max,
 }
 
 
+// ui_bool_field - make an editable field for boolean input.
+// prompt is a string label
+// value is the value displayed and returned. -1 displays blank
+// min and max are range of values
+// actual and pref are dsiplayed as actual and pref value information
+//
+void ui_bool_field(const char *prompt, bool *value, bool actual, bool pref)
+{
+    FIELD *field = new_field(1, 2, field_top, 3 + strlen(prompt), 0, 0);
+    set_field_back(field, A_UNDERLINE);
+    set_field_type(field, TYPE_ALPHA, 1);
+    set_field_buffer(field, 0, *value ? "T" : "F");
+    Dminfo *fi = dminfo.append_space(1);
+    fi->type = 'b';
+    fi->label = prompt;
+    fi->changed = false;
+    sprintf(fi->comment, "Actual: %s, Pref: %s",
+            actual ? "T" : "F", pref ? "T" : "F");
+    fi->varptr.boolptr = value;
+    fields.push_back(field);
+    field_top += 1;
+}
+
+
 void ui_run_dialog(const char *title)
 {
     fields.push_back(NULL);  // null termination
@@ -648,8 +672,10 @@ void ui_run_dialog(const char *title)
     for (i = 0; i < fields.size() - 1; i++) {
         Dminfo *dmi = &dminfo[i];
         mvprintw(i + 2, 2, dmi->label);
-        if (dmi->type == 'i') {  // only ints handled for now
+        if (dmi->type == 'i' || dmi->type == 'b') {
             mvprintw(i + 2, 11 + strlen(dmi->label), dmi->comment);
+        } else {
+            assert(false); // only ints and bools handled for now
         }
     }
     move(i + 2, 0);
@@ -713,10 +739,22 @@ void ui_end_dialog(bool good)
                     if (*ptr) continue;  // we found a non-digit, skip entry
                     *fi->varptr.intptr = atoi(buffer);
                     fi->changed = true;
+/* only 'i' and 'b' are currently implemented.
                 } else if (fi->type == 'f') {
                     *fi->varptr.floatptr = atof(buffer);
                 } else if (fi->type == 's') {
                     strcpy(fi->varptr.charptr, buffer);
+ */
+                } else if (fi->type == 'b') {
+                    if (*buffer == 'f' || *buffer == 'F') {
+                        fi->changed = (*(fi->varptr.boolptr) != false);
+                        *(fi->varptr.boolptr) = false;
+                    } else if (*buffer == 't' || *buffer == 'T') {
+                        fi->changed = (*(fi->varptr.boolptr) != true);
+                        *(fi->varptr.boolptr) = true;
+                    }
+                } else {  // unhandled field type
+                    assert(false);
                 }
             }
         }

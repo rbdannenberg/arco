@@ -36,6 +36,7 @@ int p_buffer_size = -1;
 int p_latency_ms = -1;
 bool p_network_enable = true;
 bool p_o2lite_enable = true;
+bool p_internet_enable = true;
 bool p_mqtt_enable = false;
 
 char *prefs_in_name()
@@ -87,6 +88,8 @@ bool prefs_network_enable() { return p_network_enable; }
 
 bool prefs_o2lite_enable() { return p_o2lite_enable; }
 
+bool prefs_internet_enable() { return p_internet_enable; }
+
 bool prefs_mqtt_enable() { return p_mqtt_enable; }
 
 
@@ -111,4 +114,5 @@ void prefs_set_buffer_size(int size) { p_buffer_size = size; }
 
 bool prefs_set_network_enable(bool enable) { p_network_enable = enable; }
 bool prefs_set_o2lite_enable(bool enable) { p_o2lite_enable = enable; }
+bool prefs_set_internet_enable(bool enable) { p_internet_enable = enable; }
 bool prefs_set_mqtt_enable(bool enable) { p_mqtt_enable = enable; }

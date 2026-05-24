@@ -34,14 +34,23 @@
 #include "thru.h"
 */
 
-// User preferences edited by the Audio dialog:
+// User preferences edited by the Configuration dialog. These are
+// initialized to preferences, but may be edited. These are the
+// values that are actually used:
 int arco_in_id;
 int arco_out_id;
 int arco_in_chans;
 int arco_out_chans;
 int arco_buffer_size;
 int arco_latency_ms;
+bool arco_network_enable;
+bool arco_o2lite_enable;
+bool arco_internet_enable;
+bool arco_mqtt_enable;
 
+/* host_ variables are the actual parameter *after* PortAudio opens
+   an audio device. The values may not be exactly what was requested.
+*/
 static int host_in_chans = 0;
 static int host_out_chans = 0;
 static int host_in_id = -1;
@@ -49,6 +58,14 @@ static int host_out_id = -1;
 static int host_latency_ms = -1;
 static int host_buffer_size = -1;
 
+/* these host_ variables are set from preferences when the server
+   initializes. We use them to remember the configuration which can
+   only change by restarting
+ */
+static bool host_network_enable = true;
+static bool host_o2lite_enable = true;
+static bool host_internet_enable = true;
+static bool host_mqtt_enable = false;
 
 // leading 'c' means curses only, 'p' means plain terminal only
 
@@ -214,16 +231,26 @@ int main(int argc, char *argv[])
     printf("main: initial latency %d\n", prefs_latency_ms());
     has_curses = ui_init(200) >= 0;  // <0 means error, no curses interface
     // must be true for O2lite/Zeroconf discovery:
-    o2_network_enable(prefs_network_enable());
+    host_network_enable = prefs_network_enable();
+    o2_network_enable(host_network_enable);
+
+    host_o2lite_enable = prefs_o2lite_enable();
+    if (host_o2lite_enable) {
+        o2lite_initialize();  // enable O2lite client connections
+    }
+
+    host_internet_enable = prefs_internet_enable();
+    o2_internet_enable(host_internet_enable);
+
     o2_debug_flags("");
     o2_initialize("arco");
     o2_clock_set(NULL, NULL);  // we are the reference clock
-    if (prefs_mqtt_enable()) {
+
+    host_mqtt_enable = prefs_mqtt_enable();
+    if (host_mqtt_enable) {
         o2_mqtt_enable(NULL, 0);  // only default MQTT server supported now
     }
-    if (prefs_o2lite_enable()) {
-        o2lite_initialize();  // enable O2lite client connections
-    }
+
     host_initialize();  // set up handlers
     int err;
     if ((err = arco_initialize())) {
@@ -530,7 +557,7 @@ void test_tone()
 
 /********************* USER INTERFACE *********************/
 
-void audio_dialog()
+void config_dialog()
 {
     // look up device numbers in preferences
     for (int i = 0; i < arco_device_info.size(); i++) {
@@ -545,6 +572,10 @@ void audio_dialog()
     arco_out_chans = p_out_chans;
     arco_buffer_size = prefs_buffer_size();
     arco_latency_ms = prefs_latency_ms();
+    arco_network_enable = prefs_network_enable();
+    arco_o2lite_enable = prefs_o2lite_enable();
+    arco_internet_enable = prefs_internet_enable();
+    arco_mqtt_enable = prefs_mqtt_enable();
 
     ui_start_dialog();
     // "Current" values are displayed as information to user from
@@ -562,7 +593,15 @@ void audio_dialog()
                  host_buffer_size, prefs_buffer_size());
     ui_int_field("Latency:        ", &arco_latency_ms, -1, 1024,
                  host_latency_ms, prefs_latency_ms());
-    ui_run_dialog("Audio Input/Output Configuration");
+    ui_bool_field("Network enable: ", &arco_network_enable,
+                  host_network_enable, prefs_network_enable());
+    ui_bool_field("O2lite enable:  ", &arco_o2lite_enable,
+                  host_o2lite_enable, prefs_o2lite_enable());
+    ui_bool_field("Internet enable:", &arco_internet_enable,
+                  host_internet_enable, prefs_internet_enable());
+    ui_bool_field("MQTT enable:    ", &arco_mqtt_enable,
+                  host_mqtt_enable, prefs_mqtt_enable());
+    ui_run_dialog("Arco Configuration");
 
     
 }
@@ -577,9 +616,9 @@ int action(int ch)
         return false;  // Don't interact with Arco before it is ready.
     }
     switch (ch) {
-      case 'A': // audio device
+      case 'A': // configuration dialog
         if (has_curses) {
-            audio_dialog();
+            config_dialog();
         } else {
             printf("No audio dialog without curses. Edit .arco by hand.\n");
             for (int j = 0; j < arco_device_info.size(); j++) {
@@ -646,6 +685,14 @@ void dmaction()
                 prefs_set_buffer_size(arco_buffer_size);
             } else if (strstr(dminfo[i].label, "Latency:")) {
                 prefs_set_latency(arco_latency_ms);
+            } else if (strstr(dminfo[i].label, "Network enable:")) {
+                prefs_set_network_enable(arco_network_enable);
+            } else if (strstr(dminfo[i].label, "O2lite enable:")) {
+                prefs_set_network_enable(arco_o2lite_enable);
+            } else if (strstr(dminfo[i].label, "Internet enable:")) {
+                prefs_set_internet_enable(arco_internet_enable);
+            } else if (strstr(dminfo[i].label, "Mqtt enable:")) {
+                prefs_set_mqtt_enable(arco_mqtt_enable);
             }
         }
     }
