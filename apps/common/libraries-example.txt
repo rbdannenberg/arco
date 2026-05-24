@@ -84,6 +84,10 @@ set(INTL_OPT_LIB "/opt/homebrew/Cellar/gettext/0.21.1/lib/libintl.a"
 set(INTL_DBG_LIB "/opt/homebrew/Cellar/gettext/0.21.1/lib/libintl.a"
         CACHE PATH "libintl library needed by Glib 2.0" FORCE)  
 
+# Where to find curses library (Window only):
+# This can be omitted when building for MacOS or Linux:
+set(CURSES_BASE "C:/Users/Roger/research/vcpkg/installed/x64-windows"
+    CACHE FILEPATH "Curses library directory")
 
 # FFTW is now optional. We recommend the PFFFT library included in
 # Arco sources. To use FFTW, uncomment and define the variables here:

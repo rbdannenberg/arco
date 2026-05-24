@@ -696,4 +696,11 @@ void dmaction()
             }
         }
     }
+    if (host_network_enable != prefs_network_enable() ||
+        host_o2lite_enable != prefs_o2lite_enable() ||
+        host_internet_enable != prefs_internet_enable() ||
+        host_mqtt_enable != prefs_mqtt_enable()) {
+        printf("*** Save (P), Quit (Q), and restart for network\n"
+               "***   preference changes to take effect.\n");
+    }
 }

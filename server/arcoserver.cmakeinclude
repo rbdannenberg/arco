@@ -71,7 +71,17 @@ if(APPLE)
       ${AVFOUNDATION} ${AUDIOTOOLBOX} ${FOUNDATION})
   target_link_options(${ARCO_SERVER_NAME} PUBLIC "-ObjC")
 else()
-  set(CURSES_LIB ncurses)
+  set(CURSES_BASE ncurses CACHE PATH 
+      "Where to find lib and include files for ncurses") 
+  set(CURSES_LIB "${CURSES_BASE}/lib/pdcurses.lib") 
+  set(BONJOUR_LIB_DIR "C:/Program Files/Bonjour SDK/Lib/x64" Cache 
+      PATH "where to find dnssd.lib") 
+  target_link_directories(o2host PRIVATE ${BONJOUR_LIB_DIR}) 
+  target_include_directories(o2host PRIVATE "${CURSES_BASE}/include") 
+  target_link_libraries(o2host PRIVATE 
+      winmm.lib ws2_32.lib Iphlpapi.lib dnssd.lib) 
+  # always static
+  set_property(TARGET o2host PROPERTY MSVC_RUNTIME_LIBRARY MultiThreaded)
 endif() 
 
 # O2 is not in arcolib because it is already in wxslib (if you link
