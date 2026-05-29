@@ -38,7 +38,7 @@
 /* *INDENT-OFF*/
 
 #include <curses.h>
-#include <eti.h>
+#include "eti.h"
 
 #ifdef __cplusplus
   extern "C" {

@@ -14,37 +14,40 @@ __pycache__/
 /tmp/
 srp.log
 /ugens/*/generate_*.sh
+/ugens/*/generate_*.bat
 /ugens/*/*.fh
 /ugens/*/*.dsp
 /ugens/*/*.bak
 
-/apps/*/Debug/
-/apps/*/build/
-/apps/*/*.build/
-/apps/*/arco-build/
-/apps/*/serpent/
-/apps/*/srp.log
-/apps/*/version.srp
-/apps/*/wxsbuild/
-/apps/*/build/
+Debug/
+build/
+*.build/
+arco-build/
+srp.log
+version.srp
+wxsbuild/
+build/
 /apps/*/Makefile
-/apps/*/dspmakefile
-/apps/*/make_faust_ugens.sh
-/apps/*/dspsources.cmakeinclude
-/apps/*/libarco4lib.a
-/apps/*/libsrplib.a
-/apps/*/libwxslib.a
-/apps/*/log.txt
-/apps/*/.arco
-/apps/*/Release/
-/apps/*/Debug/
-/apps/*/make_faust_ugens.sh
-/apps/**/allugens.srp
-/apps/*/*.dir/
-/apps/*/*.sln
-/apps/*/*.vcxproj
-/apps/*/*.vcxproj.filters
-/apps/*/*.vcxproj.user
+dspmakefile
+make_faust_ugens.sh
+dspsources.cmakeinclude
+libarco4lib.a
+libsrplib.a
+libwxslib.a
+log.txt
+o2debug.log
+.arco
+arco.pref
+Release/
+Debug/
+allugens.srp
+**/*.dir/
+*.sln
+*.slnx
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
 
 /apps/basic/**/arcobasic
 
@@ -68,7 +71,7 @@ srp.log
 
 /arco/src/sine_incomplete.h
 /apps/handtrack/serpent/
-/apps/test/x64/
+x64/
 
 /fluidsynth/
 
