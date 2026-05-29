@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include "arcoutil.h"
+// need dbprintf and dhprintf from O2:
+#include "o2.h"
+#include "debug.h"
 
 void arco_print(const char *format, ...)
 {
@@ -16,6 +19,7 @@ void arco_print(const char *format, ...)
     va_start(ap, format);
     char str[256];
     vsnprintf(str, 256, format, ap);
+    va_end(ap);
     printf("%s", str);
 }
 
@@ -26,8 +30,12 @@ void arco_warn(const char *format, ...)
     va_start(ap, format);
     char str[256];
     vsnprintf(str, 256, format, ap);
-    fprintf(stderr, "WARNING: %s\n", str);
-    fflush(stderr);
+    va_end(ap);
+    printf("WARNING: %s\n", str);
+    fflush(stdout);
+    // not sure what happens to stderr in console-based server
+    // fprintf(stderr, "WARNING: %s\n", str);
+    // fflush(stderr);
 }
 
 
@@ -37,8 +45,37 @@ void arco_error(const char *format, ...)
     va_start(ap, format);
     char str[256];
     vsnprintf(str, 256, format, ap);
-    fprintf(stderr, "ERROR: %s\n", str);
-    fflush(stderr);
+    va_end(ap);
+    printf("ERROR: %s\n", str);
+    fflush(stdout);
+    // not sure what happens to stderr in console-based server
+    // fprintf(stderr, "ERROR: %s\n", str);
+    // fflush(stderr);
+}
+
+
+void adprintf(const char *format, ...)
+{
+    va_list ap;
+    char output[256];
+    va_start(ap, format);
+    vsnprintf(output, sizeof(output), format, ap);
+    va_end(ap);
+    dbprintf("%s", output);
+}
+
+
+void ahprintf(const char *format, ...)
+{
+    va_list ap;
+    char output[256];
+    va_start(ap, format);
+    vsnprintf(output, sizeof(output), format, ap);
+    va_end(ap);
+    const char *save_prefix = o2_debug_prefix;
+    o2_debug_prefix = "AR";
+    hdprintf("%s", output);
+    o2_debug_prefix = save_prefix;
 }
 
 

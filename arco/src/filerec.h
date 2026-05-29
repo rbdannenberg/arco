@@ -184,7 +184,7 @@ public:
             block_on_deck ^= 1;
             frame_in_block = 0;
             full = false;
-            printf("filerec full is false\n");
+            // ahprintf("filerec full is false\n");
         }
     }
 
@@ -198,7 +198,7 @@ public:
         }
         if (num_free == 0 && !stopped) {
             full = true;
-            printf("Warning: filerec overflow\n");
+            arco_warn("filerec overflow\n");
             return;
         }
         num_free--;
@@ -216,8 +216,8 @@ public:
         // read one frame at a time and write to block
         int16_t *out = &(block->dat[frame_in_block * block->channels]);
         D if (frame_in_block == 0) {
-            printf("real_run, frame_in_block == 0, write to %p (out) dat %p\n",
-                   out, &(block->dat[0]));
+            ahprintf("real_run, frame_in_block == 0, write to %p (out) dat %p\n",
+                     out, &(block->dat[0]));
         }
         for (int i = 0; i < BL; i++) {
             Sample_ptr in = input_samps + i;

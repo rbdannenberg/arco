@@ -89,7 +89,8 @@ static void arco_sum_swap(O2SM_HANDLER_ARGS)
         return;
     }
     sum->swap(ugen, replacement);
-    printf("arco_sum_swap: removed %d, inserted %d in sum %d\n", id1, id2, id);
+    // ahprintf("arco_sum_swap: removed %d, inserted %d in sum %d\n",
+    //          id1, id2, id);
 }
 
 

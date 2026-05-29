@@ -84,7 +84,7 @@ bool Granstream_state::chan_a(Granstream *gs, Sample *out_samps, int chan) {
                 // it is out of [-1, +1] range
 #endif
             }
-            D printf("fbgain %g\n", gs->feedback_out_smoothed);
+            D ahprintf("fbgain %g\n", gs->feedback_out_smoothed);
         } else {  // need to remove samples from input_buf in any case
             input_buf.toss(BL);
         }
@@ -179,8 +179,8 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
             double delay_blocks = ts * BR;
             delay = delay_blocks > MAX_BLOCK_COUNT ? MAX_BLOCK_COUNT
                                                    : (int) delay_blocks;
-            D printf("grain dens %g poly %d ts %g delay_blocks %d\n",
-                   gs->density, gs->polyphony, ts, delay);
+            D ahprintf("grain dens %g poly %d ts %g delay_blocks %d\n",
+                       gs->density, gs->polyphony, ts, delay);
             // Make sure delay is plausible:
             if (delay < 0) delay = 0;
             if (delay > 0) {
@@ -231,7 +231,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 delay = attack_blocks;
                 assert(phase > BL && phase < bufferlen &&
                        bufferlen == perchannel->input_buf.get_fifo_len());
-                D printf("grain start: chan %d gen %ld phase %g dur %g "
+                D ahprintf("grain start: chan %d gen %ld phase %g dur %g "
                          "ratio %g\n",
                        (int) (perchannel - &(gs->states[0])),
                        (long) (this - &(perchannel->gens[0])), 
@@ -241,7 +241,7 @@ bool Gran_gen::run(Granstream *gs, Granstream_state *perchannel,
                 state = GS_PREDELAY;
                 // only one message per 1000 blocks to avoid flood of errors
                 if (gs->warning_block > gs->current_block) {
-                    printf("granstream grain too long\n");
+                    ahprintf("granstream grain too long\n");
                     gs->warning_block = gs->current_block + 1000;
                 }
             }
@@ -423,7 +423,7 @@ static void arco_granstream_ratio(O2SM_HANDLER_ARGS)
     UGEN_FROM_ID(Granstream, granstream, id, "arco_granstream_ratio");
     granstream->low = low;
     granstream->high = high;
-    // printf("granstream ratios set %g %g\n", low, high);
+    // ahprintf("granstream ratios set %g %g\n", low, high);
 }
 
 

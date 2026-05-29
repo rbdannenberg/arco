@@ -69,8 +69,8 @@ public:
     void repl_input(Ugen_ptr ugen) {
         input->unref(&input);
         if (ugen->chans > 1) {
-            printf("WARNING: Input has more than one channel, only the first "
-                   "channel is used for spectral centroid calculation.\n");
+            arco_warn("Input has more than one channel, only the first "
+                      "channel is used for spectral centroid calculation.\n");
         }
         init_input(ugen);
     }

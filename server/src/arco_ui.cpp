@@ -16,41 +16,32 @@
 // There are 2 modes for scrolling: direct_mode is true if output is
 // written immediately to the screen; direct_mode is false if the
 // users scrolls back and new output is just captured in lines[].
+// If not direct_mode, dialog_mode, or help_mode, input is used to
+// scroll the text output.
 //
-// There's also menu_mode, where scrolling stops and a menu can be
-// drawn.  When anything is typed, the screen is refreshed, and
-// menu_mode ends.
+// There's also dialog_mode, where scrolling stops and a form or help
+// can be drawn.
 //
-// In menu_mode, input is diverted to a dialog manager. The dialog 
-// manager is simple, allowing you to:
-//   open one panel of text and input fields
-//   every panel includes fields for string and int input
-//   every panel includes one confirm/
+// In dialog_mode, input is diverted to fieldentry_handle_typing unless
+// help_mode, in which case any typing revert to direct_mode.
+//
+// To make a dialog (form), call ui_start_dialog(), create fields with
+// ui_*_field(). While in dialog_mode, send input to
+// fieldentry_handle_typing(). At end, call ui_end_dialog().
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
-#ifndef _WIN32
-#include <fcntl.h>
-#include <unistd.h>
 #include <curses.h>
-// #include <form.h>
-#else
+#include "fieldentry.h"
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-// Stub types for form.h - curses UI is not available on Windows
-typedef void FIELD;
-typedef void FORM;
-#define REQ_NEXT_FIELD 0
-#define REQ_PREV_FIELD 0
-#define REQ_END_LINE 0
-#define REQ_NEXT_CHAR 0
-#define REQ_PREV_CHAR 0
-#define REQ_DEL_PREV 0
-#define REQ_DEL_CHAR 0
-#define REQ_VALIDATION 0
-#define REQ_BEG_FIELD 0
+#else
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 #include "cmtio.h"
 #include "o2internal.h"
@@ -58,6 +49,7 @@ typedef void FORM;
 #include "arco_ui.h"
 
 Vec<O2string> arco_device_info;
+bool arco_interrupt_requested = false;
 
 #define ASCII_ESC 27
 
@@ -70,8 +62,8 @@ static int save_out;
 static int save_err;
 
 static int direct_mode = true;
-static int menu_mode = false;
-static int dialog_submode = false;
+static int help_mode = false;
+static int dialog_mode = false;
 
 static int lines_max = 0;
 static char **lines = NULL;
@@ -87,10 +79,7 @@ static int out_col = 0;
 
 int stop = false;
 
-Vec<FIELD *> fields;
-Vec<Dminfo> dminfo;
-FORM *dmform;
-void ui_end_dialog(bool good);
+void ui_end_dialog();
 
 
 static void print_extras()
@@ -130,7 +119,7 @@ static void show_help()
         mvprintw(y - 6 + i, 0, help_strings2[i]);
     }
     refresh();
-    menu_mode = true;
+    help_mode = true;
     int h = y - 5;  // number of scrolling lines
     if (direct_mode) {
         display_index = lines_index - h;
@@ -208,7 +197,7 @@ static void advance(int n)
     
     // are we in direct_mode?
     direct_mode = (display_index >= lines_index - h);
-    menu_mode = false;  // we erased whatever was there
+    help_mode = false;  // we erased whatever was there
     fprintf(logfile, "advance: display_index %d lines_index %d h %d "
             "direct_mode %d\n", display_index, lines_index, h, direct_mode);
     fprintf(logfile, "advance: out_line %d out_col %d n %d\n",
@@ -422,7 +411,8 @@ int ui_poll(int delay_ms)
     }
     DEBUGGING */
     int ch;
-    if (!uiscr) {  // interface is just simple command line, for Xcode debugger
+    if (!uiscr) {  // interface is just simple command line
+        // note: for Xcode debugging curses, use Debug:Attach to Process
         usleep(delay_ms * 1000);
         ch = IOgetchar();
         if (ch <= 0) {
@@ -452,7 +442,12 @@ int ui_poll(int delay_ms)
     fd_set s_rd, s_wr, s_ex;
     static int msgcnt = 0;
     struct timeval tv;
-    if ((ch = getch()) == ERR) {
+    if (arco_interrupt_requested && dialog_mode) {  // fake an ESC to exit mode
+        ch = ASCII_ESC;
+    } else {
+        ch = getch();
+    }
+    if (ch == ERR) {
         fflush(stdout);
         FD_ZERO(&s_rd);
         FD_ZERO(&s_wr);
@@ -465,52 +460,29 @@ int ui_poll(int delay_ms)
             return false;
         }
         char buffer[80];
-        n = read(out_pipe[0], buffer, 79);  // get, display input
+        n = (int) read(out_pipe[0], buffer, 79);  // get, display input
         if (n > 0) {
             buffer[n] = 0;
             output(buffer);
         }
     } else {
-        if (dialog_submode) {
-            switch (ch) {
-              case KEY_DOWN:
-              case '\n':
-                form_driver(dmform, REQ_NEXT_FIELD);
-                form_driver(dmform, REQ_END_LINE);
-                break;
-              case KEY_UP:
-                form_driver(dmform, REQ_PREV_FIELD);
-                form_driver(dmform, REQ_END_LINE);
-                break;
-              case KEY_LEFT:
-                form_driver(dmform, REQ_PREV_CHAR);
-                break;
-              case KEY_RIGHT:
-                form_driver(dmform, REQ_NEXT_CHAR);
-                break;
-              // Delete the char before cursor
-              case KEY_BACKSPACE:
-              case 127:
-                  form_driver(dmform, REQ_DEL_PREV);
-                  break;
-              // Delete the char under the cursor
-              case KEY_DC:
-                form_driver(dmform, REQ_DEL_CHAR);
-                break;
-              case 'C':
-              case ASCII_ESC:
-                ui_end_dialog(ch == 'C');
-                break;
-              default:
-                form_driver(dmform, ch);
-                break;
-            }                
+        if (dialog_mode) {
+            if (ch == ASCII_ESC || ch == 'C' || ch == 'Q') {
+                ui_end_dialog();
+                if (ch == 'C') {
+                    configure_screen_finish();
+                } else if (ch == 'Q') {
+                    action(ch);  // pass Q(uit) to main application...
+                }
+            } else {
+                fieldentry_handle_typing(ch);
+            }
             return false;
         } else if (getting_string) {
             got_a_char(ch);
             addch(ch);
             return false;
-        } else if (menu_mode) {  // new input, so redraw screen, erase choices
+        } else if (help_mode) {  // new input, so redraw screen, erase choices
             advance(0);
         }
         switch (ch) {
@@ -573,8 +545,6 @@ int ui_finish()
     }
     free(lines);
     fclose(logfile);
-    fields.finish();
-    puts("back to normal");
     return false;
 }
 
@@ -583,12 +553,15 @@ int ui_finish()
 
 int field_top;
 
-void ui_start_dialog()
+void ui_start_dialog(const char *title)
 {
-    fields.clear();
-    dminfo.clear();
+    mvprintw(0, 0, title);
+    clrtoeol();
+    move(1, 0);  // draw horizontal line to delineate input line
+    hline(ACS_HLINE, 72);
+
     field_top = 2;  // line for first field
-    menu_mode = dialog_submode = true;
+    dialog_mode = true;
     direct_mode = false;
 }
 
@@ -600,22 +573,21 @@ void ui_start_dialog()
 // actual and pref are dsiplayed as actual and pref value information
 //
 void ui_int_field(const char *prompt, int *value, int min, int max,
-                  int actual, int pref)
+                  int actual, int pref, int id)
 {
-    FIELD *field = new_field(1, 6, field_top, 3 + strlen(prompt), 0, 0);
-    set_field_back(field, A_UNDERLINE);
-    set_field_type(field, TYPE_INTEGER, 1, min, max);
-    if (*value == -1) {
-        set_field_buffer(field, 0, "");
-    } else {
-        char init_str[32];
-        sprintf(init_str, "%d", *value);
-        set_field_buffer(field, 0, init_str);
+    // clear the line
+    move(field_top, 0);
+    clrtoeol();
+
+    Field_entry *field = new Field_entry(0, (int) strlen(prompt) + 1, field_top,
+                                 prompt, 6, FIELD_INT, id, value, nullptr);
+    char value_string[32];
+    if (*value != -1) {
+        sprintf(value_string, "%d", *value);
+        field->set_content(value_string);
     }
-    Dminfo *fi = dminfo.append_space(1);
-    fi->type = 'i';
-    fi->label = prompt;
-    fi->changed = false;
+    field->show_content();
+
     char actual_str[32];
     if (actual == -1) {
         sprintf(actual_str, "<default>");
@@ -628,10 +600,9 @@ void ui_int_field(const char *prompt, int *value, int min, int max,
     } else {
         sprintf(pref_str, "%d", pref);
     }
-    sprintf(fi->comment, "Actual: %s, Pref: %s", actual_str, pref_str);
-    fi->varptr.intptr = value;
-    fields.push_back(field);
-    field_top += 1;
+    mvprintw(field_top, (int) strlen(prompt) + 8, "Actual: %s, Pref: %s",
+             actual_str, pref_str);
+    field_top++;
 }
 
 
@@ -641,133 +612,136 @@ void ui_int_field(const char *prompt, int *value, int min, int max,
 // min and max are range of values
 // actual and pref are dsiplayed as actual and pref value information
 //
-void ui_bool_field(const char *prompt, bool *value, bool actual, bool pref)
+void ui_bool_field(const char *prompt, bool *value, bool actual,
+                   bool pref, int id)
 {
-    FIELD *field = new_field(1, 2, field_top, 3 + strlen(prompt), 0, 0);
-    set_field_back(field, A_UNDERLINE);
-    set_field_type(field, TYPE_ALPHA, 1);
-    set_field_buffer(field, 0, *value ? "T" : "F");
-    Dminfo *fi = dminfo.append_space(1);
-    fi->type = 'b';
-    fi->label = prompt;
-    fi->changed = false;
-    sprintf(fi->comment, "Actual: %s, Pref: %s",
-            actual ? "T" : "F", pref ? "T" : "F");
-    fi->varptr.boolptr = value;
-    fields.push_back(field);
-    field_top += 1;
+    // clear the line
+    move(field_top, 0);
+    clrtoeol();
+
+    Field_entry *field = new Field_entry(0, (int) strlen(prompt) + 1, field_top,
+                                prompt, 2, FIELD_BOOL, id, value, nullptr);
+    char value_string[8];
+    sprintf(value_string, "%s", *value ? "T" : "F");
+    field->set_content(value_string);
+    field->show_content();
+
+    mvprintw(field_top, (int) strlen(prompt) + 8, "Actual: %s, Pref: %s",
+             actual ? "T" : "F", pref ? "T" : "F");
+    field_top++;
 }
 
 
-void ui_run_dialog(const char *title)
+int imax(int a, int b) { return a ? a > b : b; }
+
+void ui_menu_field(const char *prompt, char *value, const char **options,
+                   const char *actual, const char *pref, int id)
 {
-    fields.push_back(NULL);  // null termination
-    dmform = new_form(&fields[0]);
-    post_form(dmform);
-    refresh();
-    mvprintw(0, 3, title);
-    move(1, 0);  // draw horizontal line to delineate input line
-    hline(ACS_HLINE, 72);
-    int i;
-    for (i = 0; i < fields.size() - 1; i++) {
-        Dminfo *dmi = &dminfo[i];
-        mvprintw(i + 2, 2, dmi->label);
-        if (dmi->type == 'i' || dmi->type == 'b') {
-            mvprintw(i + 2, 11 + strlen(dmi->label), dmi->comment);
-        } else {
-            assert(false); // only ints and bools handled for now
-        }
+    // clear the line
+    move(field_top, 0);
+    clrtoeol();
+
+    int w = 0;
+    for (const char **opt = options; *opt; opt++) {
+        w = imax(w, (int) strlen(*opt));
     }
-    move(i + 2, 0);
-    hline(ACS_HLINE, 72);
-    i += 3;
-    move(i, 0);
-    int j;
-    for (j = 0; j < arco_device_info.size(); j++) {
-        mvprintw(i + j, 3, arco_device_info[j]);
+    Field_entry *field = new Field_entry(0, (int) strlen(prompt) + 1, field_top,
+                                prompt, w, FIELD_MENU, id, value, nullptr);
+    field->set_content(value);
+    field->set_menu_options(options);
+    field->show_content();
+
+    mvprintw(field_top, (int) strlen(prompt) + w + 4, "Actual: %s, Pref: %s",
+             actual, pref);
+    field_top++;
+}    
+
+
+void ui_string_field(const char *prompt, char *value, int width,
+                   const char *actual, const char *pref, int id)
+{
+    // clear the line
+    move(field_top, 0);
+    clrtoeol();
+
+    Field_entry *field = new Field_entry(0, (int) strlen(prompt) + 1, field_top,
+                  prompt, width, FIELD_STRING, id, value, nullptr);
+    field->set_content(value);
+    field->show_content();
+    char actual_str[64];
+    if (actual) {
+        snprintf(actual_str, sizeof(actual_str), "Actual %s, ", actual);
+    } else {
+        actual_str[0] = 0;
     }
-    i += j;
-    mvprintw(i, 3, "Type C(onfirm) to exit with changes; "
-                       "or ESC to exit without changes.");
-    mvprintw(i + 1, 3, "Leave blank for default, which can "
-                       "change when devices are opened.");
-    set_current_field(dmform, fields[0]); 
-    form_driver(dmform, REQ_BEG_FIELD);
-    refresh();
+    mvprintw(field_top, (int) strlen(prompt) + width + 2,
+             "%sPref: %s", actual_str, pref);
+    field_top++;
+}    
+
+
+// call this after setting up dialog (this does not actually do
+// character input -- pass characters to fieldentry_handle_typing())
+void ui_run_dialog()
+{
+    set_current_field(nullptr);  // sets to first field
 }
 
 
 // ui_end_dialog() - finish dialog -- use the data from the form if good is true
 //
-void ui_end_dialog(bool good)
+void ui_end_dialog()
 {
-    form_driver(dmform, REQ_VALIDATION);
-    fields.pop_back();  // last element is NULL
-    if (good) {
-        for (int i = 0; i < fields.size(); i++) {
-            FIELD *field = fields[i];
-            if (field_status(field)) {
-                Dminfo *fi = &dminfo[i];
-                const char *buffer = field_buffer(field, 0);
+    for (Field_entry *field = fields; field; field = field->next) {
+        const char *buffer = field->content;
+        // convert blank input for numbers to -1 
+        // (which means ignore and use the default):
+        char trimmed[64];
+        strncpy(trimmed, buffer, 64);
+        trimmed[63] = 0;
+        // trim trailing whitespace:
+        char *ptr = trimmed + strlen(trimmed);
+        while (ptr > trimmed && isspace(ptr[-1])) {
+            *(--ptr) = 0;  // remove last whitespace character
+        }
+        // trim leading whitespace by advancing to first non-whitespace:
+        ptr = trimmed;
+        while (*ptr && isspace(*ptr)) ptr++;
+        buffer = ptr;
 
-                // convert blank input for numbers to -1 
-                // (which means ignore and use the default):
-                char trimmed[64];
-                strncpy(trimmed, buffer, 64);
-                trimmed[63] = 0;
-                // trim trailing whitespace:
-                char *ptr = trimmed + strlen(trimmed);
-                while (ptr > trimmed && isspace(ptr[-1])) {
-                    *(--ptr) = 0;  // remove last whitespace character
-                }
-                // trim leading whitespace by advancing to first non-whitespace:
-                ptr = trimmed;
-                while (*ptr && isspace(*ptr)) ptr++;
-                buffer = ptr;
-                
-                // empty string is translated to -1 if it is a number
-                if (fi->type != 's' && *buffer == 0) {
-                    buffer = "-1";
-                }
-                if (fi->type == 'i') {
-                    // I can't get validation to eliminate or flag bogus values
-                    // so do it here:
-                    const char *ptr = buffer;
-                    if (*ptr == '-') ptr++;
-                    if (!isdigit(*ptr)) continue;  // not digits, skip entry
-                    while (*ptr && isdigit(*ptr)) ptr++;
-                    if (*ptr) continue;  // we found a non-digit, skip entry
-                    *fi->varptr.intptr = atoi(buffer);
-                    fi->changed = true;
+        // empty string is translated to -1 if it is a number
+        if (field->is_int() && *buffer == 0) {
+            buffer = "-1";
+        }
+        if (field->is_int()) {
+            const char *ptr = buffer;
+            if (*ptr == '-') ptr++;
+            if (!isdigit(*ptr)) continue;  // not digits, skip entry
+            while (*ptr && isdigit(*ptr)) ptr++;
+            if (*ptr) continue;  // we found a non-digit, skip entry
+            *((int *) (field->value)) = atoi(buffer);
 /* only 'i' and 'b' are currently implemented.
                 } else if (fi->type == 'f') {
                     *fi->varptr.floatptr = atof(buffer);
                 } else if (fi->type == 's') {
                     strcpy(fi->varptr.charptr, buffer);
  */
-                } else if (fi->type == 'b') {
-                    if (*buffer == 'f' || *buffer == 'F') {
-                        fi->changed = (*(fi->varptr.boolptr) != false);
-                        *(fi->varptr.boolptr) = false;
-                    } else if (*buffer == 't' || *buffer == 'T') {
-                        fi->changed = (*(fi->varptr.boolptr) != true);
-                        *(fi->varptr.boolptr) = true;
-                    }
-                } else {  // unhandled field type
-                    assert(false);
-                }
-            }
+        } else if (field->is_bool()) {
+            *((bool *) (field->value)) = (*buffer == 'T');
+        } else if (field->is_string() || field->is_menu()) {
+            strcpy((char *) (field->value), buffer);
+        } else {  // unhandled field type
+            assert(false);
         }
     }
-    dmaction();
-    menu_mode = dialog_submode = false;
+    dialog_mode = false;
     direct_mode = true;
     refresh_screen();
+    delete_all_fields();
+}
 
-    free_form(dmform);
-    dmform = NULL;
-    for (int i = 0; i < fields.size(); i++) {
-        free_field(fields[i]);
-    }
-    fields.clear();
+
+void do_command(Field_entry *field)
+{
+    printf("do_command %d\n", field->id);
 }

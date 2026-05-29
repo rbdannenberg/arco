@@ -359,8 +359,8 @@ void fileio_fileplay_start(O2SM_HANDLER_ARGS)
             reader->load_block();
         } else {
             fileio_objs.remove(i);
-            printf("fileio_fileplay_start deleting reader @ %p addr %p\n",
-                   reader, (void *) addr);
+            ahprintf("fileio_fileplay_start deleting reader @ %p addr %p\n",
+                     reader, (void *) addr);
             delete reader;
         }
     }
@@ -400,12 +400,12 @@ void fileio_filerec_write(O2SM_HANDLER_ARGS)
     int64_t block = argv[1]->h;
     // end unpack message
     int i = fileio_find(addr);
-    D printf("fileio_filerec_write addr %p block %p index %d last %d\n",
-           (void *) addr, (void *) block, i, ((Audioblock *) block)->last);
+    D ahprintf("fileio_filerec_write addr %p block %p index %d last %d\n",
+               (void *) addr, (void *) block, i, ((Audioblock *) block)->last);
     if (i >= 0) {
         Fileio_writer *writer = (Fileio_writer *) fileio_objs[i];
         bool last = writer->write_block(block);
-        D printf("wrote audioblock %p, last %d\n", (void *) block, last);
+        D ahprintf("wrote audioblock %p, last %d\n", (void *) block, last);
         o2_send_start();
         o2_add_int64(addr);
         O2message_ptr msg = 
@@ -413,7 +413,7 @@ void fileio_filerec_write(O2SM_HANDLER_ARGS)
         o2_shmem_inst_outgoing_push(audio_bridge, (O2list_elem *) msg);
         if (last) {
             fileio_objs.remove(i);
-            printf("fileio_filerec_write deleting writer @ %p addr %p\n",
+            ahprintf("fileio_filerec_write deleting writer @ %p addr %p\n",
                    writer, (void *) addr);
             delete writer;
         }
@@ -430,7 +430,7 @@ int fileio_initialize()
     assert(fileio_bridge == NULL);
     fileio_bridge = o2_shmem_inst_new();
     fileio_actual.fio_o2_ctx = o2sm_initialize(fileio_bridge);
-    printf("initialized fileio_bridge %p id %d\n", fileio_bridge,
+    ahprintf("initialized fileio_bridge %p id %d\n", fileio_bridge,
            o2_shmem_inst_id(fileio_bridge));
     o2sm_service_new("fileio", NULL);
 
@@ -450,7 +450,7 @@ int fileio_initialize()
 
     // create a thread to poll for fileio
     if (fileio_actual.initialize(50) != 0) {
-        printf("FATAL CONDITION: Arco fileio failed initialization.\n");
+        arco_error("FATAL CONDITION: Arco fileio failed initialization.\n");
         return 1;
     }
 

@@ -74,8 +74,8 @@ public:
     void repl_input(Ugen_ptr ugen) {
         input->unref(&input);
         if (ugen->chans > 1) {
-            printf("WARNING: Chorddetect input has more than one channel, only "
-                   "the first channel is used for chord detection.\n");
+            arco_warn("Chorddetect input has more than one channel, only "
+                      "the first channel is used for chord detection.\n");
         }
         init_input(ugen);
     }

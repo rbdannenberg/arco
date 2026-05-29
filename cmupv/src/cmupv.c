@@ -489,7 +489,7 @@ float *pv_window(Phase_vocoder x, float (*window_type)(double x))
 int pv_get_input_count(Phase_vocoder x)
 {
     PV *pv = (PV*)x;
-    int ana_hopsize = lroundf((pv->syn_hopsize) * (pv->ratio));
+    int ana_hopsize = (int) lroundf((pv->syn_hopsize) * (pv->ratio));
     if (ana_hopsize > pv->max_ana_hopsize) {
         ana_hopsize = pv->max_ana_hopsize;
     }
@@ -1004,7 +1004,7 @@ float *pv_get_output(Phase_vocoder x)
     float *ana_frame = pv->ana_frame;
     float *ana_center;
     
-    int ana_hopsize = lroundf(syn_hopsize * ratio);
+    int ana_hopsize = (int) lroundf(syn_hopsize * ratio);
     if (ana_hopsize > pv->max_ana_hopsize) {
         ana_hopsize = pv->max_ana_hopsize;
     }

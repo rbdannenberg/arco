@@ -17,6 +17,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
+#include "string.h"
 #include "o2atomic.h"
 #include "sharedmem.h"   // o2_shmem_inst_new()
 #include "arcotypes.h"
@@ -27,6 +28,7 @@
 #include "prefs.h"
 #include "svprefs.h"
 #include "arcoutil.h"
+#include "fieldentry.h"
 /*
 #include "ugen.h"
 #include "zero.h"
@@ -43,10 +45,12 @@ int arco_in_chans;
 int arco_out_chans;
 int arco_buffer_size;
 int arco_latency_ms;
-bool arco_network_enable;
+char arco_network_option[24];
 bool arco_o2lite_enable;
-bool arco_internet_enable;
-bool arco_mqtt_enable;
+char arco_debug_flags[64];
+
+const char *net_options[] = {"localhost only", "local network", "internet",
+                             "wide-area discovery", NULL};
 
 /* host_ variables are the actual parameter *after* PortAudio opens
    an audio device. The values may not be exactly what was requested.
@@ -62,10 +66,9 @@ static int host_buffer_size = -1;
    initializes. We use them to remember the configuration which can
    only change by restarting
  */
-static bool host_network_enable = true;
+static char host_network_option[24];
 static bool host_o2lite_enable = true;
-static bool host_internet_enable = true;
-static bool host_mqtt_enable = false;
+// static char host_debug_flags[64]; -- not used
 
 // leading 'c' means curses only, 'p' means plain terminal only
 
@@ -84,7 +87,7 @@ const char *help_strings[] = {
     NULL  // must terminate this list with NULL
 };
 
-const char *main_commands = "(A)udio device (S)tart/Stop (R)eset (Q)uit (H)elp";
+const char *main_commands = "(A)Configure (S)tart/Stop (R)eset (Q)uit (H)elp";
 
 bool arco_ready = false;
 bool has_curses = false;  // curses interface exists
@@ -226,28 +229,30 @@ void host_ugens_init()
 
 int main(int argc, char *argv[])
 {
+    o2_use_logfile(true);  // divert debug info because of console UI
     prefs_read();
 
-    printf("main: initial latency %d\n", prefs_latency_ms());
+    ahprintf("main: initial latency %d\n", prefs_latency_ms());
     has_curses = ui_init(200) >= 0;  // <0 means error, no curses interface
+    
     // must be true for O2lite/Zeroconf discovery:
-    host_network_enable = prefs_network_enable();
-    o2_network_enable(host_network_enable);
+    strncpy(host_network_option, prefs_network_option(),
+            sizeof(host_network_option));
+    host_network_option[sizeof(host_network_option) - 1] = 0;
+    int opt = string_list_index(net_options, host_network_option, 0);
+    o2_network_enable(opt > 0);
 
     host_o2lite_enable = prefs_o2lite_enable();
     if (host_o2lite_enable) {
         o2lite_initialize();  // enable O2lite client connections
     }
 
-    host_internet_enable = prefs_internet_enable();
-    o2_internet_enable(host_internet_enable);
+    o2_internet_enable(opt > 1);
 
-    o2_debug_flags("");
     o2_initialize("arco");
     o2_clock_set(NULL, NULL);  // we are the reference clock
 
-    host_mqtt_enable = prefs_mqtt_enable();
-    if (host_mqtt_enable) {
+    if (opt > 2) {
         o2_mqtt_enable(NULL, 0);  // only default MQTT server supported now
     }
 
@@ -298,7 +303,16 @@ int main(int argc, char *argv[])
             }
         }
 
-        o2_poll();
+        O2err err = o2_poll();
+        if (err == O2_INTERRUPT_REQUESTED) {
+            arco_interrupt_requested = true;
+            o2_reset_interrupt_request();
+        }
+        if (arco_interrupt_requested) {
+            // This may fail the first time so we put it in the polling loop.
+            // It does not do anything once the goal is successfully set:
+            set_server_goal_state(FINISHED, "Waiting to finish and exit.");
+        }
         arco_thread_poll();
         if (!arco_ready) {
             arco_ready = (o2_status("arco") == O2_BRIDGE);
@@ -321,9 +335,9 @@ int main(int argc, char *argv[])
         O2_FREE((void *) arco_device_info[i]);
     }
     arco_device_info.finish();
-    dminfo.finish();
     
     o2_finish();
+    return 0;
 }
 
 
@@ -355,7 +369,7 @@ int host_open_audio()
 
 void host_quit_audio()
 {
-    return set_server_goal_state(FINISHED, "Cannot Quit now");
+    set_server_goal_state(FINISHED, "Cannot Quit now");
 }
 
 
@@ -557,6 +571,7 @@ void test_tone()
 
 /********************* USER INTERFACE *********************/
 
+// config_dialog - run form to specify configuration
 void config_dialog()
 {
     // look up device numbers in preferences
@@ -572,38 +587,58 @@ void config_dialog()
     arco_out_chans = p_out_chans;
     arco_buffer_size = prefs_buffer_size();
     arco_latency_ms = prefs_latency_ms();
-    arco_network_enable = prefs_network_enable();
+    strncpy(arco_network_option, prefs_network_option(),
+            sizeof(arco_network_option));
+    arco_network_option[sizeof(arco_network_option) - 1] = 0;
     arco_o2lite_enable = prefs_o2lite_enable();
-    arco_internet_enable = prefs_internet_enable();
-    arco_mqtt_enable = prefs_mqtt_enable();
+    strncpy(arco_debug_flags, prefs_debug_flags(), sizeof(arco_debug_flags));
+    arco_debug_flags[sizeof(arco_debug_flags) - 1] = 0;
 
-    ui_start_dialog();
+    ui_start_dialog( "   Arco Configuration");
+    
     // "Current" values are displayed as information to user from
     // host_* variables unless there is no actual value yet,
     // in which case we assume the preferences will give us a value:
     ui_int_field("Input device:   ", &arco_in_id, -1, 100,
-                 host_in_id, p_in_id);
+                 host_in_id, p_in_id, 101);
     ui_int_field("Output device:  ", &arco_out_id, -1, 100,
-                 host_out_id, p_out_id);
+                 host_out_id, p_out_id, 102);
     ui_int_field("Input channels: ", &arco_in_chans, -1, 100,
-                 host_in_chans, prefs_in_chans());
+                 host_in_chans, prefs_in_chans(), 103);
     ui_int_field("Output channels:", &arco_out_chans, -1, 100,
-                 host_out_chans, prefs_out_chans());
+                 host_out_chans, prefs_out_chans(), 104);
     ui_int_field("Buffer size:    ", &arco_buffer_size, -1, 1024,
-                 host_buffer_size, prefs_buffer_size());
+                 host_buffer_size, prefs_buffer_size(), 105);
     ui_int_field("Latency:        ", &arco_latency_ms, -1, 1024,
-                 host_latency_ms, prefs_latency_ms());
-    ui_bool_field("Network enable: ", &arco_network_enable,
-                  host_network_enable, prefs_network_enable());
+                 host_latency_ms, prefs_latency_ms(), 106);
+    ui_menu_field("Networking (menu):", arco_network_option, net_options,
+                  host_network_option, prefs_network_option(), 107);
     ui_bool_field("O2lite enable:  ", &arco_o2lite_enable,
-                  host_o2lite_enable, prefs_o2lite_enable());
-    ui_bool_field("Internet enable:", &arco_internet_enable,
-                  host_internet_enable, prefs_internet_enable());
-    ui_bool_field("MQTT enable:    ", &arco_mqtt_enable,
-                  host_mqtt_enable, prefs_mqtt_enable());
-    ui_run_dialog("Arco Configuration");
+                  host_o2lite_enable, prefs_o2lite_enable(), 109);
+    ui_string_field("Debug flags: ", arco_debug_flags, 25,
+                    nullptr, prefs_debug_flags(), 110);
+    move(field_top, 0);
+    hline(ACS_HLINE, 72);
+    field_top++;
 
-    
+    // show the audio devices
+    for (int j = 0; j < arco_device_info.size(); j++) {
+        mvaddstr(field_top, 0, "   ");
+        addstr(arco_device_info[j]);
+        clrtoeol();
+        field_top++;
+    }
+    mvaddstr(field_top, 0, "   Leave blank for default (default can "
+                       "change when devices are opened).");
+    clrtoeol();
+    field_top++;
+    mvaddstr(field_top, 0, "   Type C(onfirm) to exit with changes; "
+                       "or ESC to exit without changes.");
+    clrtoeol();
+    field_top++;
+    move(field_top, 0);
+    clrtoeol();  // blank line after instructions
+    ui_run_dialog();
 }
 
 
@@ -666,41 +701,27 @@ int action(int ch)
 }
 
 
-void dmaction()
+void configure_screen_finish()
 {
     // update preferences
-    for (int i = 0; i < dminfo.size(); i++) {
-        if (dminfo[i].changed) {
-            if (strstr(dminfo[i].label, "Input device:")) {
-                prefs_set_in_name(arco_name_lookup(arco_in_id));
-                p_in_id = arco_in_id;
-            } else if (strstr(dminfo[i].label, "Output device:")) {
-                prefs_set_out_name(arco_name_lookup(arco_out_id));
-                p_out_id = arco_out_id;
-            } else if (strstr(dminfo[i].label, "Input channels:")) {
-                prefs_set_in_chans(arco_in_chans);
-            } else if (strstr(dminfo[i].label, "Output channels:")) {
-                prefs_set_out_chans(arco_out_chans);
-            } else if (strstr(dminfo[i].label, "Buffer size:")) {
-                prefs_set_buffer_size(arco_buffer_size);
-            } else if (strstr(dminfo[i].label, "Latency:")) {
-                prefs_set_latency(arco_latency_ms);
-            } else if (strstr(dminfo[i].label, "Network enable:")) {
-                prefs_set_network_enable(arco_network_enable);
-            } else if (strstr(dminfo[i].label, "O2lite enable:")) {
-                prefs_set_network_enable(arco_o2lite_enable);
-            } else if (strstr(dminfo[i].label, "Internet enable:")) {
-                prefs_set_internet_enable(arco_internet_enable);
-            } else if (strstr(dminfo[i].label, "Mqtt enable:")) {
-                prefs_set_mqtt_enable(arco_mqtt_enable);
-            }
-        }
-    }
-    if (host_network_enable != prefs_network_enable() ||
-        host_o2lite_enable != prefs_o2lite_enable() ||
-        host_internet_enable != prefs_internet_enable() ||
-        host_mqtt_enable != prefs_mqtt_enable()) {
+    prefs_set_in_name(arco_name_lookup(arco_in_id));
+    p_in_id = arco_in_id;
+    prefs_set_out_name(arco_name_lookup(arco_out_id));
+    p_out_id = arco_out_id;
+    prefs_set_in_chans(arco_in_chans);
+    prefs_set_out_chans(arco_out_chans);
+    prefs_set_buffer_size(arco_buffer_size);
+    prefs_set_latency(arco_latency_ms);
+    prefs_set_network_option(arco_network_option);
+    prefs_set_o2lite_enable(arco_o2lite_enable);
+    prefs_set_debug_flags(arco_debug_flags);
+    if (strcmp(host_network_option, prefs_network_option()) != 0 ||
+        host_o2lite_enable != prefs_o2lite_enable()) {
         printf("*** Save (P), Quit (Q), and restart for network\n"
                "***   preference changes to take effect.\n");
+    }
+    if (server_set_debug_flags(arco_debug_flags)) {
+        o2_debug_flags(prefs_debug_flags());
+        printf("*** Set new debug flags: \"%s\".\n", prefs_debug_flags());
     }
 }

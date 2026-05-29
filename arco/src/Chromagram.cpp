@@ -21,7 +21,7 @@
 
 #include "Chromagram.h"
 #include "arcougen.h"
-//==================================================================================
+//============================================================================
 Chromagram::Chromagram (int frameSize, int fs) :
         referenceFrequency (130.81278265),
         bufferSize (8192),
@@ -80,7 +80,7 @@ Chromagram::Chromagram (int frameSize, int fs) :
     y_2 = 0;
 }
 
-//==================================================================================
+//============================================================================
 Chromagram::~Chromagram()
 {
     O2_FREE(window);
@@ -159,7 +159,7 @@ void Chromagram::processAudioFrame (float* inputAudioFrame)
     
 }
 
-//==================================================================================
+//============================================================================
 void Chromagram::setInputAudioFrameSize (int frameSize)
 {
     inputAudioFrameSize = frameSize;
@@ -167,36 +167,37 @@ void Chromagram::setInputAudioFrameSize (int frameSize)
     downSampledAudioFrameSize = inputAudioFrameSize / 4;
 }
 
-//==================================================================================
+//============================================================================
 void Chromagram::setSamplingFrequency (int fs)
 {
     samplingFrequency = fs;
 }
 
-//==================================================================================
+//============================================================================
 void Chromagram::setChromaCalculationInterval (int numSamples)
 {
     // True number of samples buffer can represent is bufferSize * 4 since we downsample
     if (numSamples > bufferSize * 4) {
-        printf("Failed to set Chroma Calculation Interval. Cannot be greater than window size\n");
+        arco_error("Failed to set Chroma Calculation Interval. Cannot be "
+                   "greater than window size\n");
         return;
     }
     chromaCalculationInterval = numSamples;
 }
 
-//==================================================================================
+//============================================================================
 float* Chromagram::getChromagram()
 {
     return chromagram;
 }
 
-//==================================================================================
+//============================================================================
 bool Chromagram::isReady()
 {
     return chromaReady;
 }
 
-//==================================================================================
+//============================================================================
 void Chromagram::setupFFT()
 {
     // ------------------------------------------------------
@@ -226,7 +227,7 @@ void Chromagram::setupFFT()
 }
 
 
-//==================================================================================
+//============================================================================
 void Chromagram::calculateChromagram()
 {
     calculateMagnitudeSpectrum();
@@ -270,7 +271,7 @@ void Chromagram::calculateChromagram()
     chromaReady = true;
 }
 
-//==================================================================================
+//============================================================================
 void Chromagram::calculateMagnitudeSpectrum()
 {
     
@@ -347,7 +348,7 @@ void Chromagram::calculateMagnitudeSpectrum()
 
 }
 
-//==================================================================================
+//============================================================================
 void Chromagram::downSampleFrame (float* inputAudioFrame)
 {
     float* filteredFrame = O2_MALLOCNT(inputAudioFrameSize, float);
@@ -378,7 +379,7 @@ void Chromagram::downSampleFrame (float* inputAudioFrame)
     O2_FREE(filteredFrame);
 }
 
-//==================================================================================
+//============================================================================
 void Chromagram::makeHammingWindow()
 {
     // set the window to the correct size
@@ -391,7 +392,7 @@ void Chromagram::makeHammingWindow()
     }
 }
 
-//==================================================================================
+//============================================================================
 double Chromagram::round (double val)
 {
     return floor (val + 0.5);

@@ -102,7 +102,7 @@ public:
                 start(false);
             } else {
                 if (flags & UGENTRACE) {
-                    printf("Fileplay::unref deleting traced ugen: ");
+                    ahprintf("Fileplay::unref deleting traced ugen: ");
                     print();
                 }
                 delete this;
@@ -154,7 +154,7 @@ public:
             stopped = true;
             send_action_id(ACTION_END);
             if (refcount == 0) {
-                printf("Fileplay::ready deleting %p\n", this);
+                // ahprintf("Fileplay::ready deleting %p\n", this);
                 delete this;
             }
         }
@@ -174,8 +174,8 @@ public:
         next_block ^= 1;  // swap 0 <-> 1
 #if FILEPLAY_DEBUG
         blocks_received++;
-        printf("fileplay @ %g: got block #%d from fileio\n", o2sm_time_get(),
-               blocks_received);
+        ahprintf("fileplay @ %g: got block #%d from fileio\n", o2sm_time_get(),
+                 blocks_received);
 #endif
     }
 
@@ -192,8 +192,8 @@ public:
             o2_shmem_inst_outgoing_push(fileio_bridge, (O2list_elem *) msg);
 #if FILEPLAY_DEBUG
             blocks_requested++;
-            printf("fileplay @ %g: requested block #%d\n", o2sm_time_get(),
-                   blocks_requested);
+            ahprintf("fileplay @ %g: requested block #%d\n", o2sm_time_get(),
+                     blocks_requested);
 #endif
         }
         blocks[block_on_deck] = NULL;
@@ -202,9 +202,9 @@ public:
         if (!block && !stopped) {
             arco_warn("fileplay underflow");
 #if FILEPLAY_DEBUG
-            printf("    fileplay @ %g: requested %d received %d blocks[0] %p"
-                   " blocks[1] %p\n", o2sm_time_get(),
-                   blocks_requested, blocks_received, blocks[0], blocks[1]);
+            ahprintf("    fileplay @ %g: requested %d received %d blocks[0] %p"
+                     " blocks[1] %p\n", o2sm_time_get(),
+                     blocks_requested, blocks_received, blocks[0], blocks[1]);
 #endif
 
         }

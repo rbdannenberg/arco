@@ -19,6 +19,9 @@
 #include "ctype.h"
 #include "prefs.h"
 #include "svprefs.h"
+#include "o2.h"
+#include "debug.h"
+#include "arcoutil.h"
 
 char *find_nonspace(const char *str)
 {
@@ -67,10 +70,20 @@ void get_name(const char *line_ptr, char *p_device)
 
 #include <errno.h>
 
+bool server_set_debug_flags(const char *new_flags)
+{
+    if (strcmp(new_flags, prefs_debug_flags()) != 0) {
+        o2_debug_flags(new_flags);
+        prefs_set_debug_flags(new_flags);
+        return true;
+    }
+    return false;
+}
+
+
 void prefs_read()
 {
-    printf("prefs_read called\n");
-    FILE *pf = fopen(".arco", "r");
+    FILE *pf = fopen("arco.prefs", "r");
     if (!pf) {
         return;
     }
@@ -94,16 +107,17 @@ void prefs_read()
             prefs_set_buffer_size(n);
         } else if (get_number(line_ptr, "latency:", &n)) {
             prefs_set_latency(n);
-        } else if (get_number(line_ptr, "network_enable:", &n)) {
-            prefs_set_network_enable(n != 0);
+        } else if (strstr(line_ptr, "network_option:") != 0) {
+            get_name(line_ptr + 15, device);
+            prefs_set_network_option(device);
         } else if (get_number(line_ptr, "o2lite_enable:", &n)) {
             prefs_set_o2lite_enable(n != 0);
-        } else if (get_number(line_ptr, "internet_enable:", &n)) {
-            prefs_set_internet_enable(n != 0);
-        } else if (get_number(line_ptr, "mqtt_enable:", &n)) {
-            prefs_set_mqtt_enable(n != 0);
-        }
+        } else if (strstr(line_ptr, "debug_flags:") != 0) {
+            get_name(line_ptr + 12, device);
+            server_set_debug_flags(device);
+       }
     }
+    ahprintf("prefs_read completed\n");
     // Note: original used POSIX getline which could realloc line_ptr.
     // fgets always uses the provided buffer, so no free needed.
 }
@@ -111,14 +125,18 @@ void prefs_read()
 
 void prefs_write()
 {
-    FILE *pf = fopen(".arco", "w");
-    if (!pf) return;
+    FILE *pf = fopen("arco.prefs", "w");
+    if (!pf) {
+        printf("Could not open arco.prefs\n");
+        return;
+    }
     fprintf(pf, "audio_in_name: \"%s\"\n", prefs_in_name());
     fprintf(pf, "audio_out_name: \"%s\"\n", prefs_out_name());
     fprintf(pf, "in_chans: %d\n", prefs_in_chans());
     fprintf(pf, "out_chans: %d\n", prefs_out_chans());
     fprintf(pf, "buffer_size: %d\n", prefs_buffer_size());
     fprintf(pf, "latency: %d\n", prefs_latency_ms());
+    fprintf(pf, "debug_flags: %s\n", prefs_debug_flags());
     fclose(pf);
     printf("audio_in_name: \"%s\"\n", prefs_in_name());
     printf("audio_out_name: \"%s\"\n", prefs_out_name());
@@ -126,8 +144,9 @@ void prefs_write()
     printf("out_chans: %d\n", prefs_out_chans());
     printf("buffer_size: %d\n", prefs_buffer_size());
     printf("latency: %d\n", prefs_latency_ms());
-    printf("network_enable: %d\n", (int) prefs_network_enable());
+    printf("network_option: %s\n", prefs_network_option());
     printf("o2lite_enable: %d\n", (int) prefs_o2lite_enable());
-    printf("internet_enable: %d\n", (int) prefs_internet_enable());
-    printf("mqtt_enable: %d\n", (int) prefs_mqtt_enable());
+    printf("debug_flags: \"%s\"\n", prefs_debug_flags());
+    fclose(pf);
+    printf("Wrote arco.prefs\n");
 }

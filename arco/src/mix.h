@@ -228,9 +228,9 @@ public:
                     input_desc->prev_gain.zero();
                 }
             } else {
-                printf("WARNING: In Mix::set_gain, current gain is not Const"
-                       " and chan to set is not zero, mix %d, name %s,"
-                       " chan %d\n", id, name, chan);
+                arco_warn("In Mix::set_gain, current gain is not Const"
+                          " and chan to set is not zero, mix %d, name %s,"
+                          " chan %d\n", id, name, chan);
             }
         }
     }
