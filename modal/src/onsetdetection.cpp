@@ -80,7 +80,7 @@ sample mean(sample arr[], int n) {
  *  http://ndevilla.free.fr/median/median/index.html
  */
 
-#define ELEM_SWAP(a,b) { register sample t=(a);(a)=(b);(b)=t; }
+#define ELEM_SWAP(a,b) { sample t=(a);(a)=(b);(b)=t; }
 
 sample median(sample arr[], int n) {
     int low, high ;

@@ -19,7 +19,7 @@ public:
 
 
     Route(int id, int nchans) : Ugen(id, 'a', nchans) {
-        printf("Route@%p created, id %d\n", this, id);
+        // ahprintf("Route@%p created, id %d\n", this, id);
         routes.set_size(chans, false);
         // initial routing is output all zeros:
         for (int i = 0; i < chans; i++) {

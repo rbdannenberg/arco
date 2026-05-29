@@ -1,0 +1,7 @@
+audio_in_name: "Core Audio : MacBook Air Microphone"
+audio_out_name: "Core Audio : MacBook Air Speakers"
+in_chans: 2
+out_chans: 2
+buffer_size: 32
+latency: 10
+debug_flags: 

@@ -149,7 +149,8 @@ void FFTCalculator::setSamplingFrequency (int fs)
 void FFTCalculator::setCalculationInterval (int numSamples)
 {
     if (numSamples > bufferSize) {
-        printf("Failed to set Calculation Interval. Cannot be greater than window size\n");
+        arco_error("FFTCalculator::setCalculationInterval: Failed to set "
+                   "Calculation Interval. Cannot be greater than window size\n");
         return;
     }
     calculationInterval = numSamples;

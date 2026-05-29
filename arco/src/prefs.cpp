@@ -34,10 +34,9 @@ int p_in_chans = -1;
 int p_out_chans = -1;
 int p_buffer_size = -1;
 int p_latency_ms = -1;
-bool p_network_enable = true;
+char p_network_option[24] = "";
 bool p_o2lite_enable = true;
-bool p_internet_enable = true;
-bool p_mqtt_enable = false;
+char p_debug_flags[64] = "";
 
 char *prefs_in_name()
 {
@@ -84,13 +83,14 @@ int prefs_buffer_size() { return p_buffer_size != -1 ? p_buffer_size : BL; }
 
 int prefs_latency_ms() { return p_latency_ms != -1 ? p_latency_ms : 10; }
 
-bool prefs_network_enable() { return p_network_enable; }
+const char *prefs_network_option()
+{
+    return p_network_option[0] ? p_network_option : "local network";
+}
 
 bool prefs_o2lite_enable() { return p_o2lite_enable; }
 
-bool prefs_internet_enable() { return p_internet_enable; }
-
-bool prefs_mqtt_enable() { return p_mqtt_enable; }
+const char *prefs_debug_flags() { return p_debug_flags; }
 
 
 void prefs_set_in_name(const char *name) 
@@ -112,7 +112,14 @@ void prefs_set_in_chans(int chans) { p_in_chans = chans; }
 void prefs_set_out_chans(int chans) { p_out_chans = chans; }
 void prefs_set_buffer_size(int size) { p_buffer_size = size; }
 
-void prefs_set_network_enable(bool enable) { p_network_enable = enable; }
+void prefs_set_network_option(const char *option) {
+    strncpy(p_network_option, option, sizeof(p_network_option));
+    p_network_option[sizeof(p_network_option) - 1] = 0;
+}
+
 void prefs_set_o2lite_enable(bool enable) { p_o2lite_enable = enable; }
-void prefs_set_internet_enable(bool enable) { p_internet_enable = enable; }
-void prefs_set_mqtt_enable(bool enable) { p_mqtt_enable = enable; }
+
+void prefs_set_debug_flags(const char *option) {
+    strncpy(p_debug_flags, option, sizeof(p_debug_flags));
+    p_debug_flags[sizeof(p_debug_flags) - 1] = 0;
+}

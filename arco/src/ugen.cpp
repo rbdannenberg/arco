@@ -91,8 +91,8 @@ bool Ugen::find_reference_to(Ugen *ugen) {
     ref_debug_mark = true;
     while (get_ref(i, &child)) {
         if (child && child->find_reference_to(ugen)) {
-            printf("Ugen %d (%s) refcount is 0 but %d (%s) has a reference"
-                   " to it\n", ugen->id, ugen->classname(), id, classname());
+            ahprintf("Ugen %d (%s) refcount is 0 but %d (%s) has a reference"
+                     " to it\n", ugen->id, ugen->classname(), id, classname());
             assert(false);
         }
         i++;

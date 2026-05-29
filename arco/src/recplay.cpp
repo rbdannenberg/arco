@@ -367,8 +367,8 @@ void Recplay::record(bool record) {
         sample_count = 0;
     } else {
         recording = false;
-        printf("Recplay::record stop, rec_index %ld end_count %ld\n",
-               rec_index, sample_count);
+        ahprintf("Recplay::record stop, rec_index %ld end_count %ld\n",
+                 rec_index, sample_count);
     }
 }
 

@@ -409,9 +409,9 @@ public:
                 fb[i] *= feedback_in_smoothed / peak_smoothed;
                 peak_envelope = 1 + fallfactor * (peak_envelope - 1);
             }
-            D printf("peak %g peaksm %g fbenv %g fbgain %g\n", peak_envelope,
-                   peak_smoothed, feedback_in_smoothed,
-                   feedback_in_smoothed / peak_smoothed);
+            D ahprintf("peak %g peaksm %g fbenv %g fbgain %g\n", peak_envelope,
+                       peak_smoothed, feedback_in_smoothed,
+                       feedback_in_smoothed / peak_smoothed);
         }
         if (feedback_delay > 0) {
             feedback_buf.enqueue_block(fb);

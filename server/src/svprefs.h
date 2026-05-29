@@ -6,4 +6,4 @@
 
 void prefs_read();
 void prefs_write();
-
+bool server_set_debug_flags(const char *new_flags);

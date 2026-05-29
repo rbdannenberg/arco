@@ -134,7 +134,7 @@ class Probe : public Ugen {
 
 
     ~Probe() {
-        printf("~Probe destructor called, id %d; does nothing.\n", id);
+        // ahprintf("~Probe destructor called, id %d; does nothing.\n", id);
         input->unref(&input);
     }
 
@@ -260,8 +260,8 @@ class Probe : public Ugen {
 
 
     void thresh(float threshold_, int direction_, float max_wait_) {
-        printf("Probe::thresh threshold %g, direction %d, max_wait %g\n",
-               threshold_, direction_, max_wait_);
+        // ahprintf("Probe::thresh threshold %g, direction %d, max_wait %g\n",
+        //          threshold_, direction_, max_wait_);
         threshold = threshold_;
         prev_sample = threshold;
         direction = direction_;

@@ -24,6 +24,7 @@
 #include <cmath>
 #include <algorithm>
 #include <numeric>
+#include "arcoutil.h"
 
 
 
@@ -163,19 +164,19 @@ void ChordDetector::compareAlgos(double a_fifth, double a_third,
     }
     
     if (printChromas) {
-        printf("Algo 1 chroma: \n");
+        arco_print("Algo 1 chroma: \n");
         for (i = 0; i < 12; i++)
         {
-            printf("%f ", chromagram1[i]);
+            arco_print("%f ", chromagram1[i]);
         }
-        printf("\n");
+        arco_print("\n");
         
-        printf("Algo 2 chroma: \n");
+        arco_print("Algo 2 chroma: \n");
         for (i = 0; i < 12; i++)
         {
-            printf("%f ", chromagram2[i]);
+            arco_print("%f ", chromagram2[i]);
         }
-        printf("\n");
+        arco_print("\n");
     }
     
     
@@ -190,10 +191,10 @@ void ChordDetector::compareAlgos(double a_fifth, double a_third,
     const char* notes[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab",
                            "A", "Bb", "B"};
     
-    printf("Algo 1: %s %s %d, Confidence: %f \n", notes[rootNote1],
-           qualities[quality1], intervals1, confidence1);
-    printf("Algo 2: %s %s %d, Confidence: %f \n", notes[rootNote2],
-           qualities[quality2], intervals2, confidence2);
+    // ahprintf("Algo 1: %s %s %d, Confidence: %f \n", notes[rootNote1],
+    //          qualities[quality1], intervals1, confidence1);
+    // ahprintf("Algo 2: %s %s %d, Confidence: %f \n", notes[rootNote2],
+    //          qualities[quality2], intervals2, confidence2);
 }
 //=======================================================================
 void ChordDetector::calculateChordScores (double chord[NUM_CHORDS],

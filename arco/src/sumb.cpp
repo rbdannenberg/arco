@@ -76,7 +76,8 @@ static void arco_sumb_swap(O2SM_HANDLER_ARGS)
         return;
     }
     sumb->swap(ugen, replacement);
-    printf("arco_sumb_swap: removed %d, inserted %d in output set\n", id, id2);
+    // hdprintf("arco_sumb_swap: removed %d, inserted %d in output set\n",
+    //          id, id2);
 }
 
 

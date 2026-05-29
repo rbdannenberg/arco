@@ -83,7 +83,7 @@ static void arco_vu_repl_input(O2SM_HANDLER_ARGS)
     UGEN_FROM_ID(Vu, vu, id, "arco_vu_repl_input");
     ANY_UGEN_FROM_ID(input, input_id, "arco_vu_repl_input");
     vu->repl_input(input);
-    //printf("vu input set to %p (%s)\n", ugen, ugen->classname());
+    // ahprintf("vu input set to %p (%s)\n", ugen, ugen->classname());
 }
 
 

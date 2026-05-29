@@ -272,6 +272,15 @@ See doc/design.md
 #include "thru.h"
 #include "fileio.h"  // for fileio_finished declaration
 
+// audio debug output is enabled or disabled here:
+#define AUDIO_DEBUG 1
+#if AUDIO_DEBUG
+#include "debug.h"  // from O2
+#define AD(...) ahprintf(__VA_ARGS__);
+#else
+#define AD(x)
+#endif
+
 
 static const int ZERO_PAD_COUNT = 4410;  // how many zeros to write when closing
 
@@ -395,18 +404,18 @@ static bool forget_ugen(Ugen_ptr ugen, Vec<Ugen_ptr> &set)
     for (int i = 0; i < set.size(); i++) {
         if (set[i] == ugen) {
             /*
-            printf("forget_ugen: removing %p (%i) at %i from %p\n",
+            ahprintf("forget_ugen: removing %p (%i) at %i from %p\n",
                    ugen, ugen->id, i, &set);
-            printf("    size %d contains", set.size());
-            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]->id);
+            adprintf("    size %d contains", set.size());
+            for (int j = 0; j < set.size(); j++) adprintf(" %d", set[j]->id);
             */
             set.remove(i);
             ugen->unref(&ugen);  // &ugen is just parameter, but it was
                                  // already removed by set.remove(i)
             /*
-            printf("    after remove, size %d contains", set.size());
-            for (int j = 0; j < set.size(); j++) printf(" %d", set[j]->id);
-            printf("\n");
+            adprintf("    after remove, size %d contains", set.size());
+            for (int j = 0; j < set.size(); j++) adprintf(" %d", set[j]->id);
+            adprintf("\n");
             */
             return true;
         }
@@ -451,7 +460,7 @@ static void arco_hb(O2SM_HANDLER_ARGS)
     int32_t hb = argv[0]->i;
     // end unpack message
 
-    printf("Block count printing %s\n", hb ? "enabled" : "disabled");
+    arco_print("Block count printing %s\n", hb ? "enabled" : "disabled");
     aud_heartbeat = (hb != 0);
 }
 
@@ -466,7 +475,7 @@ static void arco_test1(O2SM_HANDLER_ARGS)
     char *s = argv[0]->s;
     // end unpack message
 
-    printf("%s\n", s);
+    arco_print("%s\n", s);
 }
 
 
@@ -621,6 +630,7 @@ static void arco_quit(O2SM_HANDLER_ARGS)
     // now aud_state == IDLE, we also need fileio to be finished
     if (aud_state == IDLE && !fileio_finished) {
         aud_state = FINISH1;
+        AD("aud_state = FINISH1\n");
         o2sm_send_cmd("/fileio/quit", 0, "");
         schedule_arco_wait("/arco/quit");
         return;
@@ -639,6 +649,7 @@ static void arco_quit(O2SM_HANDLER_ARGS)
     o2sm_finish();
 
     aud_state = FINISHED;
+    AD("aud_state = FINISHED;\n");
 }
 
 
@@ -648,7 +659,7 @@ static void arco_quit(O2SM_HANDLER_ARGS)
 static void arco_wait_idle(O2SM_HANDLER_ARGS)
 {
     if (aud_state == IDLE) {
-        printf("arco_wait_idle calling arco_quit now that state is IDLE\n");
+        ahprintf("arco_wait_idle calling arco_quit now that state is IDLE\n");
         arco_quit(NULL, "", NULL, 0, NULL);
     } else {
         schedule_arco_wait("/arco/wait_idle");
@@ -688,7 +699,7 @@ static void arco_devinf(O2SM_HANDLER_ARGS)
     PaDeviceIndex num_devs;
     PaError err;
 
-    printf("arco_devinf aud_state %d\n", aud_state & 255);
+    ahprintf("arco_devinf aud_state %d\n", aud_state & 255);
     if (aud_state != IDLE) {  // must not be playing audio!
         goto error;
     }
@@ -696,14 +707,14 @@ static void arco_devinf(O2SM_HANDLER_ARGS)
     // re-initialized PortAudio in case there are new devices
     err = Pa_Terminate();
     if (err != paNoError) {
-        printf("ERROR: PortAudio failed to terminate.\n");
+        arco_error("PortAudio failed to terminate.\n");
         goto error;
     }
 
     
     err = Pa_Initialize();
     if (err != paNoError) {
-        printf("FATAL CONDITION: PortAudio failed to initialize.\n");
+        arco_error("FATAL CONDITION: PortAudio failed to initialize.\n");
         goto error;
     }
 
@@ -846,6 +857,7 @@ static int callback_entry(float *input, float *output,
             if (aud_zero_fill_count >= ZERO_PAD_COUNT) {
                 in_audio_callback = false;
                 aud_state = AUDIO_STOPPED;
+                AD("aud_state = AUDIO_STOPPED;\n");
                 return paComplete;
             }
             aud_zero_fill_count += BL;
@@ -923,7 +935,7 @@ static int callback_entry(float *input, float *output,
     // code below (see else part) to output zeros when Arco produces no
     // output but the audio device expects output.
     if (!arco_output) {
-        printf("WARNING (Arco audio callback): arco_output is NULL\n");
+        arco_warn("(Arco audio callback): arco_output is NULL\n");
     } else if (arco_output->chans > 0) {    // Compute the output:
         Sample_ptr arco_out_samps = arco_output->run(aud_blocks_done);
         int arco_out_chans = arco_output->chans;
@@ -974,7 +986,7 @@ static int pa_callback(const void *input, void *output,
     float *in = (float *) input;
     float *out = (float *) output;
     if (aud_heartbeat && aud_blocks_done && aud_blocks_done % 1000 == 0) {
-        printf("%d blocks\n", aud_blocks_done);
+        arco_print("%d blocks\n", aud_blocks_done);
     }
     if (status_flags) {
         // only report this once per 100 callbacks
@@ -1006,8 +1018,10 @@ static int pa_callback(const void *input, void *output,
     } else if (aud_state == FIRST) {
         switch_to_audio_time();
         aud_state = RUNNING;
+        AD("aud_state = RUNNING;\n");
     } else if (aud_state == STARTING) {
         aud_state = STARTED;
+        AD("aud_state = STARTED;\n");
     }
     return result;
 }
@@ -1030,8 +1044,8 @@ static void arco_run(O2SM_HANDLER_ARGS)
     ugen->flags |= IN_RUN_SET;
     run_set.push_back(ugen);
     ugen->ref();
-    // printf("arco_run %s %d @ %p inserted, flags %x\n", ugen->classname(),
-    //        id, ugen, ugen->flags);
+    // ahprintf("arco_run %s %d @ %p inserted, flags %x\n", ugen->classname(),
+    //          id, ugen, ugen->flags);
 }
 
 
@@ -1046,8 +1060,8 @@ static void arco_unrun(O2SM_HANDLER_ARGS)
     if (ugen && (ugen->flags & IN_RUN_SET)) {
         forget_ugen(ugen, run_set);
         ugen->flags &= ~IN_RUN_SET;
-        /* printf("arco_unrun %d @ %p removed, flags %x\n",
-                  id, ugen, ugen->flags); */
+        /* ahprintf("arco_unrun %d @ %p removed, flags %x\n",
+                    id, ugen, ugen->flags); */
     } else {
         arco_warn("/arco/unrun %d not in run set, ignored\n", id);
     }
@@ -1212,6 +1226,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
         actual_out_chans = 0;  // actual_out_chans == 0
     } else {
         aud_state = STARTING;
+        AD("aud_state = STARTING;\n");
     }
     // notify control service that audio is finally starting (or failed)
     o2sm_send_start();
@@ -1272,6 +1287,7 @@ static void arco_close(O2SM_HANDLER_ARGS)
         return;
     }
     aud_state = STOPPING;
+    AD("aud_state = STOPPING;\n");
     aud_zero_fill_count = 0;
 }
 
@@ -1327,6 +1343,7 @@ void arco_thread_poll()
     }
     if (aud_state == STARTED) {
         aud_state = FIRST;
+        AD("aud_state = FIRST;\n");
         o2sm_send_start();
         o2sm_send_finish(0.0, ctrl_complete_addr("started"), true);
         return;
@@ -1341,6 +1358,7 @@ void arco_thread_poll()
             }
         }
         aud_state = IDLE;
+        AD("aud_state = IDLE;\n");
         o2sm_send_start();
         // 1 == successful transition from RUNNING to AUDIO_STOPPED:
         o2sm_add_int32(1);
@@ -1356,6 +1374,7 @@ void arco_thread_poll()
 
     assert(aud_o2_ctx);
     void *save_ctx = o2_set_context(aud_o2_ctx);
+    assert(aud_state != FINISHED);
     o2sm_poll();
     // restore thread local context
     o2_set_context(save_ctx);
@@ -1378,8 +1397,8 @@ int audioio_initialize()
     audio_bridge = o2_shmem_inst_new();  // make our bridge
 
     aud_o2_ctx = o2sm_initialize(audio_bridge);
-    printf("initialized audio_bridge %p id %d\n",
-           audio_bridge, o2_shmem_inst_id(audio_bridge));
+    ahprintf("initialized audio_bridge %p id %d\n",
+             audio_bridge, o2_shmem_inst_id(audio_bridge));
 
     o2sm_service_new("arco", NULL);
 
@@ -1408,7 +1427,7 @@ int audioio_initialize()
 
     PaError err = Pa_Initialize();
     if (err != paNoError) {
-        printf("FATAL CONDITION: PortAudio failed to initialize.\n");
+        arco_error("FATAL CONDITION: PortAudio failed to initialize.\n");
         return err;  // FAIL!
     }
 

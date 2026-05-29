@@ -49,6 +49,7 @@ option(USE_STATIC_LIBS "Build with static libs?" TRUE)
 set(USE_O2 TRUE CACHE STRING "Link Serpent with O2 support" FORCE)
 
 SET(SOURCES src/arco.cpp src/arco_ui.cpp src/arco_ui.h
+            src/fieldentry.cpp src/fieldentry.h
             src/cmtio.c src/cmtio.h  
             src/svprefs.cpp src/svprefs.h)  
  
@@ -75,8 +76,6 @@ else()
       "Where to find lib and include files for ncurses") 
   if(WIN32)
     # WINDOWS
-    file(GLOB FORM_SOURCES "${CMAKE_CURRENT_LIST_DIR}/src/local_form/*.c")
-    target_sources(${ARCO_SERVER_NAME} PRIVATE ${FORM_SOURCES})
     set(CURSES_LIB "${CURSES_BASE}/lib/pdcurses.lib") 
     set(BONJOUR_LIB_DIR "C:/Program Files/Bonjour SDK/Lib/x64" Cache 
         PATH "where to find dnssd.lib") 

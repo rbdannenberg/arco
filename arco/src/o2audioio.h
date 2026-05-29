@@ -319,11 +319,11 @@ public:
 
         send_prep();
             
-        printf("o2audioio created@%p id %d refcnt %d\n", this, id, refcount);
+        // ahprintf("o2audioio created@%p id %d refcnt %d\n", this, id, refcount);
     }
 
     ~O2audioio() {
-        printf("o2audioio destroy@%p id %d refcnt %d\n", this, id, refcount);
+        // ahprintf("o2audioio destroy@%p id %d refcnt %d\n", this, id, refcount);
         if (dest_addr_base) O2_FREE(dest_addr_base);
         // buffer is freed by destructor
     }
@@ -375,7 +375,7 @@ public:
 
 
     void send_hello() {
-        printf("Sending /hello message\n");
+        // ahprintf("Sending /hello message\n");
         const char *data_addr = complete_address("hello");
         o2sm_send_start();
         o2sm_add_int32(id);
@@ -410,9 +410,9 @@ public:
         if (running) {
             buffer.zero_fill(buffer.size());
             next_buffer_frame = frame_count + buffer_frames_max;
-            printf("send_enab: fifo_len %d frame_count %lld "
-                   "next_buffer_frame %lld\n", buffer.get_fifo_len(),
-                   frame_count, next_buffer_frame);
+            // ahprintf("send_enab: fifo_len %d frame_count %lld "
+            //          "next_buffer_frame %lld\n", buffer.get_fifo_len(),
+            //          frame_count, next_buffer_frame);
             assert(buffer.get_fifo_len() * buffer.blocksize /* bytes */ ==
                    buffer_frames_max * 2 * (floattype + 1)  /* bytes */ );
             assert(next_buffer_frame ==
