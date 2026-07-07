@@ -330,12 +330,12 @@ class Sine(Ugen):
 class Sineb(Ugen):
 
     def __init__(self, freq, amp, chans=None):
-        if not isinstance(freq, (int, float)) and freq.rate != B_RATE:
-            print("ERROR: 'freq' input to Ugen 'sineb' must be block rate")
-            return
-        if not isinstance(amp, (int, float)) and amp.rate != B_RATE:
-            print("ERROR: 'amp' input to Ugen 'sineb' must be block rate")
-            return
+        if not isinstance(freq, (int, float)) and freq.rate == A_RATE:
+            raise ValueError("'freq' input to Ugen 'sineb' must be block or "
+                             "constant rate, not audio rate")
+        if not isinstance(amp, (int, float)) and amp.rate == A_RATE:
+            raise ValueError("'amp' input to Ugen 'sineb' must be block or "
+                             "constant rate, not audio rate")
 
         if chans is None:
             chans = max_chans(max_chans(1, freq), amp)
@@ -432,8 +432,7 @@ class Reson(Ugen):
 
     def __init__(self, snd, center, q, chans=None):
         if not isinstance(snd, (int, float)) and snd.rate != A_RATE:
-            print("ERROR: 'snd' input to Ugen 'reson' must be audio rate")
-            return None
+            raise ValueError("'snd' input to Ugen 'reson' must be audio rate")
         if chans is None:
             chans = max_chans(max_chans(max_chans(1, snd), center), q)
         super().__init__("Reson", chans, A_RATE, "UUU", None, None, 'snd', snd,
@@ -443,15 +442,15 @@ class Reson(Ugen):
 class Resonb(Ugen):
 
     def __init__(self, snd, center, q, chans=None):
-        if not isinstance(snd, (int, float)) and snd.rate != B_RATE:
-            print("ERROR: 'snd' input to Ugen 'resonb' must be block rate")
-            return None
-        if not isinstance(center, (int, float)) and center.rate != B_RATE:
-            print("ERROR: 'center' input to Ugen 'resonb' must be block rate")
-            return None
-        if not isinstance(q, (int, float)) and q.rate != B_RATE:
-            print("ERROR: 'q' input to Ugen 'resonb' must be block rate")
-            return None
+        if not isinstance(snd, (int, float)) and snd.rate == A_RATE:
+            raise ValueError("'snd' input to Ugen 'resonb' must be block or "
+                             "constant rate, not audio rate")
+        if not isinstance(center, (int, float)) and center.rate == A_RATE:
+            raise ValueError("'center' input to Ugen 'resonb' must be block or "
+                             "constant rate, not audio rate")
+        if not isinstance(q, (int, float)) and q.rate == A_RATE:
+            raise ValueError("'q' input to Ugen 'resonb' must be block or "
+                             "constant rate, not audio rate")
         if chans is None:
             chans = max_chans(max_chans(max_chans(1, snd), center), q)
         super().__init__("Resonb", chans, B_RATE, "UUU", None, None, 'snd',
@@ -462,8 +461,7 @@ class Lowpass(Ugen):
 
     def __init__(self, snd, cutoff, chans=None):
         if not isinstance(snd, (int, float)) and snd.rate != A_RATE:
-            print("ERROR: 'snd' input to Ugen 'lowpass' must be audio rate")
-            return None
+            raise ValueError("'snd' input to Ugen 'lowpass' must be audio rate")
         if chans is None:
             chans = max_chans(max_chans(1, snd), cutoff)
         super().__init__("Lowpass", chans, A_RATE, "UU", None, None, 'snd',
@@ -1073,18 +1071,15 @@ class Math(Ugen):
 class Mathb(Ugen):
 
     def __init__(self, op, x1, x2, chans=None):
-        if not isinstance(x1, (int, float)) and x1.rate != B_RATE:
-            print("ERROR: 'x1' input to Ugen 'mathb' must be block rate", op,
-                  x1)
-            return
-        elif not isinstance(x2, (int, float)) and x2.rate != B_RATE:
-            print("ERROR: 'x2' input to Ugen 'mathb' must be block rate", op,
-                  x2)
-            return
-        else:
-            chans = chans or max_chans(max_chans(1, x1), x2)
-            super().__init__("Mathb", chans, B_RATE, "iUU", None, None, 'op',
-                             op, 'x1', x1, 'x2', x2)
+        if not isinstance(x1, (int, float)) and x1.rate == A_RATE:
+            raise ValueError("'x1' input to Ugen 'mathb' must be block or "
+                             "constant rate, not audio rate")
+        if not isinstance(x2, (int, float)) and x2.rate == A_RATE:
+            raise ValueError("'x2' input to Ugen 'mathb' must be block or "
+                             "constant rate, not audio rate")
+        chans = chans or max_chans(max_chans(1, x1), x2)
+        super().__init__("Mathb", chans, B_RATE, "iUU", None, None, 'op',
+                         op, 'x1', x1, 'x2', x2)
 
     def rliset(self, x):
         self.engine.send_cmd("/arco/mathb/rliset", 0, "if", self.id, x)
@@ -1248,9 +1243,9 @@ class Unary(Ugen):
 class Unaryb(Ugen):
 
     def __init__(self, op, x1, chans=None):
-        if not isinstance(x1, (int, float)) and x1.rate != B_RATE:
-            print("ERROR: 'x1' input to Ugen 'unaryb' must be block rate", op)
-            return
+        if not isinstance(x1, (int, float)) and x1.rate == A_RATE:
+            raise ValueError("'x1' input to Ugen 'unaryb' must be block or "
+                             "constant rate, not audio rate")
         if not chans:
             chans = max_chans(1, x1)
         super().__init__("Unaryb", chans, B_RATE, "iU", None, None, 'op', op,
@@ -1515,12 +1510,12 @@ class Tableoscb(Wavetables):
 
     def __init__(self, freq, amp, phase=0, chans=None):
         # Check rate requirements for b-rate oscillators
-        if not isinstance(freq, (int, float)) and freq.rate != 'b':
-            print("ERROR: 'freq' input to Ugen 'tableoscb' must be block rate")
-            return None
-        if not isinstance(amp, (int, float)) and amp.rate != 'b':
-            print("ERROR: 'amp' input to Ugen 'tableoscb' must be block rate")
-            return None
+        if not isinstance(freq, (int, float)) and freq.rate == A_RATE:
+            raise ValueError("'freq' input to Ugen 'tableoscb' must be block or "
+                             "constant rate, not audio rate")
+        if not isinstance(amp, (int, float)) and amp.rate == A_RATE:
+            raise ValueError("'amp' input to Ugen 'tableoscb' must be block or "
+                             "constant rate, not audio rate")
         super().__init__(freq, amp, phase, chans, "Tableoscb", B_RATE)
 
 

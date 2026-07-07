@@ -1,0 +1,8 @@
+# Development / test dependencies for PyArco.
+#
+# Install into the project venv:
+#     pip install -r requirements-dev.txt
+#
+# Run the offline test suite:
+#     python -m pytest pyarco/tests -v
+pytest>=8.0
