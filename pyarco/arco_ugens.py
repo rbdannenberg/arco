@@ -1,5 +1,3 @@
-import threading
-
 from arco_engine import (
     get_engine,
     A_RATE, B_RATE, C_RATE, NO_RATE,
@@ -23,6 +21,16 @@ from arco_engine import (
     max_chans,
 )
 
+import threading
+
+# Seconds past a fade's duration before the client drops its reference to
+# a terminated Fader (server frees it at termination).
+_FADE_CLEANUP_MARGIN = 0.5
+
+import logging
+
+log = logging.getLogger("pyarco")
+
 
 class Ugen:
 
@@ -43,14 +51,19 @@ class Ugen:
         inputs_ = list(inputs_)
         if id_num is not None:
             self.id = id_num
+            self.owns_id = False  # caller/engine manages this id's lifetime
         else:
             self.id = self.engine.id_pool.request_slot()
-        self.engine.register(self)
+            self.owns_id = True
+            self.engine.register(self)
         self.classname = classname_
         self.chans = chans_
         self.rate = rate_
+        self._addr_prefix = "/arco/" + classname_.lower()
         self.inputs = {}
         self.action_id = None
+        self._server_freed = False  # set when the server has already freed this id
+        self._fade_out = None  # in-flight fade-out Fader, cleared by _drop_after
 
         if no_msg:
             return
@@ -62,7 +75,7 @@ class Ugen:
                 inputs_[i] = Const(inputs_[i], None)
 
         # construct the message
-        address = f"/arco/{self.classname.lower()}/new"
+        address = f"{self._addr_prefix}/new"
         params = []
         type_str = "i"  # only the id at first
 
@@ -84,39 +97,77 @@ class Ugen:
                 type_str += types_[i // 2]
 
         self.engine.send_cmd(address, 0, type_str, *params)
+        log.debug("Ugen %d (%s) created", self.id, self.classname)
 
     def __del__(self):
-        if getattr(self, 'engine', None) is not None:
-            self.engine.send_cmd("/arco/free", 0, "i", self.id)
-            if self.id >= self.engine.id_pool.start_id:
-                self.engine.id_pool.free_slot(self.id)
-            self.engine.unregister(self.id)
+        engine = getattr(self, 'engine', None)
+        if engine is None or not getattr(self, 'owns_id', False):
+            return
+        if not getattr(self, '_server_freed', False):
+            engine.send_cmd("/arco/free", 0, "i", self.id)
+        engine.id_pool.free_slot(self.id)
+        engine.unregister(self.id)
 
     def play(self):
+        output = self.engine.output
+        if output is not None:
+            output.members[self.id] = self
         self.engine.send_cmd("/arco/sum/ins", 0, "ii", OUTPUT_ID, self.id)
 
     def mute(self, status=None):
         # status is accepted (passed by atend actions) but ignored here
-        self.engine.send_cmd("/arco/sum/rem", 0, "ii", OUTPUT_ID, self.id)
+        # If a fade-out is in flight, the Fader is what's in the output.
+        target = self._fade_out or self
+        output = self.engine.output
+        if output is not None:
+            output.members.pop(target.id, None)
+        self.engine.send_cmd("/arco/sum/rem", 0, "ii", OUTPUT_ID, target.id)
 
     def fade(self, dur, mode=FADE_SMOOTH):
         """Fade output to zero over dur seconds, then disconnect."""
-        fader = self.engine.fade_in_lookup.get(self.id)
-        if fader:
+        fader = self.engine.fade_in_lookup.pop(self.id, None)
+        if fader is not None:
             # fade_in is in progress; convert to fade out
-            del self.engine.fade_in_lookup[self.id]
             fader.set_dur(dur)
             fader.set_goal(0)
             fader.set_mode(mode)
+            self._fade_out = fader
+            self._drop_after(fader, dur)
             return fader
-        else:
-            faded = create_fader(self, 1, dur, 0)
-            faded.term()
-            # swap self out of output, put faded in
-            self.engine.send_cmd("/arco/sum/swap", 0, "iii", OUTPUT_ID,
-                            self.id, faded.id)
-            faded.set_mode(mode)
-            return faded
+        if self._fade_out is not None:
+            # a fade-out is already in flight; adjust it, don't re-swap
+            fader = self._fade_out
+            fader.set_dur(dur)
+            fader.set_mode(mode)
+            return fader
+        faded = create_fader(self, 1, dur, 0)
+        faded.term()
+        output = self.engine.output
+        if output is not None:
+            output.members.pop(self.id, None)
+            output.members[faded.id] = faded
+        # swap self out of output, put faded in
+        self.engine.send_cmd("/arco/sum/swap", 0, "iii", OUTPUT_ID,
+                             self.id, faded.id)
+        faded.set_mode(mode)
+        self._fade_out = faded
+        self._drop_after(faded, dur)
+        return faded
+
+    def _drop_after(self, fader, dur):
+        """After a terminating fade completes, the server frees the Fader;
+        drop the client-side reference so its slot can be reclaimed."""
+        engine = self.engine
+
+        def _cleanup():
+            fader._server_freed = True
+            if self._fade_out is fader:
+                self._fade_out = None
+            output = engine.output
+            if output is not None:
+                output.members.pop(fader.id, None)
+
+        threading.Timer(dur + _FADE_CLEANUP_MARGIN, _cleanup).start()
 
     def fade_in(self, dur, mode=FADE_SMOOTH, term=True):
         """Fade in from silence. Ugen must NOT already be playing."""
@@ -126,17 +177,22 @@ class Ugen:
         self.engine.fade_in_lookup[self.id] = fader
         fader.set_mode(mode)
         fader.play()
+        engine = self.engine
 
         def _fade_in_complete():
-            if self.engine is not None:
-                f = self.engine.fade_in_lookup.get(self.id)
-                if f is not None:
-                    # swap fader out, put the original ugen directly in output
-                    self.engine.send_cmd("/arco/sum/swap", 0, "iii", OUTPUT_ID,
-                                    f.id, self.id)
-                    del self.engine.fade_in_lookup[self.id]
+            f = engine.fade_in_lookup.pop(self.id, None)
+            if f is not None:
+                # swap fader out, put the original ugen directly in output
+                engine.send_cmd("/arco/sum/swap", 0, "iii", OUTPUT_ID,
+                                f.id, self.id)
+                f._server_freed = True
+                output = engine.output
+                if output is not None:
+                    output.members.pop(f.id, None)
+                    output.members[self.id] = self
 
-        threading.Timer(dur + 0.1, _fade_in_complete).start()
+        threading.Timer(dur + _FADE_CLEANUP_MARGIN,
+                        _fade_in_complete).start()
 
     def run(self):  # add this Ugen to the run set
         self.engine.send_cmd("/arco/run", 0, "i", self.id)
@@ -158,7 +214,7 @@ class Ugen:
                       self.classname + "'")
             return
 
-        addr_prefix = "/arco/" + self.classname.lower()
+        addr_prefix = self._addr_prefix
 
         if isinstance(value, list):
             # Array of numbers: update multiple channels of a Const input.
@@ -335,9 +391,11 @@ class Smoothb(Const_like):
 
         super().__init__("Smoothb", self.chans, B_RATE, "", True, None)
 
-        self.send_floats([cutoff] +
-                         (x if isinstance(x, list) else [x] * self.chans),
-                         "/arco/smoothb/newn")
+        values = x if isinstance(x, list) else [x] * self.chans
+        floats = [cutoff] + [values[i] if i < len(values) else 0
+                             for i in range(self.chans)]
+        self.engine.send_cmd("/arco/smoothb/newn", 0,
+                             "i" + "f" * len(floats), self.id, *floats)
 
     def set(self, x):
         self.send_floats(x, "/arco/smoothb/setn")
@@ -520,6 +578,7 @@ class Recplay(Ugen):
         return self
 
     def borrow(self, u):
+        self._lender = u  # pin: server borrows u's buffer; keep it alive
         self.engine.send_cmd("/arco/recplay/borrow", 0, "ii", self.id, u.id)
         return self
 
@@ -529,20 +588,25 @@ class Sum(Ugen):
     def __init__(self, chans, wrap=True, id_num=None):
         super().__init__("Sum", chans, A_RATE, "i", None, None, 'wrap',
                          1 if wrap else 0, id_num=id_num)
+        self.members = {}  # id -> Ugen: mirror server graph client-side
 
     def ins(self, *ugens):
         for ugen in ugens:
+            self.members[ugen.id] = ugen
             self.engine.send_cmd("/arco/sum/ins", 0, "ii", self.id, ugen.id)
         return self
 
     def rem(self, *ugens):
         for ugen in ugens:
+            self.members.pop(ugen.id, None)
             self.engine.send_cmd("/arco/sum/rem", 0, "ii", self.id, ugen.id)
         return self
 
     def swap(self, ugen, replacement):
+        self.members.pop(ugen.id, None)
+        self.members[replacement.id] = replacement
         self.engine.send_cmd("/arco/sum/swap", 0, "iii", self.id, ugen.id,
-                        replacement.id)
+                             replacement.id)
         return self
 
     def set_gain(self, gain):
@@ -555,20 +619,25 @@ class Sumb(Ugen):
     def __init__(self, chans, wrap=True, id_num=None):
         super().__init__("Sumb", chans, B_RATE, "i", None, None, 'wrap',
                          1 if wrap else 0, id_num=id_num)
+        self.members = {}  # id -> Ugen: mirror server graph client-side
 
     def ins(self, *ugens):
         for ugen in ugens:
+            self.members[ugen.id] = ugen
             self.engine.send_cmd("/arco/sumb/ins", 0, "ii", self.id, ugen.id)
         return self
 
     def rem(self, *ugens):
         for ugen in ugens:
+            self.members.pop(ugen.id, None)
             self.engine.send_cmd("/arco/sumb/rem", 0, "ii", self.id, ugen.id)
         return self
 
     def swap(self, ugen, replacement):
+        self.members.pop(ugen.id, None)
+        self.members[replacement.id] = replacement
         self.engine.send_cmd("/arco/sumb/swap", 0, "iii", self.id, ugen.id,
-                        replacement.id)
+                             replacement.id)
         return self
 
     def set_gain(self, gain):
@@ -580,8 +649,10 @@ class Route(Ugen):
 
     def __init__(self, chans):
         super().__init__("Route", chans, A_RATE, "", None, None)
+        self.members = {}  # id -> Ugen; released by reminput()
 
     def ins(self, input, *routes):
+        self.members[input.id] = input
         self._send_ins_rem(input, routes, "/arco/route/ins")
         return self
 
@@ -590,7 +661,9 @@ class Route(Ugen):
         return self
 
     def reminput(self, input):
-        self.engine.send_cmd("/arco/route/reminput", 0, "ii", self.id, input.id)
+        self.members.pop(input.id, None)
+        self.engine.send_cmd("/arco/route/reminput", 0, "ii", self.id,
+                             input.id)
         return self
 
     def _send_ins_rem(self, input, routes, address):
@@ -614,6 +687,7 @@ class Vu(Ugen):
 
     def set(self, input_name, value):
         self.inputs['input'] = value
+        log.debug("Vu set %d %d", self.id, value.id)
         self.engine.send_cmd("/arco/vu/repl_input", 0, "ii", self.id, value.id)
         return self
 
@@ -650,6 +724,7 @@ class Thru(Ugen):
                          input, id_num=id_num)
 
     def set_alternate(self, alt):
+        self._alternate = alt  # pin: server's alt pointer must not outlive our ref
         self.engine.send_cmd("/arco/thru/alt", 0, "ii", self.id, alt.id)
         return self
 
@@ -1266,7 +1341,8 @@ class Chorddetect(Ugen):
         return self
 
     def set(self, input_name, value):
-        self.inputs['input'] = value
+        self.inputs['input'] = value  # the only thing you can set is 'input'
+        log.debug("Chorddetect set %d %d", self.id, value.id)
         self.engine.send_cmd("/arco/chorddetect/repl_input", 0, "ii", self.id,
                         value.id)
         return self
@@ -1284,7 +1360,8 @@ class SpectralCentroid(Ugen):
         return self
 
     def set(self, input_name, value):
-        self.inputs['input'] = value
+        self.inputs['input'] = value  # the only thing you can set is 'input'
+        log.debug("SpectralCentroid set %d %d", self.id, value.id)
         self.engine.send_cmd("/arco/spectralcentroid/repl_input", 0, "ii", self.id,
                         value.id)
         return self
@@ -1302,7 +1379,8 @@ class SpectralRolloff(Ugen):
         return self
 
     def set(self, input_name, value):
-        self.inputs['input'] = value
+        self.inputs['input'] = value  # the only thing you can set is 'input'
+        log.debug("SpectralRolloff set %d %d", self.id, value.id)
         self.engine.send_cmd("/arco/spectralrolloff/repl_input", 0, "ii", self.id,
                         value.id)
         return self
@@ -1313,6 +1391,7 @@ class Stdistr(Ugen):
     def __init__(self, n, width):
         super().__init__("Stdistr", 2, A_RATE, "if", None, True, 'n', n,
                          'width', width)
+        self.members = {}  # index -> Ugen: mirror server graph client-side
 
     def set_gain(self, gain):
         self.engine.send_cmd("/arco/stdistr/gain", 0, "if", self.id, gain)
@@ -1323,10 +1402,13 @@ class Stdistr(Ugen):
         return self
 
     def ins(self, index, ugen):
-        self.engine.send_cmd("/arco/stdistr/ins", 0, "iii", self.id, index, ugen.id)
+        self.members[index] = ugen
+        self.engine.send_cmd("/arco/stdistr/ins", 0, "iii", self.id, index,
+                             ugen.id)
         return self
 
     def rem(self, index):
+        self.members.pop(index, None)
         self.engine.send_cmd("/arco/stdistr/rem", 0, "ii", self.id, index)
         return self
 
@@ -1413,6 +1495,7 @@ class Wavetables(Ugen):
         return self.create_table(index, None, samps, "createttd")
 
     def borrow(self, lender):
+        self._lender = lender  # pin: server borrows lender's tables; keep it alive
         self.engine.send_cmd(f"{self.address_prefix}borrow", 0, "ii", self.id,
                         lender.id)
         return self
@@ -1509,19 +1592,24 @@ class Add(Ugen):
     def __init__(self, chans=1, wrap=True):
         super().__init__("Add", chans, A_RATE, "i", None, None, 'wrap',
                          1 if wrap else 0)
+        self.members = {}  # id -> Ugen: mirror server graph client-side
 
     def ins(self, *ugens):
         for ugen in ugens:
+            self.members[ugen.id] = ugen
             self.engine.send_cmd("/arco/add/ins", 0, "ii", self.id, ugen.id)
         return self
 
     def rem(self, ugen):
+        self.members.pop(ugen.id, None)
         self.engine.send_cmd("/arco/add/rem", 0, "ii", self.id, ugen.id)
         return self
 
     def swap(self, ugen, replacement):
+        self.members.pop(ugen.id, None)
+        self.members[replacement.id] = replacement
         self.engine.send_cmd("/arco/add/swap", 0, "iii", self.id, ugen.id,
-                        replacement.id)
+                             replacement.id)
         return self
 
 
@@ -1530,18 +1618,23 @@ class Addb(Ugen):
     def __init__(self, chans=1, wrap=True):
         super().__init__("Addb", chans, B_RATE, "i", None, None, 'wrap',
                          1 if wrap else 0)
+        self.members = {}  # id -> Ugen: mirror server graph client-side
 
     def ins(self, ugen):
+        self.members[ugen.id] = ugen
         self.engine.send_cmd("/arco/addb/ins", 0, "ii", self.id, ugen.id)
         return self
 
     def rem(self, ugen):
+        self.members.pop(ugen.id, None)
         self.engine.send_cmd("/arco/addb/rem", 0, "ii", self.id, ugen.id)
         return self
 
     def swap(self, ugen, replacement):
+        self.members.pop(ugen.id, None)
+        self.members[replacement.id] = replacement
         self.engine.send_cmd("/arco/addb/swap", 0, "iii", self.id, ugen.id,
-                        replacement.id)
+                             replacement.id)
         return self
 
 

@@ -1,9 +1,12 @@
 import math
 import random
+import threading
+from collections import defaultdict
 
 from arco import (
     Ugen,
     Const,
+    get_engine,
     Smoothb,
     Const_like,
     Sum,
@@ -41,32 +44,47 @@ from arco import (
     ACTION_TERM,
     ACTION_END,
     ACTION_END_OR_TERM,
+    MUTE,
+    FINISH,
     step_to_hz,
     hz_to_step,
     steps_to_hzdiff,
     vel_to_linear,
     pan_45,
 )
+
+# ======================== Action / callback constants ========================
+
 SIGNAL = 'signal'
 GAIN = 'gain'
 BOTH = 'both'
-MUTE = 'mute'
-FINISH = 'finish'
 
 # ======================== Instrument parameter framework =====================
 
-# Stack used during instrument construction (between instr_begin and
-# Instrument.__init__) to collect parameter descriptors.
-_instr_stack = []
+# Instrument-construction contexts, keyed by thread id. Each NiceGUI
+# callback runs a full instr_begin() -> Instrument.__init__() sequence on
+# one worker thread, so per-thread stacks stop concurrent constructions
+# from cross-wiring parameters. (The active engine is deliberately a
+# shared module global instead -- construction state is the exception
+# because it never crosses a callback boundary.)
+# CAUTION: an exception between instr_begin() and Instrument.__init__()
+# orphans a context on this thread's stack; if the OS later reuses the
+# thread id, the orphan can corrupt a subsequent unrelated construction.
+# Callback wrappers should catch-and-clear on that boundary.
+_instr_stacks = defaultdict(list)
+
+
+def _instr_stack():
+    return _instr_stacks[threading.get_ident()]
 
 
 def instr_begin():
     """Call at the start of an Instrument subclass __init__."""
-    _instr_stack.append({})
+    _instr_stack().append({})
 
 
 def _add_param_descr_to_context(pd, name):
-    context = _instr_stack[-1]
+    context = _instr_stack()[-1]
     if name in context:
         print("WARNING: Parameter", name, "is already specified. Ignored.")
     else:
@@ -163,19 +181,24 @@ class Instrument(Ugen):
             self.mixer_id = synth.get_mixer_id()
 
         self.output = output_ugen
-        # Inherit the output ugen's id so that wiring this Instrument
-        # into the graph is the same as wiring its output.
+        # Borrow the output ugen's id so that wiring this Instrument
+        # into the graph is the same as wiring its output. The output
+        # ugen owns the id; this wrapper never frees it.
         super().__init__(name,
                          output_ugen.chans,
                          output_ugen.rate,
                          "",
-                         no_msg=True)
-        self.id = output_ugen.id
+                         no_msg=True,
+                         id_num=output_ugen.id)
 
-        if len(_instr_stack) == 0:
+        stack = _instr_stacks.get(threading.get_ident())
+        if not stack:
             raise RuntimeError(
-                "instr_stack is empty. Did you forget instr_begin()?")
-        self.parameter_bindings = _instr_stack.pop()
+                "instr stack is empty. Did you forget instr_begin()?")
+        self.parameter_bindings = stack.pop()
+        if not stack:
+            # don't accumulate an entry per worker thread
+            del _instr_stacks[threading.get_ident()]
 
     def get(self, input_name):
         return self.parameter_bindings.get(input_name)
@@ -273,8 +296,6 @@ class Score:
 
 
 # ======================== Synth (polyphonic manager) =========================
-
-_mix_name_counter = 0
 
 
 def mix_name(i):
@@ -401,6 +422,9 @@ class Synth(Instrument):
             self.finishing_notes.remove(note)
         elif note.user_id in self.notes:
             del self.notes[note.user_id]
+        # Release the Mix input: without this the Mix pins the note's
+        # entire ugen subgraph even after the note is recycled.
+        self.output.rem(note.mixer_id)
         self.free_notes.append(note)
 
     def update_note(self, id, param_name, value):
@@ -603,15 +627,25 @@ def multi_reverb(input, rt60, wet=1, hz=10000, chans=None):
 _sawtooth_waveforms = None
 
 
-class Sawtooth_waveforms:
-    """Singleton manager for anti-aliased sawtooth wavetables."""
+def get_sawtooth_waveforms():
+    """Return the sawtooth wavetable singleton for the active engine,
+    rebuilding it if the engine changed since it was created."""
+    global _sawtooth_waveforms
+    engine = get_engine()
+    if (_sawtooth_waveforms is None
+            or _sawtooth_waveforms.engine is not engine):
+        _sawtooth_waveforms = Sawtooth_waveforms(engine)
+    return _sawtooth_waveforms
 
-    def __init__(self):
-        global _sawtooth_waveforms
+
+class Sawtooth_waveforms:
+    """Per-engine manager for anti-aliased sawtooth wavetables."""
+
+    def __init__(self, engine):
+        self.engine = engine
         self.created = [None] * 36
         self.tables = Tableosc(1, 1)
         self.next_index = 0
-        _sawtooth_waveforms = self
 
     def get_index(self, step, antialias=True):
         if antialias:
@@ -640,11 +674,8 @@ class Supersaw_instr(Instrument):
     """A supersaw instrument with multiple detuned sawtooth oscillators."""
 
     def __init__(self, synth, note_spec, pitch, vel):
-        global _sawtooth_waveforms
         instr_begin()
-
-        if _sawtooth_waveforms is None:
-            Sawtooth_waveforms()
+        self.saw = get_sawtooth_waveforms()
 
         chans = note_spec.get('chans', 1)
         self.n = max(1, round(note_spec.get('n', 8)))
@@ -663,7 +694,7 @@ class Supersaw_instr(Instrument):
                      1)
         param_method('rolloff', self.rolloff, 'set_rolloff', 'clip', 0, 1)
 
-        table_index = _sawtooth_waveforms.get_index(pitch, self.antialias != 0)
+        table_index = self.saw.get_index(pitch, self.antialias != 0)
 
         if chans == 1:
             self.mixer = Sum(1)
@@ -725,7 +756,7 @@ class Supersaw_instr(Instrument):
         amp = self._calc_tableosc_amp(i)
         phase = rndphase * random.uniform(0, 360)
         comp = Tableosc(hz, Const(amp), phase=phase)
-        comp.borrow(_sawtooth_waveforms.tables)
+        comp.borrow(self.saw.tables)
         comp.select(table_index)
 
         if chans == 1:
@@ -788,8 +819,7 @@ class Supersaw_instr(Instrument):
             self.mixer.set_width(width)
 
     def _calc_tableosc_index(self):
-        table_index = _sawtooth_waveforms.get_index(self.pitch, self.antialias
-                                                    != 0)
+        table_index = self.saw.get_index(self.pitch, self.antialias != 0)
         for comp in self.components:
             comp.select(table_index)
 

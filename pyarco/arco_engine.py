@@ -2,12 +2,11 @@ import os
 import sys
 import time
 import math
+import weakref
 
 sys.path.append(
     os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../apps/test/python")))
-
-from o2lite import O2lite
 
 ZERO_ID = 0  # a single-channel audio source of zero (silence)
 ZEROB_ID = 1  # a single-channel block-rate source of zero
@@ -234,8 +233,12 @@ class UgenID:
 
 class Ugen_action:
     def __init__(self, target, method):
-        self.target = target  # weak ref via id; caller holds strong ref
+        self.target_ref = weakref.ref(target)  # do not pin the target
         self.method = method
+
+    @property
+    def target(self):
+        return self.target_ref()
 
     def __repr__(self):
         return f"<Ugen_action {self.target} {self.method!r}>"
@@ -273,7 +276,7 @@ class ArcoEngine:
         self.timeout = timeout
         self.o2lite = None
         self.id_pool = UgenID()
-        self._ugens = {}           # id -> Ugen (strong references)
+        self._ugens = weakref.WeakValueDictionary()  # id -> Ugen (weak)
         self.action_dict = {}       # action_id -> Action_list
         self.next_action_id = 1
         self.fade_in_lookup = {}    # ugen.id -> Fader
@@ -288,6 +291,7 @@ class ArcoEngine:
         if self.o2lite is not None:
             return  # already connected
         from arco_ugens import Ugen, Sum  # deferred to break circular import
+        from o2lite import O2lite  # deferred so the library imports without o2litepy
 
         self.o2lite = O2lite()
         self.o2lite.initialize(self.ensemble, debug_flags="a")
@@ -332,13 +336,14 @@ class ArcoEngine:
         """Free all ugens, disconnect, and clear active engine."""
         if self.o2lite is None:
             return
-        # Free non-system ugens in reverse creation order
-        for ugen_id in sorted(self._ugens.keys(), reverse=True):
-            ugen = self._ugens[ugen_id]
-            if ugen_id >= 100:  # skip system ugens (0-3)
-                self.send_cmd("/arco/free", 0, "i", ugen_id)
+        # Free pool-allocated ugens in reverse id order
+        for ugen_id, ugen in sorted(list(self._ugens.items()), reverse=True):
+            self.send_cmd("/arco/free", 0, "i", ugen_id)
             ugen.engine = None  # prevent double-free in __del__
         self._ugens.clear()
+        for ugen in (self.zero, self.zerob, self.input, self.output):
+            if ugen is not None:
+                ugen.engine = None
         self.id_pool = UgenID()
         self.action_dict.clear()
         self.next_action_id = 1
@@ -370,7 +375,8 @@ class ArcoEngine:
             self.o2lite.poll()
 
     def register(self, ugen):
-        """Register a ugen in the engine's registry (prevents GC)."""
+        """Track a pool-allocated ugen. References are weak: a ugen lives
+        as long as user code or the client-side graph references it."""
         self._ugens[ugen.id] = ugen
 
     def unregister(self, ugen_id):
@@ -408,8 +414,16 @@ class ArcoEngine:
         if status & ACTION_FREE:
             self.action_dict.pop(key, None)
             return
+        live = []
         for ua in al.ugen_actions:
-            if status & al.action_mask:
-                target = ua.target
-                if target is not None and hasattr(target, ua.method):
+            target = ua.target
+            if target is None:
+                continue  # target was garbage-collected; drop the action
+            live.append(ua)
+            if status & al.action_mask and hasattr(target, ua.method):
+                try:
                     getattr(target, ua.method)(status)
+                except Exception as e:
+                    print("ERROR: actl_act_handler -", ua.method,
+                          "callback raised:", repr(e))
+        al.ugen_actions = live
