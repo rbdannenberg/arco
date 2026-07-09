@@ -46,6 +46,7 @@
 #include "o2internal.h"
 #include "prefs.h"
 #include "arco_ui.h"
+#include "fieldentry.h"
 
 Vec<O2string> arco_device_info;
 bool arco_interrupt_requested = false;
