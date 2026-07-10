@@ -242,15 +242,18 @@ int main(int argc, char *argv[])
     int opt = string_list_index(net_options, host_network_option, 0);
     o2_network_enable(opt > 0);
 
-    host_o2lite_enable = prefs_o2lite_enable();
-    if (host_o2lite_enable) {
-        o2lite_initialize();  // enable O2lite client connections
-    }
-
     o2_internet_enable(opt > 1);
 
     o2_initialize("arco");
     o2_clock_set(NULL, NULL);  // we are the reference clock
+
+    // o2lite_initialize() must run AFTER o2_initialize(): it returns
+    // O2_NOT_INITIALIZED (registering no handlers) when the ensemble
+    // name is unset, and o2lite clients then can never connect.
+    host_o2lite_enable = prefs_o2lite_enable();
+    if (host_o2lite_enable) {
+        o2lite_initialize();  // enable O2lite client connections
+    }
 
     if (opt > 2) {
         o2_mqtt_enable(NULL, 0);  // only default MQTT server supported now

@@ -47,7 +47,7 @@ public:
     }
 
     ~Dualslewb() {
-        input->unref();
+        input->unref(&input);
     }
 
     const char *classname() { return Dualslewb_name; }
@@ -100,7 +100,7 @@ public:
     }
 
     void repl_input(Ugen_ptr ugen) {
-        input->unref();
+        input->unref(&input);
         init_input(ugen);
     }
 
