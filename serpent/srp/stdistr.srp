@@ -5,7 +5,7 @@
 
 class Stdistr (Ugen):
     def init(n, width):
-        super.init(create_ugen_id(), "Stdistr", 2, 'a', "if",
+        super.init(new_ugen_id(), "Stdistr", 2, 'a', "if",
 	           'n', n, "f", 'width', width, "f", omit_chans = true)
 
     def set_gain(gain)

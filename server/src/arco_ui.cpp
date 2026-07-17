@@ -103,20 +103,30 @@ static void show_help()
     for (const char **hs = help_strings; *hs; hs++) {
         if ((*hs)[0] != 'p') n++;
     }
-    move(y - 7 - n, 0);
+    move(y - 9 - n, 0);
     hline(ACS_HLINE, 72);
+
+    // navigation commands:
+    for (int i = 0; i < 4; i++) {
+        mvprintw(y - n - 8 + i, 0, help_strings2[i]);
+        clrtoeol();
+    }
+    mvprintw(y - n - 4, 0, "");  // separator line
+    clrtoeol();
+
     // n is number of help strings
     int i = 0;
     for (const char **hs = help_strings; *hs; hs++) {
-        if ((*hs)[0] != 'p') {
-            mvprintw(y - 6 - n + i, 0, (*hs) + 1);
-        }
+        mvprintw(y - n - 3 + i, 0, (*hs) + 1);
+        clrtoeol();
         i++;
+        if (i == 10) {  // there are 10 "standard" commands
+            mvprintw(y - n - 3 + i, 0, "");  // separator
+            clrtoeol();
+            i++;
+        }
     }
-    // navigation commands:
-    for (int i = 0; i < 4; i++) {
-        mvprintw(y - 6 + i, 0, help_strings2[i]);
-    }
+
     refresh();
     help_mode = true;
     int h = y - 5;  // number of scrolling lines
@@ -500,6 +510,7 @@ int ui_poll(int delay_ms)
           case ' ':  // forward one page
             advance(2);
             break;
+          /*
           case 'e':  // write to stderr
             fprintf(stderr, "This is error output\n");
             fflush(stderr);
@@ -508,6 +519,7 @@ int ui_poll(int delay_ms)
             printf("This is a test %d\n", msgcnt++);
             break;
           case 'r':  // refresh
+          */
           case KEY_RESIZE:
             refresh_screen();
             redrawwin(curscr);
@@ -569,7 +581,7 @@ void ui_start_dialog(const char *title)
 // prompt is a string label
 // value is the value displayed and returned. -1 displays blank
 // min and max are range of values
-// actual and pref are dsiplayed as actual and pref value information
+// actual and pref are displayed as actual and pref value information
 //
 void ui_int_field(const char *prompt, int *value, int min, int max,
                   int actual, int pref, int id)
@@ -609,7 +621,7 @@ void ui_int_field(const char *prompt, int *value, int min, int max,
 // prompt is a string label
 // value is the value displayed and returned. -1 displays blank
 // min and max are range of values
-// actual and pref are dsiplayed as actual and pref value information
+// actual and pref are displayed as actual and pref value information
 //
 void ui_bool_field(const char *prompt, bool *value, bool actual,
                    bool pref, int id)

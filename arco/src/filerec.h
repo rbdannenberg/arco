@@ -66,7 +66,7 @@ public:
 
     ~Filerec();
 
-    void unref() {
+    void unref(Ugen **ptr) {
         refcount--;
         if (refcount == 0) {
             if (!finished) {

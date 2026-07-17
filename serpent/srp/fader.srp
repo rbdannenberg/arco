@@ -37,7 +37,7 @@ class Fader (Ugen):
         this.mode = mode
         if not chans:
             chans = max_chans(1, input)
-        super.init(create_ugen_id(), "fader", chans, 'a', "Uf",
+        super.init(new_ugen_id(), "Fader", chans, 'a', "Uf",
                    'input', input, "a", 'current', current, "f")
 
 

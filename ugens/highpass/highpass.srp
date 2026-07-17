@@ -5,12 +5,12 @@
 def highpass(input, cutoff, optional chans):
     if not chans:
         chans = max_chans(max_chans(1, input), cutoff)
-    Ugen(create_ugen_id(), "highpass", chans, 'a', "UU", 'input', input, "a",
+    Ugen(new_ugen_id(), "highpass", chans, 'a', "UU", 'input', input, "a",
          'cutoff', cutoff, "abc")
 
 def highpassb(input, cutoff, optional chans):
     if not chans:
         chans = max_chans(max_chans(1, input), cutoff)
-    Ugen(create_ugen_id(), "highpassb", chans, 'b', "UU", 'input', input, "bc",
+    Ugen(new_ugen_id(), "highpassb", chans, 'b', "UU", 'input', input, "bc",
          'cutoff', cutoff, "bc")
 

@@ -96,7 +96,7 @@ saved_vtsched_bps = 1.0  // default "tempo"
 #        Action: reset_arco_handler() sends to /arco/reset
 #        -> 'devinf' when receive /actl/reset
 #    'devinf': waiting for device info, will normally open audio
-#        Action: actl_reset() sends to /arco/devinf, open_audio_handler()
+#        Action: host_reset() sends to /arco/devinf, open_audio_handler()
 #                is called when last devinf message is received
 #        -> 'opening' when open_audio_handler() calls arco_open()
 #        -> 'stopped' when device in prefs is not found or if in the previous
@@ -105,10 +105,10 @@ saved_vtsched_bps = 1.0  // default "tempo"
 #                prferences, see other devices, and proceed manually
 #    'opening': waiting for Arco audio streaming to start
 #        Action: call arco_open(), sends /arco/open
-#        -> 'stopped' when /actl/starting called with 0 in and 0 out chans
-#        -> 'running' when /actl/starting called
+#        -> 'stopped' when /host/starting called with 0 in and 0 out chans
+#        -> 'running' when /host/starting called
 #    'running': computing and streaming audio
-#        Action: actl_starting()
+#        Action: host_starting()
 #        -> 'stopped' when code calls close_audio_handler() or
 #                          Close Audio menu selected
 #    'devinf2': waiting for device info, will not open audio
@@ -205,9 +205,9 @@ action_dict = {}
 max_ugen_id_used = 0
 ugens_created = 0
 
-def create_ugen_id():
+def new_ugen_id():
     var uid = arco_ugen_new()
-    // display "create_ugen_id", uid
+    // display "new_ugen_id", uid
     // Debug: track who makes an Ugen:
     // if arco_ugen_id(uid) == 54:
     //      breakpoint()
@@ -566,11 +566,12 @@ def arco_init(keyword ensemble="arco", ins = 2, outs = 2, network = t,
         print "arco_initialize() (called from Serpent) failed"
         exit(1)
     o2_service_new("actl")
+    o2_service_new("host")
     o2_method_new("/actl/devinf", "s", 'actl_devinf', t)
     o2_method_new("/actl/act", "iii", 'actl_act', t)
-    o2_method_new("/actl/starting", "iiiiii", 'actl_starting', t)
-    o2_method_new("/actl/stopped", "i", 'actl_stopped', t)
-    o2_method_new("/actl/reset", "i", 'actl_reset', t)
+    o2_method_new("/host/starting", "iiiiii", 'host_starting', t)
+    o2_method_new("/host/stopped", "i", 'host_stopped', t)
+    o2_method_new("/host/reset", "i", 'host_reset', t)
     o2_method_new("/actl/cpu", "f", 'actl_cpu', t)
     sched_select(rtsched)
     sched_cause(0.1, nil, 'poll_for_arco')
@@ -696,9 +697,9 @@ def arco_poll_to_free_ugens(id):
         last_gc_cycles = gc_cycles()
 
 
-def actl_reset(timestamp, address, types, status):
+def host_reset(timestamp, address, types, status):
     if status != 0:
-        print "!!!! ERROR: actl_reset status", status, "!!!!"
+        print "!!!! ERROR: host_reset status", status, "!!!!"
         print "!!!! Untested code path !!!!"
     if not set_arco_state('devinf' if arco_state == 'initializing' 
                                    else 'devinf2'):
@@ -717,9 +718,10 @@ def create_standard_ugens():
     if zero_ugen:
         print "WARNING: create_stanard_ugens -- ugens already created"
         return
-    zero_ugen = Zero(ZERO_ID)
-    zerob_ugen = Zerob(ZEROB_ID)
-    input_ugen = Thru(zero_ugen, arco_input_chans, INPUT_ID)
+    zero_ugen = Zero(ZERO_ID)  # invoke class directly for this singleton
+    zerob_ugen = Zerob(ZEROB_ID)  # invoke class directly
+    input_ugen = Thru(arco_input_chans, zero_ugen, INPUT_ID)
+    # invoke Sum directly because sum does not take OUTPUT_ID
     output_ugen = Sum(arco_output_chans, true, OUTPUT_ID)
 
 
@@ -743,14 +745,14 @@ monitor_audio_manager = nil
 # this is an O2 message handler for message sent by audio thread
 # when the audio stream is started:
 #
-def actl_starting(timestamp, address, types, in_id, out_id, in_chans, out_chans,
+def host_starting(timestamp, address, types, in_id, out_id, in_chans, out_chans,
                   latency_ms, buffer_size):
                   
     vtsched.set_bps(saved_vtsched_bps)  // continue advancing time
     // print "Audio stream is starting: in", in_id, "("; in_chans, "chan),",
     // print "out", out_id, "("; out_chans, "chan),", "latency", latency_ms,
     // print "ms, block size", buffer_size
-    // display "actl_starting", arco_state
+    // display "host_starting", arco_state
     if in_chans == 0 and out_chans == 0:
         print "WARNING: failed to open audio device"
         set_arco_state('stopped')
@@ -770,17 +772,28 @@ def actl_starting(timestamp, address, types, in_id, out_id, in_chans, out_chans,
     start_poll_for_status()
 
 
-def actl_stopped(timestamp, address, types, status):
-    print "**** /actl/stoppped received with status", status
+def host_stopped(timestamp, address, types, status):
+    print "**** /host/stoppped received with status", status
 
 
-def max_chans(chans, ugen):
-# compute the maximum of chans and the channels implied by ugen, where
-# ugen may be a number (Const), array (Const) or Ugen
-    if isinstance(ugen, Param_descr):
-        ugen = ugen.value()  // gets either a float or const-like
-    max(chans, 1 if isnumber(ugen) else
-               (len(ugen) if isarray(ugen) else ugen.chans))
+def max_chans(chans, rest ugens):
+# compute the maximum of chans and the channels implied by ugens, where
+# ugens may be numbers (Const), arrays (Const) or Ugens. Normally, chans
+# comes from an optional parameter specifying number of channels, so it
+# overrides everything else, but if chans is not specified for the
+# constructing function, it will be nil, and we'll compute the default
+# channel count which is the maximum number of channels in any of the
+# other parameters. Parameters can be Ugens with chans fields, or 
+# numbers (3.0) or arrays of numbers ([1.0, 0.9]).
+    if chans:
+        return chans
+    chans = 1
+    for ugen in ugens:
+        if isinstance(ugen, Param_descr):
+            ugen = ugen.value()  // gets either a float or const-like
+        chans = max(chans, 1 if isnumber(ugen) else
+                           (len(ugen) if isarray(ugen) else ugen.chans))
+    return chans
 
 
 class Ugen:
@@ -975,15 +988,28 @@ class Ugen:
                     print previous.chans, "channels but attempt to set channel",
                     print chan
                     return
-                o2_send_cmd("/arco/" + tolower(classname) +
-                            "/set_" + str(input), 0, "Uif", id, chan, value)
+                previous.set_chan(chan, value)
                 return
             // otherwise, make a Const object to hold the value
             value = const(value)  // replacing A_RATE or B_RATE with C_RATE
+        elif isarray(value):
+            if previous.rate == CRATE:
+                // set the outputs of existing Const object, one chan at a time
+                if chan != 0:
+                    print "ERROR: setting", input, "of", classname,
+                    print "to an array of values, but non-zero chan ("; chan;
+                    print ") was specified."
+                if len(value) > previous.chans:
+                    print "ERROR: setting", input, "of", classname, "to",
+                    print value, "but current Const input is mono."
+                previous.set(value)
+                return
+            value = const(value)
+                
         // value is a Ugen which is the new input value
         inputs[input] = value
-        o2_send_cmd("/arco/" + tolower(classname) +
-                    "/repl_" + str(input), 0, "UU", id, value.id)
+        var addr = "/arco/" + tolower(classname) + "/repl_" + str(input)
+        o2_send_cmd(addr, 0, "UU", id, value.id)
         this
 
 
@@ -1047,7 +1073,7 @@ class Const (Const_like):
         chans = chans if chans else chans_default
         // create with default values of 0, set below
         values_array = array(chans, 0)
-        super.init(create_ugen_id(), "Const", chans, C_RATE, "", no_msg = true)
+        super.init(new_ugen_id(), "Const", chans, C_RATE, "", no_msg = true)
         o2_send_start()
         o2_add_int32(arco_ugen_id(id))
         add_floats(x, "/arco/const/newn")

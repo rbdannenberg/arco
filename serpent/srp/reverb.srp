@@ -104,6 +104,7 @@ class Multi_reverb(Instrument):
 
     def init(input_, rt60, wet_, hz, chans_):
         // initially input is nil
+        instr_begin()
         chans = chans_
         wet = wet_
         // at this point, input is nil, so multi_init knows there is

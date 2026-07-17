@@ -5,7 +5,7 @@
 
 class Flsyn (Ugen):
     def init(path):
-        super.init(create_ugen_id(), "Flsyn", nil, 'a', "s", 'path', path, "f",
+        super.init(new_ugen_id(), "Flsyn", nil, 'a', "s", 'path', path, "f",
                    omit_chans = t) // always created with 2 channel output
         chans = 2
 

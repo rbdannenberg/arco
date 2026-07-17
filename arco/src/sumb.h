@@ -76,7 +76,7 @@ public:
     void rem(Ugen_ptr input) {
         int i = find(input);
         if (i >= 0) {
-            inputs[i]->unref();
+            input->unref(&(inputs[i]));
             inputs.remove(i);
         }
     }
@@ -89,8 +89,9 @@ public:
                       id);
             return;
         }
-        ugen->unref();
-        inputs[loc] = replacement;
+        Ugen_ptr *ptr = &(inputs[loc]);
+        ugen->unref(ptr);
+        *ptr = replacement;
         replacement->ref();
     }
 
@@ -103,7 +104,7 @@ public:
             Sample_ptr input_ptr = input->run(current_block);
             if (input->flags & TERMINATED) {
                 send_action_id(ACTION_REM, input->id);
-                input->unref();
+                input->unref(&(inputs[i]));
                 inputs.remove(i);
                 continue;
             }

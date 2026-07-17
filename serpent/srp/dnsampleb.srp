@@ -5,8 +5,8 @@
 
 class Dnsampleb(Ugen):
     def init(chans, input, mode):
-        super.init(create_ugen_id(), "Dnsampleb", chans, 'b', "Ui",
-	           'input', input, "a", 'mode', mode, "f")
+        super.init(new_ugen_id(), "Dnsampleb", chans, 'b', "Ui",
+	           'input', input, "a", 'mode', mode, "i")
 
     def set_cutoff(hz):
         o2_send_cmd("/arco/dnsampleb/cutoff", 0, "Uf", id, hz)

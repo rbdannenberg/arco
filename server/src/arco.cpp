@@ -74,18 +74,19 @@ static bool host_o2lite_enable = true;
 
 const char *help_strings[] = {
     " A - set Audio preferences",
-    " B - block count messages ON",
-    " b - block count messages OFF",
+    " B - block count messages ON/OFF",
     " H - describe commands like this",
     " P - Save latest selections to preferences",
-    " p - Print audio ugen tree",
     " Q - Quit the program",
     " R - Reset server: deletes all unit generators",
     " S - Start or Stop",
     " t - ask audio thread to print a test message",
     " T - test tone",
+    " U - Print audio ugen tree",
     NULL  // must terminate this list with NULL
 };
+
+static bool heartbeat_enabled = false;
 
 const char *main_commands = "(A)Configure (S)tart/Stop (R)eset (Q)uit (H)elp";
 
@@ -120,36 +121,6 @@ int set_server_goal_state(int state, const char *err_msg)
     server_goal_state = state;
     server_wait_since = o2_local_time();
     return 0;
-}
-    
-
-/* O2 INTERFACE: /host/openaggr string info;
-    For rapid setup and debugging, this looks for the aggregate device
-    and when found, opens it.
-*/
-void host_openaggr(O2_HANDLER_ARGS)
-{
-    const int LATENCY_MS = 50;
-
-    // begin unpack message (machine-generated):
-    char *info = argv[0]->s;
-    // end unpack message
-
-    printf("%s\n", info);
-
-    if (strstr(info, "Aggregate")) {
-        int id = atoi(info);
-        printf("  --> opening this device, id %d\n", id);
-        // open audio, 50ms latency is conservative
-        o2_send_cmd("/arco/ctrl", 0, "s", "host");
-        o2_send_cmd("/arco/open", 0, "iiiiii", id, id, 
-                    prefs_in_chans(), prefs_out_chans(), LATENCY_MS, BL);
-        o2_send_cmd("/arco/prtree", o2_time_get() + 1, "");
-        /* Log some audio:
-        o2_send_cmd("/arco/logaud", 0, "iis", 1, 1, "log.wav");
-        o2_send_cmd("/arco/logaud", o2_time_get() + 1, "iis", 0, 1, "");
-        */
-    }
 }
 
 
@@ -186,8 +157,6 @@ void automation()
         o2_send_cmd("/arco/sine/new", 0, "iiii", SINE_ID, 2, FREQ_ID, AMP_ID);
         o2_send_cmd("/arco/output", 0, "i", SINE_ID);
 
-        // get audio devices
-        o2_send_cmd("/arco/devinf", 0, "s", "/host/openaggr");
         auto_started = true;
         start_time = o2_time_get();
     } else if (!event1 && start_time + 2 < o2_time_get()) {
@@ -207,26 +176,6 @@ void automation()
 #endif
 
 
-void host_ugens_init()
-{
-    // Note: channels here are based on preferences. We try to open 
-    // matching counts, but if devices cannot achieve the preferences,
-    // inputs are expanded to the preferred count and outputs are mixed
-    // down to the available output channels.
-    arco_print("**** host_ugens_init initializing %d ins %d outs ****\n",
-               prefs_in_chans(), prefs_out_chans());
-    assert(prefs_in_chans() >= 0);
-    assert(prefs_out_chans() >= 0);
-    o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID);
-    o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID);
-    o2_send_cmd("/arco/thru/new", 0, "iii", INPUT_ID,
-                prefs_in_chans(), ZERO_ID);
-    o2_send_cmd("/arco/thru/new", 0, "iii", OUTPUT_ID, 
-                prefs_out_chans(), INPUT_ID);
-    server_aud_is_reset = true;
-}
-
-
 int main(int argc, char *argv[])
 {
     o2_use_logfile(true);  // divert debug info because of console UI
@@ -242,15 +191,15 @@ int main(int argc, char *argv[])
     int opt = string_list_index(net_options, host_network_option, 0);
     o2_network_enable(opt > 0);
 
+    o2_internet_enable(opt > 1);
+
+    o2_initialize("arco");
+    // o2_clock_set is called by audio_initialize
+
     host_o2lite_enable = prefs_o2lite_enable();
     if (host_o2lite_enable) {
         o2lite_initialize();  // enable O2lite client connections
     }
-
-    o2_internet_enable(opt > 1);
-
-    o2_initialize("arco");
-    o2_clock_set(NULL, NULL);  // we are the reference clock
 
     if (opt > 2) {
         o2_mqtt_enable(NULL, 0);  // only default MQTT server supported now
@@ -272,7 +221,6 @@ int main(int argc, char *argv[])
             // start, or we've started, state is STARTING, and action pending
             if (server_goal_state == RUNNING) {
                 if (server_aud_state == IDLE) {
-                    host_ugens_init();
                     server_aud_state = STARTING;
                     // expecting /host/starting:
                     o2_send_cmd("/arco/open", 0, "iiiiii", p_in_id, p_out_id,
@@ -280,6 +228,7 @@ int main(int argc, char *argv[])
                                 prefs_latency_ms(), prefs_buffer_size());
                 }
             } else if ((server_goal_state == IDLE ||
+                        server_goal_state == RESET_IDLE ||
                         server_goal_state == FINISHED) &&
                        (server_aud_state == RUNNING)) {
                 server_aud_state = STOPPING;
@@ -294,8 +243,11 @@ int main(int argc, char *argv[])
                        server_aud_state == IDLE) {
                 server_aud_state = FINISH1;
                 o2_send_cmd("/arco/quit", 0, "");
+            } else if (server_goal_state == RESET_IDLE &&
+                       server_aud_state == IDLE) {
+                o2_send_cmd("/arco/reset", 0, "");
+                server_goal_state = IDLE;  // clear the reset request
             }
-
             double wait = o2_local_time() - server_wait_since;
             if (wait > 5) {
                 arco_warn("current state: %d, goal state %d, elapsed time: %g",
@@ -326,7 +278,7 @@ int main(int argc, char *argv[])
             }
         }
         // automation();
-        o2_sleep(2);
+        // o2_sleep(2);
     }
     o2_bridges_finish();
     ui_finish();
@@ -341,6 +293,20 @@ int main(int argc, char *argv[])
 }
 
 
+/* O2 INTERFACE: /host/act int key, int status, int uid):
+   Receive action from Arco and forward to client at /actl
+*/
+static void host_act(O2_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int key = argv[0]->i;
+    int status = argv[1]->i;
+    int uid = argv[2]->i;
+    // end unpack message
+    o2_send_cmd("/actl/act", 0, "iii", key, status, uid);
+}
+
+
 /* O2 INTERFACE: /host/devinf string info;
    Receive and print an /arco/devinf reply, which looks like:
         "<id> - <api_name> : <name> (<in> ins, <out> outs)"
@@ -351,6 +317,7 @@ static void host_devinfo(O2_HANDLER_ARGS)
     char *info = argv[0]->s;
     // end unpack message
     arco_device_info.push_back(o2_heapify(info));
+    // (this pushes an empty string when done)
 }
 
 
@@ -370,6 +337,47 @@ int host_open_audio()
 void host_quit_audio()
 {
     set_server_goal_state(FINISHED, "Cannot Quit now");
+}
+
+
+const char *aud_state_name[] = {
+    "IDLE", "STARTING", "STARTED",
+    "FIRST", "RUNNING", "STOPPING" };
+
+
+/* O2 INTERFACE: /host/run int run;
+   Run or stop audio processing.
+*/
+static void host_run(O2_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    int run = argv[0]->i;
+    // end unpack message
+    if (run != 0 && server_aud_state == IDLE) {
+        host_open_audio();
+        printf("/host/run received. Starting audio devices.\n");
+    } else if (run == 0 && server_aud_state == RUNNING) {
+        printf("/host/run received. Closing audio devices.\n");
+        host_close_audio();
+    } else if (server_aud_state >= 0 && server_aud_state < 6) {
+        printf("/host/run received. Ignored because state is %s\n",
+               aud_state_name[server_aud_state]);
+    } else {
+        printf("/host/run received. Invalid server_aud_state: %d\n",
+               server_aud_state);
+    }
+}
+
+
+/* O2 INTERFACE: /host/clear;
+   stop audio and remove any unit generators
+*/
+static void host_clear(O2_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    // end unpack message
+    printf("/host/clear received. Closing reset in progress.\n");
+    set_server_goal_state(RESET_IDLE, "Cannot clear now");
 }
 
 
@@ -402,9 +410,8 @@ void host_reset_audio()
 */
 
 /* O2 not INTERFACE: /host/reset int32 status;
-(this is the old handler for Arco's /host/reset message; it is
-disabled until we figure out what's best to support applications. See
-audioio.cpp under "Reset: More State" and see host_ugens_init().)
+     Called when arco completes /arco/reset
+ */
 void host_reset(O2_HANDLER_ARGS)
 {
     // begin unpack message (machine-generated):
@@ -412,36 +419,13 @@ void host_reset(O2_HANDLER_ARGS)
     // end unpack message
 
     if (status != 0) {
-        arco_error("/host/reset with status %d ignored because of status\n",
+        arco_error("/host/reset failed with status %d.\n",
                    status);
         return;
     }
-
-    // Note: channels here are based on preferences. We try to open 
-    // matching counts, but if devices cannot achieve the preferences,
-    // inputs are expanded to the preferred count and outputs are mixed
-    // down to the available output channels.
-    arco_print("**** audio was reset, initializing %d ins %d outs ****\n",
-               prefs_in_chans(), prefs_out_chans());
-    assert(prefs_in_chans() >= 0);
-    assert(prefs_out_chans() >= 0);
-    o2_send_cmd("/arco/zero/new", 0, "i", ZERO_ID);
-    o2_send_cmd("/arco/zerob/new", 0, "i", ZEROB_ID);
-    o2_send_cmd("/arco/thru/new", 0, "iii", INPUT_ID,
-                prefs_in_chans(), ZERO_ID);
-    o2_send_cmd("/arco/thru/new", 0, "iii", OUTPUT_ID, 
-                prefs_out_chans(), INPUT_ID);
-    server_aud_state = IDLE;
-    server_aud_is_reset = true;
-
-    if (open_requested) {
-        open_requested = false;
-        // reset happens when we first start audio, so now we complete
-        // starting audio by opening the audio stream:
-        host_open_audio();
-    }
+    o2_send_cmd("/actl/reset", 0, "i", status);
 }
-*/
+
 
 
 /* O2 INTERFACE: /host/starting
@@ -541,17 +525,20 @@ static void host_initialize()
     o2_service_new("host");
     // O2 INTERFACE INITIALIZATION: (machine generated)
     o2_method_new("/host/devinf", "s", host_devinfo, NULL, true, true);
-    o2_method_new("/host/openaggr", "s", host_openaggr, NULL, true, true);
     o2_method_new("/host/starting", "iiiiii", host_starting, NULL, true, true);
     o2_method_new("/host/started", "", host_started, NULL, true, true);
     o2_method_new("/host/stopped", "i", host_stopped, NULL, true, true);
-//    o2_method_new("/host/reset", "i", host_reset, NULL, true, true);
+    o2_method_new("/host/reset", "i", host_reset, NULL, true, true);
+
+    o2_method_new("/host/act", "iii", host_act, NULL, true, true);
+    o2_method_new("/host/run", "i", host_run, NULL, true, true);
+    o2_method_new("/host/clear", "", host_clear, NULL, true, true);
     // END INTERFACE INITIALIZATION
 }
 
 
-bool arco_started = false;
-bool arco_reset = false;    // helps implement one-time reset. To reset again,
+//bool arco_started = false;
+//bool arco_reset = false;    // helps implement one-time reset. To reset again,
                             // either a client sends reset, or restart server.
 
 
@@ -662,8 +649,8 @@ int action(int ch)
         }
         break;
       case 'B':  // "heartbeat" block counts on/off
-      case 'b':
-        o2_send_cmd("/arco/hb", 0, "i", ch == 'B');
+        heartbeat_enabled = !heartbeat_enabled;
+        o2_send_cmd("/arco/hb", 0, "i", heartbeat_enabled);
         break;
       case 'Q':
         host_quit_audio();
@@ -676,7 +663,7 @@ int action(int ch)
             printf("Closing audio devices.\n");
             host_close_audio();
         } else if (server_aud_state == IDLE) {
-                host_open_audio();
+            host_open_audio();
         } else {
             printf("Start/stop ignored because state is not"
                    " IDLE or RUNNING.\n");
@@ -685,14 +672,14 @@ int action(int ch)
       case 'P':  // save parameters
         prefs_write();
         break;
-      case 'p':  // print the audio tree
-        o2_send_cmd("/arco/prtree", 0, "");
-        break;
       case 'T':
         test_tone();
         break;
       case 't':
         o2_send_cmd("/arco/test1", 0, "s", "Test from arco (main)");
+        break;
+      case 'U':  // print the audio tree
+        o2_send_cmd("/arco/prtree", 0, "");
         break;
       default:
         break;

@@ -287,7 +287,7 @@ static const int ZERO_PAD_COUNT = 4410;  // how many zeros to write when closing
 /* this is not used:
 const char *aud_state_name[] = {
     "IDLE", "STARTING", "STARTED",
-    "FIRST", "RUNNING", "STOPPING" };
+    "FIRST", "RUNNING", "STOPPING", "RESET_IDLE" };
 */
 
 using std::min;
@@ -308,7 +308,7 @@ int aud_state = IDLE;
 bool aud_is_reset = false;
 int64_t aud_frames_done = 0;
 int aud_blocks_done = 0;
-bool aud_heartbeat = true;
+bool aud_heartbeat = false;
 void *audio_bridge = NULL;
 
 // slew-rate limited master gain control:
@@ -341,8 +341,11 @@ static int cpuload = 0;
 
 static int underflow_count = 0;
 
-char ctrl_service_addr[64] = "";
-int ctrl_service_addr_len = 0;
+static const int ARCO_ADDR_LEN = 64;
+char ctrl_service_addr[ARCO_ADDR_LEN] = "!actl/";
+int ctrl_service_addr_len = 6;
+char host_service_addr[ARCO_ADDR_LEN] = "!host/";
+int host_service_addr_len = 6;
 
 /************ CLOCK *************/
 
@@ -424,24 +427,33 @@ static bool forget_ugen(Ugen_ptr ugen, Vec<Ugen_ptr> &set)
 }
 
 
+// safely copy service_name to service_addr.
+//   Allow 20 bytes for the rest of the address,
+//   and 3 bytes for "!", "/", and EOS. Result is "!<service_name>/"
+int set_a_service(char *service_addr, int *addr_len, const char *service_name)
+{
+    const size_t len = strlen(service_name);
+    if (len + 23 > ARCO_ADDR_LEN) {
+        arco_warn("Service name is too long: %s.", service_name);
+        service_addr[0] = 0;
+        *addr_len = 0;
+        return 1;  // error return
+    }
+    *addr_len = (int) (len + 2);
+    service_addr[0] = '!';
+    strcpy(service_addr + 1, service_name);
+    strcat(service_addr, "/");
+    return 0;  // normal, no error
+}
+
+
 // safely copy ctrlservice to ctrl_service_addr -- this is who we
 //   send action messages to.  Allow 20 bytes for the rest of the address,
 //   and 3 bytes for "!", "/", and EOS. Result is "!<ctrlservice>/"
 int ctrl_set_service(const char *ctrlservice)
 {
-    const size_t csalen = strlen(ctrlservice);
-    if (csalen + 23 > sizeof(ctrl_service_addr)) {
-        arco_warn("Control service name is too long: %s.",
-                  ctrl_service_addr);
-        ctrl_service_addr[0] = 0;
-        ctrl_service_addr_len = 0;
-        return 1;  // error return
-    }
-    ctrl_service_addr_len = (int) (csalen + 2);
-    ctrl_service_addr[0] = '!';
-    strcpy(ctrl_service_addr + 1, ctrlservice);
-    strcat(ctrl_service_addr, "/");
-    return 0;  // normal, no error
+    return set_a_service(ctrl_service_addr, &ctrl_service_addr_len,
+                         ctrlservice);
 }
 
 
@@ -450,6 +462,24 @@ const char *ctrl_complete_addr(const char *method_name)
     assert(ctrl_service_addr_len > 1);
     strcpy(ctrl_service_addr + ctrl_service_addr_len, method_name);
     return ctrl_service_addr;
+}
+
+
+// safely copy hostservice to host_service_addr -- this is who we
+//   host notification messages to.  Allow 20 bytes for the rest of the address,
+//   and 3 bytes for "!", "/", and EOS. Result is "!<hostservice>/"
+int host_set_service(const char *hostservice)
+{
+    return set_a_service(host_service_addr, &host_service_addr_len,
+                         hostservice);
+}
+
+
+const char *host_complete_addr(const char *method_name)
+{
+    assert(host_service_addr_len > 1);
+    strcpy(host_service_addr + host_service_addr_len, method_name);
+    return host_service_addr;
 }
 
 
@@ -563,6 +593,18 @@ static void arco_ctrl(O2SM_HANDLER_ARGS)
 }
 
 
+/* O2SM INTERFACE: /arco/host string s;
+   set the arco control service - where we send host notices
+*/
+static void arco_host(O2SM_HANDLER_ARGS)
+{
+    // begin unpack message (machine-generated):
+    char *s = argv[0]->s;
+    // end unpack message
+    host_set_service(s);
+}
+
+
 /* O2SM INTERFACE: /arco/reset;
    Disconnect run set and outputs,
    send to /<ctrl>/reset, where <ctrl> is the control service name
@@ -582,7 +624,7 @@ static void arco_reset(O2SM_HANDLER_ARGS)
     // notify the control service that reset is finished
     o2sm_send_start();
     o2sm_add_int32(status);
-    o2sm_send_finish(0.0, ctrl_complete_addr("reset"), true);
+    o2sm_send_finish(0.0, host_complete_addr("reset"), true);
 }
 
 
@@ -935,7 +977,13 @@ static int callback_entry(float *input, float *output,
     // code below (see else part) to output zeros when Arco produces no
     // output but the audio device expects output.
     if (!arco_output) {
-        arco_warn("(Arco audio callback): arco_output is NULL\n");
+        // When arco is reset and audio is running, arco_output is removed
+        // and there is no audio output data. The old warnings for this
+        // condition are disabled now since it is not necessarily an error.
+        // Users should really tell the host to stop the stream before
+        // doing a reset, but there are synchronization difficulties.
+        // arco_warn("(Arco audio callback): arco_output is NULL\n");
+        ;
     } else if (arco_output->chans > 0) {    // Compute the output:
         Sample_ptr arco_out_samps = arco_output->run(aud_blocks_done);
         int arco_out_chans = arco_output->chans;
@@ -1236,7 +1284,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
     o2sm_add_int32(actual_out_chans);
     o2sm_add_int32(actual_latency_ms);
     o2sm_add_int32(actual_buffer_size);
-    o2sm_send_finish(0.0, ctrl_complete_addr("starting"), true);
+    o2sm_send_finish(0.0, host_complete_addr("starting"), true);
 
     if (err == paNoError &&
         (err = Pa_StartStream(audio_stream)) != paNoError) {
@@ -1283,7 +1331,7 @@ static void arco_close(O2SM_HANDLER_ARGS)
         arco_warn("arco_close ignored because aud_state is %d\n", aud_state);
         o2sm_send_start();
         o2sm_add_int32(aud_state == IDLE ? 0 : -1);
-        o2sm_send_finish(0.0, ctrl_complete_addr("stopped"), true);
+        o2sm_send_finish(0.0, host_complete_addr("stopped"), true);
         return;
     }
     aud_state = STOPPING;
@@ -1345,7 +1393,7 @@ void arco_thread_poll()
         aud_state = FIRST;
         AD("aud_state = FIRST;\n");
         o2sm_send_start();
-        o2sm_send_finish(0.0, ctrl_complete_addr("started"), true);
+        o2sm_send_finish(0.0, host_complete_addr("started"), true);
         return;
     }
     if (aud_state == AUDIO_STOPPED) {
@@ -1362,7 +1410,7 @@ void arco_thread_poll()
         o2sm_send_start();
         // 1 == successful transition from RUNNING to AUDIO_STOPPED:
         o2sm_add_int32(1);
-        o2sm_send_finish(0.0, ctrl_complete_addr("stopped"), true);
+        o2sm_send_finish(0.0, host_complete_addr("stopped"), true);
     }
 
     if (!USE_MAIN_THREAD) {
@@ -1378,6 +1426,25 @@ void arco_thread_poll()
     o2sm_poll();
     // restore thread local context
     o2_set_context(save_ctx);
+}
+
+
+
+void audioio_message_warning_override(const char *warn, O2msg_data_ptr msg)
+{
+    if (strncmp(warn, "dropping message", 16) == 0) {
+        if ((strncmp(msg->address, "/arco/", 6) == 0) &&
+            strcmp(msg->address + strlen(msg->address) - 4, "/new") == 0) {
+            // this message was (probably) trying to create a Ugen, but
+            // the ugen class is not defined in this build. Tell client:
+            char warning[64];
+            snprintf(warning, sizeof(warning), "No such address: %s",
+                     msg->address);
+            o2sm_send_cmd("/actl/nougen", 0, "s", warning);
+        }
+    }
+    // in addition to special handling above, invoke normal handling:
+    o2_message_drop_warning(warn, msg);
 }
 
 
@@ -1401,6 +1468,7 @@ int audioio_initialize()
              audio_bridge, o2_shmem_inst_id(audio_bridge));
 
     o2sm_service_new("arco", NULL);
+    o2_message_warnings(&audioio_message_warning_override);
 
     // O2SM INTERFACE INITIALIZATION: (machine generated)
     o2sm_method_new("/arco/hb", "i", arco_hb, NULL, true, true);

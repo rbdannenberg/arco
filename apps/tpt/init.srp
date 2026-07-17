@@ -186,7 +186,8 @@ def arco_ready():
     effects = Autofx(input_ugen)
     display "init", effects.chans
     effects_ctrl = Autofx_ctrl(win, 425, 10, 340, effects)
-    effects.play()
+    effects_with_boost = mult(effects, 8)
+    effects_with_boost.play()
 
     vaecontrol_init(default_window, 770, 5)
 

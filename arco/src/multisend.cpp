@@ -3,6 +3,8 @@
  */
 
 #include "arcougen.h"
+// TODO: remove sharedmemclient.h include
+#include "sharedmemclient.h"
 #include "multisend.h"
 
 const char *Multisend_name = "Multisend";

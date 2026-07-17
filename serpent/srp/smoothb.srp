@@ -16,7 +16,7 @@ class Smoothb (Const_like):
         chans = chans if chans else chans_default
         // create with default values of 0, set below
         values_array = array(chans, 0)
-        super.init(create_ugen_id(), "Smoothb", chans, C_RATE, "",
+        super.init(new_ugen_id(), "Smoothb", chans, C_RATE, "",
                    no_msg = true)
         o2_send_start()
         o2_add_int32(arco_ugen_id(id))

@@ -5,7 +5,7 @@
 
 class Olapitchshift (Ugen):
     def init(chans, input, ratio, xfade, windur):
-        super.init(create_ugen_id(), "olaps", chans, 'a', "Ufff",
+        super.init(new_ugen_id(), "olaps", chans, 'a', "Ufff",
 	           'input', input, "a", 'ratio', ratio, "f",
                    'xfade', xfade, "f", 'windur', windur, "f")
     

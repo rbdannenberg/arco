@@ -81,6 +81,7 @@ public:
         }
         if (expected) {
             arco_warn("Sum::find: %p not found, nothing was changed", input);
+            arco_warn("  id %d table has %p", input->id, ugen_table[input->id]);
         }
         return -1;
     }
@@ -90,8 +91,11 @@ public:
     void rem(Ugen_ptr input) {
         int i = find(input);
         if (i >= 0) {
-            inputs[i]->unref(&(inputs[i]));
+            input->unref(&(inputs[i]));
             inputs.remove(i);
+            for (int j = 0; j < inputs.size(); j++) {
+                arco_warn("rem left over %d %p", j, inputs[j]);
+            }
         }
     }
 
@@ -103,8 +107,9 @@ public:
                       id);
             return;
         }
-        ugen->unref(&(inputs[loc]));
-        inputs[loc] = replacement;
+        Ugen_ptr *ptr = &(inputs[loc]);
+        ugen->unref(ptr);
+        *ptr = replacement;
         replacement->ref();
     }
 

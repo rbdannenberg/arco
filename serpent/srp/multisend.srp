@@ -5,7 +5,7 @@
 
 class Multisend(Ugen):
     def init()
-        super.init(create_ugen_id(), "Multisend", chans, A_RATE, "i",
+        super.init(new_ugen_id(), "Multisend", chans, A_RATE, "i",
                    omit_chans = true)
 
     def ins(addr, target, rest params)

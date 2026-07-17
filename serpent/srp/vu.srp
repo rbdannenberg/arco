@@ -9,8 +9,8 @@ def vu(reply_addr, period):
 
 class Vu (Ugen):
     def init(reply_addr, period)
-        super.init(create_ugen_id(), "Vu", 0, '', "sf",
-                   'reply_addr', reply_addr, "f",
+        super.init(new_ugen_id(), "Vu", 0, '', "sf",
+                   'reply_addr', reply_addr, "s",
                    'period', period, "f")
 
     def start(reply_addr, period):

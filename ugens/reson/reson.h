@@ -238,7 +238,7 @@ public:
             float fTemp2 = 1.0f / std::max<float>(float(input2[i0]), 0.1f);
             float fTemp3 = (fTemp2 + fTemp1) / fTemp0 + 1.0f;
             state->fRec0[0] = float(input0[i0]) - (state->fRec0[2] * ((fTemp1 - fTemp2) / fTemp0 + 1.0f) + 2.0f * state->fRec0[1] * (1.0f - 1.0f / Reson_faustpower2_f(fTemp0))) / fTemp3;
-            output0[i0] = FAUSTFLOAT((state->fRec0[2] + 2.0f * state->fRec0[1] + state->fRec0[0]) / fTemp3);
+            output0[i0] = FAUSTFLOAT((state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]) / fTemp3);
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
         }

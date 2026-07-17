@@ -5,6 +5,6 @@
 def delayvi(input, delay, maxdelay, optional chans):
     if not chans:
         chans = max_chans(max_chans(max_chans(1, input), delay), maxdelay)
-    Ugen(create_ugen_id(), "delayvi", chans, 'a', "UUf", 'input', input, "a",
+    Ugen(new_ugen_id(), "delayvi", chans, 'a', "UUf", 'input', input, "a",
          'delay', delay, "abc", 'maxdelay', maxdelay, "f")
 

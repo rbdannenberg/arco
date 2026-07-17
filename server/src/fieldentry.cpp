@@ -374,7 +374,7 @@ void fieldentry_handle_typing(int ch)
     } else if (ch == DEL_CHAR || ch == BACKSPACE_CHAR || ch == KEY_DC) {
         current_field->handle_typing(DEL_CHAR);
     } else if (ch <= 0 || ch >= 128) {
-        return true;  // ignore other "special" characters
+        return;  // ignore other "special" characters
     } else if (isgraph(ch) || ch == ' ') {
         current_field->handle_typing(ch);
     }

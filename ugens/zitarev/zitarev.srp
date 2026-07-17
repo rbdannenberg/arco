@@ -16,6 +16,6 @@ def zitarev(input, wet, gain, rt60):
         print "ERROR: 'rt60' input to Ugen '{c}' must be single channel"
         return nil
 
-    Ugen(create_ugen_id(), "zitarev", 2, 'a', "UUUU", omit_chans = true,
-         'input', input, "a", 'wet', wet, "bc", 'gain', gain, "bc", 'rt60', rt60, "bc")
+    Ugen(new_ugen_id(), "zitarev", 2, 'a', "UUUU", omit_chans = true, 'input',
+         input, "a", 'wet', wet, "bc", 'gain', gain, "bc", 'rt60', rt60, "bc")
 

@@ -207,24 +207,28 @@ method will return the Const object, not the constant value(s).
 ### ugen.set(name, value, [chan], [quiet])
 Set the input to `ugen` named by `name` to `value`. If `value` is
 a number and the current input is a `Const` (e.g., it was initialized
-by passing a number to the constructor), then the `Const` is updated
-by writing `value` to the channel specified by `chan`.
+by passing number(s) to the constructor), then the `Const` is updated
+by writing `value` to the channel specified by `chan`, which defaults
+to 0. If the `Const` input has fewer than `chan` channels, an update
+message will be sent but ignored. Note that if a multi-channel input
+is initialized with a number, a 1-channel `Const` is created and that
+value is fanned out to all channels. In that case the input must be
+treated as 1-channel. You can *construct* a new multi-channel `Const`
+and pass the `Const` as `value` to get around this. (This is also a
+way to set all input values atomically/simultaneously).
+
 If `value` is an array of numbers and the current input is a `Const`,
 then `chan` is ignored and multiple channels, starting with 0, are
-updated in the named input. If a number or array of numbers is
-specified and the curren tinput is *not* constant or there is a
-mismatch in channels, then a new `Const` object is constructed to
-replace the current input. Note that if `chan` is zero and a `Const`
-object exists, then only one channel is updated, but if a `Const`
-must be created with one channel, the "mono" constant will apply to
-all channels. This could lead to surprising behavior. Therefore,
-*if channel is unspecified, the Const will be replaced if necessary
-so that the input is single-channel*, and if channel *is* specified,
-either `ugen` must be single channel and `chan` is 0, or a
-multi-channel Const must already exist. Otherwise, no action is taken
-and, if `quiet` is false (the default), a warning is printed.
-Therefore, the case to avoid is providing a numberical `value` and
-specifying a channel when the current value is not a `Const`'.
+updated in the named input, as if converting the call to multiple
+calls with numbers as `value` and using channels 0, 1, 2, .... The
+same cases mentioned in the previous paragraph apply if an existing
+`Const` has 1 channel.
+
+If a number or array of numbers is specified and the current input
+is *not* constant, then a new `Const` object is constructed to
+replace the current input.
+
+If `value` is a Ugen, that Ugen replaces the previous input.
 
 ### ugen.atend(action, [target, mask])
 When this unit generator ends, `action` will be sent to `this` or, if
@@ -245,7 +249,7 @@ status values. E.g. to receive only a termination notifications, use
 `ACTION_TERM` as `mask`. To receive notification when an envelope end
 (decays to zero and there are no more breakpoints), use
 `ACTION_END`. The default mask is `ACTION_END | ACTION_TERM`, and note
-that a status can have multiple bits set, e.g. `ACTION_ERROR |
+that a status can have multiple bits set, e.g., `ACTION_ERROR |
 ACTION_END | ACTION_TERM` is returned by `recplay` when there is an
 error.
 

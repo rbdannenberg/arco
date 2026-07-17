@@ -33,7 +33,7 @@ Arco receives `/arco/reset`: shuts down audio thread, deletes all
 Ugens, sets reply service (here, we assume it is "actl"), sends
 confirmation. Do this first, even before `/arco/open`.
  
-Arco sends `/actl/reset`: confirms audio stream closed and Ugens are
+Arco sends `/host/reset`: confirms audio stream closed and Ugens are
 deleted. Client can send `/arco/open` again.
 
 Client creates Zero and Thru Ugens for `INPUT_ID` and `PREV_OUTPUT_ID`
@@ -52,11 +52,11 @@ channels, latency and buffer size (in frames). (Control or reply
 service is also specified, but by convention it should be the same
 service passed to `/arco/reset`. Here, we assume `/actl`.
 
-Arco sends `/actl/starting`: gives actual device ids, actual channel
+Arco sends `/host/starting`: gives actual device ids, actual channel
 counts, actual latency and actual buffer size (in frames).
 
 If open is successful (indicated by actual_in_chans and
-actual_out_chans both equal to zero), Arco later sends `/actl/started`
+actual_out_chans both equal to zero), Arco later sends `/host/started`
 when audio callbacks are happening.
 
 Arco receives `/arco/close`: close audio stream, but keep Ugens in
@@ -64,82 +64,6 @@ place.
 
 Arco sends `/actl/closed`: confirms audio stream closed.
 
-## Preferences
-Preferences within Arco source code are confusing enough that you
-will need this to understand the code:
-
-There are several sets of preference variables with different prefixes:
-- `p_*` -- private to prefs module; values correspond to .arco prefs file
-- `arco_*` -- Used for getting preferences from the user interactively.
-- `host_*` -- Parameters determined after devices were actually opened.
-  These values are displayed in interfaces as the "Actual" value of any
-  parameter.
-
-These prefixes are applied to each of the following suffixes. Here is
-what they mean:
-
-- `*_in_id` -- PortAudio input device number
-- `*_out_id` -- PortAudio output device number
-- `*_in_name` -- PortAudio input device name (or substring thereof)
-- `*_out_name` -- PortAudio output device name (or substring thereof)
-- `*_in_chans` -- input channel count
-- `*_out_chans` -- output channel count
-- `*_buffer_size` -- samples per audio buffer (not necessarily the
-  same as the Arco block length, BL, as Arco may need to compute
-  multiple blocks to fill the buffer on each audio callback).
-- `*_latency` -- output latency in ms (the output buffer should be
-  about this long, or if double-buffered, each buffer should be about
-  this long. The input buffer should also be this long, but we assume
-  it is empty when the output buffer is full, so input buffers do not
-  contribute additional latency.)
-- `*_network_enable` -- is networking enabled? If not, only
-  connections within the local machine are possible.
-- `*_o2lite_enable` -- is o2lite enabled? Implies `network_enable`.
-- `*_internet_enable` -- is internet enabled? If not, O2 will not
-  wait to determine a public IP address, causing delays if there is
-  no internet access.
-- `*_mqtt_enable` -- is MQTT enabled? If not, O2 cannot establish
-  wide-area connections and only uses Bonjour.
-  
-
-**General information flow:**
-- `host_*` values are provided by PortAudio when devices are opened.
-  The `host_network_enable`, `host_o2lite_enable`,
-  `host_internet_enable`, and `host_mqtt_enable` are not related to
-  PortAudio. Instead, they are set and applied at server startup and
-  cannot be changed without restarting.
-  
-The other `host_*` values are used by the audio callback to interpret
-the audio stream.
-- `p_*` values are initialized from the preferences file `.arco`
-- `arco_*` values are initialized from `p_*` values, and when the user
-  sets valid `arco_*` values, they are used to update `p_*` values.
-  (Setting to -1 or some indication of "default" is also valid and
-  means "use default value instead of whatever might have been in the
-  preferences file", i.e., "clear the preference".)
-- Values used to open PortAudio devices are the `p_*` values unless
-  they are -1 in which case default values are used.
-
-Preferences are only written on request by writing the current `p_*`
-values, which can include -1 for "no preference".
-
-Initially, arco_* values are set to preferences. They can be changed.
-Changes are *not* automatically saved back to the .arco preference file.
-You must use the 'P' command to save them.
-
-Default in and out channels is 2. 
-
-**Preferences inside/outside the server**
-Applications pass in parameters to open audio: device ids, channel
-counts, buffer size and latency. -1 works to get default values.
-
-Preferences are on the "server side" and not visible to
-the "arco side". To allow inspection of actual values selected, the
-arco side sends actual (`host_*`) values back to the control service,
-the name of which is provided in /arco/ctrl.
-
-On the "arco side", we have only defaults and whatever values are
-passed into the open operation.
 
 **Synchronization and Threads**
 
@@ -335,20 +259,6 @@ is not connected to any other inputs, it will be freed. The reference
 counts will propagate up the tree, freeing all the unit generators in
 the tree.
 
-The structures are drawn here:
-```
-Client                             │  Arco Server
-                                   │     ugen_table
-                                   │      ┌──────┐
-┌─────────────────┐  ┌──────────┐  │    0 │      │
-│ Client shadow   ├─>│ Ugen_id  │  │    … │      │   ┌───────────────┐
-│ object for Ugen │  │  id = 15 ├──├──>15 │      ├──>│  Ugen  id=15  │
-└─────────────────┘  └──────────┘  │    … │      │   │  refcount > 0 │
-                          ▲        │      └──────┘   └───────────────┘
-  Other client reference  │        │
-  to the Ugen ────────────┘        │
-```
-
 You can also use `/arco/run` to insert a ugen ID into `run_set`, which
 is a list of unit generators to "run" before computing each block of
 audio output. Typically, unit generators in the `run_set` analyze
@@ -370,21 +280,16 @@ object.
 
 In Serpent, I have created shadow classes and objects for unit
 generators, so the entire unit generator graph in Arco is mirrored in
-the client side control program.  These objects encapsulate and manage
-reference counts so that the client code is written in terms of
-methods on the mirror objects. The client works at this level of
+the client side control program. The client works at this level of
 abstraction and there are no direct messages to Arco. Languages with
 garbage collectors that call "cleanup code" when objects are freed
 could store Arco IDs directly in the shadow object and free the ID
 when the shadow object is freed.
 
-In the more elaborate Serpent scheme, the ID on the client side is
-actually an object, not a simple integer. When all references to the
-object (and thus all ability to referene the actual Arco ugen) are
-deleted and the object is garbage collected, we can `/arco/free` the
-ID, which decrements the reference count and possibly deletes the
-ugen. (It could still have other references within Arco and survive
-longer.)
+Serpent does not have "cleanup" methods the run when objects are
+freed, so Serpent was extended to make ID a built-in object known
+to the runtime system and garbage collector as an external object.
+See "Unit Generator References in Serpent" below for details.
 
 ### Output and Run Sets
 
@@ -426,6 +331,20 @@ whenever Arco is reset, clearing all unit generators.  After a reset,
 all references are invalid, so incrementing the epoch number is a 
 way of invalidating them.
 
+The structures are drawn here:  
+``` 
+Client                             │  Arco Server  
+                                   │     ugen_table  
+                                   │      ┌──────┐
+┌─────────────────┐  ┌──────────┐  │    0 │      │
+│ Client shadow   ├─>│ Ugen_id  │  │    … │      │   ┌───────────────┐
+│ object for Ugen │  │  id = 15 ├──├──>15 │      ├──>│  Ugen  id=15  │
+└─────────────────┘  └──────────┘  │    … │      │   │  refcount > 0 │
+                          ▲        │      └──────┘   └───────────────┘
+  Other client reference  │        │
+  to the Ugen ────────────┘        │
+```
+ 
 How safe should this be? Since users can construct arbitrary O2
 message and send to Arco, it's always possible to circumvent any Ugen
 management mechanism, e.g. we can send a message like `/arco/free
@@ -436,7 +355,7 @@ as possible to avoid mistakes.
 
 Currently, users normally send O2 messages from Serpent using
 `o2_send_cmd` with a type string to specify types in the message.  We
-will add a special type character code "U" for Ugen that expects a
+use a special type character code "U" for Ugen that expects a
 Ugen_id object, checks the epoch number to make sure it is valid,
 extracts the id from the Ugen_id, and adds it to the message using
 `o2_add_int32`.
@@ -574,7 +493,7 @@ we trace through some paths. These descriptions have been used to also
 trace through and check the actual code:
 
 1. A Serpent Ugen subclass initialization calls` Ugen.init()` which
-   calls `create_ugen_id` which calls extern function `arco_ugen_new`.
+   calls `new_ugen_id` which calls extern function `arco_ugen_new`.
    `arco_ugen_new` (Serpent extern function) calls `new(m) Ugen_id`
    which pops an integer id from the static list `Ugen_id::free_list`
    and returns the allocated Ugen_id. We assume the created Ugen is

@@ -4,7 +4,7 @@ def spectralcentroid(input, reply_addr):
 
 class SpectralCentroid (Ugen):
     def init(input, reply_addr)
-        super.init(create_ugen_id(), "SpectralCentroid", 0, '', "Us",
+        super.init(new_ugen_id(), "SpectralCentroid", 0, '', "Us",
                    omit_chans = 1, 'input', input, "a",
                    'reply_addr', reply_addr, "f")
 

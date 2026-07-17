@@ -34,7 +34,7 @@ def stnoisegate(input, threshold, attack, hold, release):
         print "ERROR: 'release' input to Ugen '{c}' must be single channel"
         return nil
 
-    Ugen(create_ugen_id(), "stnoisegate", 2, 'a', "UUUUU", omit_chans = true,
+    Ugen(new_ugen_id(), "stnoisegate", 2, 'a', "UUUUU", omit_chans = true,
          'input', input, 'threshold', threshold, 'attack', attack, 'hold', hold,
          'release', release)
 

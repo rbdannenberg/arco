@@ -8,6 +8,7 @@
 
 import sys
 import os
+from pathlib import Path
 
 WIN32 = (os.name == 'nt')
 PY = "python" if WIN32 else "python3"
@@ -34,6 +35,8 @@ in the same sine subdirectory named ugens/sine/
 The makefile also makes allugens.srp by appending all the ugen.srp
 files corresponding to classes in the manifest. allugens.srp is
 written to the same folder as dspmanifest.txt.
+
+And makes allugens.py for Python programs.
 
 Math ugens, implemented by mathugen and mathugenb, including mult, add,
 greater, hz_to_step, and many others (see MATHUGENS and UNARYUGENS list
@@ -94,9 +97,26 @@ def append_to_srp_srcs(spec, path, nonfaust):
 
 
 
+def append_to_py_srcs(spec, path, nonfaust):
+    """add a Python source file to be included in allugens.py.
+    spec - the specification (ugen name) in manifest.txt
+    path - the path for the .srp file
+    nonfaust - is this a non-Faust Ugen? If so, the .srp file should
+        already exist. Otherwise, the .srp file will be created by
+        the dspmakefile.
+    """
+    global py_srcs
+    if nonfaust and not os.path.isfile(path):
+        print('ERROR: dspmanifest.txt specifies "', spec, '" but "',
+              path, '" does not exist.', sep = "", file=sys.stderr)
+    else:
+        py_srcs.append(path)
+
+
+
 def make_makefile(arco_path, manifest, outf):
     """make the makefile for faust-based dsp .cpp and .h files"""
-    global srp_srcs
+    global srp_srcs, py_srcs
 
     print("# dspmakefile - a makefile for Arco unit generator dsp sources",
           file=outf)
@@ -107,8 +127,14 @@ def make_makefile(arco_path, manifest, outf):
     # ignore b-rate versions, so sine* just describes dependent sine.cpp, but
     # when sine.cpp is generated, so are sine.h, sineb.cpp, sineb.h
     sources = []
+
+    # also gather Serpent and Python sources
     srp_srcs = []
     srp_path = arco_path + "/serpent/srp/"
+
+    py_srcs = []
+    py_path = arco_path + "/pyarco/ugens/"
+
     ugens_path = arco_path + "/ugens/"
 
     for ugen in manifest:
@@ -131,19 +157,24 @@ def make_makefile(arco_path, manifest, outf):
                     basename = basename[0 : -1]
             source = srp_path + basename + ".srp"
             append_to_srp_srcs(ugen, source, True)
+            source = py_path + basename + ".py"
+            append_to_py_srcs(ugen, source, True)
         else:
             sources.append(ugens_path + basename + "/" + basename + ".cpp")
             if basename == "mult":  # get "mult" code from srp_path,
                                     # not ugens_path:
                 append_to_srp_srcs(ugen, srp_path + "mult.srp", True)
+                append_to_py_srcs(ugen, py_path + "mult.py", True)
             elif basename != "fader":  # fader is included by arco.srp
                 append_to_srp_srcs(ugen, ugens_path + basename + "/" +
                                          basename + ".srp", False)
+                append_to_py_srcs(ugen, ugens_path + basename + "/" +
+                                         basename + ".py", False)
 
     print("all:  ", end="", file=outf)
     for source in sources:
         print(" \\\n    " + source, end="", file=outf)
-    print(" \\\n    allugens.srp\n\n", file=outf)
+    print(" \\\n    allugens.srp allugens.py\n\n", file=outf)
     
     # for each source, write the command to generate it
     # this generates all variants (a-rate, b-rate) and both .cpp and .h
@@ -205,6 +236,36 @@ def make_makefile(arco_path, manifest, outf):
             print("\tcat", src, ">> allugens.srp", file=outf)
             # this newline also is needed for files with no final newline:
             print("\techo >> allugens.srp", file=outf)  # blank line separator
+
+    print("allugens.py: dspmakefile", end="", file=outf)
+    for src in py_srcs:
+        print(" " + src, end="", file=outf)
+    if WIN32:
+        print("\n\tdel allugens.py", file=outf)
+        print("\tcopy NUL allugens.py", file=outf)
+    else:
+        print("\n\trm -f allugens.py", file=outf)
+        print("\ttouch allugens.py", file=outf)
+    for src in py_srcs:
+        if WIN32:
+            print('\techo. >> allugens.py', file=outf)
+            print('\techo # ---- included from', src,
+                  '----" >> allugens.py', file=outf)
+            print('\techo. >> allugens.py', file=outf)
+            src = src.replace('/', '\\')  # convert to Windows path
+            print("\ttype", src, ">> allugens.py", file=outf)
+            # this newline also is needed for files with no final newline:
+            print("\techo. >> allugens.py", file=outf)  # blank line separator
+        else:
+            print('\techo "\\n# ---- included from', src,
+                  '----\\n" >> allugens.py', file=outf)
+            print("\tcat", src, ">> allugens.py", file=outf)
+            # this newline also is needed for files with no final newline:
+            print("\techo >> allugens.py", file=outf)  # blank line separator
+    current_dir = Path(__file__).resolve().parent
+    print("\tpython3", current_dir / "consolidate_imports.py allugens.py",
+          file=outf)
+
 
 
 def make_inclfile(arco_path, manifest, outf):
@@ -575,6 +636,9 @@ def main():
         make_inclfile(arco_path, manifest, outf)
     print("Merged the following files to form allugens.srp: ")
     for src in srp_srcs:
+        print("   ", src)
+    print("Merged the following files to form allugens.py: ")
+    for src in py_srcs:
         print("   ", src)
 
 main()

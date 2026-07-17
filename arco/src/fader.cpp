@@ -99,7 +99,7 @@ static void arco_fader_mode(O2SM_HANDLER_ARGS)
     int32_t mode = argv[1]->i;
     // end unpack message
 
-    UGEN_FROM_ID(Fader, fader, id, "arco_fader_repl_x2");
+    UGEN_FROM_ID(Fader, fader, id, "arco_fader_mode");
     fader->set_mode(mode);
 }
 

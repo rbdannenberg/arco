@@ -9,7 +9,7 @@ class Wavetables (Ugen):
     def init(freq, amp, phase, chans, classname, rate):
         if not chans:
             chans = max_chans(max_chans(1, freq), amp)
-        super.init(create_ugen_id(), classname, chans, rate,
+        super.init(new_ugen_id(), classname, chans, rate,
                    "UUf", 'freq', freq, "abc", 'amp', amp, "abc",
                    'phase', phase, "f")
         address_prefix = "/arco/" + tolower(classname) + "/"

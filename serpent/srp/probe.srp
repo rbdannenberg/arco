@@ -12,9 +12,9 @@ class Probe (Ugen):
     var running
 
     def init(input, reply_addr):
-        super.init(create_ugen_id(), "Probe", 0, '', "Us",
+        super.init(new_ugen_id(), "Probe", 0, '', "Us",
                    omit_chans = t,
-                   'input', input, "abc", 'reply_addr', reply_addr, "f")
+                   'input', input, "abc", 'reply_addr', reply_addr, "s")
 
     def probe(period, frames, chan, nchans, stride):
         o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,

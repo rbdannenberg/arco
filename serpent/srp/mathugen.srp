@@ -24,7 +24,7 @@ class Math (Ugen):
     def init(op, x1, x2, optional chans):
         if not chans:
             chans = max_chans(max_chans(1, x1), x2)
-        super.init(create_ugen_id(), "math", chans, 'a', "iUU",
+        super.init(new_ugen_id(), "math", chans, 'a', "iUU",
                    'op', op, "f", 'x1', x1, "abc", 'x2', x2, "abc")
 
     def rliset(x):
@@ -38,7 +38,7 @@ class Mathb (Ugen):
     def init(op, x1, x2, optional chans):
         if not chans:
             chans = chans or max_chans(max_chans(1, x1), x2)
-        super.init(create_ugen_id(), "mathb", chans, 'b', "iUU",
+        super.init(new_ugen_id(), "mathb", chans, 'b', "iUU",
                    'op', op, "f", 'x1', x1, "bc", 'x2', x2, "bc")
 
     def rliset(x):
@@ -49,8 +49,8 @@ def mult(x1, x2, optional chans, keyword x2_init):
     if x2_init:
         if not chans:
             chans = max_chans(max_chans(1, x1), x2)
-        Ugen(create_ugen_id(), "multx", chans, 'a', "UUf", 'x1', x1, 'x2', x2,
-             'init', x2_init)
+        Ugen(new_ugen_id(), "Multx", chans, 'a', "UUf",
+             'x1', x1, "abc", 'x2', x2, "abc", 'init', x2_init, "f")
     else:
         Math(MATH_OP_MUL, x1, x2, chans)
 

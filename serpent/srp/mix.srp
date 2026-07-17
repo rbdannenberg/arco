@@ -6,7 +6,7 @@
 class Mix (Ugen):
     
     def init(chans_, wrap):
-        super.init(create_ugen_id(), "Mix", chans_, A_RATE,
+        super.init(new_ugen_id(), "Mix", chans_, A_RATE,
                    "i", 'wrap', 1 if wrap else 0, "f")
         register_action(this, ACTION_REM, this, 'action_rem')
 

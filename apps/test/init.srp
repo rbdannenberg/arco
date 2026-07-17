@@ -534,7 +534,7 @@ def record_output(x, optional chans = 1):
                 recplay1.record(false)
                 recplay1.unrun()
             // long fade time to test this feature
-            recplay1 = recplay(output_ugen, chans, 0.5, 3.0, false)
+            recplay1 = recplay(arco.output, chans, 0.5, 3.0, false)
         recplay1.run()  # needs be in run set to make active
         recplay1.record(true)
     elif not recplay1:
@@ -1624,6 +1624,7 @@ def multisend_cleanup():
     mts3 = nil
     mtms = nil
     // after GC, everything should be free
+
 
 
 ########## Main Initialization ################

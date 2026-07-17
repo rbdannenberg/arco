@@ -6,7 +6,7 @@
 class Zero (Ugen):
 
     def init(optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+        super.init(arco_ugen_new_id(id_num) if id_num else new_ugen_id(), 
                    "Zero", 1, 'a', "", omit_chans = true)
 
 
@@ -17,7 +17,7 @@ class Zero (Ugen):
 class Zerob (Ugen)
 
     def init(optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+        super.init(arco_ugen_new_id(id_num) if id_num else new_ugen_id(), 
                    "Zerob", 1, 'b', "", omit_chans = true)
 
 # DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen

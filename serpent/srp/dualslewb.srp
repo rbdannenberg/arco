@@ -6,7 +6,7 @@
 class Dualslewb(Ugen):
     def init(chans, input, attack, release, optional current = 0,
              attack_linear = true, release_linear = true):
-        super.init(create_ugen_id(), "Dualslewb", chans, 'a', "Ufffii",
+        super.init(new_ugen_id(), "Dualslewb", chans, 'a', "Ufffii",
 	           'input', input, "bc", 'attack', attack, "f", 
                    'release', release, "f", 'current', current, "f",
                    'attack_linear', 1 if attack_linear else 0, "f",

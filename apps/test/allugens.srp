@@ -27,7 +27,7 @@ class Math (Ugen):
     def init(op, x1, x2, optional chans):
         if not chans:
             chans = max_chans(max_chans(1, x1), x2)
-        super.init(create_ugen_id(), "math", chans, 'a', "iUU",
+        super.init(new_ugen_id(), "math", chans, 'a', "iUU",
                    'op', op, "f", 'x1', x1, "abc", 'x2', x2, "abc")
 
     def rliset(x):
@@ -41,7 +41,7 @@ class Mathb (Ugen):
     def init(op, x1, x2, optional chans):
         if not chans:
             chans = chans or max_chans(max_chans(1, x1), x2)
-        super.init(create_ugen_id(), "mathb", chans, 'b', "iUU",
+        super.init(new_ugen_id(), "mathb", chans, 'b', "iUU",
                    'op', op, "f", 'x1', x1, "bc", 'x2', x2, "bc")
 
     def rliset(x):
@@ -52,8 +52,8 @@ def mult(x1, x2, optional chans, keyword x2_init):
     if x2_init:
         if not chans:
             chans = max_chans(max_chans(1, x1), x2)
-        Ugen(create_ugen_id(), "multx", chans, 'a', "UUf", 'x1', x1, 'x2', x2,
-             'init', x2_init)
+        Ugen(new_ugen_id(), "Multx", chans, 'a', "UUf",
+             'x1', x1, "abc", 'x2', x2, "abc", 'init', x2_init, "f")
     else:
         Math(MATH_OP_MUL, x1, x2, chans)
 
@@ -186,18 +186,18 @@ UNARY_OP_LINEAR_TO_DB = 12
 def unary(op, x1, optional chans):
     if not chans:
         chans = max_chans(1, x1)
-    Ugen(create_ugen_id(), "unary", chans, 'a', "iU",
-         'op', op, 'x1', x1)
+    Ugen(new_ugen_id(), "unary", chans, 'a', "iU",
+         'op', op, "i", 'x1', x1, "abc")
 
 
 def unaryb(op, x1, optional chans):
     if not isnumber(x1) and x1.rate != 'b':
-        display "ERROR: 'x1' input to Ugen 'mathb' must be block rate", op
+        display "ERROR: 'x1' input to unaryb Ugen must be block rate", op
         return nil
     if not chans:
         chans = max_chans(1, x1)
-    Ugen(create_ugen_id(), "unaryb", chans, 'b', "iU",
-         'op', op, 'x1', x1)
+    Ugen(new_ugen_id(), "unaryb", chans, 'b', "iU",
+         'op', op, "i", 'x1', x1, "bc")
 
 
 def ugen_abs(x1, optional chans):
@@ -275,8 +275,8 @@ def ugen_linear_to_dbb(x1, optional chans):
 
 class Thru (Ugen):
 
-    def init(input, optional chans = 1, id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+    def init(chans, input, id_num):
+        super.init(arco_ugen_new_id(id_num) if id_num else new_ugen_id(), 
                    "Thru", chans, 'a', "U", 'input', input, "a")
 
     def set_alternate(alt):
@@ -284,14 +284,14 @@ class Thru (Ugen):
         this
 
 def thru(input, optional chans = 1):
-    Thru(input, chans)
+    Thru(chans, input)
 
 
 def fanout(input, chans)
 # When thru is used for fanout, the preferred constructor is "fanout",
 # which requires the number of channels you are expanding to. You should
 # only use this if input is mono.
-    Thru(input, chans)
+    Thru(chans, input, nil)
 
 
 # ---- included from /Users/rbd/arco/serpent/srp/zero.srp ----
@@ -304,7 +304,7 @@ def fanout(input, chans)
 class Zero (Ugen):
 
     def init(optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+        super.init(arco_ugen_new_id(id_num) if id_num else new_ugen_id(), 
                    "Zero", 1, 'a', "", omit_chans = true)
 
 
@@ -315,7 +315,7 @@ class Zero (Ugen):
 class Zerob (Ugen)
 
     def init(optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(), 
+        super.init(arco_ugen_new_id(id_num) if id_num else new_ugen_id(), 
                    "Zerob", 1, 'b', "", omit_chans = true)
 
 # DO NOT DEFINE zerob() -- SEE arco.srp, WHICH DEFINES zerob() TO RETURN zerob_ugen
@@ -363,7 +363,7 @@ class Fader (Ugen):
         this.mode = mode
         if not chans:
             chans = max_chans(1, input)
-        super.init(create_ugen_id(), "fader", chans, 'a', "Uf",
+        super.init(new_ugen_id(), "Fader", chans, 'a', "Uf",
                    'input', input, "a", 'current', current, "f")
 
 
@@ -419,22 +419,23 @@ class Fader (Ugen):
 
 class Sum(Ugen):
     def init(chans, wrap, optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
-                   "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0, "f")
+        super.init(arco_ugen_new_id(id_num) if id_num else new_ugen_id(),
+                   "Sum", chans, A_RATE, "i", 'wrap', 1 if wrap else 0, "i")
         register_action(this, ACTION_REM, this, 'action_rem')
 
     def action_rem(status, uid, parameters):
         // find input with uid if any -- similar to mix but inputs
         // directly map to ugens:
         display "Sum.action_rem", status, uid, parameters
-        for ugen in inputs.values():
-            if arco_ugen_id(ugen.id) == uid:
-                inputs.remove(uid)
+        stacktrace()
+        if inputs.has_key(uid):
+            inputs.remove(uid)
 
     def ins(rest ugens):
         for ugen in ugens:
             // for sum, use integer Arco id as input name in dictionary:
             inputs[arco_ugen_id(ugen.id)] = ugen
+            display "Sum.ins", inputs
             o2_send_cmd("/arco/sum/ins", 0, "UU", id, ugen.id)
         this
 
@@ -461,7 +462,7 @@ def sum(optional chans = 1, keyword wrap = true): Sum(chans, wrap)
 
 class Sumb(Ugen):
     def init(chans, wrap, optional id_num):
-        super.init(arco_ugen_new_id(id_num) if id_num else create_ugen_id(),
+        super.init(arco_ugen_new_id(id_num) if id_num else new_ugen_id(),
                    "Sumb", chans, B_RATE, "i", 'wrap', 1 if wrap else 0)
         register_action(this, ACTION_REM, this, 'action_rem')
 
@@ -514,8 +515,8 @@ def vu(reply_addr, period):
 
 class Vu (Ugen):
     def init(reply_addr, period)
-        super.init(create_ugen_id(), "Vu", 0, '', "sf",
-                   'reply_addr', reply_addr, "f",
+        super.init(new_ugen_id(), "Vu", 0, '', "sf",
+                   'reply_addr', reply_addr, "s",
                    'period', period, "f")
 
     def start(reply_addr, period):
@@ -546,9 +547,9 @@ class Probe (Ugen):
     var running
 
     def init(input, reply_addr):
-        super.init(create_ugen_id(), "Probe", 0, '', "Us",
+        super.init(new_ugen_id(), "Probe", 0, '', "Us",
                    omit_chans = t,
-                   'input', input, "abc", 'reply_addr', reply_addr, "f")
+                   'input', input, "abc", 'reply_addr', reply_addr, "s")
 
     def probe(period, frames, chan, nchans, stride):
         o2_send_cmd("/arco/probe/probe", 0, "Ufiiii", id, period,
@@ -632,7 +633,7 @@ def pweb(keyword init, start = true, lin = false, rest points):
 class Mix (Ugen):
     
     def init(chans_, wrap):
-        super.init(create_ugen_id(), "Mix", chans_, A_RATE,
+        super.init(new_ugen_id(), "Mix", chans_, A_RATE,
                    "i", 'wrap', 1 if wrap else 0, "f")
         register_action(this, ACTION_REM, this, 'action_rem')
 
@@ -786,16 +787,14 @@ def mix_name(i):
 # (machine generated by u2f.py)
 
 def sine(freq, amp, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(1, freq), amp)
-    Ugen(create_ugen_id(), "sine", chans, 'a', "UU", 'freq', freq, "abc",
-         'amp', amp, "abc")
+    chans = max_chans(chans, freq, amp)
+    Ugen(new_ugen_id(), "sine", chans, 'a', "UU", 'freq', freq, "abc", 'amp',
+         amp, "abc")
 
 def sineb(freq, amp, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(1, freq), amp)
-    Ugen(create_ugen_id(), "sineb", chans, 'b', "UU", 'freq', freq, "bc",
-         'amp', amp, "bc")
+    chans = max_chans(chans, freq, amp)
+    Ugen(new_ugen_id(), "sineb", chans, 'b', "UU", 'freq', freq, "bc", 'amp',
+         amp, "bc")
 
 
 
@@ -806,15 +805,13 @@ def sineb(freq, amp, optional chans):
 # (machine generated by u2f.py)
 
 def reson(input, center, q, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(max_chans(1, input), center), q)
-    Ugen(create_ugen_id(), "reson", chans, 'a', "UUU", 'input', input, "a",
+    chans = max_chans(chans, input, center, q)
+    Ugen(new_ugen_id(), "reson", chans, 'a', "UUU", 'input', input, "a",
          'center', center, "abc", 'q', q, "abc")
 
 def resonb(input, center, q, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(max_chans(1, input), center), q)
-    Ugen(create_ugen_id(), "resonb", chans, 'b', "UUU", 'input', input, "bc",
+    chans = max_chans(chans, input, center, q)
+    Ugen(new_ugen_id(), "resonb", chans, 'b', "UUU", 'input', input, "bc",
          'center', center, "bc", 'q', q, "bc")
 
 
@@ -826,15 +823,13 @@ def resonb(input, center, q, optional chans):
 # (machine generated by u2f.py)
 
 def lowpass(input, cutoff, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(1, input), cutoff)
-    Ugen(create_ugen_id(), "lowpass", chans, 'a', "UU", 'input', input, "a",
+    chans = max_chans(chans, input, cutoff)
+    Ugen(new_ugen_id(), "lowpass", chans, 'a', "UU", 'input', input, "a",
          'cutoff', cutoff, "abc")
 
 def lowpassb(input, cutoff, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(1, input), cutoff)
-    Ugen(create_ugen_id(), "lowpassb", chans, 'b', "UU", 'input', input, "bc",
+    chans = max_chans(chans, input, cutoff)
+    Ugen(new_ugen_id(), "lowpassb", chans, 'b', "UU", 'input', input, "bc",
          'cutoff', cutoff, "bc")
 
 
@@ -856,17 +851,17 @@ class Fileplay (Ugen):
 
     def init(chans, filename, start, end, cycle, mix, expand):
         // -chans cuts off standard creation:
-        super.init(create_ugen_id(), "Fileplay", chans, 'a', "sffBBB",
-                   'filename', filename, "f", 'start', start, "f",
-                   'end', end, "f", 'cycle', cycle, "f", 'mix', mix, "f",
-                   'expand', expand, "f")
+        super.init(new_ugen_id(), "Fileplay", chans, 'a', "sffBBB",
+                   'filename', filename, "s", 'start', start, "f",
+                   'end', end, "f", 'cycle', cycle, "B", 'mix', mix, "B",
+                   'expand', expand, "B")
 
     def start(optional play_flag = true):
         o2_send_cmd("/arco/fileplay/start", 0, "UB", id, play_flag)
         this
     
     def stop():
-        go(false)
+        start(false)
         this
 
 
@@ -885,7 +880,7 @@ def filerec(filename, input, optional chans = 2)
 class Filerec (Ugen):
 
     def init(chans, filename, input):
-        super.init(create_ugen_id(), "Filerec", chans, '', "sU",
+        super.init(new_ugen_id(), "Filerec", chans, '', "sU",
                    'filename', filename, "f", 'input', input, "a")
 
     def start(optional rec_flag = true):
@@ -912,9 +907,9 @@ def recplay(input, optional chans = 1, gain = 1,
 class Recplay (Ugen):
 
     def init(chans, input, gain, fade_time, loop):
-        super.init(create_ugen_id(), "Recplay", chans, 'a', "UUfB",
+        super.init(new_ugen_id(), "Recplay", chans, 'a', "UUfB",
                    'input', input, "a", 'gain', gain, "bc",
-                   'fade_time', fade_time, "f", 'loop', loop, "f")
+                   'fade_time', fade_time, "f", 'loop', loop, "B")
 
     def record(record_flag):
         o2_send_cmd("/arco/recplay/record", 0, "UB", id, record_flag)
@@ -947,12 +942,13 @@ class Recplay (Ugen):
 
 class Delay(Ugen):
     def init(chans, input, dur, fb, maxdur):
-        super.init(create_ugen_id(), "Delay", chans, 'a', "UUUf",
+        chans = max_chans(chans, input, dur, fb)
+        super.init(new_ugen_id(), "Delay", chans, 'a', "UUUf",
 	           'input', input,  "a", 'dur', dur,  "abc", 'fb', fb, "abc",
                    'maxdur', maxdur, "f")
 
 
-def delay(input, dur, fb, maxdur, optional chans = 1):
+def delay(input, dur, fb, maxdur, optional chans):
     Delay(chans, input, dur, fb, maxdur)  # delay as a function
 
 
@@ -967,7 +963,7 @@ def delay(input, dur, fb, maxdur, optional chans = 1):
 def delayvi(input, delay, maxdelay, optional chans):
     if not chans:
         chans = max_chans(max_chans(max_chans(1, input), delay), maxdelay)
-    Ugen(create_ugen_id(), "delayvi", chans, 'a', "UUf", 'input', input, "a",
+    Ugen(new_ugen_id(), "delayvi", chans, 'a', "UUf", 'input', input, "a",
          'delay', delay, "abc", 'maxdelay', maxdelay, "f")
 
 
@@ -981,7 +977,7 @@ def delayvi(input, delay, maxdelay, optional chans):
 
 class Allpass (Ugen):
     def init(chans, input, dur, fb, maxdur):
-        super.init(create_ugen_id(), "Allpass", chans, 'a', "UUUf",
+        super.init(new_ugen_id(), "Allpass", chans, 'a', "UUUf",
 	           'input', input, "a", 'dur', dur, "abc", 'fb', fb, "abc",
                    'maxdur', maxdur, "f")
 
@@ -1001,7 +997,7 @@ def allpass(input, dur, fb, maxdur, optional chans = 1):
 
 class Olapitchshift (Ugen):
     def init(chans, input, ratio, xfade, windur):
-        super.init(create_ugen_id(), "olaps", chans, 'a', "Ufff",
+        super.init(new_ugen_id(), "olaps", chans, 'a', "Ufff",
 	           'input', input, "a", 'ratio', ratio, "f",
                    'xfade', xfade, "f", 'windur', windur, "f")
     
@@ -1030,21 +1026,22 @@ def olapitchshift(input, ratio, xfade, windur, optional chans = 1):
 
 class Feedback (Ugen):
     def init(chans, input):
-        super.init(create_ugen_id(), "feedback", chans, 'a', "U",
+        chans = max_chans(chans, input)
+        super.init(new_ugen_id(), "feedback", chans, 'a', "U",
                    'input', input, "a")
         inputs['from'] = zero_ugen  // enables .set('from', x)
         inputs['gain'] = zero_ugen  // enables .set('gain', x)
 
     def fb(from, gain):
         if isinstance(from, Param_descr):
-            from = from.get_ugen_value("Feeback", 'from')
+            from = from.get_ugen_value("Feedback", 'from')
         if isinstance(gain, Param_descr):
-            gain = gain.get_ugen_value("Feeback", 'gain')
+            gain = gain.get_ugen_value("Feedback", 'gain')
         set('from', from)
         set('gain', gain)
         
 
-def feedback(input, optional chans = 1):
+def feedback(input, optional chans):
     Feedback(chans, input)
 
 
@@ -1057,9 +1054,9 @@ def feedback(input, optional chans = 1):
 
 class Granstream (Ugen):
     def init(chans, input, polyphony, dur, enable):
-        super.init(create_ugen_id(), "Granstream", chans, 'a', "UifB",
-	           'input', input, "a", 'polyphony', polyphony, "f",
-                   'dur', dur, "f", 'enable', enable, "f")
+        super.init(new_ugen_id(), "Granstream", chans, 'a', "UifB",
+	           'input', input, "a", 'polyphony', polyphony, "i",
+                   'dur', dur, "f", 'enable', enable, "B")
 
     def set_gain(gain)
         o2_send_cmd("/arco/granstream/gain", 0, "Uf", id, gain)
@@ -1117,7 +1114,7 @@ def granstream(input, polyphony, dur, enable, optional chans = 1):
 
 class Flsyn (Ugen):
     def init(path):
-        super.init(create_ugen_id(), "Flsyn", nil, 'a', "s", 'path', path, "f",
+        super.init(new_ugen_id(), "Flsyn", nil, 'a', "s", 'path', path, "f",
                    omit_chans = t) // always created with 2 channel output
         chans = 2
 
@@ -1171,7 +1168,7 @@ def flsyn(path): Flsyn(path)
 
 class Pv(Ugen):
     def init(chans, input, ratio, fftsize, hopsize, points, mode):
-        super.init(create_ugen_id(), "pv", chans, 'a', "Ufiiii",
+        super.init(new_ugen_id(), "pv", chans, 'a', "Ufiiii",
 	           'input', input, "a",     'ratio', ratio, "f",
                    'fftsize', fftsize, "f", 'hopsize', hopsize, "f",
                    'points', points, "f",   'mode', mode, "f")
@@ -1198,7 +1195,7 @@ def pv(input, ratio, fftsize, hopsize, points, mode, optional chans = 1):
 
 class Yin(Ugen):
     def init(chans, input, minstep, maxstep, hopsize, address):
-        super.init(create_ugen_id(), "Yin", chans, 'a', "Uiiis",
+        super.init(new_ugen_id(), "Yin", chans, 'a', "Uiiis",
                    'input', input, "a", 'minstep', minstep, "f",
                    'maxstep', maxstep, "f", 'hopsize', hopsize, "f",
                    'address', address, "f")
@@ -1217,8 +1214,8 @@ def yin(input, minstep, maxstep, hopsize, address, optional chans = 1):
 
 class Trig(Ugen):
     def init(input, reply_addr, window, threshold, pause):
-        super.init(create_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
-                   'input', input, "a",   'reply_addr', reply_addr, "f",
+        super.init(new_ugen_id(), "Trig", 0, 'a', "Usiff", omit_chans = t,
+                   'input', input, "a",   'reply_addr', reply_addr, "s",
                    'window', window, "f", 'threshold', threshold, "f",
                    'pause', pause, "f")
 
@@ -1253,7 +1250,7 @@ def trig(input, reply_addr, window, threshold, pause):
 
 class Route (Ugen):
     def init(chans):
-        super.init(create_ugen_id(), "Route", chans, A_RATE, "")
+        super.init(new_ugen_id(), "Route", chans, A_RATE, "")
 
     def ins(input, rest routes):
         send_ins_rem(input, routes, "/arco/route/ins")
@@ -1290,7 +1287,7 @@ def chorddetect(input, reply_addr):
 
 class Chorddetect (Ugen):
     def init(input, reply_addr)
-        super.init(create_ugen_id(), "Chorddetect", 0, '', "Us",
+        super.init(new_ugen_id(), "Chorddetect", 0, '', "Us",
         omit_chans = 1, 'input', input, "a", 'reply_addr', reply_addr, "f")
 
     def start(reply_addr):
@@ -1308,7 +1305,7 @@ class Chorddetect (Ugen):
 
 class Onset(Ugen):
     def init(input, reply_addr):
-        super.init(create_ugen_id(), "Onset", 0, 'a', "Usiff", omit_chans = t,
+        super.init(new_ugen_id(), "Onset", 0, 'a', "Usiff", omit_chans = t,
                    'input', input, "a", 'reply_addr', reply_addr, "f")
 
 
@@ -1324,7 +1321,7 @@ def spectralcentroid(input, reply_addr):
 
 class SpectralCentroid (Ugen):
     def init(input, reply_addr)
-        super.init(create_ugen_id(), "SpectralCentroid", 0, '', "Us",
+        super.init(new_ugen_id(), "SpectralCentroid", 0, '', "Us",
                    omit_chans = 1, 'input', input, "a",
                    'reply_addr', reply_addr, "f")
 
@@ -1341,7 +1338,7 @@ def spectralrolloff(input, reply_addr, threshold):
 
 class SpectralRolloff (Ugen):
     def init(input, reply_addr, threshold)
-        super.init(create_ugen_id(), "SpectralRolloff", 0, '', "Usf",
+        super.init(new_ugen_id(), "SpectralRolloff", 0, '', "Usf",
                    omit_chans = 1, 'input', input, "a",
                    'reply_addr', reply_addr, "f", 'threshold_', threshold, "f")
 
@@ -1360,7 +1357,7 @@ class SpectralRolloff (Ugen):
 class O2audioio(Ugen):
     def init(input, destaddr, destchans, recvchans, buffsize,
              sampletype, msgsize):
-        super.init(create_ugen_id(), "o2aud", recvchans, 'a', "Usiiii",
+        super.init(new_ugen_id(), "o2aud", recvchans, 'a', "Usiiii",
 	           'input', input, "a", 'destaddr', destaddr, "f",
                    'destchans', destchans, "f", 'buffsize', buffsize, "f",
                    'sampletype', sampletype, "f", 'msgsize', msgsize, "f")
@@ -1397,7 +1394,7 @@ def sttest(input, hz1, hz2):
         print "ERROR: 'hz2' input to Ugen '{c}' must be single channel"
         return nil
 
-    Ugen(create_ugen_id(), "sttest", 2, 'a', "Uff", omit_chans = true, 'input',
+    Ugen(new_ugen_id(), "sttest", 2, 'a', "Uff", omit_chans = true, 'input',
          input, "a", 'hz1', hz1, "c", 'hz2', hz2, "c")
 
 
@@ -1422,8 +1419,8 @@ def zitarev(input, wet, gain, rt60):
         print "ERROR: 'rt60' input to Ugen '{c}' must be single channel"
         return nil
 
-    Ugen(create_ugen_id(), "zitarev", 2, 'a', "UUUU", omit_chans = true,
-         'input', input, "a", 'wet', wet, "bc", 'gain', gain, "bc", 'rt60', rt60, "bc")
+    Ugen(new_ugen_id(), "zitarev", 2, 'a', "UUUU", omit_chans = true, 'input',
+         input, "a", 'wet', wet, "bc", 'gain', gain, "bc", 'rt60', rt60, "bc")
 
 
 
@@ -1440,7 +1437,7 @@ class Wavetables (Ugen):
     def init(freq, amp, phase, chans, classname, rate):
         if not chans:
             chans = max_chans(max_chans(1, freq), amp)
-        super.init(create_ugen_id(), classname, chans, rate,
+        super.init(new_ugen_id(), classname, chans, rate,
                    "UUf", 'freq', freq, "abc", 'amp', amp, "abc",
                    'phase', phase, "f")
         address_prefix = "/arco/" + tolower(classname) + "/"
@@ -1530,9 +1527,11 @@ BLEND_45 = 2
 
 class Blend (Ugen):
     def init(chans, x1, x2, b, init_b, mode):
-        super.init(create_ugen_id(), "Blend", chans, 'a', "UUUfi",
+        chans = max_chans(chans, x1, x2, b)
+        mode = mode or BLEND_POWER
+        super.init(new_ugen_id(), "Blend", chans, 'a', "UUUfi",
 	           'x1', x1, "abc", 'x2', x2, "abc", 'b', b, "abc",
-                   'init_b', init_b, "f", 'mode', mode)
+                   'init_b', init_b, "f", 'mode', mode, "i")
 
     def set_gain(gain)
         o2_send_cmd("/arco/blend/gain", 0, "Uf", id, gain)
@@ -1544,8 +1543,6 @@ class Blend (Ugen):
 
 
 def blend(x1, x2, b, optional chans, mode, keyword gain = 1, init_b = 0.5):
-    chans = chans or max_chans(max_chans(max_chans(1, x1), x2), b)
-    mode = mode or BLEND_POWER
     var ugen = Blend(chans, x1, x2, b, init_b, mode)  # blend as a function
     if gain != 1:  // default for Arco
         ugen.set_gain(gain)
@@ -1554,7 +1551,7 @@ def blend(x1, x2, b, optional chans, mode, keyword gain = 1, init_b = 0.5):
 
 class Blendb (Ugen):
     def init(chans, x1, x2, b, mode):
-        super.init(create_ugen_id(), "Blendb", chans, 'b', "UUUi",
+        super.init(new_ugen_id(), "Blendb", chans, 'b', "UUUi",
 	           'x1', x1, "bc", 'x2', x2, "bc", 'b', b, "bc",
                    'mode', mode, "f")
 
@@ -1568,7 +1565,7 @@ class Blendb (Ugen):
 
 
 def blendb(x1, x2, b, optional chans, mode, keyword gain = 1):
-    chans = chans or max_chans(max_chans(max_chans(1, x1), x2), b)
+    chans = max_chans(chans, x1, x2, b)
     mode = mode or BLEND_POWER
     var ugen = Blendb(chans, x1, x2, b, mode)  # blend as a function
     if gain != 1:  // default for Arco
@@ -1586,7 +1583,7 @@ def blendb(x1, x2, b, optional chans, mode, keyword gain = 1):
 
 class Stdistr (Ugen):
     def init(n, width):
-        super.init(create_ugen_id(), "Stdistr", 2, 'a', "if",
+        super.init(new_ugen_id(), "Stdistr", 2, 'a', "if",
 	           'n', n, "f", 'width', width, "f", omit_chans = true)
 
     def set_gain(gain)
@@ -1617,10 +1614,9 @@ def stdistr(n, width):
 # (machine generated by u2f.py)
 
 def monodistortion(input, gain, tone, volume, optional chans):
-    if not chans:
-        chans = max_chans(max_chans(max_chans(max_chans(1, input), gain), tone), volume)
-    Ugen(create_ugen_id(), "monodistortion", chans, 'a', "UUUU", 'input',
-         input, "a", 'gain', gain, "bc", 'tone', tone, "bc", 'volume', volume, "bc")
+    chans = max_chans(chans, input, gain, tone, volume)
+    Ugen(new_ugen_id(), "monodistortion", chans, 'a', "UUUU", 'input', input,
+         "a", 'gain', gain, "bc", 'tone', tone, "bc", 'volume', volume, "bc")
 
 
 
@@ -1633,7 +1629,7 @@ def monodistortion(input, gain, tone, volume, optional chans):
 
 class Multisend(Ugen):
     def init()
-        super.init(create_ugen_id(), "Multisend", chans, A_RATE, "i",
+        super.init(new_ugen_id(), "Multisend", chans, A_RATE, "i",
                    omit_chans = true)
 
     def ins(addr, target, rest params)

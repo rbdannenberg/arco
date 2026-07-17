@@ -9,7 +9,7 @@ class Envelope (Ugen):
 
     def init(classname, addr, rate, points)
         address = addr
-        super.init(create_ugen_id(), classname, 1, rate, "", omit_chans = true)
+        super.init(new_ugen_id(), classname, 1, rate, "", omit_chans = true)
         sample_rate = (AR if rate == 'a' else BR)
         set_point_array(points)
 

@@ -5,7 +5,7 @@
 def noisegate(input, threshold, attack, hold, release, optional chans):
     if not chans:
         chans = max_chans(max_chans(max_chans(max_chans(max_chans(1, input), threshold), attack), hold), release)
-    Ugen(create_ugen_id(), "noisegate", chans, 'a', "UUUUU", 'input', input,
+    Ugen(new_ugen_id(), "noisegate", chans, 'a', "UUUUU", 'input', input,
          "a", 'threshold', threshold, "bc", 'attack', attack, "bc", 'hold', hold, "bc",
          'release', release, "bc")
 

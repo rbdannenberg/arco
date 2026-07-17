@@ -1,0 +1,8 @@
+# manifest for test (daserpent)
+pwl*
+pwe*
+mix
+sine*
+mult*
+sum
+reson

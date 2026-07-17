@@ -1,1 +1,1 @@
-SERPENTPATH=/Users/rbd/serpent/lib:/Users/rbd/serpent/programs:/Users/rbd/serpent/wxslib:/Users/rbd/arco/serpent/srp ./Debug/tpt.app/Contents/MacOS/tpt
+SERPENTPATH=/Users/rbd/serpent/lib:/Users/rbd/serpent/programs:/Users/rbd/serpent/wxslib:/Users/rbd/arco/serpent/srp ./Release/tpt.app/Contents/MacOS/tpt

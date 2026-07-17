@@ -6,7 +6,7 @@
 class O2audioio(Ugen):
     def init(input, destaddr, destchans, recvchans, buffsize,
              sampletype, msgsize):
-        super.init(create_ugen_id(), "o2aud", recvchans, 'a', "Usiiii",
+        super.init(new_ugen_id(), "o2aud", recvchans, 'a', "Usiiii",
 	           'input', input, "a", 'destaddr', destaddr, "f",
                    'destchans', destchans, "f", 'buffsize', buffsize, "f",
                    'sampletype', sampletype, "f", 'msgsize', msgsize, "f")

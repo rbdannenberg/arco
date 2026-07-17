@@ -12,19 +12,20 @@
 
 class Feedback (Ugen):
     def init(chans, input):
-        super.init(create_ugen_id(), "feedback", chans, 'a', "U",
+        chans = max_chans(chans, input)
+        super.init(new_ugen_id(), "feedback", chans, 'a', "U",
                    'input', input, "a")
         inputs['from'] = zero_ugen  // enables .set('from', x)
         inputs['gain'] = zero_ugen  // enables .set('gain', x)
 
     def fb(from, gain):
         if isinstance(from, Param_descr):
-            from = from.get_ugen_value("Feeback", 'from')
+            from = from.get_ugen_value("Feedback", 'from')
         if isinstance(gain, Param_descr):
-            gain = gain.get_ugen_value("Feeback", 'gain')
+            gain = gain.get_ugen_value("Feedback", 'gain')
         set('from', from)
         set('gain', gain)
         
 
-def feedback(input, optional chans = 1):
+def feedback(input, optional chans):
     Feedback(chans, input)

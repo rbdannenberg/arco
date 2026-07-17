@@ -33,7 +33,7 @@ const int RESET_SENT = 9 + USE_MAIN_THREAD_BIT;  // not used
 const int QUIT_SENT = 11 + USE_MAIN_THREAD_BIT;  // not used
 const int FINISH1 = 12 + USE_MAIN_THREAD_BIT;
 const int FINISHED = 13 + USE_MAIN_THREAD_BIT;
-
+const int RESET_IDLE = 14;  // used as goal: reset after IDLE reached
 
 // actual values used to open audio device
 //extern char actual_in_name[80];

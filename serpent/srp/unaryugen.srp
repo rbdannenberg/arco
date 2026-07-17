@@ -19,18 +19,18 @@ UNARY_OP_LINEAR_TO_DB = 12
 def unary(op, x1, optional chans):
     if not chans:
         chans = max_chans(1, x1)
-    Ugen(create_ugen_id(), "unary", chans, 'a', "iU",
-         'op', op, 'x1', x1)
+    Ugen(new_ugen_id(), "unary", chans, 'a', "iU",
+         'op', op, "i", 'x1', x1, "abc")
 
 
 def unaryb(op, x1, optional chans):
     if not isnumber(x1) and x1.rate != 'b':
-        display "ERROR: 'x1' input to Ugen 'mathb' must be block rate", op
+        display "ERROR: 'x1' input to unaryb Ugen must be block rate", op
         return nil
     if not chans:
         chans = max_chans(1, x1)
-    Ugen(create_ugen_id(), "unaryb", chans, 'b', "iU",
-         'op', op, 'x1', x1)
+    Ugen(new_ugen_id(), "unaryb", chans, 'b', "iU",
+         'op', op, "i", 'x1', x1, "bc")
 
 
 def ugen_abs(x1, optional chans):

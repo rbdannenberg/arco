@@ -5,7 +5,7 @@
 
 class Allpass (Ugen):
     def init(chans, input, dur, fb, maxdur):
-        super.init(create_ugen_id(), "Allpass", chans, 'a', "UUUf",
+        super.init(new_ugen_id(), "Allpass", chans, 'a', "UUUf",
 	           'input', input, "a", 'dur', dur, "abc", 'fb', fb, "abc",
                    'maxdur', maxdur, "f")
 
