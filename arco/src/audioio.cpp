@@ -56,7 +56,9 @@ but the client sets the service name using /arco/reset (see above):
   /host/reset - audio processing has been reset (all ugens are freed)
 
   /host/starting - audio processing is starting; actual audio
-          parameters are provided in this message
+          parameters are provided in this message. If both channel counts
+          are zero, open failed and new devices and/or parameters should
+          be provided before trying /arco/open again.
 
   /host/started - audio callback is happening soon
 
@@ -75,11 +77,13 @@ control of the arco service between main thread and audio thread.
 
 Let's assume that it can take awhile for audio to start up, so we'll
 get it running first, then switch over to actually using it.
- - states for startup are IDLE, STARTING, STARTED,
-   FIRST, RUNNING, STOPPING, AUDIO_STOPPED:
+
+- states for startup are IDLE, STARTING, STARTED,
+  FIRST, RUNNING, STOPPING, AUDIO_STOPPED:
    If aud_is_reset (meaning that thru and zero ugens exist to represent
      audio input/output, then
    IDLE->STARTING done by arco/open when starting PortAudio
+     but arco/open leaves state at IDLE if there is an error
    STARTING->STARTED done by callback when first callback happens - 
      this signals the non-audio thread
    STARTED->FIRST done by the non-audio thread - acknowledges the 
@@ -168,8 +172,51 @@ ugens. Then, server_aud_reset is set to true so this only happens
 the first time that audio is started.
 
 The application can do an /arco/reset, but it must handle the
-/actrl/reset response and recreate that unit generators. In the
+/actrl/reset response and recreate unit generators. In the
 future, the server may provide some support for this.
+
+Application/Server/Audio Initialization
+---------------------------------------
+(This sequence is for pyarco and may be different for other
+applications.)
+
+Application calls arco.initialize()
+  -> calls arco.reset()
+    -> sends /host/clear
+Server host_clear() sets server_goal_state to RESET_IDLE
+  -> polling sends /arco/reset and sets server_goal_state to IDLE
+Audio arco_reset() removes Ugens and sends /host/reset
+Server host_reset() sends /actl/reset 0
+Application actl_reset_handler()
+  -> calls arco.reset_completed_callback(status)
+     (Non-zero status indicates Arco was not in IDLE state, but
+      host_clear() makes sure we go to IDLE before the reset.)
+    -> calls arco.start_audio(True)
+      -> sends /host/run
+Server host_run() calls host_open_audio()
+  -> sets server_goal_state to RUNNING
+    -> polling sets server_aud_state to STARTING, sends /arco/open
+Audio arco_open() opens and sends /host/starting
+Server host_starting() just records actual audio parameters from Pa_Open()
+[If audio has an error opening, continue with OpenError: below]
+On audio callback, aud_state becomes STARTED,
+In arco_thread_poll(), aud_state becomes FIRST, send /host/started
+On next audio callback, aud_state becomes RUNNING
+Server host_started sets server_aud_state to RUNNING, send /actl/started
+Application actl_started_handler()
+  -> calls arco.started_callback(status)
+    -> starts scheduler and calls call_when_ready() which is the callback
+       from library (arco_engine.Arco) to application-specific intialization.
+
+OpenError:
+  Server host_starting()
+    -> sets server_goal_state to IDLE
+    -> sets server_aud_state to IDLE
+    -> sends /actl/started 1 (error)
+  Application actl_started_handler()
+    -> calls arco.started_callback(status=1)
+       Error is printed. Easy path is just exit, let user reconfigure audio,
+       restart application.
 
 
 For the application developer
@@ -188,7 +235,7 @@ The superclass also provides methods that the application can use:
     arco_close() - shuts down audio, completed when aud_state == FINISHED
     
 
-Typical pattern is:
+Typical pattern (for Serpent applications) is:
 - arco_init(...) - starts waiting for arco service to be available;
     when found, /arco/close is used to shut down audio in case it is
     running. When /actl/stopped gets a success code (either 0 or 1),
@@ -260,7 +307,7 @@ See doc/design.md
 #include <inttypes.h>
 #include "sndfile.h"
 #include "portaudio.h"
-#include "prefs.h"
+//#include "prefs.h"
 #include "arcoinit.h"
 #include "arcougen.h"
 #include "o2atomic.h"
@@ -888,7 +935,7 @@ static int callback_entry(float *input, float *output,
     assert(!in_audio_callback);
     in_audio_callback++;
     
-    if (COMPUTE_AUDIO) {
+    if (COMPUTE_AUDIO) {  // RUNNING state
         // arco time will suffer from audio computation time jitter, and
         // if PortAudio blocks are large (e.g. multiple Arco blocks), time
         // will tend to advance in big steps on each callback.
@@ -1125,6 +1172,7 @@ static void arco_unrun(O2SM_HANDLER_ARGS)
 */
 static void arco_open(O2SM_HANDLER_ARGS)
 {
+    printf("arco_open called\n");
     // begin unpack message (machine-generated):
     int32_t in_id = argv[0]->i;
     int32_t out_id = argv[1]->i;
@@ -1177,7 +1225,7 @@ static void arco_open(O2SM_HANDLER_ARGS)
             arco_print("    Arco selects input device: %s\n", info->name);
             actual_in_chans = in_chans;
            if (info->maxInputChannels < in_chans) {
-                arco_print("        WARNING: only %d input channels",
+                arco_print("        WARNING: only %d input channels"
                            " available.\n", info->maxInputChannels);
                 actual_in_chans = info->maxInputChannels;
             }
@@ -1290,9 +1338,9 @@ static void arco_open(O2SM_HANDLER_ARGS)
         (err = Pa_StartStream(audio_stream)) != paNoError) {
         Pa_CloseStream(&audio_stream);  // ignore any close error
         audio_stream_open = false;
-    } else {
+    } /* else {
         arco_print("    arco_open: audio open completed successfully\n");
-    }
+    } */
     const char *indent = "        ";
     arco_print("%sRequested input chans: %d\n", indent, req_in_chans(in_chans));
     arco_print("%sRequested output chans: %d\n", indent,
@@ -1312,14 +1360,16 @@ static void arco_open(O2SM_HANDLER_ARGS)
                    stream_info->outputLatency);
         arco_print("%sReported sample rate: %g\n", indent,
                    stream_info->sampleRate);
-    } else {
+    } /* else {
         arco_warn("Pa_GetStreamInfo returned NULL after audio open\n",
                   indent);
-    }
+    } */
     if (err < 0) {  // print a PortAudio error
          arco_error("Audio open error: %d, %s\n", err, Pa_GetErrorText(err));
     } else if (err == 1) {  // print configuration error
         arco_error("Audio open error: 0 input and 0 output channels\n");
+    } else {
+        arco_print("Audio open completed successfully.\n");
     }
 }
     

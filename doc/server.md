@@ -10,11 +10,15 @@ Preferences within Arco source code are confusing enough that you
 will need this to understand the code:
 
 There are several sets of preference variables with different prefixes:
-- `p_*` -- private to prefs module; values correspond to .arco prefs file
-- `arco_*` -- Used for getting preferences from the user interactively.
+- `p_*` -- private to Arco prefs module. Set by user interfaces that
+  depend on the client, and read by Arco.
+- `arco_*` -- Used for getting preferences from the user
+  interactively. These are declared in and specific to the Arco server.
 - `host_*` -- Parameters determined after devices were actually opened.
-  These values are displayed in interfaces as the "Actual" value of any
-  parameter.
+  These values are printed after opening devices but do not appear in
+  the preferences dialog. They include O2 parameters too, e.g., the
+  actual network extent as opposed to the extent preference that may
+  not take effect until restart.
 
 These prefixes are applied to each of the following suffixes. Here is
 what they mean:
@@ -33,53 +37,23 @@ what they mean:
   this long. The input buffer should also be this long, but we assume
   it is empty when the output buffer is full, so input buffers do not
   contribute additional latency.)
-- `*_network_enable` -- is networking enabled? If not, only
-  connections within the local machine are possible.
-- `*_o2lite_enable` -- is o2lite enabled? Implies `network_enable`.
-- `*_internet_enable` -- is internet enabled? If not, O2 will not
-  wait to determine a public IP address, causing delays if there is
-  no internet access.
-- `*_mqtt_enable` -- is MQTT enabled? If not, O2 cannot establish
-  wide-area connections and only uses Bonjour.
-  
-### General preference information flow:**
-- `host_*` values are provided by PortAudio when devices are opened.
-  The `host_network_enable`, `host_o2lite_enable`,
-  `host_internet_enable`, and `host_mqtt_enable` are not related to
-  PortAudio. Instead, they are set and applied at server startup and
-  cannot be changed without restarting.
-  
-The other `host_*` values are used by the audio callback to interpret
-the audio stream.
-- `p_*` values are initialized from the preferences file `.arco`
-- `arco_*` values are initialized from `p_*` values, and when the user
-  sets valid `arco_*` values, they are used to update `p_*` values.
-  (Setting to -1 or some indication of "default" is also valid and
-  means "use default value instead of whatever might have been in the
-  preferences file", i.e., "clear the preference".)
-- Values used to open PortAudio devices are the `p_*` values unless
-  they are -1 in which case default values are used.
+- `*_o2lite_enable` -- is o2lite enabled? Implies `network_enable`. 
+- `*_http_enable` -- is http server enabled?
+- `*_network_option` -- string describing network availability: 
+  "localhost only", "local network", "internet", "wide-area discovery"
 
-Preferences are only written on request by writing the current `p_*`
-values, which can include -1 for "no preference".
+Restart is required to change these, which are set at start time:
 
-Initially, arco_* values are set to preferences. They can be changed.
-Changes are *not* automatically saved back to the .arco preference file.
-You must use the 'P' command to save them.
+- `host_network_option`
+- `host_o2lite_enable`
+- `host_http_enable`
 
-Default in and out channels is 2. 
+In the user interface, blanks mean default values. To see the
+defaults, you must exit the user interface. At that point,
+all *actual* values in use are displayed.
 
-### Preferences inside/outside the server**
-Applications pass in parameters to open audio: device ids, channel
-counts, buffer size and latency. -1 works to get default values.
 
-Preferences are on the "server side" and not visible to
-the "arco side". To allow inspection of actual values selected, the
-arco side sends actual (`host_*`) values back to the control service,
-the name of which is provided in /arco/ctrl.
-
-On the "arco side", we have only defaults and whatever values are
-passed into the open operation.
+## Old Preferences -- see end of document for original design
 
 ## State Transitions
 
@@ -198,3 +172,79 @@ values of various times should not matter, but if you need to
 get a timestamp, it is convenient that `o2lite.get_time()` (which
 is also O2's global time), `sched.rtime`, and `sched.get_time`
 are all compatible and based on the same O2 time.)
+
+## Old Preferences 
+Preferences within Arco source code are confusing enough that you
+will need this to understand the code:
+
+There are several sets of preference variables with different prefixes:
+- `p_*` -- private to prefs module; values correspond to .arco prefs file
+- `arco_*` -- Used for getting preferences from the user interactively.
+- `host_*` -- Parameters determined after devices were actually opened.
+  These values are displayed in interfaces as the "Actual" value of any
+  parameter.
+
+These prefixes are applied to each of the following suffixes. Here is
+what they mean:
+
+- `*_in_id` -- PortAudio input device number
+- `*_out_id` -- PortAudio output device number
+- `*_in_name` -- PortAudio input device name (or substring thereof)
+- `*_out_name` -- PortAudio output device name (or substring thereof)
+- `*_in_chans` -- input channel count
+- `*_out_chans` -- output channel count
+- `*_buffer_size` -- samples per audio buffer (not necessarily the
+  same as the Arco block length, BL, as Arco may need to compute
+  multiple blocks to fill the buffer on each audio callback).
+- `*_latency` -- output latency in ms (the output buffer should be
+  about this long, or if double-buffered, each buffer should be about
+  this long. The input buffer should also be this long, but we assume 
+  it is empty when the output buffer is full, so input buffers do not
+  contribute additional latency.)
+- `*_network_enable` -- is networking enabled? If not, only
+  connections within the local machine are possible.
+- `*_o2lite_enable` -- is o2lite enabled? Implies `network_enable`.
+- `*_internet_enable` -- is internet enabled? If not, O2 will not
+  wait to determine a public IP address, causing delays if there is
+  no internet access.
+- `*_mqtt_enable` -- is MQTT enabled? If not, O2 cannot establish
+  wide-area connections and only uses Bonjour.
+  
+### General preference information flow:**
+- `host_*` values are provided by PortAudio when devices are opened.
+  The `host_network_enable`, `host_o2lite_enable`,
+  `host_internet_enable`, and `host_mqtt_enable` are not related to
+  PortAudio. Instead, they are set and applied at server startup and
+  cannot be changed without restarting.
+  
+The other `host_*` values are used by the audio callback to interpret
+the audio stream.
+- `p_*` values are initialized from the preferences file `.arco`
+- `arco_*` values are initialized from `p_*` values, and when the user
+  sets valid `arco_*` values, they are used to update `p_*` values.
+  (Setting to -1 or some indication of "default" is also valid and
+  means "use default value instead of whatever might have been in the
+  preferences file", i.e., "clear the preference".)
+- Values used to open PortAudio devices are the `p_*` values unless
+  they are -1 in which case default values are used.
+
+Preferences are only written on request by writing the current `p_*`
+values, which can include -1 for "no preference".
+
+Initially, arco_* values are set to preferences. They can be changed.
+Changes are *not* automatically saved back to the .arco preference file.
+You must use the 'P' command to save them.
+
+Default in and out channels is 2. 
+
+### Preferences inside/outside the server**
+Applications pass in parameters to open audio: device ids, channel
+counts, buffer size and latency. -1 works to get default values.
+
+Preferences are on the "server side" and not visible to
+the "arco side". To allow inspection of actual values selected, the
+arco side sends actual (`host_*`) values back to the control service,
+the name of which is provided in /arco/ctrl.
+
+On the "arco side", we have only defaults and whatever values are
+passed into the open operation. 

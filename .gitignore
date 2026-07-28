@@ -119,3 +119,5 @@ x64/
 /python25/
 
 /pr4-filemerge/
+
+/apps/pytest/arco_server_prefs.json

@@ -5,14 +5,13 @@
 
 import random
 import re
-from arco_engine import arco
+from arco_engine import arco, async_terminal_input
 from pan import stereoize
 from steps import *
 from allugens import *
 from arco_instr import *
 import sched
 from sched import rtsched, vtsched, absolute, real_delay
-from terminput import TermInput
 
 # call arco_init(ensemble) to start
 # call arco_run() after setting up UI and or scheduling things
@@ -108,6 +107,7 @@ def arco_ready():
     if ready_count > 1:
         print("arco_ready called again: ready_count", ready_count)
     print("    current time: ", sched.time_get())
+    print("Type 'H' for help, 'Q' to quit");
     # term_test()
     # play_simple_test(True)
     # o2lite.sleep(1)
@@ -279,12 +279,11 @@ def print_help():
     for help in help_strings:
         print(help)
 
-def terminal_input_poll():
-    input = io.getch()
+def terminal_input_handler(input):
     if input:
         print("terminal input got: ", repr(input))
         key = "0" if input in "0123456789" else input
-        func = commands.get(input, None)
+        func = commands.get(key, None)
         if func is None:
             print_help()
         else:
@@ -297,14 +296,12 @@ def reset_arco(keychar):
 def quit_pytest(keychar):
     global io
     sched.stop()
-    io.stop()
     arco.reset(exit)
 
 
 def main():
     global io
-    io = TermInput()
-    io.start()
+    async_terminal_input(terminal_input_handler)
     arco.initialize(o2_debug_flags="")
     add_command("a - play_simple_tone(True)", play_simple_tone)
     add_command("b - play_simple_tone(False)", stop_simple_tone)
@@ -313,13 +310,12 @@ def main():
     add_command("e - toggle atone_sequence", atone_sequence_start)
     add_command("f - toggle play_finish_test", play_finish_test)
     add_command("g - reset arco", reset_arco)
-    add_command("q - quit", quit_pytest)
+    add_command("Q - quit", quit_pytest)
     add_command("0-9 - play_simple_test pitched", play_pitched)
     # when arco is connected and running, call arco_ready():
     arco_ready()  # our application start-up code after initialization
     # sched.cause(2.0, None, play_finish_test, True)
     # sched.cause(4.0, None, play_finish_test, False)
-    sched.poll_function_add(terminal_input_poll)
     sched.run(poll_period_ms=5)
 
 

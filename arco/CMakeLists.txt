@@ -35,7 +35,6 @@ set(ARCO_SRC
     ugen.cpp ugen.h
     arcoutil.cpp arcoutil.h
     arcotypes.h
-    prefs.cpp prefs.h
     thru.cpp thru.h
     zero.cpp zero.h 
     zerob.cpp zerob.h 
@@ -160,7 +159,7 @@ if(MODAL_INCL)
   append_to_global(ALL_INCLUDE_DIRECTORIES "${MODAL_INCL}")
 endif()
 if(FFTW_INCL)
-  append_to_global(ALL_INCLUDE_DIRECTORIES "${FFTW_INCL}")
+  append_to_global(ALL_INCLUDE_DIRECTORIES "${FFTW_INCL}")  
 endif()
 if(CHROMAGRAM_INCL)
     append_to_global(ALL_INCLUDE_DIRECTORIES ${CHROMAGRAM_INCL})

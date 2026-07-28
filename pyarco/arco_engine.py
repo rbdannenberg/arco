@@ -2,6 +2,8 @@ import time
 import math
 import weakref
 import platform
+from terminput import TermInput
+import atexit
 from ugens.zero import Zero, Zerob
 from ugens.thru import Thru
 from ugens.sum import Sum
@@ -93,6 +95,7 @@ class ArcoEngine:
         o2lite.method_new("/actl/act", "iii", True, actl_act_handler, None)
         o2lite.method_new("/actl/nougen", "s", True, actl_nougen_handler, None)
         o2lite.method_new("/actl/reset", "", True, actl_reset_handler, None)
+        o2lite.method_new("/actl/started", "", True, actl_started_handler, None)
         deadline = time.time() + timeout
         while o2lite.time_get() < 0:
             if time.time() > deadline:
@@ -131,6 +134,12 @@ class ArcoEngine:
         self.output = Sum(self.output_chans, True, OUTPUT_ID)
         self.start_audio(True)
 
+
+    def started_callback(self, status):
+        if (status != 0):
+            print("!!!! ERROR: Error opening audio.",
+                  "Reconfigure audio and restart.")
+            exit(1)
         # now initialize scheduler - sched.poll functions remain intact
         #   but schedulers are initialized and time base is reset here:
         sched.time_get = o2lite_time_get
@@ -149,10 +158,6 @@ class ArcoEngine:
     def reset(self, readyfn=None):
         o2lite.send_cmd("/host/clear", 0, "")
         self.call_when_ready = readyfn
-
-
-#    def new_ugen_id(self):
-#         return new_ugen_id()
 
 
     def run(self):
@@ -214,16 +219,6 @@ class ArcoEngine:
         return True
 
 
-#    def actl_reset(self, timestamp, address, types, status):
-#        if not self.set_arco_state('devinf' if self.arco_state == 'initializing' 
-#                                            else 'devinf2'):
-#            return
-#        # else arco_state is 'initializing' and we are starting up
-#        print("**** arco was reset, starting initialization ****")
-#        # arco_ugen_reset()  # new epoch of ugen_ids; all are invalidated
-#        # self.arco_ready()  # need new way to get to application's startup code
-
-
     def start_audio(self, run_stop: bool):
         """Turn audio processing on (True) or off (False)"""
         o2lite.send_cmd("/host/run", 0, "i", 1 if run_stop else 0)
@@ -259,6 +254,12 @@ def actl_reset_handler(address, types, info):
     """Handler for /actl/reset messages from Arco server"""
     status = o2lite.get_int32()
     arco.reset_completed_callback(status)
+
+
+def actl_started_handler(address, types, info):
+    """Handler for /actl/started messages from Arco server"""
+    status = o2lite.get_int32()
+    arco.started_callback(status)
 
 
 def actl_nougen_handler(address, types, info):
@@ -312,6 +313,49 @@ if platform.system() == "Linux":
    arco_open_msg = (" If Arco crashes (on Linux) after opening audio, "
                     "try increasing latency to 100 msec or opening other "
                     "device(s).")
+
+# ------------- Async Terminal Input ----------------
+#
+# Since the client might want to use TermInput, but also might call
+# exit(), we provide a "safe" implementation to make it easy:
+# call async_terminal_input(callbackfn) to start, and
+# async_terminal_input(None) to stop. Cleanup is automatic through
+# atexit (although not bulletproof).
+
+_terminput_callback = None  # TermInput is stopped if None
+_io = None  # the TermInput object
+_terminput_polling = False  # polling set up yet?
+
+
+def _terminput_poll():
+    global _io, _terminput_callback
+    if _io:
+        input = _io.getch()
+        if input and _terminput_callback is not None:
+            _terminput_callback(input)
+
+
+# def _terminput_shutdown():
+#     global _io, _terminput_callback
+#     if _io is not None and _terminput_callback is not None:
+#         # _io is started
+#        _io.stop()
+        
+
+def async_terminal_input(callbackfn):
+    global _terminput_callback, _io, _terminput_polling
+    
+    if not _io and callbackfn is not None:
+        _io = TermInput()
+        # atexit.register(_terminput_shutdown)
+        if not _terminput_polling:
+            sched.poll_function_add(_terminput_poll)
+    
+    if _terminput_callback is not None and callbackfn is None:
+        _io.stop()
+    elif _terminput_callback is None and callbackfn is not None:
+        _io.start()
+    _terminput_callback = callbackfn
 
 
 arco = ArcoEngine()

@@ -1,3 +1,4 @@
+import os
 import sys
 import atexit
 from types import TracebackType
@@ -21,6 +22,7 @@ class TermInput:
         self._is_windows: bool = (sys.platform == 'win32')
         self._old_settings: Optional[list] = None
         self._active: bool = False
+        self._fd = None
 
 
     def start(self) -> None:
@@ -30,12 +32,15 @@ class TermInput:
         
         if not self._is_windows:
             # Capture original terminal settings
-            self._old_settings = termios.tcgetattr(sys.stdin)
-            # Switch to cbreak mode (uncooked, no line buffering, echoes disabled)
+            # private fd in case stdin closed:
+            self._fd = os.dup(sys.stdin.fileno())
+            self._old_settings = termios.tcgetattr(self._fd)
+            # Switch to cbreak mode (uncooked, no line buffering, disable echo)
             tty.setcbreak(sys.stdin.fileno())
             
         self._active = True
-        # Ensure terminal is ALWAYS restored, even if the script crashes or exit() is called
+        # Try to restore terminal if the script crashes or exit() is called
+        # (probably fails to clean up on ^C or os._exit())
         atexit.register(self.stop)
 
 
@@ -45,9 +50,17 @@ class TermInput:
             return
             
         if not self._is_windows and self._old_settings is not None:
-            # Restore original terminal state smoothly after flushing queues
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._old_settings)
-            
+            try:
+                # Restore original terminal state smoothly after flushing queues
+                termios.tcsetattr(self._fd, termios.TCSADRAIN,
+                                  self._old_settings)
+            except (OSError, termios.error):
+                pass
+            finally:
+                try:
+                    os.close(self._fd)
+                except OSError:
+                    pass
         self._active = False
         # Clean up the atexit registry to prevent memory leaks
         try:
