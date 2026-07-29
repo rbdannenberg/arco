@@ -191,7 +191,7 @@ and Arco sides. The Arco side has an array of pointers to unit
 generators, the `ugen_table`. Unit generators (Ugens) are referenced
 by this table as well as by other unit generators. The id instance
 variable in the abstract Ugen class is the index in the `ugen_table`,
-and id servse as a "back-pointer" to the table. Reference counting is
+and id serves as a "back-pointer" to the table. Reference counting is
 used and the table entry counts as one reference. Initially, the
 table entry points to the Ugen, and the reference count is 1, so it
 is up to the client to free the table entry in order to free the Ugen.
@@ -247,23 +247,23 @@ immediately free to reuse an id.
 In the simplest case, a tree of unit generators is created by the
 client, which frees all but its reference ID to the output (Ugen at
 the root of the tree). To produce audio output, the `/arco/output`
-message inserts the output ugen into the `output_set`, which is a list
-of ID's of unit generators whose outputs should be mixed to form the
-audio output.
+message inserts the output ugen into the "output" which is a Sum
+Ugen that mixes any number of Ugens to form the audio output.
 
-Eventually, the client can remove the ugen from the `output_set` using
-`/arco/mute` and delete its reference to the corresponding Ugen_id.
-The client should also free the ID, which might take place
-automatically through the client's garbage collector.  If the object
-is not connected to any other inputs, it will be freed. The reference
-counts will propagate up the tree, freeing all the unit generators in
-the tree.
+Eventually, the client can remove the ugen from the output using
+`/arco/mute` and delete its reference to the corresponding `Ugen_id`.
+(Or in Python, there is no `Ugen_id`, and the id is stored directly in
+the `id_num` property of the Ugen instance.)  The client should also
+free the ID, which might take place automatically through the client's
+garbage collector.  If the object is not connected to any other
+inputs, it will be freed. The reference counts will propagate up the
+tree, freeing all the unit generators in the tree.
 
 You can also use `/arco/run` to insert a ugen ID into `run_set`, which
 is a list of unit generators to "run" before computing each block of
 audio output. Typically, unit generators in the `run_set` analyze
 input audio (Arco's Vu meters are an example). Note that if a member
-of the `output_set` depends directly or indirectly on another ugen,
+of the output Sum depends directly or indirectly on another ugen,
 that ugen will be run automatically (the tree of unit generators is
 traversed in a depth-first manager, running all input-providers before
 computing output). Therefore, anything that an output depends on does
@@ -278,15 +278,16 @@ different variable for easy reference. The programmer must explicitly
 free the ID by sending a message to `/arco/free` to delete the
 object.
 
-In Serpent, I have created shadow classes and objects for unit
-generators, so the entire unit generator graph in Arco is mirrored in
-the client side control program. The client works at this level of
-abstraction and there are no direct messages to Arco. Languages with
-garbage collectors that call "cleanup code" when objects are freed
-could store Arco IDs directly in the shadow object and free the ID
-when the shadow object is freed.
+In Serpent and Python, I have created shadow classes and objects for
+unit generators, so the entire unit generator graph in Arco is
+mirrored in the client side control program. The client works at this
+level of abstraction and there are no direct messages from application
+code above the Ugen shadow classes to Arco. Languages with garbage
+collectors (including Python) that call "cleanup code" when objects
+are freed could store Arco IDs directly in the shadow object and free
+the ID when the shadow object is freed.
 
-Serpent does not have "cleanup" methods the run when objects are
+Serpent does not have "cleanup" methods that run when objects are
 freed, so Serpent was extended to make ID a built-in object known
 to the runtime system and garbage collector as an external object.
 See "Unit Generator References in Serpent" below for details.
@@ -303,7 +304,10 @@ count once more. Thus, if an object only has a reference from the
 client and is also in the `output_set`, then an `/arco/free` message
 will remove it from the `output_set` (immediately) and free it. If
 this policy is implemented, one should not free a unit generator while
-it is producing sound, as this could cause a click.*
+it is producing sound, as this could cause a click. Also, the
+libraries initialize `output_set` with a single Sum object that serves
+the same purpose as a set (Sum has any number of inputs), but which
+handles input termination (documented elsewhere).
 
 
 ## Unit Generator References in Serpent
@@ -331,10 +335,10 @@ whenever Arco is reset, clearing all unit generators.  After a reset,
 all references are invalid, so incrementing the epoch number is a 
 way of invalidating them.
 
-The structures are drawn here:  
+The structures are drawn here:
 ``` 
-Client                             │  Arco Server  
-                                   │     ugen_table  
+Client                             │  Arco Server
+                                   │     ugen_table
                                    │      ┌──────┐
 ┌─────────────────┐  ┌──────────┐  │    0 │      │
 │ Client shadow   ├─>│ Ugen_id  │  │    … │      │   ┌───────────────┐
@@ -345,11 +349,11 @@ Client                             │  Arco Server
   to the Ugen ────────────┘        │
 ```
  
-How safe should this be? Since users can construct arbitrary O2
+How safe should this be? Since users can construct an arbitrary O2
 message and send to Arco, it's always possible to circumvent any Ugen
-management mechanism, e.g. we can send a message like `/arco/free
+management mechanism, e.g., we can send a message like `/arco/free
 25`. Since this loophole is available, we can be relaxed about other
-loopholes, e.g. we can allow Serpent programs to extract integer id's
+loopholes, e.g., we can allow Serpent programs to extract integer id's
 from Ugen_id objects, but we want to automate things for users as much
 as possible to avoid mistakes.
 
@@ -365,13 +369,13 @@ return a new ID, or `arco_ugen_new_id(id)` to make a Ugen_id for a
 known ID such as Zero (ID=0). This is implemented by consulting an
 array of integers. The array is initialized as a linked list, where
 each array element contains the index of the next array element. To
-create a Ugen_id, pop an entry off the linked list to get an
+create a `Ugen_id`, pop an entry off the linked list to get an
 integer. Mark the array element at that index with its own index to
-mean *allocated*. Set the current epoch number in the Ugen_id.
+mean *allocated*. Set the current epoch number in the `Ugen_id`.
 
-Note that Serpent can have any number of references to a Ugen_id and
+Note that Serpent can have any number of references to a `Ugen_id` and
 it can be freely copied (because assignment of an object assigns the
-object address). When a Ugen_id is freed by GC, we will send an
+object address). When a `Ugen_id` is freed by GC, we will send an
 `/arco/free` message, and locally, the ID is put back on the
 free list for reuse because `/arco/free` will at least release the
 ID if not the Ugen as well.
@@ -398,9 +402,9 @@ call a function (`arco_ugen_free_now`) that immediately sends
 `/arco/free`. Details will follow, but it is important to notice an
 important asynchronous behavior:
   1. If `arco_ugen_free_now` is called, we free the Ugen ID at the
-  server, but we still have a Ugen_id locally (otherwise, how would
-  we say which Ugen_id to free? If we put the ID on a client free
-  list and it gets allocated again, we could have two Ugen_id objects
+  server, but we still have a `Ugen_id` locally (otherwise, how would
+  we say which `Ugen_id` to free? If we put the ID on a client free
+  list and it gets allocated again, we could have two `Ugen_id` objects
   with the same ID and if either is GD'd, it could free an ID that is
   still active.
  
@@ -496,7 +500,7 @@ trace through and check the actual code:
    calls `new_ugen_id` which calls extern function `arco_ugen_new`.
    `arco_ugen_new` (Serpent extern function) calls `new(m) Ugen_id`
    which pops an integer id from the static list `Ugen_id::free_list`
-   and returns the allocated Ugen_id. We assume the created Ugen is
+   and returns the allocated `Ugen_id`. We assume the created Ugen is
    saved in some reachable variable until some time in the future.
 2. `Ugen.init()` continues by getting the integer id by calling extern
    function `arco_ugen_id(id)` and sending it and other parameters to
@@ -505,14 +509,14 @@ trace through and check the actual code:
    remembers the id with `this->id = id`. The reference count is set
    to 1.
 4. The variable referencing the Serpent Ugen is cleared so the Ugen
-   becomes "garbage". It references the Ugen_id object, so that
+   becomes "garbage". It references the `Ugen_id object`, so that
    becomes garbage too.
 5. Garbage collection (GC) eventually discovers and frees the
-   Ugen_id by calling Ugen_id_descriptor::free(obj). The Ugen_id
+   `Ugen_id` by calling `Ugen_id_descriptor::free(obj)`. The `Ugen_id`
    is put on the to-be-freed list.
 6. Serpent calls `arco_ugen_gc` which sends `/arco/free` for each
    to-be-freed id, and puts the id back on `Ugen_id::free_list`.
-7. In the server, the unit generator ugen->unref() is called and
+7. In the server, the unit generator `ugen->unref()` is called and
    the table entry is set to NULL.
 8. In the server, when the reference count is zero,
    `on_terminate(ACTION_FREE)` and the Ugen is freed.
@@ -719,12 +723,25 @@ to get a notice when an instance of Pwlb reaches the last breakpoint
 
 The mechanism is an O2 message to any designated service with an ID
 number representing the end-of-envelope event.  To request a message,
-send `/arco/pwlb/act id action_id` to the Pwlb instance (indicated by
-the `id` parameter). The `action_id` is an arbitrary `int32` integer
-other than 0, which means "no action notice." When the pwlb envelope
-ends, a message is sent: `/actl/act action_id`, where `actl` is the
-control service (`ctrlservice`) parameter passed in the `/arco/open`
-message to initialize the Arco server.
+send `/arco/pwlb/act id action_id action_mask` to the Pwlb instance
+(indicated by the `id` parameter). The `action_id` is an arbitrary
+`int32` integer other than 0 (0 means "no action notice.") The
+`action_mask` is a binary mask for the actions of interest, each
+indicated by a bit position. Note that a Ugen can have at most one
+`action_id`, but there can be multiple actions in the `action_mask`.
+Also, `action_mask`s are distinct from Ugen id's to avoid some
+circularities related to the lifetime of Ugens and their id's.
+When the pwlb envelope ends, a message is sent: `/actl/act action_id
+status UID`, where
+
+  - `actl` is the control service (`ctrlservice`) parameter passed
+    in the `/arco/open` message to initialize the Arco server, .
+  - `action_id` is the action id associated with the Ugen
+  - `status` reports the action types in effect, e.g., whether the
+    Ugen has been freed and whether some other event took place.
+  - `UID` is an optional Ugen ID, e.g., when Sum reports it has
+    removed a terminated input, the Ugen ID of that input is
+    provided.
 
 ### Sounds that End
 

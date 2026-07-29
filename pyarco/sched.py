@@ -83,7 +83,7 @@
 
 import time as _time
 from bisect import insort
-from timemap import Time_map
+from .timemap import Time_map
 
 
 

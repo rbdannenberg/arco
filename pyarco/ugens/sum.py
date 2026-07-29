@@ -1,7 +1,8 @@
 # sum.py -- sum and sumb unit generators
 
-from arco_ugens import *
+from ..arco_ugens import *
 from o2litepy import o2lite
+# import sys
 
 def here_is_arco(arco_ref):
     global arco
@@ -25,7 +26,10 @@ class Sum(Ugen):
         # directly map to ugens:
         # print(f"Sum.action_rem: status {status}, uid {uid}, "
         #       f"parameters {parameters}")
+        # print(f"  refcnt for {self.inputs[uid]} is {sys.getrefcount(self.inputs[uid])}")
         self.inputs.pop(uid, None)
+        # print("After action_rem, inputs are", self.inputs)
+    
 
     def ins(self, *ugens):
         for ugen in ugens:

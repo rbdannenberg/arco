@@ -1,5 +1,5 @@
-import sched  # for globals and more
-from sched import rtsched, vtsched, absolute, real_delay
+from . import sched  # for globals and more
+from .sched import rtsched, vtsched, absolute, real_delay
 from typing import Optional
 from o2litepy import o2lite
 
@@ -91,9 +91,19 @@ class UgenID:
     def __init__(self, size=1000, start_id=100):
         self.size = size
         self.start_id = start_id
+        self.free_head = None  # tell static analysis about free_head
         self.array : list[Optional[int]] = [None] * size
         self.arco_epoch = 0  # Epoch for unique ID generation
         self.new_epoch()  # initial epoch is 1 << 32
+
+
+    def free_count(self):
+        count = 0
+        index = self.free_head
+        while index is not None:
+            count += 1
+            index = self.array[index]
+        return count
 
 
     def new_epoch(self):
@@ -230,12 +240,13 @@ class Ugen:
 
 
     def __del__(self):
-        if arco_ids.arco_epoch != (self.id_num >> 32):
+        if (arco_ids.arco_epoch >> 32) != (self.id_num >> 32):
+            print(f"__del__ on {self} from old epoch {self.id_num >> 32}"
+                  f" while current epoch is {arco_ids.arco_epoch >> 32}.")
             return  # residual Ugen from another epoch. All Ugens in that
                     # epoch were freed.
         ar = self.arco_ref()
         o2lite.send_cmd("/arco/free", 0, "i", ar)
-        # print("__del__ freeing", ar)
         if ar >= arco_ids.start_id:
             arco_ids.free_ugen_id(ar)
 

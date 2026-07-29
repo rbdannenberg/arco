@@ -1,15 +1,16 @@
+import sys
 import time
 import math
+import re
 import weakref
 import platform
-from terminput import TermInput
-import atexit
-from ugens.zero import Zero, Zerob
-from ugens.thru import Thru
-from ugens.sum import Sum
-from arco_ugens import *
+from .terminput import TermInput
+from .ugens.zero import Zero, Zerob
+from .ugens.thru import Thru
+from .ugens.sum import Sum
+from .arco_ugens import *
 from o2litepy import o2lite
-import sched
+from . import sched
 
 # --- Action registration system ---
 
@@ -24,7 +25,10 @@ class Ugen_action:
 
 
     def __repr__(self):
-        return (f"<Ugen_action {self.target()} {self.method!r}>")
+        refcnt = 0
+        if self.target():
+            refcnt = sys.getrefcount(self.target())
+        return (f"<Ugen_action {self.target()} ({refcnt}) {self.method!r}>")
 
 
 class Action_list:
@@ -76,7 +80,7 @@ class ArcoEngine:
 
 
     def initialize(self, ensemble="arco", input_chans=2, output_chans=2,
-                   o2_debug_flags="", network=True, timeout=30):
+                   o2_debug_flags="", network=True, timeout=30, when_ready=None):
         global o2lite
         print("o2lite", o2lite)
         if o2lite and o2lite.time_get() > 0:
@@ -106,7 +110,7 @@ class ArcoEngine:
         print("Connected to ensemble", ensemble, "O2time", o2lite.time_get())
         sched.poll_function_add(o2lite_poll)
 
-        self.reset()
+        self.reset(when_ready)
         #  callback to /actl/reset will signal that arco has been reset
         self.zero = None  # use zero as signal that reset is completed
         deadline = time.time() + 5
@@ -152,7 +156,7 @@ class ArcoEngine:
         sched.rtsched.time_offset = 0.0
         sched.vtsched.rt_base = sched.rtsched.time  # fix vtime mapping
         if self.call_when_ready is not None:
-            call_when_ready()
+            self.call_when_ready()
 
 
     def reset(self, readyfn=None):
@@ -194,13 +198,15 @@ class ArcoEngine:
                               action_list.action_mask)
             action_list.ugen_actions.append(action)
         else:
+            aid = self.next_action_id
             al = Action_list(action_mask, [action])
-            self.action_dict[self.next_action_id] = al
-            ugen.action_id = self.next_action_id
+            self.action_dict[aid] = al
+            ugen.action_id = aid
             o2lite.send_cmd("/arco/act", 0, "iii", ugen.arco_ref(),
                           self.next_action_id, action_mask)
             self.next_action_id += 1
-
+        # print(f"registered aid {aid} list {self.action_dict[aid]}")
+        
 
     def set_arco_state(self, newstate: str):
         """This function checks if a transition to newstate is legal. If legal,
@@ -226,7 +232,18 @@ class ArcoEngine:
 
 
 def actl_act_handler(address, types, info):
-    """Handler for /actl/act messages from Arco server."""
+    """Handler for /actl/act messages from Arco server. An act(ion) message
+    consists of:
+        action_id - when a Ugen (on this side) wants to receive notices from
+            Arco service, it sends a unique action_id and a mask to indicate
+            what notices are requested. The action_id is stored on the Arco
+            Ugen and returned in this /actl/act message.
+        status - an int with bits set according to state of the Ugen, e.g.,
+            ACTION_TERM means the Ugen has terminated; ACTION_FREE means the
+            Ugen reference count went to zero and it was freed.
+        uid - an optional Ugen ID, e.g., when an input to Sum terminates,
+            Sum sends ACTION_REM with the input ID. -1 means "no ID provided"
+    """
     key = o2lite.get_int32()
     status = o2lite.get_int32()
     uid = o2lite.get_int32()
@@ -333,13 +350,6 @@ def _terminput_poll():
         input = _io.getch()
         if input and _terminput_callback is not None:
             _terminput_callback(input)
-
-
-# def _terminput_shutdown():
-#     global _io, _terminput_callback
-#     if _io is not None and _terminput_callback is not None:
-#         # _io is started
-#        _io.stop()
         
 
 def async_terminal_input(callbackfn):
@@ -351,9 +361,9 @@ def async_terminal_input(callbackfn):
         if not _terminput_polling:
             sched.poll_function_add(_terminput_poll)
     
-    if _terminput_callback is not None and callbackfn is None:
+    if _io and _terminput_callback is not None and callbackfn is None:
         _io.stop()
-    elif _terminput_callback is None and callbackfn is not None:
+    elif _io and _terminput_callback is None and callbackfn is not None:
         _io.start()
     _terminput_callback = callbackfn
 
