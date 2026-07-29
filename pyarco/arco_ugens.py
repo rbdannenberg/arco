@@ -1,7 +1,7 @@
 from . import sched  # for globals and more
 from .sched import rtsched, vtsched, absolute, real_delay
 from typing import Optional
-from o2litepy import o2lite
+from o2lite import o2lite
 
 
 ZERO_ID = 0  # a single-channel audio source of zero (silence)
@@ -246,7 +246,9 @@ class Ugen:
             return  # residual Ugen from another epoch. All Ugens in that
                     # epoch were freed.
         ar = self.arco_ref()
-        o2lite.send_cmd("/arco/free", 0, "i", ar)
+        if not arco.finished:
+            o2lite.send_cmd("/arco/free", 0, "i", ar)
+        # otherwise, this process is exiting and o2lite may not even exist
         if ar >= arco_ids.start_id:
             arco_ids.free_ugen_id(ar)
 

@@ -1,6 +1,6 @@
 # envelope.py - the Envelope class inherited by pwl, pwe, pwlb, pweb, etc.
 
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Envelope(Ugen):
 

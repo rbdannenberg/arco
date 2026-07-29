@@ -1,4 +1,4 @@
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 # recplay.py -- record and play audio in memory
 

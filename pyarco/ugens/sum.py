@@ -1,6 +1,6 @@
 # sum.py -- sum and sumb unit generators
 
-from ..arco_ugens import *
+from pyarco.arco_ugens import *
 from o2litepy import o2lite
 # import sys
 

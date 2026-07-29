@@ -24,7 +24,7 @@ MATH_OP_ATAN2 = 18
 MATH_OP_SIN = 19
 MATH_OP_COS = 20
 
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Math(Ugen):
 

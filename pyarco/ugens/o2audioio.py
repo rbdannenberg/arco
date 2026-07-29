@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # July 2026 (from o2audioio.srp)
 
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 
 class O2audioio(Ugen):

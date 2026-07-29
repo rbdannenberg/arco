@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # Mar 2026
 
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Multisend(Ugen):
     def init(self)

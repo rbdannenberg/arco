@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # July 2026 (from allpass.srp)
 
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Allpass (Ugen):
     def init(self, chans, input, dur, fb, maxdur):

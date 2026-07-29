@@ -1,6 +1,6 @@
 # smoothb.py -- class for Smoothb unit generator
 
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Smoothb(Const_like):
     """ 

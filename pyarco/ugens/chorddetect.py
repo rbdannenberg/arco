@@ -1,4 +1,4 @@
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 # chorddetect.py -- chord detection based on chroma
 

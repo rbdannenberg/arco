@@ -1,4 +1,4 @@
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 # delay.py -- feedback delay unit generator
 

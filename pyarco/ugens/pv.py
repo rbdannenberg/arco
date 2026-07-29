@@ -1,4 +1,4 @@
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 # pv.py -- overlap add pitch shift unit generator
 

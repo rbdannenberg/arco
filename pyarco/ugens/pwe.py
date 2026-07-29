@@ -1,7 +1,7 @@
 # pwe.py -- piece-wise linear envelope
 
-from arco_ugens import *
-from ugens.envelope import *
+from pyarco.arco_ugens import *
+from pyarco.ugens.envelope import *
 
 class Pwe(Envelope):
 

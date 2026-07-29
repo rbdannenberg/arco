@@ -2,6 +2,7 @@
 
 Run with "PYTHON_PATH=../.. python3 mintest.py" in this directory. You need pyarco
 and o2lite to be subdirectories of the PYTHON_PATH.
+You also need to run server built using CMakeLists.txt in this directory.
 
 """
 
@@ -10,7 +11,8 @@ from pyarco.steps import step_to_hz
 from allugens import *  # this gets definitions for all ugens in dspmanifest.txt
 # but when dspmanifest.txt is updated, you need to make the project again to
 # update allgens and also make sure the server has the DSP code compiled in.
-
+# we import allugens rather than "from pyarco.ugens import *" because that
+# might import classes that have no corresponding DSP implementation.
 
 def play_tone(pitch, amp, dur):
     """Play a tone. This is a simple approach that does not reuse
@@ -22,10 +24,6 @@ def play_tone(pitch, amp, dur):
     amp - amplitude (linear)
     dur - in seconds
     """
-
-    # a 1-channel mixer that terminates when there are no more inputs
-    # the_mix = mix(1).term()  
-    
     freq = step_to_hz(pitch)
     im = 30  # index of modulation
     modulator = sine(freq, im * freq)
@@ -51,6 +49,8 @@ def terminal_input_handler(ch):
         play_tone(36 + chi - ord('a'), 0.2, 1.0)
     elif ch == '?':
         print(f"There are {arco_ids.free_count()} arco IDs in the free list.")
+    elif ch == 'Q':
+        arco.finish()  # returns from sched.run() in main()
 
 
 def main():
@@ -58,11 +58,13 @@ def main():
     async_terminal_input(terminal_input_handler)
     flags = "" if len(sys.argv) < 2 else sys.argv[1]
     arco.initialize(o2_debug_flags=flags, when_ready=play_now)
+    print("\nStarting mintest.py: a-z play notes, "
+          "? prints how many IDs are free.")
+    print("    Q to exit.")
     if flags:
         print("mintest initialized o2lite with o2_debug_flags", flags)
     else:
-        print("You can pass o2_debug_flags, e.g. rs, on the command line.")
-    print("mintest - a-z play notes, ? prints how many IDs are free.")
+        print("You can pass o2_debug_flags, e.g. rs, on the command line.\n")
     sched.run(poll_period_ms=2)
 
 

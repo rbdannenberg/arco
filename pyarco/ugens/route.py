@@ -1,6 +1,6 @@
 # route.srp -- route input channels to output channels
 
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Route(Ugen):
 

@@ -1,5 +1,5 @@
 import math
-from ugens.mathugen import mult
+from .ugens.mathugen import mult
 
 # --------------- Panning utilities ---------------
 

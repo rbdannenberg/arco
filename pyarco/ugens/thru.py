@@ -1,6 +1,6 @@
 # thru.py -- audio pass-through
 
-from ..arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Thru(Ugen):
 

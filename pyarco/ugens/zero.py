@@ -3,7 +3,7 @@
 # Roger B. Dannenberg
 # Jul 2026, ported from zero.srp
 
-from ..arco_ugens import *
+from pyarco.arco_ugens import *
 
 class Zero(Ugen):
 

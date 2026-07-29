@@ -76,13 +76,13 @@ class ArcoEngine:
         self.state = 'init'
         self.arco_run_set = []  # UGens that run but not used for audio output
         self.call_when_ready = None
+        self.finished = False
         return None
 
 
     def initialize(self, ensemble="arco", input_chans=2, output_chans=2,
                    o2_debug_flags="", network=True, timeout=30, when_ready=None):
         global o2lite
-        print("o2lite", o2lite)
         if o2lite and o2lite.time_get() > 0:
             return None  # already started
 
@@ -107,13 +107,14 @@ class ArcoEngine:
                     f"{timeout} seconds. Is the Arco server running?")
             o2lite.poll()
             time.sleep(0.01)
-        print("Connected to ensemble", ensemble, "O2time", o2lite.time_get())
+        print(f"Connected to ensemble {ensemble} at O2time"
+              f" {o2lite.time_get():.3f}.")
         sched.poll_function_add(o2lite_poll)
 
         self.reset(when_ready)
         #  callback to /actl/reset will signal that arco has been reset
         self.zero = None  # use zero as signal that reset is completed
-        deadline = time.time() + 5
+        deadline = time.time() + 15
         while self.zero is None:
             if time.time() > deadline:
                 raise TimeoutError("Could not reset Arco server within 5 "
@@ -122,6 +123,16 @@ class ArcoEngine:
             time.sleep(0.01)
         # when we return, reset has completed and initial ugens for
         # zero and input/output are constructed and installed
+
+    def finish(self):
+        """Currently this is only designed to do some cleanup before a
+        program exits. It does not prepare to reinitialize or restart.
+        """
+        self.finished = True
+        sched.stop()
+        print("Arco_engine: finish called. Python should exit now.")
+        # now, when Ugens try to clean up, they will NOT try to send
+        # free messages to Arco. Arco ugens are left in place.
 
 
     def reset_completed_callback(self, status):
@@ -269,6 +280,7 @@ def actl_act_handler(address, types, info):
 
 def actl_reset_handler(address, types, info):
     """Handler for /actl/reset messages from Arco server"""
+    print("Arco reset completed.")
     status = o2lite.get_int32()
     arco.reset_completed_callback(status)
 

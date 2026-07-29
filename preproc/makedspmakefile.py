@@ -237,6 +237,7 @@ def make_makefile(arco_path, manifest, outf):
             # this newline also is needed for files with no final newline:
             print("\techo >> allugens.srp", file=outf)  # blank line separator
 
+    # write the code to make allugens.py
     print("allugens.py: dspmakefile", end="", file=outf)
     for src in py_srcs:
         print(" " + src, end="", file=outf)

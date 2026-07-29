@@ -1,11 +1,11 @@
 import math
 import random
 
-from arco_ugens import Ugen, Const, Param_descr, ACTION_END_OR_TERM
-from ugens.smoothb import Smoothb
-from ugens.sum import Sum, Sumb
-from ugens.route import Route
-from ugens.mix import Mix
+from .arco_ugens import Ugen, Const, Param_descr, ACTION_END_OR_TERM
+from .ugens.smoothb import Smoothb
+from .ugens.sum import Sum, Sumb
+from .ugens.route import Route
+from .ugens.mix import Mix
 
 SIGNAL = 'signal'
 GAIN = 'gain'

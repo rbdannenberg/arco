@@ -1,4 +1,4 @@
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 # olapitchshift.py -- overlap add pitch shift unit generator
 

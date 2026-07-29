@@ -1,4 +1,4 @@
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 # unaryugen.py - constructor implementation for abs, neg, exp, log,
 #     log10, log2, sqrt, step_to_hz, hz_to_step, vel_to_lin, lin_to_vel.

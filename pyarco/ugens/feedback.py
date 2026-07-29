@@ -1,4 +1,4 @@
-from arco_ugens import *
+from pyarco.arco_ugens import *
 
 # feedback.py -- mix input with most recent output of some Ugen
 #
