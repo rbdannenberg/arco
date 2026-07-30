@@ -70,13 +70,22 @@ list(TRANSFORM ARCO_SRC PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 cmake_path(GET CMAKE_CURRENT_LIST_DIR PARENT_PATH ARCO_PATH)
 cmake_path(GET ARCO_PATH PARENT_PATH FRIENDS_PATH)
 
-# make dspmakefile and dspsources.cmakeinclude from dspmanifest.txt:
+# tell CMake it depends on some Python preproc files
+set_property(DIRECTORY APPEND PROPERTY 
+    CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py"
+        "${CMAKE_CURRENT_LIST_DIR}/../preproc/f2a.py"
+        "${CMAKE_CURRENT_LIST_DIR}/../preproc/u2f.py"
+        "${CMAKE_CURRENT_LIST_DIR}/../preproc/implementation.py"
+        "${CMAKE_CURRENT_LIST_DIR}/../preproc/params.py"
+        "${CMAKE_CURRENT_LIST_DIR}/../preproc/makeallugens.py")
+
+# make dspsources.cmakeinclude from dspmanifest.txt:
 #
 message(STATUS "----- executing makedspmakefile.py")  
 execute_process(COMMAND ${PYTHON} ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
                     ${ARCO_PATH}
                     ${CMAKE_SOURCE_DIR}/dspmanifest.txt
-                    ${CMAKE_SOURCE_DIR}/dspmakefile
                     ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude
                 OUTPUT_VARIABLE makedspmakefile_out
                 ERROR_VARIABLE makedspmakefile_err)
@@ -97,38 +106,38 @@ endif()
 # directory, then we run it. We can also set up dependencies
 # to run it at build time whenever something changes.
 #
-message(STATUS
-        "CMAKE_SOURCE_DIR (where to run dspmakefile): ${CMAKE_SOURCE_DIR}")
-if(WIN32)
-  add_custom_target(make_faust_ugens ALL
-      COMMAND nmake /F dspmakefile
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
-else()
-  set(MFU_SET_PATH "")
-  if(FAUST_PATH)
-    set(MFU_SET_PATH "export PATH=$PATH:${FAUST_PATH}\n")
-  else()
-    message(STATUS "FAUST_PATH not set in apps/common/libraries.txt")
-    message(STATUS "   This may result in not finding FAUST compiler when")
-    message(STATUS "   running dspmakefile")
-  endif()
-  file(WRITE "${CMAKE_SOURCE_DIR}/make_faust_ugens.sh"
-       "${MFU_SET_PATH}"
-       "make --makefile=dspmakefile\n")
+# message(STATUS
+#         "CMAKE_SOURCE_DIR (where to run dspmakefile): ${CMAKE_SOURCE_DIR}")
+# if(WIN32)
+#   add_custom_target(make_faust_ugens ALL
+#       COMMAND nmake /F dspmakefile
+#       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#       DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
+# else()
+#   set(MFU_SET_PATH "")
+#   if(FAUST_PATH)
+#     set(MFU_SET_PATH "export PATH=$PATH:${FAUST_PATH}\n")
+#   else()
+#     message(STATUS "FAUST_PATH not set in apps/common/libraries.txt")
+#     message(STATUS "   This may result in not finding FAUST compiler when")
+#     message(STATUS "   running dspmakefile")
+#   endif()
+#   file(WRITE "${CMAKE_SOURCE_DIR}/make_faust_ugens.sh"
+#        "${MFU_SET_PATH}"
+#        "make --makefile=dspmakefile\n")
 #
 # now we run make by running the shell command
 #
-  message(STATUS "----- executing make_faust_ugens.sh")
-  execute_process(COMMAND sh make_faust_ugens.sh 
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+#   message(STATUS "----- executing make_faust_ugens.sh")
+#   execute_process(COMMAND sh make_faust_ugens.sh 
+#                   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 #
 # also run make_faust_ugens at build time to make sure source code is generated
-  add_custom_target(make_faust_ugens ALL
-      COMMAND sh make_faust_ugens.sh 
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
-endif()
+#   add_custom_target(make_faust_ugens ALL
+#       COMMAND sh make_faust_ugens.sh 
+#       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#       DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
+# endif()
 #
 # now that sources are made, add them here using the cmakeinclude file
 # made by makedspmakefile.py called by make_faust_ugens.sh
@@ -177,7 +186,13 @@ include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude")
 message(STATUS "ARCO_SRC: ${ARCO_SRC}") 
 
 register_target(arcolib)
-add_dependencies(arcolib make_faust_ugens)
+add_custom_target(generate_allugens DEPENDS
+                                    ${CMAKE_SOURCE_DIR}/allugens.srp 
+                                    ${CMAKE_SOURCE_DIR}/allugens.py)
+
+add_dependencies(arcolib generate_allugens)
+
+# add_dependencies(arcolib make_faust_ugens)
 
 #-----------------------------------------------------------------------
 #------ libsndfile and externals ---------------------------------------

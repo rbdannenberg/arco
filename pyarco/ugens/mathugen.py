@@ -171,28 +171,3 @@ def ugen_cos(x1, x2, chans=None):
     return Math(MATH_OP_COS, x1, x2, chans)
 def ugen_cosb(x1, x2, chans=None):
     return Mathb(MATH_OP_COS, x1, x2, chans)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
