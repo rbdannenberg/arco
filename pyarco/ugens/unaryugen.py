@@ -99,10 +99,3 @@ def ugen_linear_to_db(x1, chans=None):
     return Unary(UNARY_OP_LINEAR_TO_DB, x1, chans)
 def ugen_linear_to_dbb(x1, chans=None):
     return Unaryb(UNARY_OP_LINEAR_TO_DB, x1, chans)
-
-
-
-
-
-
-

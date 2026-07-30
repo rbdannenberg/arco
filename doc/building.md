@@ -413,7 +413,8 @@ ncurses interface (which will not work in the usual Xcode console).
 
   - `generate_<ugenname>.sh` (scripts immediately invoked by `dspmakefile` )
 
-- `generate_<ugenname>.sh` runs `f2a.py` and `o2idc.py` to generate audio-rate and block-rate versions unit generators for Arco.
+- `generate_<ugenname>.sh` runs `f2a.py` and `o2idc.py` to generate
+  audio-rate and block-rate versions unit generators for Arco.
 
 - `f2a.py` reads multiple `.cpp` and `.h` files written by FAUST and creates:
   - `.cpp` and `.h` files that become Arco sources.
@@ -427,3 +428,38 @@ In general, two unit generators are
 created for each basic DSP algorithm. For example, `sine.ugen` directs
 the build system to create the Arco unit generators `Sine` and `Sineb`
 which produce audio-rate and block-rate signals, respectively.
+
+## Dependencies, Makefiles and CMake
+
+application depends on arcolib
+
+Your target depends on sources and libraries, but most of the
+arco-specific files are in the arcolib library. arcolib is specific
+for each application because it contains unit generators named in
+dspmanifest.txt, which is specific to the application.
+
+arcolib depends on dspsources.cmakeinclude
+
+dspsources.cmakeinclude depends on dspmanifest.txt
+
+when dspmanifest.txt is changed, dspsources.cmakeinclude is built by
+running preproc/makedspmakefile.py
+
+to be safe, the `CMAKE_CONFIGURE_DEPENDS` property on the arco
+directory has the application's dspmanifest.txt file, so when the file
+changes, the entire project is rebuilt with CMake.
+
+arcolib will also depend on ugen sources specified in
+dspsources.cmakeinclude and allugens.srp and allugens.py to make sure
+they get built.
+
+many ugen sources depend on u2f.py and a .ugen file when the source is
+made with Faust. In those cases, dependencies are listed in
+dspsources.cmakeinclude.
+
+allugens.srp depends on many .srp files that are assembled by a script
+named preproc/makeallugens.py.
+
+allugens.srp also depends on dspsources.cmakeinclude which tells how
+to build it and makeallugens.py, which is the program that builds it.
+

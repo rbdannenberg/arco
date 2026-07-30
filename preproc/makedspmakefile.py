@@ -19,7 +19,6 @@ USE_PFFFT = True  # use PFFFT (new) instead of ffts for FFTs
 Command line should have three parameters:
     path-to-arco-root
     path-to-dspmanifest.txt
-    path-to-dspmakefile
     path-to-dspsources.cmakeinclude
 
 Each line of dspmanifest (not starting with '#') is either a unit
@@ -31,12 +30,6 @@ of the following three lines:
     sine* -- both audio and control rate generators
 In the last case (sine*), both sine.cpp and sineb.cpp are created
 in the same sine subdirectory named ugens/sine/
-
-The makefile also makes allugens.srp by appending all the ugen.srp
-files corresponding to classes in the manifest. allugens.srp is
-written to the same folder as dspmanifest.txt.
-
-And makes allugens.py for Python programs.
 
 Math ugens, implemented by mathugen and mathugenb, including mult, add,
 greater, hz_to_step, and many others (see MATHUGENS and UNARYUGENS list
@@ -114,13 +107,15 @@ def append_to_py_srcs(spec, path, nonfaust):
 
 
 
-def make_makefile(arco_path, manifest, outf):
+def add_preproc_commands(arco_path, manifest, outf):
     """make the makefile for faust-based dsp .cpp and .h files"""
     global srp_srcs, py_srcs
 
-    print("# dspmakefile - a makefile for Arco unit generator dsp sources",
+    print("Called add_preproc_commands", arco_path, manifest, outf)
+
+    print("# dspsources.cmakefile - included to build arcolib\n" +
+          "#      adds project-dependent files listed in dspmanifest.txt\n",
           file=outf)
-    print("#\n", file=outf)
 
     # make a list of all the .cpp files we will generate. Ignore .h files
     # and assume they are created along with .cpp files. Similarly,
@@ -155,55 +150,106 @@ def make_makefile(arco_path, manifest, outf):
                 # cases.
                 if basename[0 : -1] in NONFAUST:  # both a- and b-rate exist
                     basename = basename[0 : -1]
-            source = srp_path + basename + ".srp"
-            append_to_srp_srcs(ugen, source, True)
-            source = py_path + basename + ".py"
-            append_to_py_srcs(ugen, source, True)
+            if basename != "nofileio" and basename != "fader":
+                # fader is included by arco.srp, nofileio is a stub in c++
+                # that does not create an Arco class named Fileio, and
+                # there is no corresponding .py or .srp file
+                source = srp_path + basename + ".srp"
+                append_to_srp_srcs(ugen, source, True)
+                source = py_path + basename + ".py"
+                append_to_py_srcs(ugen, source, True)
         else:
             sources.append(ugens_path + basename + "/" + basename + ".cpp")
             if basename == "mult":  # get "mult" code from srp_path,
                                     # not ugens_path:
                 append_to_srp_srcs(ugen, srp_path + "mult.srp", True)
                 append_to_py_srcs(ugen, py_path + "mult.py", True)
-            elif basename != "fader":  # fader is included by arco.srp
+            else:
                 append_to_srp_srcs(ugen, ugens_path + basename + "/" +
                                          basename + ".srp", False)
                 append_to_py_srcs(ugen, ugens_path + basename + "/" +
                                          basename + ".py", False)
 
-    print("all:  ", end="", file=outf)
-    for source in sources:
-        print(" \\\n    " + source, end="", file=outf)
-    print(" \\\n    allugens.srp allugens.py\n\n", file=outf)
+#     print("all:  ", end="", file=outf)
+#     for source in sources:
+#         print(" \\\n    " + source, end="", file=outf)
+#     print(" \\\n    allugens.srp allugens.py\n\n", file=outf)
     
+
+    # add macro for Faust-to-Arco translation
+    print("""
+macro(add_faust_ugen arco_path src_path name)
+    add_custom_command(
+        OUTPUT  ${src_path}/${name}.cpp
+                ${src_path}/${name}.h
+                ${src_path}/${name}.srp
+                ${src_path}/${name}.py
+        COMMAND python3 ${arco_path}/preproc/u2f.py ${name}
+        COMMAND sh ${src_path}/generate_${name}.sh
+        WORKING_DIRECTORY ${src_path}
+        DEPENDS ${src_path}/${name}.ugen
+                ${arco_path}/preproc/u2f.py
+        COMMENT "Generating ${name}.cpp from ${name}.ugen"
+        VERBATIM
+    )
+endmacro()
+""", file=outf)
+
+
+
     # for each source, write the command to generate it
     # this generates all variants (a-rate, b-rate) and both .cpp and .h
     for source in sources:
         sans_extension = source[ : -4]
         src_path, basename = sans_extension.rsplit("/", 1)
-        cmd = "sh " + src_path + "/generate_" + basename + ".sh"
-        # For make, u2f.py command has to be on the same line as the
-        # cd so it runs in the right directory. Make/Unix can use
-        # the ";" separator for commands:
-        cdsep = "; "
-        if WIN32:
-            cmd = src_path + "/generate_" + basename + ".bat"
-            # For Windows NMake, the cd command can go on a
-            # separate line (and I don't think ";" would work):
-            cdsep = "\n\t"
-        print(source + ": " + sans_extension + ".ugen " +
-              arco_path + "/preproc/u2f.py", file=outf)
-        print("\tcd " + src_path + cdsep + PY + " " + arco_path +
-              "/preproc/u2f.py " + basename, file=outf)
-        print("\tcd " + src_path + cdsep + cmd, file=outf)
-        # does NMake not restore the current directory? Not sure.
-        if WIN32:
-            print("\tcd " + arco_app_path + "\n", file=outf)
-        print("\n", file=outf)
+        print("add_faust_ugen(", arco_path, src_path, basename, ")", file=outf)
 
+
+#         cmd = "sh " + src_path + "/generate_" + basename + ".sh"
+#         # For make, u2f.py command has to be on the same line as the
+#         # cd so it runs in the right directory. Make/Unix can use
+#         # the ";" separator for commands:
+#         cdsep = "; "
+#         if WIN32:
+#             cmd = src_path + "/generate_" + basename + ".bat"
+#             # For Windows NMake, the cd command can go on a
+#             # separate line (and I don't think ";" would work):
+#             cdsep = "\n\t"
+#         print(source + ": " + sans_extension + ".ugen " +
+#               arco_path + "/preproc/u2f.py", file=outf)
+#         print("\tcd " + src_path + cdsep + PY + " " + arco_path +
+#               "/preproc/u2f.py " + basename, file=outf)
+#         print("\tcd " + src_path + cdsep + cmd, file=outf)
+#         # does NMake not restore the current directory? Not sure.
+#         if WIN32:
+#             print("\tcd " + arco_app_path + "\n", file=outf)
+#         print("\n", file=outf)
+# 
     # write the code to make allugens.srp
+
+    srp_srcs_string = " ".join(srp_srcs)
+    py_srcs_string = " ".join(py_srcs)
+
+    print("\nadd_custom_command(", file=outf)
+    print("    OUTPUT ${CMAKE_SOURCE_DIR}/allugens.srp", file=outf)
+    print("           ${CMAKE_SOURCE_DIR}/allugens.py", file=outf)
+    print("    COMMAND python3", arco_path + "/preproc/makeallugens.py",
+          srp_srcs_string, file=outf)
+    print("    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}", file=outf)
+    print("    DEPENDS", arco_path + "/preproc/makeallugens.py", file=outf)
+    for src in srp_srcs:
+        print("       ", src, file=outf)
+    for src in py_srcs:
+        print("       ", src, file=outf)
+    print('    COMMENT "Generating allugens.srp and allugens.py"', file=outf)
+    print("    VERBATIM)\n", file=outf)
+
+    return (srp_srcs_string, py_srcs_string)
+
+"""
     # nmake needs dspmakefile to be a target, even though we never use
     # make or nmake to make dspmakefile; we only want to depend on it
+<<<<<<< HEAD
     # and regenerate allugens when dspmakefile changes. Update: CMake
     # rewrites dspmakefile, so if we depend on it, we do a lot of work
     # for every build. So take out the dependency and depend on
@@ -214,6 +260,12 @@ def make_makefile(arco_path, manifest, outf):
     # print('\techo "ERROR: dspmakefile does not exist!"', file=outf)
     # print("", file=outf)
     print("dspmanifest.txt:", file=outf)
+=======
+    # and regenerate allugens when dspmakefile changes:
+
+
+    print("dspmakefile:", file=outf)
+>>>>>>> a5ec025a0820690abc8a9256fd86119e24112f25
     if WIN32:
        print('\tdir dspmanifest.txt', file=outf)
     print('\techo "ERROR: dspmanifest.txt does not exist!"', file=outf)
@@ -274,11 +326,13 @@ def make_makefile(arco_path, manifest, outf):
     current_dir = Path(__file__).resolve().parent
     print("\tpython3", current_dir / "consolidate_imports.py allugens.py",
           file=outf)
+"""
 
 
 
 def make_inclfile(arco_path, manifest, outf):
-    "make the CMake include file that lists all the sources"
+    """make dspsources.cmakeinclude, the CMake include file that
+    lists all the sources"""
 
     need_ringbuf = False  # need to compile with ringbuf.h
     need_fastrand = False # need to compile with fastrand.h
@@ -318,7 +372,7 @@ def make_inclfile(arco_path, manifest, outf):
     if rejected in manifest:
         manifest.remove(rejected)
 
-    print("set(ARCO_SRC ${ARCO_SRC}", file=outf)
+    print("set(ARCO_UGEN_SRC", file=outf)
 
     ## Compute Dependencies
     if "fileio" in manifest:  # need fileiothread
@@ -447,7 +501,10 @@ def make_inclfile(arco_path, manifest, outf):
         if basename == "flsyn":
             need_flsyn_lib = True
 
-    print(")", file=outf)
+    print(")\n", file=outf)
+
+    print("set(ARCO_SRC ${ARCO_SRC} ${ARCO_UGEN_SRC})", file=outf)
+
     print("\ntarget_sources(arcolib PRIVATE ${ARCO_SRC})", file=outf)
     if need_flsyn_lib:
         print("target_link_libraries(arcolib PRIVATE", file=outf)
@@ -492,52 +549,7 @@ def make_inclfile(arco_path, manifest, outf):
         if not WIN32:
             print("target_link_libraries(arcolib PRIVATE", file=outf)
             print("    debug readline optimized readline)", file=outf)
-        # make this one public - I don't want to ever link curses in twice,
-        # and I'm not sure how this interacts with Arco Server's use of
-        # curses. Not even sure why Fluidsynth needs curses if I'm just
-        # trying to synthesize sound and not running it as an application.
-#        print("target_link_libraries(arcolib PUBLIC", file=outf)
-#        print("    debug ${CURSES_LIB} optimized ${CURSES_LIB})", file=outf)
-#        print("set(ARCO_TARGET_LINK_OBJC true PARENT_SCOPE)", file=outf)
 
-    # ADDITION FOR CHROMAGRAM following the flsyn format
-#    if need_chromagram_lib:
-#        print("target_link_libraries(arcolib PRIVATE", file=outf)
-#        print("    debug ${CHROMAGRAM_DBG_LIB} optimized ${CHROMAGRAM_OPT_LIB})",
-#              file=outf)
-#
-#        print('if(NOT EXISTS "${CHROMAGRAM_DBG_LIB}")', file=outf)
-#        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_DBG_LIB}, ' + \
-#              'delete CHROMAGRAM_DBG_LIB from cache and fix in ' + \
-#              'apps/common/libraries.txt")', file=outf)
-#        print("endif()", file=outf)
-#        print('if(NOT EXISTS "${CHROMAGRAM_OPT_LIB}")', file=outf)
-#        print('  message(FATAL_ERROR "Could not find ${CHROMAGRAM_OPT_LIB}, ' + \
-#              'delete CHROMAGRAM_OPT_LIB from cache and fix in ' + \
-#              'apps/common/libraries.txt")', file=outf)
-#        print("endif()", file=outf)
-#              
-#        print("target_link_libraries(arcolib PRIVATE", file=outf)
-#        print("    debug readline optimized readline)", file=outf)
-
-#    if need_fftw:
-#        print("target_link_libraries(arcolib PRIVATE", file=outf)
-#        print("    debug ${FFTW_DBG_LIB} optimized ${FFTW_OPT_LIB})",
-#              file=outf)
-#
-#        print('if(NOT EXISTS "${FFTW_DBG_LIB}")', file=outf)
-#        print('  message(FATAL_ERROR "Could not find ${FFTW_DBG_LIB}, ' + \
-#              'delete FFTW_DBG_LIB from cache and fix in ' + \
-#              'apps/common/libraries.txt")', file=outf)
-#        print("endif()", file=outf)
-#        print('if(NOT EXISTS "${FFTW_OPT_LIB}")', file=outf)
-#        print('  message(FATAL_ERROR "Could not find ${FFTW_OPT_LIB}, ' + \
-#              'delete FFTW_OPT_LIB from cache and fix in ' + \
-#              'apps/common/libraries.txt")', file=outf)
-#        print("endif()", file=outf)
-#
-#        print("target_link_libraries(arcolib PRIVATE", file=outf)
-#        print("    debug readline optimized readline)", file=outf)
 
 def is_a_unit_generator(line):
     "determine if line describes a unit generator (not empty, not a comment)"
@@ -593,15 +605,15 @@ def need_ugen(manifest, name):
 
 def main():
     global arco_app_path
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 4:
         print("Usage: " + PY + " makedspmakefile.py arco_path " + 
-              "dspmanifest.txt dspmakefile dspsources.cmakeinclude")
+              "dspmanifest.txt dspsources.cmakeinclude")
+        print("argv:", sys.argv)
         exit(-1)
     arco_path = sys.argv[1]
     manifest_name = sys.argv[2]
     arco_app_path = os.path.dirname(manifest_name)
-    makefile_name = sys.argv[3]
-    inclfile_name = sys.argv[4]
+    inclfile_name = sys.argv[3]
 
     # first remove existing inclfile_name in case we fail
     try:
@@ -639,31 +651,13 @@ def main():
 
     manifest = manifest2  # use the "cleaned up" and canonical manifest
 
-    with open(makefile_name + ".tmp", "w") as outf:
-        make_makefile(arco_path, manifest, outf)
-
-    files_differ = True
-    if os.path.exists(makefile_name):
-        files_differ = False
-        with (open(makefile_name, 'r') as f1,
-              open(makefile_name + ".tmp", 'r') as f2):
-            line_num = 0
-            for line1, line2 in zip(f1, f2):
-                line_num += 1
-                if line1 != line2:
-                    files_differ = True
-                    break
-    if files_differ:
-        os.remove(makefile_name)
-        os.rename(makefile_name + ".tmp", makefile_name)
-
     with open(inclfile_name, "w") as outf:
         make_inclfile(arco_path, manifest, outf)
+        # must come second, depends on ARCO_UGEN_SRC
+        (srp_srcs, py_srcs) = add_preproc_commands(arco_path, manifest, outf)
     print("Merged the following files to form allugens.srp: ")
-    for src in srp_srcs:
-        print("   ", src)
+    print("   ", srp_srcs)
     print("Merged the following files to form allugens.py: ")
-    for src in py_srcs:
-        print("   ", src)
+    print("   ", py_srcs)
 
 main()
