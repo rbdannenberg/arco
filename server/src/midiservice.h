@@ -37,9 +37,9 @@ void midi_output_initialize(string &service, const char *device);
 
 void midi_poll();
 
-void insert_midi_to_o2();
+int insert_midi_to_o2();
 
-void insert_o2_to_midi();
+int insert_o2_to_midi();
 
 void midi_services_finish();
 

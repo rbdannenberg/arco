@@ -119,7 +119,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../arco build)
 target_link_whole_library(${ARCO_SERVER_NAME} arcolib)
 target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
                       debug ${O2_DBG_LIB} optimized ${O2_OPT_LIB})
-target_link_libraries(${ARCO_SERVER_NAME} PRIVATE form ${CURSES_LIB})
+# target_link_libraries(${ARCO_SERVER_NAME} PRIVATE form ${CURSES_LIB})
 
 if(UNIX AND NOT APPLE)  # linux
   target_link_libraries(arcolib PRIVATE avahi-client avahi-common atomic rt) 

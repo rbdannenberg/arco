@@ -120,7 +120,7 @@ void insert_o2_to_midi_fields(int y, string service, string device)
 
 // make three fields and insert before key "arco_in_id"
 // find "arco_in_id" -- that's the line we want to use
-void insert_o2_to_midi() {
+int insert_o2_to_midi() {
     get_midi_device_options();
     int y = open_midi_osc_line();
 
@@ -130,6 +130,7 @@ void insert_o2_to_midi() {
     insert_o2_to_midi_fields(y, "", init_selection);
     tu->dialog_refresh();
     // redraw_requested = true;
+    return y;
 }
 
 
@@ -153,7 +154,7 @@ void insert_midi_to_o2_fields(int y, string device, string service)
 
 // Insert forms into dialog for configuring midi to O2 service.
 // If there are no midi input devices, display "NO MIDI IN DEVICE!"
-void insert_midi_to_o2() {
+int insert_midi_to_o2() {
     get_midi_device_options();
     int y = open_midi_osc_line();
 

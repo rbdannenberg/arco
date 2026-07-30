@@ -41,15 +41,20 @@
 #include <vector>
 #include <ctype.h>
 #include <assert.h>
-#include <curses.h>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <io.h>      // for _dup, _dup2, _pipe, _close, _read
 #else
-#include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
 #endif
+#include <fcntl.h>   // for _O_BINARY
+
+#ifdef MOUSE_MOVED  // may be defined by windows.h
+#undef MOUSE_MOVED
+#endif
+#include <curses.h>
 
 using std::string;
 using std::vector;
@@ -58,7 +63,7 @@ using std::vector;
 #include "termui.h"
 
 
-#define ASCII_ESC 27
+const int ASCII_ESC = 27;
 
 /* termui_interrupt_requested = false; */
 
@@ -96,6 +101,16 @@ Terminal_ui::Terminal_ui(int count)  // count is how many output lines to save
     help_command_keys = "H";
 
     TUDBG(logfile = fopen("log.txt", "w");)
+#ifdef _WIN32
+    // On Windows, disable Ctrl+S flow control using Console API
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    GetConsoleMode(hStdin, &mode);
+    mode &= ~ENABLE_PROCESSED_INPUT;  // Disable Ctrl+C and Ctrl+S processing
+    SetConsoleMode(hStdin, mode);
+
+    ttyfd = stdout;  // Use stdout on Windows
+#else
     ttyfd = fopen("/dev/tty", "r+");
     if (!ttyfd) {
         printf("Could not open /dev/tty. Initialization Failed!\n");
@@ -107,6 +122,7 @@ Terminal_ui::Terminal_ui(int count)  // count is how many output lines to save
     // clear the IXON flag to turn off CTRL-S/CTRL-Q flow control
     t.c_iflag &= ~IXON;
     tcsetattr(fd, TCSANOW, &t);
+#endif
     // setenv("NCURSES_NO_PADDING", "1", 1);
     uiscr = newterm(NULL, ttyfd, ttyfd);
     set_term(uiscr);
@@ -115,16 +131,26 @@ Terminal_ui::Terminal_ui(int count)  // count is how many output lines to save
     // clearok(stdscr, FALSE);  // avoid hard-clear optimization, again, that
     // might cause clearing of underline attributes.
     nodelay(stdscr, TRUE);
-    set_escdelay(50);
+#ifndef WIN32
+    set_escdelay(50);  // reduce delay for ESC key to 50 ms on Mac (Linux too?)
+#endif
     noecho();
     curs_set(2);
 
     keypad(stdscr, true);
+#ifdef _WIN32
+    save_out = _dup(_fileno(stdout));
+    save_err = _dup(_fileno(stderr));
+    _pipe(out_pipe, 4096, _O_BINARY);
+    _dup2(out_pipe[1], _fileno(stdout));
+    _dup2(out_pipe[1], _fileno(stderr));
+#else
     save_out = dup(fileno(stdout));
     save_err = dup(fileno(stderr));
     pipe(out_pipe);
     dup2(out_pipe[1], fileno(stdout));
     dup2(out_pipe[1], fileno(stderr));
+#endif
 
     screen_refresh();
 }
@@ -140,12 +166,21 @@ int Terminal_ui::finish()
     fclose(ttyfd);
     fflush(stdout);
     fflush(stderr);
+#ifdef _WIN32
+    _dup2(save_out, _fileno(stdout));
+    _dup2(save_err, _fileno(stderr));
+    _close(out_pipe[0]);
+    _close(out_pipe[1]);
+    _close(save_out);
+    _close(save_err);
+#else
     dup2(save_out, fileno(stdout));
     dup2(save_err, fileno(stderr));
     close(out_pipe[0]);
     close(out_pipe[1]);
     close(save_out);
     close(save_err);
+#endif
     for (int i = 0; i < lines.size(); i++) {
         if (lines[i]) {
             delete lines[i];
@@ -610,13 +645,26 @@ void Terminal_ui::help_keys(string keys)
 
 void Terminal_ui::poll(int delay_usec)
 {
-    fd_set s_rd, s_wr, s_ex;
     static int msgcnt = 0;
-    struct timeval tv;
 
     int ch = getch();
     if (ch == ERR) {
         fflush(stdout);
+#ifdef _WIN32
+        // On Windows, check if data is available without blocking
+        HANDLE hPipe = (HANDLE)_get_osfhandle(out_pipe[0]);
+        DWORD bytesAvail = 0;
+        if (PeekNamedPipe(hPipe, NULL, 0, NULL, &bytesAvail, NULL) && bytesAvail > 0) {
+            char buffer[80];
+            int n = _read(out_pipe[0], buffer, 79);
+            if (n > 0) {
+                buffer[n] = 0;
+                output(buffer);
+            }
+        }
+#else
+        fd_set s_rd, s_wr, s_ex;
+        struct timeval tv;
         FD_ZERO(&s_rd);
         FD_ZERO(&s_wr);
         FD_ZERO(&s_ex);
@@ -625,7 +673,7 @@ void Terminal_ui::poll(int delay_usec)
         tv.tv_usec = delay_usec;
         int n = select(out_pipe[0] + 1, &s_rd, &s_wr, &s_ex, &tv);
         if (n <= 0) {
-            return false;
+            return;
         }
         char buffer[80];
         n = (int) read(out_pipe[0], buffer, 79);  // get, display input
@@ -633,6 +681,7 @@ void Terminal_ui::poll(int delay_usec)
             buffer[n] = 0;
             output(buffer);
         }
+#endif
     } else {
         if (dialog_mode) {
             if (strchr(escape_keys.c_str(), ch) != nullptr) {
@@ -640,11 +689,11 @@ void Terminal_ui::poll(int delay_usec)
             } else {
                 dialog_handle_typing(ch);
             }
-            return false;
+            return;
         } else if (getting_string) {
             got_a_char(ch);
             addch(ch);
-            return false;
+            return;
         } else if (help_mode) {  // new input, so redraw screen, erase choices
             advance(0);
         }
@@ -665,7 +714,9 @@ void Terminal_ui::poll(int delay_usec)
                 advance(2);
                 break;
               case KEY_RESIZE:
+#if defined(NCURSES_VERSION) || !defined(_WIN32)
                 resizeterm(0, 0);
+#endif
                 wclear(stdscr);
                 screen_refresh();
                 touchwin(stdscr);
@@ -673,11 +724,11 @@ void Terminal_ui::poll(int delay_usec)
                 refresh();
                 break;
               default:
-                return (*key_callback)(ch, false);
+                (*key_callback)(ch, false);
+                break;
             }
         }
     }
-    return false;
 }
 
 

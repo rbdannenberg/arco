@@ -74,20 +74,22 @@ MIDI_out: <servicename> <devicename>
 */
 
 #include "o2internal.h"  // need internal to offer bridge
-#ifndef _WIN32
 #include <fcntl.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <string>
 #include <vector>
+
+// Undefine Windows MOUSE_MOVED before including curses to avoid conflict
+#ifdef MOUSE_MOVED
+#undef MOUSE_MOVED
+#endif
 
 #ifdef __linux__
 #include "ncurses.h"
 #else
 #include "curses.h"
-#endif
-#else
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #endif
 #include "string.h"
 #include "o2atomic.h"
@@ -1049,7 +1051,7 @@ void action(int ch, bool is_escape)
     }
     if (!arco_ready) {
         printf("Ignored input. Arco has not started.\n");
-        return false;  // Don't interact with Arco before it is ready.
+        return;  // Don't interact with Arco before it is ready.
     }
     switch (ch) {
       case 'A': // configuration dialog
@@ -1105,10 +1107,9 @@ void action(int ch, bool is_escape)
             snprintf(quoted, 16, "'\\x%02x'", ch);
         }
         printf("%s is not a key command.\n", inp);
+        break;
       }
-      break;
     }
-    return false;
 }
 
 
@@ -1134,7 +1135,7 @@ int main(int argc, char *argv[])
 
     // ahprintf("main: initial latency %d\n", prefs_latency_ms());
     tu = new Terminal_ui(200);
-    tu->key_callback = &action;
+    tu->set_key_callback(&action);
     if (tu->uiscr == nullptr) {
         exit(1);
     }

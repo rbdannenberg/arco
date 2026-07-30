@@ -430,6 +430,7 @@ public:
 
     void enable(int32_t enab) {
     // handle /arco/o2aud/enab message, which starts this Ugen
+        enab = enab != 0;  // convert to bool
         if (running != enab) {
             running = enab;
             send_enab();

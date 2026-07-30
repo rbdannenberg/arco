@@ -200,6 +200,7 @@ bool config_to_prefs()
         strcmp(host_ensemble_name, prefs_ensemble_name()) != 0) {
         need_restart = true;
     }
+    return need_restart;
 }
 
 

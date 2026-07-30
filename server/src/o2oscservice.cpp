@@ -52,7 +52,7 @@ void insert_o2_to_osc_fields(int y, string service, string ip,
 }
 
 
-void insert_o2_to_osc() {
+int insert_o2_to_osc() {
     int y = open_midi_osc_line();
     insert_o2_to_osc_fields(y, "", "", "", "UDP");
 
@@ -87,7 +87,7 @@ void insert_osc_to_o2_fields(int y, string port, string tcp, string service)
 
 // make three fields and insert before key "arco_in_id"
 // find "arco_in_id" -- that's the line we want to use
-void insert_osc_to_o2()
+int insert_osc_to_o2()
 {
     int y = open_midi_osc_line();
     insert_osc_to_o2_fields(y, "", "UDP", "");

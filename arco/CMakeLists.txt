@@ -12,7 +12,8 @@ execute_process(COMMAND python3 --version
                 OUTPUT_VARIABLE pyversion_out
                 ERROR_VARIABLE pyerror_out)
 
-# If we get an error, assume python3 does not exist. On Windows, maybe we have python:
+# If we get an error, assume python3 does not exist.
+# On Windows, maybe we have python:
 if(pyerror_out)
   execute_process(COMMAND python --version
                   OUTPUT_VARIABLE pyversion_out
@@ -70,23 +71,47 @@ list(TRANSFORM ARCO_SRC PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 cmake_path(GET CMAKE_CURRENT_LIST_DIR PARENT_PATH ARCO_PATH)
 cmake_path(GET ARCO_PATH PARENT_PATH FRIENDS_PATH)
 
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             "${CMAKE_SOURCE_DIR}/dspmanifest.txt")
+
+
+
 # make dspmakefile and dspsources.cmakeinclude from dspmanifest.txt:
 #
-message(STATUS "----- executing makedspmakefile.py")  
-execute_process(COMMAND ${PYTHON} ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
-                    ${ARCO_PATH}
-                    ${CMAKE_SOURCE_DIR}/dspmanifest.txt
-                    ${CMAKE_SOURCE_DIR}/dspmakefile
-                    ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude
-                OUTPUT_VARIABLE makedspmakefile_out
-                ERROR_VARIABLE makedspmakefile_err)
-if(makedspmakefile_out) 
-    message(STATUS "makedspmakefile.py output: " ${makedspmakefile_out}) 
-endif() 
-if(makedspmakefile_err) 
-    message(FATAL_ERROR "makedspmakefile.py error output: " ${makedspmakefile_err}) 
+# If the output files don't exist, run the script at configure time
+# Otherwise, they will be regenerated at build time only when dependencies change
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/dspmakefile" OR 
+   NOT EXISTS "${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude")
+    message(STATUS "----- executing makedspmakefile.py (initial run)")
+    execute_process(COMMAND ${PYTHON} ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
+                        ${ARCO_PATH}
+                        ${CMAKE_SOURCE_DIR}/dspmanifest.txt
+                        ${CMAKE_SOURCE_DIR}/dspmakefile
+                        ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude
+                    OUTPUT_VARIABLE makedspmakefile_out
+                    ERROR_VARIABLE makedspmakefile_err)
+    if(makedspmakefile_out) 
+        message(STATUS "makedspmakefile.py output: " ${makedspmakefile_out}) 
+    endif() 
+    if(makedspmakefile_err) 
+        message(FATAL_ERROR "makedspmakefile.py error output: " ${makedspmakefile_err}) 
+    endif()
 endif()
 
+
+# This will re-run at build time when makedspmakefile.py or dspmanifest.txt changes
+add_custom_command(
+    OUTPUT ${CMAKE_SOURCE_DIR}/dspmakefile ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude
+    COMMAND ${PYTHON} ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
+            ${ARCO_PATH}
+            ${CMAKE_SOURCE_DIR}/dspmanifest.txt
+            ${CMAKE_SOURCE_DIR}/dspmakefile
+            ${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude
+    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../preproc/makedspmakefile.py
+            ${CMAKE_SOURCE_DIR}/dspmanifest.txt
+    COMMENT "Regenerating dspmakefile and dspsources.cmakeinclude (dependencies changed)"
+    VERBATIM
+)
 
 #
 # run the dspmakefile at CMake Configure time to make sure there are
@@ -100,7 +125,7 @@ endif()
 message(STATUS
         "CMAKE_SOURCE_DIR (where to run dspmakefile): ${CMAKE_SOURCE_DIR}")
 if(WIN32)
-  add_custom_target(make_faust_ugens ALL
+  add_custom_target(OUTPUT ${CMAKE_SOURCE_DIR}/allugens.srp
       COMMAND nmake /F dspmakefile
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
@@ -119,15 +144,15 @@ else()
 #
 # now we run make by running the shell command
 #
-  message(STATUS "----- executing make_faust_ugens.sh")
-  execute_process(COMMAND sh make_faust_ugens.sh 
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+#  message(STATUS "----- executing make_faust_ugens.sh")
+#  execute_process(COMMAND sh make_faust_ugens.sh 
+#                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 #
 # also run make_faust_ugens at build time to make sure source code is generated
-  add_custom_target(make_faust_ugens ALL
-      COMMAND sh make_faust_ugens.sh 
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      DEPENDS ${CMAKE_SOURCE_DIR}/dspmakefile)
+#  add_custom_target(make_faust_ugens ALL
+#      COMMAND sh make_faust_ugens.sh 
+#      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#      DEPENDS ${CMAKE_SOURCE_DIR}/make_faust_ugens.sh)
 endif()
 #
 # now that sources are made, add them here using the cmakeinclude file
@@ -177,7 +202,7 @@ include("${CMAKE_SOURCE_DIR}/dspsources.cmakeinclude")
 message(STATUS "ARCO_SRC: ${ARCO_SRC}") 
 
 register_target(arcolib)
-add_dependencies(arcolib make_faust_ugens)
+add_dependencies(arcolib dspmakefile)
 
 #-----------------------------------------------------------------------
 #------ libsndfile and externals ---------------------------------------

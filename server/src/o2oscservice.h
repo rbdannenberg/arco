@@ -21,8 +21,8 @@ class Osc_io_info {
 extern vector<Osc_io_info> from_osc_input;
 extern vector<Osc_io_info> to_osc_output;
 
-void insert_o2_to_osc();
-void insert_osc_to_o2();
+int insert_o2_to_osc();
+int insert_osc_to_o2();
 void insert_o2_to_osc_fields(int y, string service, string ip,
                              string port, string tcp);
 void insert_osc_to_o2_fields(int y, string port, string tcp, string service);

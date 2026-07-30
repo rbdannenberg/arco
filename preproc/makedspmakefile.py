@@ -204,14 +204,22 @@ def make_makefile(arco_path, manifest, outf):
     # write the code to make allugens.srp
     # nmake needs dspmakefile to be a target, even though we never use
     # make or nmake to make dspmakefile; we only want to depend on it
-    # and regenerate allugens when dspmakefile changes:
-    print("dspmakefile:", file=outf)
+    # and regenerate allugens when dspmakefile changes. Update: CMake
+    # rewrites dspmakefile, so if we depend on it, we do a lot of work
+    # for every build. So take out the dependency and depend on
+    # dspmanifest.txt instead.
+    # print("dspmakefile:", file=outf)
+    # if WIN32:
+    #    print('\tdir dspmakefile', file=outf)
+    # print('\techo "ERROR: dspmakefile does not exist!"', file=outf)
+    # print("", file=outf)
+    print("dspmanifest.txt:", file=outf)
     if WIN32:
-        print('\tdir dspmakefile', file=outf)
-    print('\techo "ERROR: dspmakefile does not exist!"', file=outf)
+       print('\tdir dspmanifest.txt', file=outf)
+    print('\techo "ERROR: dspmanifest.txt does not exist!"', file=outf)
     print("", file=outf)
 
-    print("allugens.srp: dspmakefile", end="", file=outf)
+    print("allugens.srp: dspmanifest.txt", end="", file=outf)
     for src in srp_srcs:
         print(" " + src, end="", file=outf)
     if WIN32:
@@ -238,7 +246,7 @@ def make_makefile(arco_path, manifest, outf):
             print("\techo >> allugens.srp", file=outf)  # blank line separator
 
     # write the code to make allugens.py
-    print("allugens.py: dspmakefile", end="", file=outf)
+    print("allugens.py: dspmanifest.txt", end="", file=outf)
     for src in py_srcs:
         print(" " + src, end="", file=outf)
     if WIN32:
@@ -631,8 +639,24 @@ def main():
 
     manifest = manifest2  # use the "cleaned up" and canonical manifest
 
-    with open(makefile_name, "w") as outf:
+    with open(makefile_name + ".tmp", "w") as outf:
         make_makefile(arco_path, manifest, outf)
+
+    files_differ = True
+    if os.path.exists(makefile_name):
+        files_differ = False
+        with (open(makefile_name, 'r') as f1,
+              open(makefile_name + ".tmp", 'r') as f2):
+            line_num = 0
+            for line1, line2 in zip(f1, f2):
+                line_num += 1
+                if line1 != line2:
+                    files_differ = True
+                    break
+    if files_differ:
+        os.remove(makefile_name)
+        os.rename(makefile_name + ".tmp", makefile_name)
+
     with open(inclfile_name, "w") as outf:
         make_inclfile(arco_path, manifest, outf)
     print("Merged the following files to form allugens.srp: ")
