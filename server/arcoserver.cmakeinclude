@@ -74,6 +74,10 @@ if(APPLE)
       ${COREAUDIO} ${COREFOUNDATION} ${COREMIDI} ${CORESERVICES}
       ${AVFOUNDATION} ${AUDIOTOOLBOX} ${FOUNDATION})
   target_link_options(${ARCO_SERVER_NAME} PUBLIC "-ObjC")
+  set_property(TARGET ${ARCO_SERVER_NAME} PROPERTY
+               XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS
+               "$<IF:$<CONFIG:DEBUG>,YES,NO>")
+
 else()
   set(CURSES_BASE ncurses CACHE PATH 
       "Where to find lib and include files for ncurses") 
@@ -88,8 +92,9 @@ else()
     target_link_libraries(${ARCO_SERVER_NAME} PRIVATE 
         winmm.lib ws2_32.lib Iphlpapi.lib dnssd.lib) 
     # always static
-    set_property(TARGET ${ARCO_SERVER_NAME}
-                 PROPERTY MSVC_RUNTIME_LIBRARY MultiThreaded)
+    set_property(TARGET ${ARCO_SERVER_NAME} PROPERTY
+       MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:DebugDLL>"
+       WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
   endif()
 endif() 
 target_include_directories(${ARCO_SERVER_NAME} PRIVATE
