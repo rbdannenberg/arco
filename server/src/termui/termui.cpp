@@ -45,17 +45,17 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <io.h>      // for _dup, _dup2, _pipe, _close, _read
+// linux/macOS compatibility:
+#define dup _dup
+#define dup2 _dup2
+#define pipe(out_pipe) (_pipe((out_pipe), 4096, _O_BINARY))
+#define fileno _fileno
 #else
 #include <unistd.h>
 #include <termios.h>
 #endif
 #include <fcntl.h>   // for _O_BINARY
-// linux/macOS compatibility:
-#define dup _dup
-#define dup2 _dup2
-#define pipe _pipe
-#define fileno _fileno
-
+#define _O_BINARY 0
 #ifdef MOUSE_MOVED  // may be defined by windows.h
 #undef MOUSE_MOVED
 #endif
@@ -153,7 +153,7 @@ Terminal_ui::Terminal_ui(int count)  // count is how many output lines to save
     orig_stderr_fd = fileno(stderr);
     save_out = dup(orig_stdout_fd);
     save_err = dup(orig_stderr_fd);
-    pipe(out_pipe, 4096, _O_BINARY);
+    pipe(out_pipe);
     dup2(out_pipe[1], orig_stdout_fd);
     dup2(out_pipe[1], orig_stderr_fd);
 

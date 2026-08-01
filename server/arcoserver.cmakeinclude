@@ -72,13 +72,13 @@ if(APPLE)
   find_library(FOUNDATION Foundation)
   target_link_libraries(${ARCO_SERVER_NAME} PRIVATE
       ${COREAUDIO} ${COREFOUNDATION} ${COREMIDI} ${CORESERVICES}
-      ${AVFOUNDATION} ${AUDIOTOOLBOX} ${FOUNDATION})
+      ${AVFOUNDATION} ${AUDIOTOOLBOX} ${FOUNDATION} curses)
   target_link_options(${ARCO_SERVER_NAME} PUBLIC "-ObjC")
   set_property(TARGET ${ARCO_SERVER_NAME} PROPERTY
                XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS
                "$<IF:$<CONFIG:DEBUG>,YES,NO>")
 else()
-  set(CURSES_BASE ncurses CACHE PATH 
+  set(CURSES_LIB ncurses CACHE PATH   # added below to link libraries
       "Where to find lib and include files for ncurses") 
   if(WIN32)
     # WINDOWS
@@ -89,7 +89,7 @@ else()
     target_include_directories(${ARCO_SERVER_NAME} PRIVATE
         "${CURSES_BASE}/include")
     target_link_libraries(${ARCO_SERVER_NAME} PRIVATE 
-        winmm.lib ws2_32.lib Iphlpapi.lib dnssd.lib ${CURSES_LIB}) 
+        winmm.lib ws2_32.lib Iphlpapi.lib dnssd.lib)
     # always static
     set_target_properties(${ARCO_SERVER_NAME} PROPERTIES
                           MSVC_RUNTIME_LIBRARY "MultiThreaded"
@@ -103,6 +103,7 @@ else()
       COMMENT "Copying pdcurses.dll to output directory")
   endif()
 endif() 
+target_link_libraries(${ARCO_SERVER_NAME} PRIVATE ${CURSES_LIB})
 target_include_directories(${ARCO_SERVER_NAME} PRIVATE
                            "${CMAKE_CURRENT_LIST_DIR}/src/termui")
 
