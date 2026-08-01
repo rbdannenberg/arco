@@ -47,8 +47,13 @@ static int required_height = 4;
 
 // configure -- handle keyboard input to set O2 configuration
 
-#define DEL_CHAR 0x7f
+// MacOS: backspace appears as 0x7F, Fn-Delete (forward delete) is 330
+// Windows: backspace appears as 0x08, Delete (forward) is 330
+#ifdef WIN32
 #define BACKSPACE_CHAR 0x08
+#else
+#define BACKSPACE_CHAR 0x7f
+#endif
 
 // find index of content in array of strings (options), return dflt if none
 // are found
@@ -129,23 +134,21 @@ void Field_entry::handle_typing(int ch, Terminal_ui *tu)
         // If it fails, we didn't really move the cursor, so nothing to clean up
         // but if it is successful, DEL_CHAR moves the cursor to the left, so
         // we have to remember not to do that:
-        bool delete_char = false;
-        if (ch == KEY_DC) {  // DC is "delete char" = 330
-            ch = DEL_CHAR;
-            content_posn++;
-            delete_char = true;
-        }
-        if (ch == DEL_CHAR && field_type != FIELD_BOOL) {
-            if (content_posn <= 0) {
+
+        if ((ch == BACKSPACE_CHAR || ch == KEY_DC) && field_type != FIELD_BOOL) {
+            int loc = content_posn;  // location to delete
+            if (ch == BACKSPACE_CHAR) {
+                loc--;  // delete location is left of cursor posn
+            }
+            if (loc < 0) {
                 ;  // ignore DEL if you are at the beginning of field
                    // never happens with KEY_DC because content_posn incremented
             } else if (is_ip()) {
-                // delete in IP address edits a single byte
-                int loc = content_posn - 1;  // location to delete
+                // delete in IP address edits a single byte (1 of 4 fields)
                 if (content[loc] == '.') {
                     ;  // if delete is after '.', then ignore
                 } else {  // shift from right; pad with blank
-                    if (!delete_char) {  // only move cursor if we had DEL_CHAR
+                    if (ch == BACKSPACE_CHAR) {  // only move cursor if we had DEL_CHAR
                         tu->dialog_x = x + w1 + loc;
                     }
                     if (loc % 4 == 0) {
@@ -162,10 +165,10 @@ void Field_entry::handle_typing(int ch, Terminal_ui *tu)
                     show_content(tu);
                 }
             } else if (content.size() > 0) {
-                if (!delete_char) {  // only move cursor if we had DEL_CHAR
+                if (ch == BACKSPACE_CHAR) {  // only move cursor if we have backspace
                     tu->dialog_x--;
                 }
-                content.erase(content_posn - 1, 1);
+                content.erase(loc, 1);
                 show_content(tu);
             } // else ignore DEL
         } else if ((is_int() || is_ip()) && !isdigit(ch)) {
@@ -177,10 +180,10 @@ void Field_entry::handle_typing(int ch, Terminal_ui *tu)
                 }
             }
         } else if (is_bool()) {
-            if (content == "F" && strchr("yYtTxX", ch)) {
+            if (content != "T" && strchr("yYtTxX", ch)) {
                 content = "T";
                 show_content(tu);
-            } else if (content == "T" && strchr("nNfFxX", ch)) {
+            } else if (content != "F" && strchr("nNfFxX", ch)) {
                 content = 'F';
                 show_content(tu);
             } else {
@@ -253,6 +256,8 @@ void Field_entry::set_number(int i, const char *if_zero)
 void Field_entry::set_option(Terminal_ui *tu, int i, int ch)
 {
     content = (*options)[i];
+    show_content(tu);  // important to show_content() now because the field
+            // exists, after callback(), it could be removed or replaced
     if (tu->field_callback) {
         (*tu->field_callback)(key, ch);
     }
@@ -302,15 +307,15 @@ bool Field_entry::cursor_in_field_text(int cx, int cy)
 }
 
 
-// cursor is to the right of any existing text (1 to len)
+// cursor is to the right of any existing text character (1 to len)
 bool Field_entry::cursor_after_field_text(int cx, int cy)
 {
-    return cx > x + w1 + 1 && cx <= x + w1 + content.size() && cy == y;
+    return cx > x + w1 + 1 && cx <= x + w1 + 1 + content.size() && cy == y;
 }
 
 // cursor is within this field
 bool Field_entry::cursor_in_or_after_field(int cx, int cy)
 {
-    return cx = x + w1 + 1 && cx <= x + w1 + 1 + w2 && cy == y;
+    return cx >= x + w1 + 1 && cx <= x + w1 + 1 + w2 && cy == y;
 }
 

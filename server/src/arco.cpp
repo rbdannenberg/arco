@@ -175,6 +175,10 @@ const char *help_strings[] = {
     NULL  // must terminate this list with NULL
 };
 
+vector<string> top_lines;
+vector<string> bottom_lines;
+vector<string> dialog_bottom_lines;
+
 static bool heartbeat_enabled = false;
 
 bool arco_ready = false;
@@ -697,6 +701,7 @@ static void config_callback(string key, int ch)
             
             configuration_options.clear();
         }
+        tu->fixed_info(&top_lines, &bottom_lines);
     } else if (key == "configuration") {
         current_config = &configs.config(tu->get_string("configuration",
                                                         "default"));
@@ -895,6 +900,7 @@ int dialog_midi_osc_setup(int ln)
 // dialog_configure - build form from configuration and start dialog
 void dialog_configure()
 {
+    tu->fixed_info(&top_lines, &dialog_bottom_lines);
     tu->dialog_begin();
     // location parameters are: x, y, w1, w2, where x = 0 means left column,
     // x > 0 means advance this many spaces, y = 0 means same line,
@@ -1152,8 +1158,7 @@ int main(int argc, char *argv[])
     tu->add_help("T - test tone");
     tu->add_help("U - Print audio ugen tree");
 
-    vector<string> top_lines;
-    vector<string> bottom_lines;
+    dialog_bottom_lines.push_back(string("Press ^S to save and exit, ESC to cancel"));
     top_lines.push_back(string("Arco v4"));
     bottom_lines.push_back(string("(A)Configure (S)tart/Stop (R)eset (Q)uit (H)elp"));
 

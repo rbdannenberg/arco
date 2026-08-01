@@ -12,7 +12,18 @@ using std::string;
 using std::vector;
 using std::pair;
 #include "fieldentry.h"
+
+// Undefine Windows MOUSE_MOVED before including curses to avoid conflict
+#ifdef MOUSE_MOVED
+#undef MOUSE_MOVED
+#endif
+
+#ifdef __linux__
+#include "ncurses.h"
+#else
 #include "curses.h"
+#endif
+
 #include "termui.h"
 #include "arco_internal.h"
 #include "o2oscservice.h"

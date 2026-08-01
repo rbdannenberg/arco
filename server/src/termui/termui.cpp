@@ -50,11 +50,20 @@
 #include <termios.h>
 #endif
 #include <fcntl.h>   // for _O_BINARY
+// linux/macOS compatibility:
+#define dup _dup
+#define dup2 _dup2
+#define pipe _pipe
+#define fileno _fileno
 
 #ifdef MOUSE_MOVED  // may be defined by windows.h
 #undef MOUSE_MOVED
 #endif
+#ifdef __linux__
+#include "ncurses.h"
+#else
 #include <curses.h>
+#endif
 
 using std::string;
 using std::vector;
@@ -76,6 +85,8 @@ Terminal_ui::Terminal_ui(int count)  // count is how many output lines to save
     direct_mode = true;
     help_mode = false;
     dialog_mode = false;
+    bottom_lines = nullptr;
+    top_lines = nullptr;
 
     // lines is a vector of strings, initially empty
     lines_max = count;
@@ -138,19 +149,13 @@ Terminal_ui::Terminal_ui(int count)  // count is how many output lines to save
     curs_set(2);
 
     keypad(stdscr, true);
-#ifdef _WIN32
-    save_out = _dup(_fileno(stdout));
-    save_err = _dup(_fileno(stderr));
-    _pipe(out_pipe, 4096, _O_BINARY);
-    _dup2(out_pipe[1], _fileno(stdout));
-    _dup2(out_pipe[1], _fileno(stderr));
-#else
-    save_out = dup(fileno(stdout));
-    save_err = dup(fileno(stderr));
-    pipe(out_pipe);
-    dup2(out_pipe[1], fileno(stdout));
-    dup2(out_pipe[1], fileno(stderr));
-#endif
+    orig_stdout_fd = fileno(stdout);
+    orig_stderr_fd = fileno(stderr);
+    save_out = dup(orig_stdout_fd);
+    save_err = dup(orig_stderr_fd);
+    pipe(out_pipe, 4096, _O_BINARY);
+    dup2(out_pipe[1], orig_stdout_fd);
+    dup2(out_pipe[1], orig_stderr_fd);
 
     screen_refresh();
 }
@@ -166,21 +171,12 @@ int Terminal_ui::finish()
     fclose(ttyfd);
     fflush(stdout);
     fflush(stderr);
-#ifdef _WIN32
-    _dup2(save_out, _fileno(stdout));
-    _dup2(save_err, _fileno(stderr));
-    _close(out_pipe[0]);
-    _close(out_pipe[1]);
-    _close(save_out);
-    _close(save_err);
-#else
-    dup2(save_out, fileno(stdout));
-    dup2(save_err, fileno(stderr));
+    dup2(save_out, orig_stdout_fd);
+    dup2(save_err, orig_stderr_fd);
     close(out_pipe[0]);
     close(out_pipe[1]);
     close(save_out);
     close(save_err);
-#endif
     for (int i = 0; i < lines.size(); i++) {
         if (lines[i]) {
             delete lines[i];

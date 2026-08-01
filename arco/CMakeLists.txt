@@ -192,8 +192,7 @@ endif()
 add_library(arcolib STATIC ${ARCO_APP_SRC})
 
 set_target_properties(arcolib PROPERTIES
-                      MSVC_RUNTIME_LIBRARY 
-                      "MultiThreaded$<$<CONFIG:Debug>:DebugDLL>"
+                      MSVC_RUNTIME_LIBRARY "MultiThreaded"
                       WINDOWS_EXPORT_ALL_SYMBOLS TRUE
                       XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS
                       "$<IF:$<CONFIG:DEBUG>,YES,NO>")

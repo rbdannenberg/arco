@@ -77,7 +77,6 @@ if(APPLE)
   set_property(TARGET ${ARCO_SERVER_NAME} PROPERTY
                XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS
                "$<IF:$<CONFIG:DEBUG>,YES,NO>")
-
 else()
   set(CURSES_BASE ncurses CACHE PATH 
       "Where to find lib and include files for ncurses") 
@@ -90,11 +89,18 @@ else()
     target_include_directories(${ARCO_SERVER_NAME} PRIVATE
         "${CURSES_BASE}/include")
     target_link_libraries(${ARCO_SERVER_NAME} PRIVATE 
-        winmm.lib ws2_32.lib Iphlpapi.lib dnssd.lib) 
+        winmm.lib ws2_32.lib Iphlpapi.lib dnssd.lib ${CURSES_LIB}) 
     # always static
-    set_property(TARGET ${ARCO_SERVER_NAME} PROPERTY
-       MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:DebugDLL>"
-       WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+    set_target_properties(${ARCO_SERVER_NAME} PROPERTIES
+                          MSVC_RUNTIME_LIBRARY "MultiThreaded"
+                          windows_EXPORT_ALL_SYMBOLS TRUE)
+    target_link_options(${ARCO_SERVER_NAME} PRIVATE
+                        "$<$<CONFIG:Debug>:/VERBOSE:LIB>")
+    add_custom_command(TARGET ${ARCO_SERVER_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      ${CURSES_BASE}/bin/pdcurses.dll
+      "$<TARGET_FILE_DIR:${ARCO_SERVER_NAME}>/pdcurses.dll"
+      COMMENT "Copying pdcurses.dll to output directory")
   endif()
 endif() 
 target_include_directories(${ARCO_SERVER_NAME} PRIVATE

@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "sineb"
-Code generated with Faust 2.75.7 (https://faust.grame.fr)
-Compilation options: -lang cpp -os -light -ct 1 -cn Sineb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
+Code generated with Faust 2.85.9 (https://faust.grame.fr)
+Compilation options: -lang cpp -fpga-mem-th 4 -os -light -ct 1 -cn Sineb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Sineb_H__
@@ -44,6 +44,7 @@ class SinebSIG0 {
     
     int iVec0[2];
     int iRec0[2];
+    int fSampleRate;
     
   public:
     
@@ -55,6 +56,7 @@ class SinebSIG0 {
     }
     
     void instanceInitSinebSIG0(int sample_rate) {
+        fSampleRate = sample_rate;
         for (int l0 = 0; l0 < 2; l0 = l0 + 1) {
             iVec0[l0] = 0;
         }
@@ -67,7 +69,7 @@ class SinebSIG0 {
         for (int i1 = 0; i1 < count; i1 = i1 + 1) {
             iVec0[0] = 1;
             iRec0[0] = (iVec0[1] + iRec0[1]) % 65536;
-            table[i1] = std::sin(9.58738e-05f * float(iRec0[0]));
+            table[i1] = std::sin(9.58738e-05f * static_cast<float>(iRec0[0]));
             iVec0[1] = iVec0[0];
             iRec0[1] = iRec0[0];
         }
@@ -86,10 +88,10 @@ extern const char *Sineb_name;
 class Sineb : public Ugen {
 public:
     struct Sineb_state {
-        FAUSTFLOAT fEntry0;
         int iVec1[2];
-        FAUSTFLOAT fEntry1;
+        FAUSTFLOAT fEntry0;
         float fRec1[2];
+        FAUSTFLOAT fEntry1;
     };
     Vec<Sineb_state> states;
     void (Sineb::*run_channel)(Sineb_state *state);
@@ -110,7 +112,7 @@ public:
         amp = amp_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
-        fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
+        fConst0 = 1.0f / std::min<float>(1.92e+05f, std::max<float>(1.0f, static_cast<float>(BR)));
         init_freq(freq);
         init_amp(amp);
         initialize_channel_states();
@@ -177,12 +179,12 @@ public:
         amp_samps = amp->run(current_block);  // update input
         Sineb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
-            float fSlow0 = float(amp_samps[0]);
-            float fSlow1 = fConst0 * float(freq_samps[0]);
+            float fSlow0 = fConst0 * static_cast<float>(freq_samps[0]);
+            float fSlow1 = static_cast<float>(amp_samps[0]);
             state->iVec1[0] = 1;
-            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow1 + state->fRec1[1]);
+            float fTemp0 = ((1 - state->iVec1[1]) ? 0.0f : fSlow0 + state->fRec1[1]);
             state->fRec1[0] = fTemp0 - std::floor(fTemp0);
-            out_samps[0] = FAUSTFLOAT(fSlow0 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(int(65536.0f * state->fRec1[0]), 65535))]);
+            out_samps[0] = static_cast<FAUSTFLOAT>(fSlow1 * ftbl0SinebSIG0[std::max<int>(0, std::min<int>(static_cast<int>(65536.0f * state->fRec1[0]), 65535))]);
             state->iVec1[1] = state->iVec1[0];
             state->fRec1[1] = state->fRec1[0];
     

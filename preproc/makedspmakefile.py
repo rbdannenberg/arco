@@ -150,10 +150,12 @@ def add_preproc_commands(arco_path, manifest, outf):
                 # cases.
                 if basename[0 : -1] in NONFAUST:  # both a- and b-rate exist
                     basename = basename[0 : -1]
-            if basename != "nofileio" and basename != "fader":
-                # fader is included by arco.srp, nofileio is a stub in c++
-                # that does not create an Arco class named Fileio, and
-                # there is no corresponding .py or .srp file
+            if (basename != "fileio" and basename != "nofileio" and
+                basename != "fader"):
+                # fader is included by arco.srp,
+                # fileio and nofileio are requirements for fileplay and
+                # filerec, but there is no .srp or .py file associated with
+                # either -- they are not unit generators, just .cpp and .h
                 source = srp_path + basename + ".srp"
                 append_to_srp_srcs(ugen, source, True)
                 source = py_path + basename + ".py"
@@ -176,6 +178,11 @@ def add_preproc_commands(arco_path, manifest, outf):
 #     print(" \\\n    allugens.srp allugens.py\n\n", file=outf)
     
 
+    if WIN32:
+        run_generate_command = "COMMAND generate_${name}.bat"
+    else:
+        run_generate_command = "COMMAND sh ./generate_${name}.sh"
+
     # add macro for Faust-to-Arco translation
     print("""
 macro(add_faust_ugen arco_path src_path name)
@@ -185,7 +192,7 @@ macro(add_faust_ugen arco_path src_path name)
                 ${src_path}/${name}.srp
                 ${src_path}/${name}.py
         COMMAND python3 ${arco_path}/preproc/u2f.py ${name}
-        COMMAND sh ${src_path}/generate_${name}.sh
+""" + run_generate_command + """
         WORKING_DIRECTORY ${src_path}
         DEPENDS ${src_path}/${name}.ugen
                 ${arco_path}/preproc/u2f.py
@@ -349,13 +356,15 @@ def make_inclfile(arco_path, manifest, outf):
     
     # "standard" for Serpent GUI are vu, probe, and filerec:
     if "filerec" not in manifest:
-        print('WARNING: "filerec" is not in dspmanifest.txt but it is needed')
-        print('    for input and output recording offered in the Arco')
-        print('    Monitor window.')
+        print('WARNING: "filerec" is not in dspmanifest.txt. If you are')
+        print('    building an application with input/output recording')
+        print('    options, e.g., wxSerpent with an Arco Monitor window,')
+        print('    then you should add filerec to the dspmanifest.txt file.')
     if "probe" not in manifest or "vu" not in manifest:
-        print('WARNING: "probe" and "vu" are not in dspmanifest.txt but are')
-        print('    needed for meters in the Arco Monitor window.')
-
+        print('WARNING: "probe" and "vu" are not in dspmanifest.txt. If you')
+        print('    are building an application with audio level monitoring')
+        print('    options, e.g., wxSerpent with an Arco Monitor window,')
+        print('    then you should add probe and vu to dspmanifest.txt.')
 
     # we need either fileio or nofileio
     # use fileio if either fileio or fileplay or filerec is in manifest

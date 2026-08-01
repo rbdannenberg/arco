@@ -163,7 +163,6 @@ public:
     // Fetch or create a specific named configuration
     Config& config(const string& name) {
         if (!has_config(name)) {  // create an empty default configuration
-            assert(name == "default");
             configs[name].set_value("name", name);
             // that's really all we need in a configuration
         }
@@ -273,7 +272,7 @@ public:
         if (!file.is_open()) {
             // make an empty configuration
             config("__configuration__").add("__configuration__", "default");
-            config("default").add("name", "default");
+            config("default");
             return;
         }
         string line;

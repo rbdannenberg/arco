@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "lowpassb"
-Code generated with Faust 2.75.7 (https://faust.grame.fr)
-Compilation options: -lang cpp -os -light -ct 1 -cn Lowpassb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
+Code generated with Faust 2.85.9 (https://faust.grame.fr)
+Compilation options: -lang cpp -fpga-mem-th 4 -os -light -ct 1 -cn Lowpassb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Lowpassb_H__
@@ -45,8 +45,8 @@ class Lowpassb : public Ugen {
 public:
     struct Lowpassb_state {
         FAUSTFLOAT fEntry0;
-        FAUSTFLOAT fEntry1;
         float fVec0[2];
+        FAUSTFLOAT fEntry1;
         float fRec0[2];
     };
     Vec<Lowpassb_state> states;
@@ -68,7 +68,7 @@ public:
         cutoff = cutoff_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
-        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
+        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, static_cast<float>(BR)));
         init_input(input);
         init_cutoff(cutoff);
         initialize_channel_states();
@@ -139,13 +139,13 @@ public:
         }
         Lowpassb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
-            float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
-            float fSlow1 = 1.0f / (fSlow0 + 1.0f);
-            float fSlow2 = 1.0f - fSlow0;
-            float fSlow3 = float(input_samps[0]);
-            state->fVec0[0] = fSlow3;
-            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (fSlow3 + state->fVec0[1])));
-            out_samps[0] = FAUSTFLOAT(state->fRec0[0]);
+            float fSlow0 = static_cast<float>(input_samps[0]);
+            float fSlow1 = 1.0f / std::tan(fConst0 * static_cast<float>(cutoff_samps[0]));
+            float fSlow2 = 1.0f - fSlow1;
+            float fSlow3 = 1.0f / (fSlow1 + 1.0f);
+            state->fVec0[0] = fSlow0;
+            state->fRec0[0] = -(fSlow3 * (fSlow2 * state->fRec0[1] - (fSlow0 + state->fVec0[1])));
+            out_samps[0] = static_cast<FAUSTFLOAT>(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
     

@@ -21,6 +21,10 @@ class Terminal_ui {
     TUDBG(FILE *logfile;)  // for debugging
 
     int out_pipe[2];
+    // WIN32 only for now:
+    int orig_stdout_fd;
+    int orig_stderr_fd;
+
     int save_out;
     int save_err;
 

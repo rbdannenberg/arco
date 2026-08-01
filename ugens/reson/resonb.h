@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "resonb"
-Code generated with Faust 2.75.7 (https://faust.grame.fr)
-Compilation options: -lang cpp -os -light -ct 1 -cn Resonb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
+Code generated with Faust 2.85.9 (https://faust.grame.fr)
+Compilation options: -lang cpp -fpga-mem-th 4 -os -light -ct 1 -cn Resonb -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Resonb_H__
@@ -77,7 +77,7 @@ public:
         q = q_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
-        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(BR)));
+        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, static_cast<float>(BR)));
         init_input(input);
         init_center(center);
         init_q(q);
@@ -161,15 +161,15 @@ public:
         }
         Resonb_state *state = states.get_array();
         for (int i = 0; i < chans; i++) {
-            float fSlow0 = 1.0f / std::max<float>(float(q_samps[0]), 0.1f);
-            float fSlow1 = std::tan(fConst0 * std::max<float>(float(center_samps[0]), 0.1f));
-            float fSlow2 = 1.0f / fSlow1;
-            float fSlow3 = 1.0f / ((fSlow0 + fSlow2) / fSlow1 + 1.0f);
-            float fSlow4 = float(input_samps[0]);
-            float fSlow5 = (fSlow2 - fSlow0) / fSlow1 + 1.0f;
-            float fSlow6 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(fSlow1));
-            state->fRec0[0] = fSlow4 - fSlow3 * (fSlow5 * state->fRec0[2] + fSlow6 * state->fRec0[1]);
-            out_samps[0] = FAUSTFLOAT(fSlow3 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
+            float fSlow0 = std::tan(fConst0 * std::max<float>(static_cast<float>(center_samps[0]), 0.1f));
+            float fSlow1 = 2.0f * (1.0f - 1.0f / Resonb_faustpower2_f(fSlow0));
+            float fSlow2 = 1.0f / std::max<float>(static_cast<float>(q_samps[0]), 0.1f);
+            float fSlow3 = 1.0f / fSlow0;
+            float fSlow4 = (fSlow3 - fSlow2) / fSlow0 + 1.0f;
+            float fSlow5 = 1.0f / ((fSlow2 + fSlow3) / fSlow0 + 1.0f);
+            float fSlow6 = static_cast<float>(input_samps[0]);
+            state->fRec0[0] = fSlow6 - fSlow5 * (fSlow4 * state->fRec0[2] + fSlow1 * state->fRec0[1]);
+            out_samps[0] = static_cast<FAUSTFLOAT>(fSlow5 * (state->fRec0[2] + state->fRec0[0] + 2.0f * state->fRec0[1]));
             state->fRec0[2] = state->fRec0[1];
             state->fRec0[1] = state->fRec0[0];
     
