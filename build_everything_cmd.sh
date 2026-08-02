@@ -57,8 +57,6 @@ brew install libogg
 brew install flac
 brew install libvorbis
 brew install opus
- https://cmu.zoom.us/rec/share/7dxfFLVcdaGEARpGfPAm4Rrp3jLBfKqAWovemNuGQ3mYQvWlXhHXqmQnSJM4ukjD.NtPr1QbMqipBvOH_
-Passcode: 22BXvA+J brew install glib
 # libintl is installed by gettext:
 brew install gettext
 
@@ -87,7 +85,7 @@ fi
 # building serpent will build o2 and wxWidgets, which we can use for Arco too
 
 # We need faust: get it from dmg and put it in $HOME
-FAUSTVER="2.72.14"
+FAUSTVER="2.85.5"
 if [ ! -d ~/faust ]
 then
   if [ ! -e ~/Downloads/Faust-$FAUSTVER.dmg ]
@@ -154,14 +152,13 @@ then
   echo "===== made Debug ===="
   rm src/fluidsynth
 
-  # install soundfont
+ # install soundfont
   mkdir -p FluidR3_GM
-  curl -L "https://keymusician01.s3.amazonaws.com/FluidR3_GM.zip" > \
-       FluidR3_GM/FluidR3_GM.zip
+  curl -L "https://archive.org/download/fluidr3-gm-gs/FluidR3_GM_GS.sf2" > \
+       FluidR3_GM/FluidR3_GM_GS.sf2
   cd FluidR3_GM
-  unzip FluidR3_GM.zip
   # make soundfont.srp file loaded by daserpent in apps/test/init.srp:
-  echo "SOUNDFONT = \"$PWD/FluidR3_GM.zip\"" > \
+  echo "SOUNDFONT = \"$PWD/FluidR3_GM_GS.sf2\"" > \
        ../../arco/apps/test/soundfont.srp
   popd
   echo "# After making fluidsynth, arco/build_everything_cmd.sh in $PWD"
