@@ -786,7 +786,7 @@ above `chans` if
 `chans` output channels if the number of file channels is less than
 `chans` (if `expand` is true), and padding channels with zero if the
 file has fewer than `chans` channels. If `end` is zero, reading will
-end at the end of the file.
+end at the *end* of the file.
 
 `/arco/fileplay/start id play_flag` - Starts or stops playback
 according to `playflag` (Boolean). Play will pause if necessary to

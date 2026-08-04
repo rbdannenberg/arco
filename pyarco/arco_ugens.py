@@ -231,7 +231,7 @@ class Ugen:
                 params.append(inp.arco_ref())
                 self.inputs[inputs_[i]] = inp  # build inputs dict
                 type_str += "i"
-            else:  # one of "sihdft"
+            else:  # one of "sihdftB"
                 params.append(inp)
                 type_str += types_[i // 3]
         # send "/arco/<classname>/new" message to arco

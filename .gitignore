@@ -121,3 +121,9 @@ x64/
 /pr4-filemerge/
 
 /apps/pytest/arco_server_prefs.json
+
+/apps/pytest/sndtest0.wav
+
+/apps/pytest/sndtest1.wav
+
+/apps/pytest/soundfont.py

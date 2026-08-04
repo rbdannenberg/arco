@@ -16,9 +16,9 @@ from . import sched
 
 class Ugen_action:
     def __init__(self, target, method, parameters):
-        self.target = weakref.ref(target)
-        assert isinstance(method, str), (
-               f"Ugen_action method {method} must be a string.")
+        # actions can invoke functions by passing target=None, so only
+        # construct a weakref if target exists:
+        self.target = weakref.ref(target) if target else None
         self.method = method
         self.parameters = parameters
         # print("Created", self)
@@ -265,13 +265,14 @@ def actl_act_handler(address, types, info):
     i = 0
     while i < len(al.ugen_actions):
         action = al.ugen_actions[i]
-        target = action.target()  # deref weak reference
-        if target:
-            method = action.method
-            getattr(target, method)(status, uid, action.parameters)
-            i = i + 1
+        if action.target is None:  # "method" is a function, no object
+            action.method(status, uid, *action.parameters)
         else:
-            al.ugen_actions.pop(i)
+            target = action.target()  # deref weak reference to object
+            if target:
+                method = action.method
+                getattr(target, method)(status, uid, *action.parameters)
+        i = i + 1
 
     if (status & ACTION_FREE) > 0:
         arco.action_dict.pop(key, None)

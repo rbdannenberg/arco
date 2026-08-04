@@ -6,3 +6,5 @@ sine*
 mult*
 sum
 reson
+flsyn
+fileplay
