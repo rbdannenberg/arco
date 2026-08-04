@@ -407,7 +407,9 @@ class Default_arco_window (Arco_window):
         varname = 'default_window'
         control_map[0] = this
         // in case any handlers are already attached to the old window:
-        contact = default_window.contact
+        contact = nil
+        if isinstance(default_window, Default_arco_window):
+            contact = default_window.contact
 
 
 default_window = Default_arco_window()
