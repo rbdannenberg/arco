@@ -46,6 +46,7 @@ set(CMAKE_OSX_ARCHITECTURES ${CMAKE_SYSTEM_PROCESSOR} CACHE STRING
 			    "only build for local architecture" FORCE)
 
 option(USE_STATIC_LIBS "Build with static libs?" TRUE)
+option(ARCO_CPU_MONITOR "Enable internal CPU monitoring?" TRUE)
 set(USE_O2 TRUE CACHE STRING "Link Serpent with O2 support" FORCE)
 
 set(SOURCES src/arco.cpp src/arco_internal.h
@@ -160,6 +161,9 @@ else()
   add_definitions("-DUSE_MIDI=0") 
 endif() 
 
+if(${ARCO_CPU_MONITOR})
+  add_definitions("-DARCO_CPU_MONITOR=1")
+endif()
 
 apply_common_settings()
 message(STATUS "--------- bottom of server/CMakeLists.txt ---------")

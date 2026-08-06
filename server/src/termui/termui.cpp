@@ -640,7 +640,8 @@ void Terminal_ui::poll(int delay_usec)
         // On Windows, check if data is available without blocking
         HANDLE hPipe = (HANDLE)_get_osfhandle(out_pipe[0]);
         DWORD bytesAvail = 0;
-        if (PeekNamedPipe(hPipe, NULL, 0, NULL, &bytesAvail, NULL) && bytesAvail > 0) {
+        if (PeekNamedPipe(hPipe, NULL, 0, NULL, &bytesAvail, NULL) &&
+            bytesAvail > 0) {
             char buffer[80];
             int n = _read(out_pipe[0], buffer, 79);
             if (n > 0) {

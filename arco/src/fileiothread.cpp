@@ -51,6 +51,7 @@ void *fileio_thread_run(void *data)
 int Fileio_thread::initialize(int per)
 {
     assert(!fileio_thread_created);
+    period = per;
     fileio_thread_created = true;  // no more threads after this!
 #ifdef WIN32
     fileio_thread_id = CreateThread( 

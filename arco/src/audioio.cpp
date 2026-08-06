@@ -1111,6 +1111,7 @@ static int pa_callback(const void *input, void *output,
             result = paComplete;
         }
     } else if (aud_state == FIRST) {
+        pthread_setname_np("arco-audio");
         switch_to_audio_time();
         aud_state = RUNNING;
         AD("aud_state = RUNNING;\n");

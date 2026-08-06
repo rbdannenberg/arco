@@ -81,6 +81,12 @@ MIDI_out: <servicename> <devicename>
 #include <string>
 #include <vector>
 
+#if defined(ARCO_CPU_MONITOR) && defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/thread_info.h>
+#include <pthread.h>
+#endif
+
 // Undefine Windows MOUSE_MOVED before including curses to avoid conflict
 #ifdef MOUSE_MOVED
 #undef MOUSE_MOVED
@@ -116,6 +122,10 @@ using std::vector;
 #include "arco_internal.h"
 
 void dialog_configure();  // forward reference
+
+#if defined(ARCO_CPU_MONITOR)
+static void log_per_thread_cpu_times();
+#endif
 
 // Global singleton with the curses interface manager object:
 Terminal_ui *tu = nullptr;
@@ -166,6 +176,9 @@ static char host_http_root[120] = "";
 const char *help_strings[] = {
     " A - set Audio preferences",
     " B - block count messages ON/OFF",
+#if defined(ARCO_CPU_MONITOR)
+    " C - Toggle CPU monitor",
+#endif
     " H - describe commands like this",
     " P - Save latest selections to preferences",
     " Q - Quit the program",
@@ -182,6 +195,12 @@ vector<string> bottom_lines;
 vector<string> dialog_bottom_lines;
 
 static bool heartbeat_enabled = false;
+
+#if defined(ARCO_CPU_MONITOR)
+static bool cpu_monitor_enabled = false;
+static double cpu_monitor_last_log = 0.0;
+static double cpu_monitor_interval = 5.0; // seconds
+#endif
 
 bool arco_ready = false;
 bool has_curses = false;  // curses interface exists
@@ -543,11 +562,6 @@ static void host_initialize()
 }
 
 
-//bool arco_started = false;
-//bool arco_reset = false;    // helps implement one-time reset. To reset again,
-                            // either a client sends reset, or restart server.
-
-
 /********************* TEST FUNCTIONS *********************/
 
 void test_tone()
@@ -562,6 +576,75 @@ void test_tone()
     o2_send_cmd("/arco/output", 0, "i", 6);
 }
 
+#if defined(ARCO_CPU_MONITOR)
+static void log_per_thread_cpu_times()
+{
+#if defined(__APPLE__)
+    thread_act_array_t thread_list;
+    mach_msg_type_number_t thread_count = 0;
+    kern_return_t kr = task_threads(mach_task_self(), &thread_list,
+                                    &thread_count);
+    if (kr != KERN_SUCCESS) {
+        fprintf(stderr, "task_threads failed: %d\n", kr);
+        return;
+    }
+
+    for (mach_msg_type_number_t i = 0; i < thread_count; i++) {
+        thread_basic_info_data_t info;
+        mach_msg_type_number_t count = THREAD_BASIC_INFO_COUNT;
+        kr = thread_info(thread_list[i], THREAD_BASIC_INFO,
+                         reinterpret_cast<thread_info_t>(&info), &count);
+        if (kr != KERN_SUCCESS) {
+            fprintf(stderr, "thread_info failed for thread %u: %d\n", i, kr);
+            continue;
+        }
+        if ((info.flags & TH_FLAGS_IDLE) == 0) {
+            double cpu_percent = (double) info.cpu_usage * 100.0 / 
+                                 TH_USAGE_SCALE;
+            double user_sec = info.user_time.seconds +
+                              info.user_time.microseconds / 1e6;
+            double sys_sec = info.system_time.seconds +
+                             info.system_time.microseconds / 1e6;
+
+            // Get a unique identifier for the thread
+            thread_identifier_info_data_t idinfo;
+            mach_msg_type_number_t idcount = THREAD_IDENTIFIER_INFO_COUNT;
+            uint64_t mach_tid = 0;
+            if (thread_info(thread_list[i], THREAD_IDENTIFIER_INFO,
+                            reinterpret_cast<thread_info_t>(&idinfo),
+                            &idcount) == KERN_SUCCESS) {
+                mach_tid = idinfo.thread_id;
+            }
+
+            // Try to get a pthread name for this Mach thread
+            char tname[64] = {0};
+            pthread_t pthread = pthread_from_mach_thread_np(thread_list[i]);
+            if (pthread) {
+                pthread_getname_np(pthread, tname, sizeof(tname));
+            }
+            if (tname[0] != '\0') {
+                printf("[CPU] %s (tid %llu): CPU %.2f%%, user %.3fs,"
+                       " system %.3fs\n", tname, (unsigned long long) mach_tid,
+                       cpu_percent, user_sec, sys_sec);
+            } else {
+                printf("[CPU] Thread %llu: CPU %.2f%%, user %.3fs,"
+                       " system %.3fs\n", (unsigned long long) mach_tid, 
+                       cpu_percent, user_sec, sys_sec);
+            }
+        }
+    }
+
+    for (mach_msg_type_number_t i = 0; i < thread_count; i++) {
+        mach_port_deallocate(mach_task_self(), thread_list[i]);
+    }
+    vm_deallocate(mach_task_self(),
+                  reinterpret_cast<vm_address_t>(thread_list),
+                  thread_count * sizeof(thread_act_t));
+#else
+    // Not implemented on this platform
+#endif
+}
+#endif
 
 /********************* USER INTERFACE *********************/
 
@@ -1080,6 +1163,17 @@ void action(int ch, bool is_escape)
         heartbeat_enabled = !heartbeat_enabled;
         o2_send_cmd("/arco/hb", 0, "i", heartbeat_enabled);
         break;
+#if defined(ARCO_CPU_MONITOR)
+      case 'C':  // toggle CPU monitor
+        cpu_monitor_enabled = !cpu_monitor_enabled;
+        if (cpu_monitor_enabled) {
+            cpu_monitor_last_log = o2_local_time();
+            printf("CPU monitor enabled (interval %.1fs).\n", cpu_monitor_interval);
+        } else {
+            printf("CPU monitor disabled.\n");
+        }
+        break;
+#endif
       case 'Q':
         host_quit_audio();
         break;
@@ -1162,6 +1256,9 @@ int main(int argc, char *argv[])
     tu->dialog_escape_keys("\x13\x18\x1b");  // CTRL-S, CTRL-X, ESC
     tu->add_help("A - set Audio preferences");
     tu->add_help("B - block count messages ON/OFF");
+#if defined(ARCO_CPU_MONITOR)
+    tu->add_help("C - Toggle CPU monitor");
+#endif
     tu->add_help("H - describe commands like this");
     tu->add_help("P - Save latest selections to preferences");
     tu->add_help("Q - Quit the program");
@@ -1173,7 +1270,11 @@ int main(int argc, char *argv[])
 
     dialog_bottom_lines.push_back(string("Press ^S to save and exit, ESC to cancel"));
     top_lines.push_back(string("Arco v4"));
+#ifdef ARCO_CPU_MONITOR
+    bottom_lines.push_back(string("(A)Configure (S)tart/Stop (R)eset (C)PU (Q)uit (H)elp"));
+#else
     bottom_lines.push_back(string("(A)Configure (S)tart/Stop (R)eset (Q)uit (H)elp"));
+#endif
 
     tu->fixed_info(&top_lines, &bottom_lines);  // one info line at top, one at bottom
     
@@ -1225,10 +1326,26 @@ int main(int argc, char *argv[])
 
     int running = true;
     int shared_mem_active = true;
+    int poll_count = 0;
+    double start_timing = o2_local_time();
+    pthread_setname_np("arco-server-host");
     while (server_aud_state != FINISHED) {
         tu->poll(1000000 / prefs_polling_rate());  // 2 ms polling period
 #if USE_MIDI
         midi_poll();
+#endif
+#if defined(ARCO_CPU_MONITOR)
+        if (cpu_monitor_enabled) {
+            double now = o2_local_time();
+            if (now - cpu_monitor_last_log >= cpu_monitor_interval) {
+                printf("--- CPU per-thread snapshot ---\n");
+                log_per_thread_cpu_times();
+                printf("est pollling rate (Hz): %g\n",
+                       poll_count / (now - cpu_monitor_last_log));
+                poll_count = 0;
+                cpu_monitor_last_log = now;
+            }
+        }
 #endif
         if (server_goal_state != server_aud_state) {
             // if goal is RUNNNING, either we're IDLE and need to
@@ -1271,16 +1388,8 @@ int main(int argc, char *argv[])
 
         O2err err = o2_poll();
         if (err == O2_INTERRUPT_REQUESTED) {
-            // arco_interrupt_requested = true;
             o2_reset_interrupt_request();
         }
-        /*
-        if (arco_interrupt_requested) {
-            // This may fail the first time so we put it in the polling loop.
-            // It does not do anything once the goal is successfully set:
-            set_server_goal_state(FINISHED, "Waiting to finish and exit.");
-        }
-        */
         arco_thread_poll();
         if (!arco_ready) {
             arco_ready = (o2_status("arco") == O2_BRIDGE);
@@ -1298,8 +1407,7 @@ int main(int argc, char *argv[])
                 o2_send_cmd("/arco/devinf", 0, "s", "/host/devinf");
             }
         }
-        // automation();
-        // o2_sleep(2);
+        poll_count++;
     }
     o2_bridges_finish();
     tu->finish();
