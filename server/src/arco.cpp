@@ -108,8 +108,10 @@ using std::vector;
 
 #include "fieldentry.h"
 #include "termui.h"
-#include "portmidi.h"
-#include "midiservice.h"
+#if USE_MIDI
+  #include "portmidi.h"
+  #include "midiservice.h"
+#endif
 #include "o2oscservice.h"
 #include "arco_internal.h"
 
@@ -741,10 +743,12 @@ static void config_callback(string key, int ch)
         // key "configuration", which sets up a new configuration
         // since the field key is "configuration", the callback
         // (this function) will ignore the 3rd parameter (0).
+#if USE_MIDI
     } else if (key == "midi_in_new") {
         insert_midi_to_o2();
     } else if (key == "midi_out_new") {
         insert_o2_to_midi();
+#endif
     } else if (key == "osc_to_o2_new") {
         insert_osc_to_o2();
     } else if (key == "o2_to_osc_new") {
@@ -757,14 +761,16 @@ static void config_callback(string key, int ch)
             tu->dialog_remove_line(tu->dialog_y);
         }
         tu->dialog_refresh();
+#if USE_MIDI
     } else if (key == "midi_refresh") {
         midi_devices_refresh();
+#endif
     }
 }
 
-
 void create_midi_handlers()
 {
+#if USE_MIDI
     midi_services_finish();  // clean up any existing connections
 
     vector<string> values = current_config->get_values("midi_in");
@@ -786,6 +792,7 @@ void create_midi_handlers()
         }
         midi_output_initialize(contents[0], contents[1].c_str());
     }
+#endif
 }
 
 
@@ -832,7 +839,7 @@ int open_midi_osc_line()
     int y = tu->fields[in_index]->y;  // y is our line
     tu->dialog_insert_line(y);
     if (midi_osc_line_count == 0) {
-        tu->dialog_insert_line(y);  // need some separator lines too
+        tu->field_blank("before_forwarding", y);  // need a separator line
     } else {
         y--;  // place y above blank line above "Input devices:" line
     }
@@ -847,7 +854,9 @@ int dialog_midi_osc_setup(int ln)
     // fields for every midi_in, midi_out, osc_in, osc_out element
     // sort the elements into the above order
 
-    vector<string> values = current_config->get_values("midi_in");
+    vector<string> values;
+#if USE_MIDI
+    values = current_config->get_values("midi_in");
     for (string &value : values) {
         vector<string> contents = Config::string_to_list(value);
         if (contents.size() != 2) {
@@ -868,6 +877,7 @@ int dialog_midi_osc_setup(int ln)
         insert_o2_to_midi_fields(ln++, contents[0], contents[1]);
         midi_osc_line_count++;
     }
+#endif
 
     values = current_config->get_values("osc_in");
     for (string &value : values) {
@@ -920,7 +930,8 @@ void dialog_configure()
     tu->field_string("New Configuration:", "name", "", 0, ln, 18, 26);
     tu->field_button("Copy This:", "config_save", 49, ln, 10, 1);
     tu->field_button("New", "config_new", 63, ln++, 3, 1);
-    ln++;
+    tu->field_blank("after_config_new", ln++);
+
     tu->field_string("Ensemble name:", "ensemble",
                      current_config->get_string_value("ensemble"),
                      0, ln, 18, 32);
@@ -959,13 +970,15 @@ void dialog_configure()
                      0, ln, 22, 1);
     tu->field_button("New forward OSC to O2:", "osc_to_o2_new",
                      32, ln++, 22, 1);
+#if USE_MIDI
     tu->field_button("New MIDI In to O2:", "midi_in_new",
                      0, ln, 18, 1);
     tu->field_button("New MIDI Out from O2:", "midi_out_new",
                      25, ln, 21, 1);
     tu->field_button("MIDI Refresh:", "midi_refresh",
                      54, ln++, 13, 1);
-    ln++;  // separator line
+#endif
+    tu->field_blank("after_server_prefs", ln++);
 
     // are there midi/osc in/out lines to configure?
     ln = dialog_midi_osc_setup(ln);
@@ -1214,7 +1227,9 @@ int main(int argc, char *argv[])
     int shared_mem_active = true;
     while (server_aud_state != FINISHED) {
         tu->poll(1000000 / prefs_polling_rate());  // 2 ms polling period
+#if USE_MIDI
         midi_poll();
+#endif
         if (server_goal_state != server_aud_state) {
             // if goal is RUNNNING, either we're IDLE and need to
             // start, or we've started, state is STARTING, and action pending

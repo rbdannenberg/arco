@@ -1,7 +1,7 @@
 from . import sched  # for globals and more
 from .sched import rtsched, vtsched, absolute, real_delay
 from typing import Optional
-from o2lite import o2lite
+from o2litepy import o2lite
 
 
 ZERO_ID = 0  # a single-channel audio source of zero (silence)

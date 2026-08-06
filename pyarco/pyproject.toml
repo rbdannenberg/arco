@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyarco"
+version = "0.1.0"
+description = "Python client-side interface for Arco"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "o2litepy",
+]
+
+[tool.setuptools]
+packages = ["pyarco", "pyarco.ugens"]
+
+[tool.setuptools.package-dir]
+pyarco = "."
+"pyarco.ugens" = "ugens"

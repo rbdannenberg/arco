@@ -85,6 +85,7 @@ class Terminal_ui {
                      int x, int y, int w1, int w2);
     int field_menu(string label, string key, string init,
                    int x, int y, int w1, int w2, vector<string> &options);
+    int field_blank(string key, int y);
     void set_menu_options(string key, vector<string> &options, int n);
     void dialog_escape_keys(string keys);
     void set_field_callback(field_callback_t callback);

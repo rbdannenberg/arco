@@ -21,12 +21,12 @@ class Sum(Ugen):
                          'wrap', 1 if wrap else 0, "i")
         arco.register_action(self, ACTION_REM, self, "action_rem")
 
-    def action_rem(self, status, uid, parameters):
+    def action_rem(self, status, uid):
         # find input with uid if any -- similar to mix but inputs
         # directly map to ugens:
-        # print(f"Sum.action_rem: status {status}, uid {uid}, "
-        #       f"parameters {parameters}")
-        # print(f"  refcnt for {self.inputs[uid]} is {sys.getrefcount(self.inputs[uid])}")
+        # print(f"Sum.action_rem: status {status}, uid {uid}")
+        # print(f"  refcnt for {self.inputs[uid]} is",
+        #       f"{sys.getrefcount(self.inputs[uid])}")
         self.inputs.pop(uid, None)
         # print("After action_rem, inputs are", self.inputs)
     
@@ -68,16 +68,15 @@ def sum(chans=1, wrap=True):
 class Sumb(Ugen):
 
     def __init__(self, chans, wrap, id_num=None):
-        super().__init__(self, new_ugen_id(id_num), "Sumb", chans,
+        super().__init__(new_ugen_id(id_num), "Sumb", chans,
                           B_RATE, "i", None, None,
                          'wrap', 1 if wrap else 0, "i")
         arco.register_action(self, ACTION_REM, self, "action_rem")
 
-    def action_rem(self, status, uid, parameters):
+    def action_rem(self, status, uid):
         # find input with uid if any -- similar to mix but inputs
         # directly map to ugens:
-        # print(f"Sumb.action_rem: status {status}, uid {uid}, "
-        #       f"parameters {parameters}")
+        # print(f"Sumb.action_rem: status {status}, uid {uid})
         self.inputs.pop(uid, None)
 
     def ins(self, *ugens):

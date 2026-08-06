@@ -194,11 +194,11 @@ class OnsetDetectionFunction(object):
 
     def smooth_type_string(self):
         if self.smooth_type == self.SMOOTH_MOVING_AVERAGE:
-            'moving_average'
+            return 'moving_average'
         elif self.smooth_type == self.SMOOTH_SAVITZKY_GOLAY:
-            'savitzky_golay'
+            return 'savitzky_golay'
         elif self.smooth_type == self.SMOOTH_LPF:
-            'lpf'
+            return 'lpf'
         elif self.smooth_type == self.SMOOTH_NONE:
             return 'none'
         else:
@@ -207,7 +207,7 @@ class OnsetDetectionFunction(object):
 
 class EnergyODF(OnsetDetectionFunction):
     def __init__(self):
-        OnsetDetectionFunction.__init__(self)
+        super().__init__()
         self.prev_energy = 0.0
 
     def process_frame(self, frame):
@@ -221,7 +221,7 @@ class EnergyODF(OnsetDetectionFunction):
 
 class SpectralDifferenceODF(OnsetDetectionFunction):
     def __init__(self):
-        OnsetDetectionFunction.__init__(self)
+        super().__init__()
         self.window = np.hanning(self.frame_size)
         self.num_bins = (self.frame_size / 2) + 1
         self.prev_amps = np.zeros(self.num_bins)
@@ -248,7 +248,7 @@ class SpectralDifferenceODF(OnsetDetectionFunction):
 
 class ComplexODF(OnsetDetectionFunction):
     def __init__(self):
-        OnsetDetectionFunction.__init__(self)
+        super().__init__()
         self.window = np.hanning(self.frame_size)
         self.num_bins = (self.frame_size / 2) + 1
         self.prev_mags = np.zeros(self.num_bins)
@@ -300,7 +300,7 @@ class LinearPredictionODF(OnsetDetectionFunction):
     BURG = 1
 
     def __init__(self):
-        OnsetDetectionFunction.__init__(self)
+        super().__init__()
         self._order = 5
         self.method = self.BURG
 
@@ -331,7 +331,7 @@ class LinearPredictionODF(OnsetDetectionFunction):
 
 class LPEnergyODF(LinearPredictionODF):
     def __init__(self):
-        LinearPredictionODF.__init__(self)
+        super().__init__()
         self.prev_values = np.zeros(self.order)
 
     def process_frame(self, frame):
@@ -345,7 +345,7 @@ class LPEnergyODF(LinearPredictionODF):
 
 class LPSpectralDifferenceODF(LinearPredictionODF):
     def __init__(self):
-        LinearPredictionODF.__init__(self)
+        super().__init__()
         self.window = np.hanning(self.frame_size)
         self.num_bins = (self.frame_size / 2) + 1
         self.prev_amps = np.zeros((self.order + 1, self.num_bins))
@@ -375,7 +375,7 @@ class LPSpectralDifferenceODF(LinearPredictionODF):
 
 class LPComplexODF(LinearPredictionODF):
     def __init__(self):
-        LinearPredictionODF.__init__(self)
+        super().__init__()
         self.window = np.hanning(self.frame_size)
         self.num_bins = (self.frame_size / 2) + 1
         self.prev_frame = np.zeros(self.num_bins, dtype=np.complex)
@@ -409,7 +409,7 @@ class LPComplexODF(LinearPredictionODF):
 
 class PeakODF(OnsetDetectionFunction):
     def __init__(self):
-        OnsetDetectionFunction.__init__(self)
+        super().__init__()
         self._max_peaks = 10
         self.pd = mq.MQPeakDetection(self._max_peaks, self._sampling_rate,
                                      self._frame_size)
@@ -459,7 +459,7 @@ class PeakODF(OnsetDetectionFunction):
 
 class PeakAmpDifferenceODF(PeakODF):
     def __init__(self):
-        PeakODF.__init__(self)
+        super().__init__()
 
     def get_distance(self, peak1, peak2):
         if not peak2:
@@ -478,7 +478,7 @@ class PeakAmpDifferenceODF(PeakODF):
 
 class PeakFreqDifferenceODF(PeakODF):
     def __init__(self):
-        PeakODF.__init__(self)
+        super().__init__()
 
     def get_distance(self, peak1, peak2):
         if not peak2:
@@ -489,7 +489,7 @@ class PeakFreqDifferenceODF(PeakODF):
 
 class PeakDifferenceODF(PeakODF):
     def __init__(self):
-        PeakODF.__init__(self)
+        super().__init__()
 
     def get_distance(self, peak1, peak2):
         if not peak2:
@@ -501,7 +501,7 @@ class PeakDifferenceODF(PeakODF):
 
 class UnmatchedPeaksODF(PeakODF):
     def __init__(self):
-        PeakODF.__init__(self)
+        super().__init__()
 
     def get_distance(self, peak1, peak2):
         if not peak2:

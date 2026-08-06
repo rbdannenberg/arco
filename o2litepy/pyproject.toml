@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "o2litepy"
+version = "0.1.0"
+description = "Python O2lite implementation"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "netifaces",
+    "zeroconf",
+]
+
+[tool.setuptools]
+packages = ["o2litepy"]
+
+[tool.setuptools.package-dir]
+o2litepy = "."

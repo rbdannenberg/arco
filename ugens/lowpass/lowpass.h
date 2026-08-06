@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "lowpass"
-Code generated with Faust 2.85.9 (https://faust.grame.fr)
-Compilation options: -lang cpp -fpga-mem-th 4 -light -ct 1 -cn Lowpass -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Lowpass -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Lowpass_H__
@@ -66,7 +66,7 @@ public:
         cutoff = cutoff_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
-        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, static_cast<float>(AR)));
+        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_input(input);
         init_cutoff(cutoff);
         run_channel = (void (Lowpass::*)(Lowpass_state *)) 0;
@@ -148,32 +148,32 @@ public:
 
     void init_cutoff(Ugen_ptr ugen) { init_param(ugen, cutoff, &cutoff_stride); }
 
-    void chan_aa_a(Lowpass_state *state) {
+    void chan_ab_a(Lowpass_state *state) {
         FAUSTFLOAT* input0 = input_samps;
-        FAUSTFLOAT* input1 = cutoff_samps;
         FAUSTFLOAT* output0 = out_samps;
+        float fSlow0 = 1.0f / std::tan(fConst0 * float(cutoff_samps[0]));
+        float fSlow1 = 1.0f / (fSlow0 + 1.0f);
+        float fSlow2 = 1.0f - fSlow0;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
-            float fTemp0 = 1.0f / std::tan(fConst0 * static_cast<float>(input1[i0]));
-            float fTemp1 = static_cast<float>(input0[i0]);
-            state->fVec0[0] = fTemp1;
-            state->fRec0[0] = -((state->fRec0[1] * (1.0f - fTemp0) - (fTemp1 + state->fVec0[1])) / (fTemp0 + 1.0f));
-            output0[i0] = static_cast<FAUSTFLOAT>(state->fRec0[0]);
+            float fTemp0 = float(input0[i0]);
+            state->fVec0[0] = fTemp0;
+            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1])));
+            output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
         }
     }
 
-    void chan_ab_a(Lowpass_state *state) {
+    void chan_aa_a(Lowpass_state *state) {
         FAUSTFLOAT* input0 = input_samps;
+        FAUSTFLOAT* input1 = cutoff_samps;
         FAUSTFLOAT* output0 = out_samps;
-        float fSlow0 = 1.0f / std::tan(fConst0 * static_cast<float>(cutoff_samps[0]));
-        float fSlow1 = 1.0f - fSlow0;
-        float fSlow2 = 1.0f / (fSlow0 + 1.0f);
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
-            float fTemp0 = static_cast<float>(input0[i0]);
-            state->fVec0[0] = fTemp0;
-            state->fRec0[0] = -(fSlow2 * (fSlow1 * state->fRec0[1] - (fTemp0 + state->fVec0[1])));
-            output0[i0] = static_cast<FAUSTFLOAT>(state->fRec0[0]);
+            float fTemp0 = 1.0f / std::tan(fConst0 * float(input1[i0]));
+            float fTemp1 = float(input0[i0]);
+            state->fVec0[0] = fTemp1;
+            state->fRec0[0] = -((state->fRec0[1] * (1.0f - fTemp0) - (fTemp1 + state->fVec0[1])) / (fTemp0 + 1.0f));
+            output0[i0] = FAUSTFLOAT(state->fRec0[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
         }

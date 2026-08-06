@@ -42,8 +42,10 @@
 #include "fieldentry.h"
 #include "termui.h"
 #include "arco_internal.h"
-#include "portmidi.h"
-#include "midiservice.h"
+#if USE_MIDI
+  #include "portmidi.h"
+  #include "midiservice.h"
+#endif
 #include "o2oscservice.h"
 
 /* these are the preferences */
@@ -256,6 +258,7 @@ void prefs_to_config()
         values.push_back(out_info.is_tcp ? "T" : "F");
         current_config->add("osc_out", Config::list_to_string(values));
     }
+#if USE_MIDI
     for (Midi_io_info &in_info : from_midi_input) {
         vector<string> values;
         values.push_back(in_info.device_name);
@@ -268,6 +271,7 @@ void prefs_to_config()
         values.push_back(out_info.device_name);
         current_config->add("midi_out", Config::list_to_string(values));
     }
+#endif
 }
 
 

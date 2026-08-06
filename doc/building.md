@@ -46,10 +46,24 @@ You need:
   - Glib 2.0, e.g. you can install with Homebrew or package managers
     on Linux. See `libraries.txt` below, which must be configured to
     reference your Glib library file.) You need to define GLIB_OPT_LIB
-    and GLIB_DBG_LIB in `libraries.txt` (see below).
+    and GLIB_DBG_LIB in `libraries.txt` (see below).  These can be 
+    "ignore" if you do not need to link them.
   - `intl`, e.g. you can install with Homebrew or package managers
     on Linux (and it may come with Glib 2.0). You need to define
     INTL_OPT_LIB and INTL_DBG_LIB in `libraries.txt` (see below).
+    These can be "ignore" if you do not need to link them.
+  - When I build FluidSynth on MacOS, the libraries above are 
+    sufficient, but apparently it can be built to depend on libiconv,
+    so `libraries.txt` must define ICONV_DBG_LIB and ICONV_OPT_LIB.
+    Set these to "ignore" if your fluidsynth library does not need
+    you to link them.
+- MIDI is supported by default in Arco Server programs (executables
+  that use a terminal and curses interface to act as an O2 host
+  communicating with an embedded Arco library). Unless you set the
+  CMake USE_MIDI option to FALSE, you need PortMidi
+  [build from github sources](https://github.com/PortMidi/portmidi),
+  and you need to set PM_INCL, PM_OPT_LIB, and PM_DBG_LIB in
+  `libraries.txt` (see below).
 
 ## Defining a New Ugen Using FAUST
 Arco implements an automated toolchain allowing unit generators to

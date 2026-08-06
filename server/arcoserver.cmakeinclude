@@ -48,13 +48,15 @@ set(CMAKE_OSX_ARCHITECTURES ${CMAKE_SYSTEM_PROCESSOR} CACHE STRING
 option(USE_STATIC_LIBS "Build with static libs?" TRUE)
 set(USE_O2 TRUE CACHE STRING "Link Serpent with O2 support" FORCE)
 
-SET(SOURCES src/arco.cpp src/arco_internal.h
+set(SOURCES src/arco.cpp src/arco_internal.h
             src/termui/termui.cpp src/termui/termui.h
             src/termui/fieldentry.cpp src/termui/fieldentry.h
             src/prefs.cpp src/prefs.h
-            src/midiservice.cpp src/midiservice.h
             src/o2oscservice.cpp src/o2oscservice.h
             src/config.h)
+if(USE_MIDI)
+  set(SOURCES ${SOURCES} src/midiservice.cpp src/midiservice.h)
+endif(USE_MIDI)
  
 list(TRANSFORM SOURCES PREPEND "${CMAKE_CURRENT_LIST_DIR}/")
 add_executable(${ARCO_SERVER_NAME} ${SOURCES}) 
@@ -153,6 +155,7 @@ if(USE_MIDI)
   elseif(UNIX) 
     target_link_libraries(${ARCO_SERVER_NAME} PUBLIC -lasound ${PTHREAD_LIB}) 
   endif() 
+  add_definitions("-DUSE_MIDI=1")
 else() 
   add_definitions("-DUSE_MIDI=0") 
 endif() 

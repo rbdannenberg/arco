@@ -95,6 +95,11 @@ Field_entry::Field_entry(string label_, string key_, string init, double min_,
 void Field_entry::show_content(Terminal_ui *tu)
 {
     move(y, x);
+    if (is_blank()) {
+        move(y, 0);  // make sure we clear from col 0
+        clrtoeol();
+        return;  // ignore other fields
+    }
     addstr(label.c_str());
     // pad with blanks after label to field's start x:
     for (int i = (int) label.size(); i < w1 + 1; i++) {

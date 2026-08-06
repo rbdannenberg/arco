@@ -7,8 +7,8 @@
 
 /* ------------------------------------------------------------
 name: "sttest"
-Code generated with Faust 2.85.9 (https://faust.grame.fr)
-Compilation options: -lang cpp -fpga-mem-th 4 -light -ct 1 -cn Sttest -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
+Code generated with Faust 2.75.7 (https://faust.grame.fr)
+Compilation options: -lang cpp -light -ct 1 -cn Sttest -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0
 ------------------------------------------------------------ */
 
 #ifndef  __Sttest_H__
@@ -44,11 +44,11 @@ extern const char *Sttest_name;
 class Sttest : public Ugen {
 public:
     struct Sttest_state {
-        float fVec0[2];
         FAUSTFLOAT fEntry0;
+        float fVec0[2];
         float fRec0[2];
-        float fVec1[2];
         FAUSTFLOAT fEntry1;
+        float fVec1[2];
         float fRec1[2];
     };
     Vec<Sttest_state> states;
@@ -69,7 +69,7 @@ public:
         hz2 = hz2_;
         flags = CAN_TERMINATE;
         states.set_size(chans);
-        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, static_cast<float>(AR)));
+        fConst0 = 3.1415927f / std::min<float>(1.92e+05f, std::max<float>(1.0f, float(AR)));
         init_input(input);
         run_channel = (void (Sttest::*)(Sttest_state *)) 0;
         update_run_channel();
@@ -139,21 +139,21 @@ public:
         FAUSTFLOAT* input1 = input_samps + input_stride;
         FAUSTFLOAT* output0 = out_samps;
         FAUSTFLOAT* output1 = out_samps + BL;
-        float fSlow0 = 1.0f / std::tan(fConst0 * static_cast<float>(hz1));
-        float fSlow1 = 1.0f - fSlow0;
-        float fSlow2 = 1.0f / (fSlow0 + 1.0f);
-        float fSlow3 = 1.0f / std::tan(fConst0 * static_cast<float>(hz2));
-        float fSlow4 = 1.0f - fSlow3;
-        float fSlow5 = 1.0f / (fSlow3 + 1.0f);
+        float fSlow0 = 1.0f / std::tan(fConst0 * float(hz1));
+        float fSlow1 = 1.0f / (fSlow0 + 1.0f);
+        float fSlow2 = 1.0f - fSlow0;
+        float fSlow3 = 1.0f / std::tan(fConst0 * float(hz2));
+        float fSlow4 = 1.0f / (fSlow3 + 1.0f);
+        float fSlow5 = 1.0f - fSlow3;
         for (int i0 = 0; i0 < BL; i0 = i0 + 1) {
-            float fTemp0 = static_cast<float>(input0[i0]);
+            float fTemp0 = float(input0[i0]);
             state->fVec0[0] = fTemp0;
-            state->fRec0[0] = -(fSlow2 * (fSlow1 * state->fRec0[1] - (fTemp0 + state->fVec0[1])));
-            output0[i0] = static_cast<FAUSTFLOAT>(state->fRec0[0]);
-            float fTemp1 = static_cast<float>(input1[i0]);
+            state->fRec0[0] = -(fSlow1 * (fSlow2 * state->fRec0[1] - (fTemp0 + state->fVec0[1])));
+            output0[i0] = FAUSTFLOAT(state->fRec0[0]);
+            float fTemp1 = float(input1[i0]);
             state->fVec1[0] = fTemp1;
-            state->fRec1[0] = -(fSlow5 * (fSlow4 * state->fRec1[1] - (fTemp1 + state->fVec1[1])));
-            output1[i0] = static_cast<FAUSTFLOAT>(state->fRec1[0]);
+            state->fRec1[0] = -(fSlow4 * (fSlow5 * state->fRec1[1] - (fTemp1 + state->fVec1[1])));
+            output1[i0] = FAUSTFLOAT(state->fRec1[0]);
             state->fVec0[1] = state->fVec0[0];
             state->fRec0[1] = state->fRec0[0];
             state->fVec1[1] = state->fVec1[0];

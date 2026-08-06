@@ -519,7 +519,6 @@ def make_inclfile(arco_path, manifest, outf):
         print("target_link_libraries(arcolib PRIVATE", file=outf)
         print("    debug ${FLSYN_DBG_LIB} optimized ${FLSYN_OPT_LIB})",
               file=outf)
-
         print('if(NOT (GLIB_DBG_LIB STREQUAL "ignore"))', file=outf)
         print('  if(NOT EXISTS "${GLIB_DBG_LIB}")', file=outf)
         print('    message(FATAL_ERROR "Could not find ${GLIB_DBG_LIB},',
@@ -537,20 +536,34 @@ def make_inclfile(arco_path, manifest, outf):
         print('if(NOT (INTL_DBG_LIB STREQUAL "ignore"))', file=outf)
         print('  if(NOT EXISTS "${INTL_DBG_LIB}")', file=outf)
         print('    message(FATAL_ERROR "Could not find ${INTL_DBG_LIB},',
-              'fix the definition in apps/common/libraries.txt")', file=outf)
+              'fix the definition in apps/common/libraries.txt,', 
+              'set the value to \\"ignore\\" to omit the library.")', file=outf)
         print("  endif()", file=outf)
         print('  if(NOT EXISTS "${INTL_OPT_LIB}")', file=outf)
         print('    message(FATAL_ERROR "Could not find ${INTL_OPT_LIB},',
-              'fix the definition in apps/common/libraries.txt")', file=outf)
+              'fix the definition in apps/common/libraries.txt,',
+              'set the value to \\"ignore\\" to omit the library.")', file=outf)
         print("  endif()", file=outf)
         print("  target_link_libraries(arcolib PRIVATE", file=outf)
         print("      debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
               file=outf)
         print("endif()", file=outf)
 
-#        print("target_link_libraries(arcolib PRIVATE", file=outf)
-#        print("    debug ${INTL_DBG_LIB} optimized ${INTL_OPT_LIB})",
-#              file=outf)
+        print('if(NOT (ICONV_DBG_LIB STREQUAL "ignore"))', file=outf)
+        print('  if(NOT EXISTS "${ICONV_DBG_LIB}")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${ICONV_DBG_LIB},',
+              'fix the definition in apps/common/libraries.txt,', 
+              'set the value to \\"ignore\\" to omit the library.")', file=outf)
+        print("  endif()", file=outf)
+        print('  if(NOT EXISTS "${ICONV_OPT_LIB}")', file=outf)
+        print('    message(FATAL_ERROR "Could not find ${ICONV_OPT_LIB},',
+              'fix the definition in apps/common/libraries.txt,',
+              'set the value to \\"ignore\\" to omit the library.")', file=outf)
+        print("  endif()", file=outf)
+        print("  target_link_libraries(arcolib PRIVATE", file=outf)
+        print("    debug ${ICONV_DBG_LIB} optimized ${ICONV_OPT_LIB})",
+              file=outf)
+        print("endif()", file=outf)
 
         # On windows, we build fluidsynth from sources and do not use/enable
         # readline library. On non-windows, I think we use an installer or

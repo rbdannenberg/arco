@@ -11,9 +11,10 @@ class Terminal_ui;
 #define FIELD_INT 2
 #define FIELD_DOUBLE 3
 #define FIELD_BUTTON 4  /* display _ and call do_command() if x,X,y,Y typed */
-#define FIELD_BOOL 5  /* T/F field */
-#define FIELD_IP 6  /* display looks like ___.___.___.___ */
-#define FIELD_MENU 7  /* list of selections */
+#define FIELD_BOOL 5    /* T/F field */
+#define FIELD_IP 6      /* display looks like ___.___.___.___ */
+#define FIELD_MENU 7    /* list of selections */
+#define FIELD_BLANK 8   /* entire blank line */
 
 char *itos(int i);
 
@@ -44,6 +45,7 @@ class Field_entry {
     bool is_button() { return field_type == FIELD_BUTTON; }
     bool is_ip() { return field_type == FIELD_IP; }
     bool is_bool() { return field_type == FIELD_BOOL; }
+    bool is_blank() { return field_type == FIELD_BLANK; }
 
     // set the field to be an option menu using list of options_, which
     // is an array of pointers to strings followed by a NULL pointer.

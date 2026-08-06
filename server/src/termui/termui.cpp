@@ -317,6 +317,14 @@ int Terminal_ui::field_menu(string label, string key, string init,
 }
 
 
+int Terminal_ui::field_blank(string key, int y)
+{
+    fields.push_back(new Field_entry("", key, "", 0, 0,
+                                     0, y , 0, 0, FIELD_BLANK));
+    return (int) fields.size() - 1;
+}
+
+
 void Terminal_ui::set_menu_options(string key, vector<string> &options, int n)
 {
     int i = find_field(key);
@@ -362,24 +370,6 @@ void Terminal_ui::dialog_refresh()
     for (Field_entry *fd : fields) {
         fd->show_content(this);
     }
-    
-    // clear blank lines too: first do line after New Configuration
-    int i = find_field("name");
-    int y = fields[i]->y + 1;
-    move(y, 0);
-    clrtoeol();
-    
-    // do line below New MIDI In to O2:
-    i = find_field("midi_in_new");
-    y = fields[i]->y + 1;
-    move(y, 0);
-    clrtoeol();
-    
-    // do line above Input device:
-    i = find_field("arco_in_id");
-    y = fields[i]->y - 1;
-    move(y, 0);
-    clrtoeol();
 }
 
 
