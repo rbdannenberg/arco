@@ -32,10 +32,12 @@ class Py3discovery (O2lite_disc):
             print(f"Service removed: {name}")
 
     def handle_new_service(self, info):
-        add = info.addresses
-        server_ip = socket.inet_ntoa(info.addresses[0])
         if _verbose:
             print("handle_new_service", info)
+        if not info.name.startswith(self.ensemble):
+            return
+        add = info.addresses
+        server_ip = socket.inet_ntoa(info.addresses[0])
         tcp_port = info.port
 
         txt_records = info.properties

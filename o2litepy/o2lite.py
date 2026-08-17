@@ -399,6 +399,7 @@ class O2lite:
         if self._out_msg_tcp_flag:
             if self._tcp_socket is None:
                 print("O2lite error: cannot send, no tcp socket")
+                assert False, "cannot send"
             else:
                 bytes_sent = self._tcp_socket.send(
                              self._outbuf[ : self._out_msg_cnt])
@@ -964,8 +965,10 @@ class O2lite:
             if "g" in self.debug_flags:
                 print(f"O2lite: connected to {ip} on port {port}.")
         except OSError as e:
-            print(f"O2lite: connection failed: {e}.")
+            if "g" in self.debug_flags:
+                print(f"O2lite: connection failed: {e}.")
             self.tcp_close()
+            return
 
         self.send_cmd("!_o2/o2lite/con", 0, "si", self.internal_ip,
                       self._udp_recv_port)
