@@ -57,6 +57,7 @@ brew install libogg
 brew install flac
 brew install libvorbis
 brew install opus
+brew install glib
 # libintl is installed by gettext:
 brew install gettext
 
@@ -152,17 +153,20 @@ then
   echo "===== made Debug ===="
   rm src/fluidsynth
 
- # install soundfont
-  mkdir -p FluidR3_GM
-  curl -L "https://archive.org/download/fluidr3-gm-gs/FluidR3_GM_GS.sf2" > \
-       FluidR3_GM/FluidR3_GM_GS.sf2
-  cd FluidR3_GM
-  # make soundfont.srp file loaded by daserpent in apps/test/init.srp:
-  echo "SOUNDFONT = \"$PWD/FluidR3_GM_GS.sf2\"" > \
-       ../../arco/apps/test/soundfont.srp
   popd
   echo "# After making fluidsynth, arco/build_everything_cmd.sh in $PWD"
 fi
+# install soundfont and write soundfont.srp (loaded by daserpent in
+# apps/test/init.srp). This is outside the fluidsynth block so both are
+# restored on a re-run even when fluidsynth is already built.
+if [ ! -e fluidsynth/FluidR3_GM/FluidR3_GM_GS.sf2 ]
+then
+  mkdir -p fluidsynth/FluidR3_GM
+  curl -L "https://archive.org/download/fluidr3-gm-gs/FluidR3_GM_GS.sf2" > \
+       fluidsynth/FluidR3_GM/FluidR3_GM_GS.sf2
+fi
+echo "SOUNDFONT = \"$PWD/fluidsynth/FluidR3_GM/FluidR3_GM_GS.sf2\"" > \
+     arco/apps/test/soundfont.srp
 # currently we are in build
 # install PortAudio, but only if it is not there already
 # try to use homebrew, then install from sources
@@ -405,6 +409,9 @@ sed "s|CMAKE_OSX_DEPLOYMENT_TARGET \"\"|CMAKE_OSX_DEPLOYMENT_TARGET \"$OSX_VER\"
     > tmplib2.txt
 mv tmplib2.txt libraries.txt
 rm tmplib1.txt
+# point iconv at this machine's macOS SDK (see comment in libraries-example.txt)
+SDK_PATH=$(xcrun --show-sdk-path)
+sed -i '' "s|/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk|$SDK_PATH|g" libraries.txt
 popd
 echo "# After arco/apps/common/libraries.txt is built, $PWD"
 
