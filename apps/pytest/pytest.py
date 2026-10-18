@@ -5,13 +5,13 @@
 
 import random
 import re
-from arco_engine import arco, async_terminal_input
-from pan import stereoize
-from steps import *
+from pyarco.arco_engine import arco, async_terminal_input
+from pyarco.pan import stereoize
+from pyarco.steps import *
 from allugens import *
-from arco_instr import *
-import sched
-from sched import rtsched, vtsched, absolute, real_delay
+from pyarco.arco_instr import *
+from pyarco import sched
+from pyarco.sched import rtsched, vtsched, absolute, real_delay
 
 # call arco_init(ensemble) to start
 # call arco_run() after setting up UI and or scheduling things
@@ -134,6 +134,9 @@ def atone_start(keychar):
 
 def atone_stop(keychar):
     global atone
+    if atone is None:  # nothing playing, e.g. 'd' pressed twice
+        print("No Atone is playing; press c to start one.")
+        return
     atone.mute()
     atone = None
 

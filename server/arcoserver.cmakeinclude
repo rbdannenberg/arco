@@ -49,6 +49,9 @@ option(USE_STATIC_LIBS "Build with static libs?" TRUE)
 option(ARCO_CPU_MONITOR "Enable internal CPU monitoring?" TRUE)
 set(USE_O2 TRUE CACHE STRING "Link Serpent with O2 support" FORCE)
 
+# USE_MIDI must be declared before it is used to select sources below
+option(USE_MIDI "Enable midi message I/O" TRUE)
+
 set(SOURCES src/arco.cpp src/arco_internal.h
             src/termui/termui.cpp src/termui/termui.h
             src/termui/fieldentry.cpp src/termui/fieldentry.h
@@ -141,7 +144,7 @@ if(UNIX AND NOT APPLE)  # linux
 endif()
 
 # ------- MIDI I/O Option -----------
-option(USE_MIDI "Enable midi message I/O" TRUE) 
+# (the USE_MIDI option itself is declared near the top of this file)
 
 if(USE_MIDI) 
   append_to_global(ALL_INCLUDE_DIRECTORIES "${PM_INCL}") 

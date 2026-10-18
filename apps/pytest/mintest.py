@@ -1,7 +1,7 @@
 """mintest.py - a minimal example now that PyArco implementation has settled down.
 
-Run with "PYTHON_PATH=../.. python3 mintest.py" in this directory. You need pyarco
-and o2lite to be subdirectories of the PYTHON_PATH.
+Run with "PYTHONPATH=../.. python3 mintest.py" in this directory. You need pyarco
+and o2litepy to be subdirectories of the PYTHONPATH.
 You also need to run server built using CMakeLists.txt in this directory.
 
 """

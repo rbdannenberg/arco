@@ -4,7 +4,9 @@
 
 ## Contents
 
-- [Quick Install and Test](quick-install-and-test) - fully automated complete build for MacOS
+- [Step-by-Step Install and Test](#step-by-step-install-and-test-macos) - complete build for MacOS, with timings and checks
+- [Troubleshooting on MacOS](#troubleshooting-on-macos) - common failures and what they mean
+- [Getting Started with Arco from Python](python-getting-started.md) - run the Arco server and control it from Python
 - [Dependencies](#dependencies) - what software does Arco depend on?
 - [General Installation Information](general-installation-information)
 - [Installation on MacOS](#installation-on-macos)
@@ -39,56 +41,113 @@ the same so that Arco CMake files can find them.
 
 ## Installation on MacOS
 
-### Quick Install and Test
+### Step-by-Step Install and Test (MacOS)
 
-The zip file `arco_src_for_build_everything_cmd.zip` contains code and a script
-that can be used to compile Arco and the daserpent test program as follows:
+This walkthrough builds everything from current sources and ends with the
+`daserpent` test program playing a tone. Expect 2-3 hours total, most of it
+one long unattended compile, and about 20 GB of free disk space. It was
+written from repeated clean-machine installs on Apple Silicon with a current
+Xcode.
 
- 1. create an empty build directory, e.g.
-    `cd; mkdir build`
- 2. move arco_src_for_build_everything_cmd.zip to build directory, e.g.
-    `mv Downloads/arco_src_for_build_everything_cmd.zip build`
- 3. unzip the file, e.g.
-    `cd build; unzip arco_src_for_build_everything_cmd.zip`
- 4. execute build_everything_cmd.sh in arco, e.g.
-    `cd arco; ./build_everything_cmd.sh`
+Step 0: prerequisites. Run each in Terminal; skip what you already have:
 
-The build_everything_cmd.sh file, in building and installing serpent,
-will offer options to configure your system to run serpent. See
-`serpent/make_src_for_build_everything_cmd.sh` for details.
+ 1. Xcode command line tools (skip if `xcode-select -p` prints a path):
+    `xcode-select --install`
+ 2. Homebrew, if `brew --version` fails: see https://brew.sh
+ 3. Build tools (macOS no longer ships svn):
+    `brew install cmake subversion git`
+ 4. Libraries:
+    `brew install libogg flac libvorbis opus glib gettext`
+    (the Arco build script also installs these, but installing them first
+    is harmless and makes Step 2 faster)
 
-The script will build *only* the test program `arco/apps/test/daserpent.app`.
-Follow the instructions printed by `build_everything_cmd.sh` to run the
-`daserpent` test program.
+Any recent CMake works.
 
-If you want to work on Arco implementation, you will want to clone the
-Arco repository so that you can update your sources with the latest
-changes and push your changes to the main shared repository. This
-*Quick Install and Test* gets sources from a zip file, so you should
-follow the next section.
+Step 1: build Serpent (this also builds portmidi, wxWidgets, and o2):
 
-### Automated Install From a Clone of the Git Repository
-Using sources managed by git is similar to the *Quick Install and Test*
-described in the previous section:
+    mkdir ~/build && cd ~/build
+    svn checkout https://svn.code.sf.net/p/serpent/code/trunk serpent
+    cd serpent
+    ./build_everything_cmd.sh
 
- 1. create an empty build directory, e.g.
-    `cd; mkdir build`
- 2. change to the build directory:
-    `cd build`
- 2. get sources into a directory `build/arco`:
-    `git clone git@github.com:rbdannenberg/arco.git`
- 4. execute build_everything_cmd.sh in arco, e.g.
-    `cd arco; ./build_everything_cmd.sh`
+(Alternative: the `serpent_src_for_build_everything_cmd.zip` source bundle
+from the SourceForge Files section, folder 553 or later. The svn checkout is
+always current.)
 
-The build_everything_cmd.sh file, in building and installing serpent,
-will offer options to configure your system to run serpent. See
-`serpent/make_src_for_build_everything_cmd.sh` for details.
+What to expect, in order: portmidi is cloned from GitHub and built (~2 min);
+wxWidgets downloads ~60 MB and then compiles for 30-60 minutes - this is
+the long quiet part, it is not stuck; o2 downloads and builds (~3 min);
+Serpent builds twice, Release and Debug (~10 min). The script then asks
+questions, so check back when the build ends: answer `y` to "Install
+serpent to ~/bin/?", `y` to "Create aliases se and wx?", and `y` to
+"Create SERPENTPATH?" (it writes `~/.zshenv` so Serpent can find its
+libraries).
 
-The script will build *only* the test program `arco/apps/test/daserpent.app`.
-Follow the instructions printed by `build_everything_cmd.sh` to run the
-`daserpent` test program.
+Check that it worked:
 
-Finally, you will probably want to develop with Xcode:
+    ls ~/bin/serpent64 ~/bin/wxserpent64.app/Contents/MacOS/wxserpent64
+
+Both files should exist with today's date. Check for the file *inside* the
+`.app` bundle - CMake creates the bundle folder before the program is linked,
+so an empty bundle can exist even after a failed build. Then open a `new`
+Terminal and run `wx wxs_test`; a window of test controls should appear.
+
+Step 2: build Arco:
+
+    cd ~/build
+    git clone https://github.com/rbdannenberg/arco.git
+    cd arco
+    ./build_everything_cmd.sh
+
+The script finds your `serpent` directory and skips rebuilding it. Then:
+FAUST downloads as a `.dmg` and is copied to `~/faust` (if the copy complains
+the volume isn't mounted, open the dmg from `~/Downloads` yourself, run
+`cp -pR /Volumes/Faust-* ~/faust`, and restart the script); FluidSynth builds
+(~5 min); a 144 MB soundfont downloads; PortAudio and libsndfile build (a
+few minutes each - during libsndfile the script temporarily renames a
+Homebrew FLAC header and restores it, which is normal); finally `apps/test`
+builds `daserpent` (~10-15 min), running FAUST and the Python preprocessors
+to generate unit generators along the way.
+
+The script currently prints "completed" even if the last step failed, so
+always check:
+
+    ls -lh apps/test/Debug/daserpent.app/Contents/MacOS/daserpent
+
+You should see a file of roughly 13 MB dated today.
+
+Step 3: run it:
+
+    cd ~/build/arco/apps/test
+    source ../common/setpath.sh
+    Debug/daserpent.app/Contents/MacOS/daserpent
+
+The `source` line points SERPENTPATH at this build for the current Terminal.
+If you keep more than one Serpent/Arco tree, check `echo $SERPENTPATH`:
+every path must belong to the same tree, or you will get confusing script
+errors from mixed versions.
+
+Success looks like this, in order: (1) the Terminal prints
+`**** arco audio is running! ****` and lists your audio devices; (2) the main
+window fills with test buttons and no debugger prompt appears; (3) in the
+menu bar at the top of the screen, Window : Configure Audio opens - pick
+your output device - and clicking Simple test in the main window plays a
+tone. Window : Monitor Audio shows level meters. Audio settings persist
+in `~/Library/Application Support/arco/prefs.txt`.
+
+To update later: `svn update` in `serpent/`, `git pull` in `arco/`, and
+re-run the build scripts - they skip what is already built.
+
+Avoid `git clean` in `arco/`: it deletes the files the build generated,
+including `apps/common/libraries.txt` and `apps/test/soundfont.srp`. If
+that happens, re-run `./build_everything_cmd.sh` to recreate them.
+
+To control Arco from Python instead of Serpent, see
+[Getting Started with Arco from Python](python-getting-started.md).
+
+### Developing with Xcode
+
+You will probably want to develop with Xcode:
  1. Open `CMake.app`
  2. change "Where to build the binaries" to your `build/arco/apps/test`, 
     e.g. I would select `/Users/rbd/build/arco/apps/test`. 
@@ -113,6 +172,24 @@ Finally, you will probably want to develop with Xcode:
 
 Note that every application in Arco is potentially linked with a
 different set of unit generators and has a separate Xcode project.
+
+### Troubleshooting on MacOS
+
+General rule: when a build fails, scroll up to the first line containing
+`error:` - that is the real problem; everything after it is fallout.
+
+| What you see | What it means | What to do |
+|---|---|---|
+| `cmake_minimum_required ... < 3.5` error | Stale sources somewhere (an old copy of o2 was the classic cause). | Delete and re-checkout/re-clone; current sources don't produce this. |
+| `fatal error: 'fp.h' file not found` | wxWidgets' bundled libpng vs. a newer macOS SDK. The build script patches this automatically; seeing it means the patch didn't run. | In `wxWidgets/src/png/pngpriv.h`, change `#include <fp.h>` to `#include <math.h>`, then run `make` again in `wxWidgets/wx-build`. |
+| `'portmidi.h' file not found` late in the Serpent build | portmidi was never actually built. | Check `../portmidi/Release/libportmidi_static.a` exists; re-run the build script. |
+| `mv: ... Directory not empty` | A leftover empty `.app` from an earlier failed run blocks the fresh one. | The current script clears these; if seen anyway, delete the `.app` folders in `64bit/Release` and `64bit/Debug` and re-run. |
+| An `.app` exists but running it says "no such file" | The bundle is a skeleton; linking never finished. | Look for the binary in `Contents/MacOS/`; scroll up for the first error. |
+| `ERROR: build did not produce ...` at install time | The build failed earlier and the installer correctly refused to install. | Find the first `error:` above. |
+| `Could not find ... libiconv ...` at cmake, or `"_iconv"` undefined at link | `libraries.txt` points `ICONV_OPT_LIB`/`ICONV_DBG_LIB` at the wrong iconv. Homebrew's glib needs macOS's own iconv, not Homebrew's libiconv. | Set both to `$(xcrun --show-sdk-path)/usr/lib/libiconv.tbd` in `arco/apps/common/libraries.txt` (machine-local and safe to edit), or re-run the build script, which sets them. |
+| `include could not find requested file: .../apps/common/libraries.txt` | `libraries.txt` was never generated, or was deleted (e.g. by `git clean`). | Re-run `./build_everything_cmd.sh` in `arco/`. |
+| Serpent debugger appears (a `1>` prompt) at runtime | A Serpent script error - often SERPENTPATH mixing files from two trees. | Check `echo $SERPENTPATH`; type `!` to exit the debugger; details are in `srp.log`. |
+| Script says "completed" but there is no daserpent | The Arco script does not verify its final step. | Run the Step 2 check; scroll up for `Configuring incomplete`. |
 
 ### Manual Install
 These instructions explain more of what is going on when you install Arco.

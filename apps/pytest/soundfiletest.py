@@ -1,18 +1,17 @@
 """soundfiletest.py - a minimal example now that PyArco implementation has settled down.
 
-Run with "PYTHON_PATH=../.. python3 soundfiletest.py" in this directory.
-You need pyarco and o2lite to be subdirectories of the PYTHON_PATH.
+Run with "PYTHONPATH=../.. python3 soundfiletest.py" in this directory.
+You need pyarco and o2litepy to be subdirectories of the PYTHONPATH.
 You also need to run server built using CMakeLists.txt in this directory.
 
-This program depends on soundfont.py to define a path to a sound font,
-e.g., I use FluidR3_GM.sf2. You need to get the file and define the
-path, e.g., my directory has soundfont.py with:
+This program plays two MONO sound files, FILE0 and FILE1 (defined
+below as ./sndtest0.wav and ./sndtest1.wav). They are not included in
+the project. The paths are opened by the Arco server, so a relative
+path is relative to the directory where you started the server, not
+where you run this Python script. On macOS you can make test files with:
 
-SOUNDFONT = "/Users/<myid>/fluidsynth/FluidR3_GM/FluidR3_GM.sf2"
-
-but your path will obviously be different. The path is sent to the Arco
-audio process, so if you use a relative path, it should be based on
-where you run the audio process, not on where you run this Python script.
+    say -o sndtest0.wav --data-format=LEI16@44100 "This is sound file zero"
+    say -o sndtest1.wav --data-format=LEI16@44100 "And this is sound file one"
 """
 
 from pyarco.arco import *  # you might want to be more selective
